@@ -135,6 +135,8 @@ var GitService = class {
       args.push(`--before=${options.before}`);
     if (options.branch)
       args.push(options.branch);
+    if (options.query)
+      args.push(`--grep=${options.query}`, "-i");
     if (options.path) {
       args.push("--");
       args.push(options.path);
@@ -667,7 +669,7 @@ var GraphViewProvider = class {
         break;
       }
       case "filter": {
-        const { branch, author, after, before, path: filePath } = msg.payload;
+        const { branch, author, after, before, path: filePath, query } = msg.payload;
         try {
           this.allCommits = await this.gitService.getLog({
             maxCount: 300,
@@ -676,7 +678,8 @@ var GraphViewProvider = class {
             author: author || void 0,
             after: after || void 0,
             before: before || void 0,
-            path: filePath || void 0
+            path: filePath || void 0,
+            query: query || void 0
           });
           this.graphNodes = buildGraph(this.allCommits);
           this.sendCommits();

@@ -5844,7 +5844,7 @@ ${component_stack}
   var root2 = from_html(`<span class="labels svelte-et0zx2"></span>`);
   var $$css2 = {
     hash: "svelte-et0zx2",
-    code: ".labels.svelte-et0zx2 {display:inline-flex;gap:3px;flex-shrink:0;}.label.svelte-et0zx2 {display:inline-block;padding:1px 6px;border-radius:3px;font-size:0.8em;font-weight:500;line-height:1.4;}.branch.svelte-et0zx2 {background:rgba(86, 156, 214, 0.2);color:#569cd6;border:1px solid rgba(86, 156, 214, 0.4);}.remote.svelte-et0zx2 {background:rgba(78, 201, 176, 0.2);color:#4ec9b0;border:1px solid rgba(78, 201, 176, 0.4);}.tag.svelte-et0zx2 {background:rgba(220, 220, 170, 0.2);color:#dcdcaa;border:1px solid rgba(220, 220, 170, 0.4);}.head.svelte-et0zx2 {background:rgba(197, 134, 192, 0.2);color:#c586c0;border:1px solid rgba(197, 134, 192, 0.4);font-weight:700;}"
+    code: ".labels.svelte-et0zx2 {order:5;margin-left:auto;display:inline-flex;gap:4px;flex-shrink:0;padding-right:12px;max-width:45%;overflow:hidden;align-items:center;}.label.svelte-et0zx2 {display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:0.8em;font-weight:500;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.branch.svelte-et0zx2 {background:rgba(86,156,214,0.15);color:#58a6ff;border:1px solid rgba(86,156,214,0.4);}.remote.svelte-et0zx2 {background:rgba(163,113,247,0.15);color:#bc8cff;border:1px solid rgba(163,113,247,0.4);}.tag.svelte-et0zx2 {background:rgba(210,153,34,0.15);color:#d29922;border:1px solid rgba(210,153,34,0.4);}.head.svelte-et0zx2 {background:rgba(56,139,253,0.22);color:#ffffff;border:1px solid #388bfd;font-weight:600;}"
   };
   function BranchLabels($$anchor, $$props) {
     append_styles($$anchor, $$css2);
@@ -5887,7 +5887,7 @@ ${component_stack}
   var root3 = from_html(`<div class="commit-list-container svelte-1rusxbg"><div class="scroll-content"><div class="visible-rows svelte-1rusxbg"><div class="graph-column svelte-1rusxbg"><!></div> <div class="rows-column svelte-1rusxbg"></div></div></div></div> <!>`, 1);
   var $$css3 = {
     hash: "svelte-1rusxbg",
-    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;}.visible-rows.svelte-1rusxbg {position:relative;display:block;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {width:100%;}.commit-row.svelte-1rusxbg {display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;overflow:hidden;position:relative;border-bottom:1px solid rgba(128,128,128,0.08);}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:600;color:var(--vscode-foreground);font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:var(--vscode-descriptionForeground);font-size:0.9em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:5;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
+    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;}.visible-rows.svelte-1rusxbg {position:relative;display:block;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {width:100%;}.commit-row.svelte-1rusxbg {display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;overflow:hidden;position:relative;border-bottom:1px solid rgba(128,128,128,0.08);}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:600;color:var(--vscode-foreground);font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:var(--vscode-descriptionForeground);font-size:0.9em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
   };
   function CommitList($$anchor, $$props) {
     push($$props, true);
@@ -6278,65 +6278,508 @@ ${component_stack}
   var root4 = from_html(`<div class="filter-bar svelte-51df0s"><input type="text" placeholder="Branch..." class="filter-input svelte-51df0s"/> <input type="text" placeholder="Author..." class="filter-input svelte-51df0s"/> <input type="date" placeholder="After..." class="filter-input date-input svelte-51df0s"/> <input type="date" placeholder="Before..." class="filter-input date-input svelte-51df0s"/> <input type="text" placeholder="File path..." class="filter-input svelte-51df0s"/> <button class="filter-btn svelte-51df0s">Filter</button> <button class="filter-btn clear svelte-51df0s">Clear</button></div>`);
   var $$css5 = {
     hash: "svelte-51df0s",
-    code: ".filter-bar.svelte-51df0s {display:flex;gap:6px;padding:6px 8px;border-bottom:1px solid var(--vscode-panel-border);flex-wrap:wrap;align-items:center;}.filter-input.svelte-51df0s {background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);padding:3px 8px;font-size:0.9em;border-radius:3px;outline:none;min-width:100px;}.filter-input.svelte-51df0s:focus {border-color:var(--vscode-focusBorder);}.date-input.svelte-51df0s {min-width:130px;}.filter-btn.svelte-51df0s {background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;padding:3px 12px;border-radius:3px;cursor:pointer;font-size:0.9em;}.filter-btn.svelte-51df0s:hover {background:var(--vscode-button-hoverBackground);}.filter-btn.clear.svelte-51df0s {background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);}.filter-btn.clear.svelte-51df0s:hover {background:var(--vscode-button-secondaryHoverBackground);}"
+    code: ".filter-bar.svelte-51df0s {display:flex;gap:8px;padding:5px 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;min-height:36px;box-sizing:border-box;font-size:12px;position:relative;z-index:50;user-select:none;flex-wrap:nowrap;overflow-x:auto;}.filter-search-box {display:flex;align-items:center;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:4px;padding:0 8px;height:24px;width:170px;min-width:140px;gap:6px;flex-shrink:0;}.filter-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.filter-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;width:100%;}.filter-search-icon {color:var(--vscode-descriptionForeground);display:flex;align-items:center;}.filter-pill-container {position:relative;display:inline-block;flex-shrink:0;}.filter-pill {display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:4px;font-size:12px;color:var(--vscode-foreground);background:rgba(128, 128, 128, 0.08);border:1px solid rgba(128, 128, 128, 0.2);cursor:pointer;white-space:nowrap;transition:all 0.15s ease;}.filter-pill:hover {background:var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));border-color:rgba(128, 128, 128, 0.35);}.filter-pill.active {background:rgba(56, 139, 253, 0.15);border-color:rgba(56, 139, 253, 0.45);color:#58a6ff;font-weight:500;}.filter-pill .pill-arrow {font-size:8px;color:var(--vscode-descriptionForeground);margin-left:2px;}.filter-pill.active .pill-arrow {color:#58a6ff;}.filter-pill .pill-clear {margin-left:4px;font-size:12px;cursor:pointer;opacity:0.7;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;}.filter-pill .pill-clear:hover {opacity:1;background:rgba(255,255,255,0.15);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:5px;box-shadow:0 4px 16px rgba(0, 0, 0, 0.4);min-width:210px;max-width:320px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px 0;display:flex;flex-direction:column;}.filter-popup-search {padding:6px 8px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:3px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:5px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #ccc);cursor:pointer;font-size:12px;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #04395e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:#58a6ff;}.filter-popup-header {padding:6px 12px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-panel-border);margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground);}.filter-custom-date input {background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:3px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground);}.filter-reset-btn {margin-left:auto;background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:3px;flex-shrink:0;}.filter-reset-btn:hover {color:var(--vscode-foreground);background:rgba(128,128,128,0.15);}"
   };
-  function FilterBar($$anchor, $$props) {
+    function FilterBar($$anchor, $$props) {
     push($$props, true);
     append_styles($$anchor, $$css5);
-    let branch2 = state("");
-    let author = state("");
-    let after = state("");
-    let before = state("");
-    let filePath = state("");
+
+    var bar = document.createElement("div");
+    bar.className = "filter-bar svelte-51df0s";
+
+    let curQuery = "";
+    let curBranch = "";
+    let curUser = "";
+    let curDate = "";
+    let curAfter = "";
+    let curBefore = "";
+    let curPath = "";
+    let openPopup = null; // 'branch' | 'user' | 'date' | 'path' | null
+    let branchSearchText = "";
+    let userSearchText = "";
+
     function applyFilter() {
       $$props.onFilter({
-        branch: get(branch2) || void 0,
-        author: get(author) || void 0,
-        after: get(after) || void 0,
-        before: get(before) || void 0,
-        path: get(filePath) || void 0
+        query: curQuery || void 0,
+        branch: curBranch || void 0,
+        author: curUser || void 0,
+        after: curAfter || void 0,
+        before: curBefore || void 0,
+        path: curPath || void 0
       });
+      renderBar();
     }
-    function clearFilter() {
-      set(branch2, "");
-      set(author, "");
-      set(after, "");
-      set(before, "");
-      set(filePath, "");
-      $$props.onFilter({});
+
+    function closePopup() {
+      if (openPopup) {
+        openPopup = null;
+        renderBar();
+      }
     }
-    function onKeydown(e) {
-      if (e.key === "Enter")
-        applyFilter();
+
+    document.addEventListener("click", (e) => {
+      if (openPopup && !bar.contains(e.target)) {
+        closePopup();
+      }
+    });
+
+    user_effect(() => {
+      const extBranch = $$props.activeBranch;
+      if (extBranch !== undefined && extBranch !== curBranch) {
+        curBranch = extBranch || "";
+        renderBar();
+      }
+    });
+
+    user_effect(() => {
+      // Re-render when branches or commits change
+      const bData = $$props.branchData;
+      const cList = $$props.commits;
+      renderBar();
+    });
+
+    function renderBar() {
+      bar.innerHTML = "";
+
+      // 1. Search Box
+      const searchBox = document.createElement("div");
+      searchBox.className = "filter-search-box";
+      searchBox.innerHTML = '<span class="filter-search-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M11.5 7a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zm-.82 4.74a6 6 0 1 0-1.06 1.06l3.79 3.79a.75.75 0 1 0 1.06-1.06l-3.79-3.79z"/></svg></span>';
+      const searchInput = document.createElement("input");
+      searchInput.type = "text";
+      searchInput.className = "filter-search-input";
+      searchInput.placeholder = "Text or hash";
+      searchInput.value = curQuery;
+      searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          curQuery = searchInput.value.trim();
+          applyFilter();
+        }
+      });
+      searchInput.addEventListener("input", (e) => {
+        if (!searchInput.value && curQuery) {
+          curQuery = "";
+          applyFilter();
+        }
+      });
+      searchBox.appendChild(searchInput);
+      bar.appendChild(searchBox);
+
+      // Helper to create pill container
+      function createPill(type, labelText, isActive, onClear, onTogglePopup) {
+        const container = document.createElement("div");
+        container.className = "filter-pill-container";
+
+        const pill = document.createElement("div");
+        pill.className = "filter-pill" + (isActive ? " active" : "");
+        pill.innerHTML = '<span>' + labelText + '</span><span class="pill-arrow">&#9662;</span>';
+
+        if (isActive) {
+          const clearBtn = document.createElement("span");
+          clearBtn.className = "pill-clear";
+          clearBtn.innerHTML = "&times;";
+          clearBtn.title = "Clear";
+          clearBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            onClear();
+          });
+          pill.appendChild(clearBtn);
+        }
+
+        pill.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onTogglePopup();
+        });
+
+        container.appendChild(pill);
+        return { container, pill };
+      }
+
+      // 2. Branch Pill
+      const branchPillLabel = curBranch ? ("Branch: " + curBranch) : "Branch";
+      const branchPillObj = createPill(
+        "branch",
+        branchPillLabel,
+        !!curBranch,
+        () => {
+          curBranch = "";
+          if ($$props.setActiveBranch) $$props.setActiveBranch("");
+          applyFilter();
+        },
+        () => {
+          openPopup = openPopup === "branch" ? null : "branch";
+          renderBar();
+        }
+      );
+
+      if (openPopup === "branch") {
+        const popup = document.createElement("div");
+        popup.className = "filter-popup";
+
+        const pSearch = document.createElement("div");
+        pSearch.className = "filter-popup-search";
+        const bInput = document.createElement("input");
+        bInput.type = "text";
+        bInput.placeholder = "Search branch...";
+        bInput.value = branchSearchText;
+        bInput.addEventListener("input", (e) => {
+          branchSearchText = bInput.value.toLowerCase();
+          populateBranchItems(itemsDiv, branchSearchText);
+        });
+        pSearch.appendChild(bInput);
+        popup.appendChild(pSearch);
+
+        const itemsDiv = document.createElement("div");
+        itemsDiv.style.overflowY = "auto";
+        itemsDiv.style.flex = "1";
+
+        function populateBranchItems(container, search) {
+          container.innerHTML = "";
+          const bData = $$props.branchData || { branches: [], currentBranch: "" };
+          const branches = bData.branches || [];
+
+          const allItem = document.createElement("div");
+          allItem.className = "filter-popup-item" + (!curBranch ? " selected" : "");
+          allItem.textContent = "All Branches";
+          allItem.addEventListener("click", () => {
+            curBranch = "";
+            if ($$props.setActiveBranch) $$props.setActiveBranch("");
+            closePopup();
+            applyFilter();
+          });
+          container.appendChild(allItem);
+
+          if (bData.currentBranch && (!search || bData.currentBranch.toLowerCase().includes(search))) {
+            const headItem = document.createElement("div");
+            headItem.className = "filter-popup-item" + (curBranch === bData.currentBranch ? " selected" : "");
+            headItem.innerHTML = '<span>HEAD (' + bData.currentBranch + ')</span>';
+            headItem.addEventListener("click", () => {
+              curBranch = bData.currentBranch;
+              if ($$props.setActiveBranch) $$props.setActiveBranch(curBranch);
+              closePopup();
+              applyFilter();
+            });
+            container.appendChild(headItem);
+          }
+
+          const localBranches = branches.filter(b => !b.remote && (!search || b.name.toLowerCase().includes(search)));
+          if (localBranches.length > 0) {
+            const hdr = document.createElement("div");
+            hdr.className = "filter-popup-header";
+            hdr.textContent = "Local";
+            container.appendChild(hdr);
+            for (const b of localBranches) {
+              const item = document.createElement("div");
+              item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
+              item.textContent = b.name;
+              item.addEventListener("click", () => {
+                curBranch = b.name;
+                if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
+                closePopup();
+                applyFilter();
+              });
+              container.appendChild(item);
+            }
+          }
+
+          const remoteBranches = branches.filter(b => b.remote && (!search || b.name.toLowerCase().includes(search)));
+          if (remoteBranches.length > 0) {
+            const hdr = document.createElement("div");
+            hdr.className = "filter-popup-header";
+            hdr.textContent = "Remote";
+            container.appendChild(hdr);
+            for (const b of remoteBranches) {
+              const item = document.createElement("div");
+              item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
+              item.textContent = b.name;
+              item.addEventListener("click", () => {
+                curBranch = b.name;
+                if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
+                closePopup();
+                applyFilter();
+              });
+              container.appendChild(item);
+            }
+          }
+        }
+
+        populateBranchItems(itemsDiv, branchSearchText);
+        popup.appendChild(itemsDiv);
+        branchPillObj.container.appendChild(popup);
+        setTimeout(() => bInput.focus(), 20);
+      }
+      bar.appendChild(branchPillObj.container);
+
+      // 3. User Pill
+      const userPillLabel = curUser ? ("User: " + curUser) : "User";
+      const userPillObj = createPill(
+        "user",
+        userPillLabel,
+        !!curUser,
+        () => {
+          curUser = "";
+          applyFilter();
+        },
+        () => {
+          openPopup = openPopup === "user" ? null : "user";
+          renderBar();
+        }
+      );
+
+      if (openPopup === "user") {
+        const popup = document.createElement("div");
+        popup.className = "filter-popup";
+
+        const pSearch = document.createElement("div");
+        pSearch.className = "filter-popup-search";
+        const uInput = document.createElement("input");
+        uInput.type = "text";
+        uInput.placeholder = "Type author name or email...";
+        uInput.value = userSearchText;
+        uInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && uInput.value.trim()) {
+            curUser = uInput.value.trim();
+            closePopup();
+            applyFilter();
+          }
+        });
+        uInput.addEventListener("input", (e) => {
+          userSearchText = uInput.value.toLowerCase();
+          populateUserItems(itemsDiv, userSearchText);
+        });
+        pSearch.appendChild(uInput);
+        popup.appendChild(pSearch);
+
+        const itemsDiv = document.createElement("div");
+        itemsDiv.style.overflowY = "auto";
+        itemsDiv.style.flex = "1";
+
+        function populateUserItems(container, search) {
+          container.innerHTML = "";
+          const allItem = document.createElement("div");
+          allItem.className = "filter-popup-item" + (!curUser ? " selected" : "");
+          allItem.textContent = "All Users";
+          allItem.addEventListener("click", () => {
+            curUser = "";
+            closePopup();
+            applyFilter();
+          });
+          container.appendChild(allItem);
+
+          const commitsList = $$props.commits || [];
+          const authorCounts = {};
+          for (const c of commitsList) {
+            if (c.author) {
+              authorCounts[c.author] = (authorCounts[c.author] || 0) + 1;
+            }
+          }
+          const authorNames = Object.keys(authorCounts).sort();
+          const filtered = authorNames.filter(name => !search || name.toLowerCase().includes(search));
+
+          if (filtered.length > 0) {
+            const hdr = document.createElement("div");
+            hdr.className = "filter-popup-header";
+            hdr.textContent = "Authors in repo";
+            container.appendChild(hdr);
+
+            for (const name of filtered) {
+              const item = document.createElement("div");
+              item.className = "filter-popup-item" + (curUser === name ? " selected" : "");
+              item.innerHTML = '<span>' + name + '</span> <span style="opacity:0.6;font-size:11px;">(' + authorCounts[name] + ')</span>';
+              item.addEventListener("click", () => {
+                curUser = name;
+                closePopup();
+                applyFilter();
+              });
+              container.appendChild(item);
+            }
+          }
+        }
+
+        populateUserItems(itemsDiv, userSearchText);
+        popup.appendChild(itemsDiv);
+        userPillObj.container.appendChild(popup);
+        setTimeout(() => uInput.focus(), 20);
+      }
+      bar.appendChild(userPillObj.container);
+
+      // 4. Date Pill
+      const datePillLabel = curDate ? ("Date: " + curDate) : "Date";
+      const datePillObj = createPill(
+        "date",
+        datePillLabel,
+        !!curDate,
+        () => {
+          curDate = "";
+          curAfter = "";
+          curBefore = "";
+          applyFilter();
+        },
+        () => {
+          openPopup = openPopup === "date" ? null : "date";
+          renderBar();
+        }
+      );
+
+      if (openPopup === "date") {
+        const popup = document.createElement("div");
+        popup.className = "filter-popup";
+
+        const options = [
+          { label: "All", key: "" },
+          { label: "Today", key: "today" },
+          { label: "Yesterday", key: "yesterday" },
+          { label: "Last 7 Days", key: "7days" },
+          { label: "Last 30 Days", key: "30days" }
+        ];
+
+        for (const opt of options) {
+          const item = document.createElement("div");
+          item.className = "filter-popup-item" + (curDate === opt.label ? " selected" : "");
+          item.textContent = opt.label;
+          item.addEventListener("click", () => {
+            if (!opt.key) {
+              curDate = "";
+              curAfter = "";
+              curBefore = "";
+            } else if (opt.key === "today") {
+              curDate = "Today";
+              const now = new Date();
+              now.setHours(0, 0, 0, 0);
+              curAfter = now.toISOString();
+              curBefore = "";
+            } else if (opt.key === "yesterday") {
+              curDate = "Yesterday";
+              const now = new Date();
+              now.setHours(0, 0, 0, 0);
+              const yesterday = new Date(now.getTime() - 86400000);
+              curAfter = yesterday.toISOString();
+              curBefore = now.toISOString();
+            } else if (opt.key === "7days") {
+              curDate = "Last 7 Days";
+              const d = new Date(Date.now() - 7 * 86400000);
+              curAfter = d.toISOString();
+              curBefore = "";
+            } else if (opt.key === "30days") {
+              curDate = "Last 30 Days";
+              const d = new Date(Date.now() - 30 * 86400000);
+              curAfter = d.toISOString();
+              curBefore = "";
+            }
+            closePopup();
+            applyFilter();
+          });
+          popup.appendChild(item);
+        }
+
+        const divdr = document.createElement("div");
+        divdr.className = "filter-popup-divider";
+        popup.appendChild(divdr);
+
+        const customBox = document.createElement("div");
+        customBox.className = "filter-custom-date";
+        customBox.innerHTML = '<label>Custom Range:</label><input type="date" id="custom-after" /><input type="date" id="custom-before" /><button class="filter-apply-btn">Apply</button>';
+        const afterInput = customBox.querySelector("#custom-after");
+        const beforeInput = customBox.querySelector("#custom-before");
+        const applyBtn = customBox.querySelector("button");
+
+        if (curAfter && curAfter.includes("T")) afterInput.value = curAfter.split("T")[0];
+        if (curBefore && curBefore.includes("T")) beforeInput.value = curBefore.split("T")[0];
+
+        applyBtn.addEventListener("click", () => {
+          if (afterInput.value || beforeInput.value) {
+            curDate = (afterInput.value || "...") + " - " + (beforeInput.value || "...");
+            curAfter = afterInput.value ? new Date(afterInput.value).toISOString() : "";
+            curBefore = beforeInput.value ? new Date(beforeInput.value).toISOString() : "";
+          } else {
+            curDate = "";
+            curAfter = "";
+            curBefore = "";
+          }
+          closePopup();
+          applyFilter();
+        });
+        popup.appendChild(customBox);
+
+        datePillObj.container.appendChild(popup);
+      }
+      bar.appendChild(datePillObj.container);
+
+      // 5. Path Pill
+      const pathPillLabel = curPath ? ("Path: " + curPath) : "Path";
+      const pathPillObj = createPill(
+        "path",
+        pathPillLabel,
+        !!curPath,
+        () => {
+          curPath = "";
+          applyFilter();
+        },
+        () => {
+          openPopup = openPopup === "path" ? null : "path";
+          renderBar();
+        }
+      );
+
+      if (openPopup === "path") {
+        const popup = document.createElement("div");
+        popup.className = "filter-popup";
+        popup.style.padding = "8px 12px";
+
+        const pInput = document.createElement("input");
+        pInput.type = "text";
+        pInput.className = "branch-search-input";
+        pInput.placeholder = "e.g. lib/models or file.dart";
+        pInput.value = curPath;
+        pInput.style.marginBottom = "6px";
+
+        const btn = document.createElement("button");
+        btn.className = "filter-apply-btn";
+        btn.textContent = "Apply";
+        btn.addEventListener("click", () => {
+          curPath = pInput.value.trim();
+          closePopup();
+          applyFilter();
+        });
+        pInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            curPath = pInput.value.trim();
+            closePopup();
+            applyFilter();
+          }
+        });
+
+        popup.appendChild(pInput);
+        popup.appendChild(btn);
+        pathPillObj.container.appendChild(popup);
+        setTimeout(() => pInput.focus(), 20);
+      }
+      bar.appendChild(pathPillObj.container);
+
+      // 6. Reset All Button (if any filter active)
+      if (curQuery || curBranch || curUser || curDate || curPath) {
+        const resetBtn = document.createElement("button");
+        resetBtn.className = "filter-reset-btn";
+        resetBtn.textContent = "Reset All";
+        resetBtn.addEventListener("click", () => {
+          curQuery = "";
+          curBranch = "";
+          curUser = "";
+          curDate = "";
+          curAfter = "";
+          curBefore = "";
+          curPath = "";
+          if ($$props.setActiveBranch) $$props.setActiveBranch("");
+          applyFilter();
+        });
+        bar.appendChild(resetBtn);
+      }
     }
-    var div = root4();
-    var input = child(div);
-    remove_input_defaults(input);
-    var input_1 = sibling(input, 2);
-    remove_input_defaults(input_1);
-    var input_2 = sibling(input_1, 2);
-    remove_input_defaults(input_2);
-    var input_3 = sibling(input_2, 2);
-    remove_input_defaults(input_3);
-    var input_4 = sibling(input_3, 2);
-    remove_input_defaults(input_4);
-    var button = sibling(input_4, 2);
-    var button_1 = sibling(button, 2);
-    reset(div);
-    delegated("keydown", input, onKeydown);
-    bind_value(input, () => get(branch2), ($$value) => set(branch2, $$value));
-    delegated("keydown", input_1, onKeydown);
-    bind_value(input_1, () => get(author), ($$value) => set(author, $$value));
-    bind_value(input_2, () => get(after), ($$value) => set(after, $$value));
-    bind_value(input_3, () => get(before), ($$value) => set(before, $$value));
-    delegated("keydown", input_4, onKeydown);
-    bind_value(input_4, () => get(filePath), ($$value) => set(filePath, $$value));
-    delegated("click", button, applyFilter);
-    delegated("click", button_1, clearFilter);
-    append($$anchor, div);
+
+    renderBar();
+    append($$anchor, bar);
     pop();
   }
-  delegate(["keydown", "click"]);
 
   // webview/graph/App.svelte
   var root_14 = from_html(`<div class="loading svelte-1lrl78g">Loading commits...</div>`);
@@ -6470,7 +6913,7 @@ ${component_stack}
         const headSec = createSec("HEAD (Current Branch)", true);
         const item = document.createElement("div");
         item.className = "tree-item current-head" + (currentActive === currentBranch ? " active" : "");
-        item.innerHTML = '<span class="branch-tag-icon">🏷</span> <span>' + currentBranch + '</span>';
+        item.innerHTML = '<span class="branch-tag-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:2px;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + currentBranch + '</span>';
         item.addEventListener("click", () => handleBranchClick(currentBranch));
         headSec.bdy.appendChild(item);
         treeContent.appendChild(headSec.sec);
@@ -6507,7 +6950,7 @@ ${component_stack}
           fDiv.className = "tree-folder";
           const fHdr = document.createElement("div");
           fHdr.className = "tree-folder-header";
-          fHdr.innerHTML = '<span class="arrow">▾</span> <span class="folder-icon">📁</span> <span>' + fn + '</span>';
+          fHdr.innerHTML = '<span class="arrow">▾</span> <span class="folder-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:2px;color:#dcb67a;"><path d="M1.75 2.5h3.69a1.75 1.75 0 0 1 1.24.51l.8.8H14.25c.97 0 1.75.78 1.75 1.75v7.69c0 .97-.78 1.75-1.75 1.75H1.75A1.75 1.75 0 0 1 0 13.25V4.25c0-.97.78-1.75 1.75-1.75z"/></svg></span> <span>' + fn + '</span>';
           const fBdy = document.createElement("div");
           fBdy.className = "tree-folder-body";
           fBdy.style.paddingLeft = "14px";
@@ -6554,7 +6997,7 @@ ${component_stack}
         for (const t of tagList) {
           const item = document.createElement("div");
           item.className = "tree-item" + (currentActive === t.name ? " active" : "");
-          item.innerHTML = '<span class="tag-icon">🏷</span> <span>' + t.name + '</span>';
+          item.innerHTML = '<span class="tag-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:2px;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + t.name + '</span>';
           item.addEventListener("click", () => handleBranchClick(t.name));
           tagSec.bdy.appendChild(item);
         }
@@ -6566,7 +7009,21 @@ ${component_stack}
 
     var div = root5();
     var node = child(div);
-    FilterBar(node, { onFilter });
+    FilterBar(node, {
+      onFilter,
+      get branchData() {
+        return get(branchData);
+      },
+      get commits() {
+        return get(commits);
+      },
+      get activeBranch() {
+        return get(activeBranch);
+      },
+      setActiveBranch(name) {
+        set(activeBranch, name, true);
+      }
+    });
     var div_1 = sibling(node, 2);
 
 

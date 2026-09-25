@@ -1,0 +1,298 @@
+{
+  "name": "intellij-git-ext",
+  "displayName": "IntelliJ Git",
+  "description": "IntelliJ-style Git integration for VS Code — visual commit graph, colored branch lines, inline blame annotations, interactive rebase, changelists, and side-by-side diff viewer. Bring the best of JetBrains Git tooling to your editor.",
+  "version": "0.1.0",
+  "publisher": "WMBGmbH",
+  "icon": "icon.png",
+  "license": "MIT",
+  "homepage": "https://github.com/intellij-git-ext/intellij-git-ext#readme",
+  "bugs": {
+    "url": "https://github.com/intellij-git-ext/intellij-git-ext/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/intellij-git-ext/intellij-git-ext"
+  },
+  "keywords": [
+    "git",
+    "git log",
+    "git graph",
+    "git blame",
+    "gitlens",
+    "gitlens alternative",
+    "git lens",
+    "free",
+    "blame annotations",
+    "commit graph",
+    "commit history",
+    "branch graph",
+    "branch visualization",
+    "interactive rebase",
+    "changelists",
+    "intellij",
+    "jetbrains",
+    "webstorm",
+    "pycharm",
+    "diff",
+    "diff viewer",
+    "merge",
+    "branch manager",
+    "source control",
+    "scm",
+    "git gui",
+    "git tree",
+    "git history",
+    "git timeline"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Visualization",
+    "Other"
+  ],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "activationEvents": [
+    "workspaceContains:.git",
+    "onCommand:intellij-git.openLog",
+    "onCommand:intellij-git.toggleBlame",
+    "onView:intellij-git.branches",
+    "onView:intellij-git.changelists"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "intellij-git.openLog",
+        "title": "Open Git Log",
+        "category": "IntelliJ Git",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "intellij-git.toggleBlame",
+        "title": "Toggle Blame Annotations",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.interactiveRebase",
+        "title": "Interactive Rebase...",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.newChangelist",
+        "title": "New Changelist...",
+        "category": "IntelliJ Git",
+        "icon": "$(add)"
+      },
+      {
+        "command": "intellij-git.deleteChangelist",
+        "title": "Delete Changelist",
+        "category": "IntelliJ Git",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "intellij-git.setActiveChangelist",
+        "title": "Set as Active Changelist",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.commitChangelist",
+        "title": "Commit Changelist",
+        "category": "IntelliJ Git",
+        "icon": "$(check)"
+      },
+      {
+        "command": "intellij-git.refreshBranches",
+        "title": "Refresh Branches",
+        "category": "IntelliJ Git",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "intellij-git.checkoutBranch",
+        "title": "Checkout",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.deleteBranch",
+        "title": "Delete Branch",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.mergeBranch",
+        "title": "Merge into Current",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.rebaseBranch",
+        "title": "Rebase Current onto...",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.compareBranch",
+        "title": "Compare with Current",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.createBranch",
+        "title": "Create Branch...",
+        "category": "IntelliJ Git",
+        "icon": "$(git-branch-create)"
+      },
+      {
+        "command": "intellij-git.resolveConflicts",
+        "title": "Resolve Merge Conflicts",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.acceptAllNonConflicting",
+        "title": "Accept All Non-Conflicting",
+        "category": "IntelliJ Git"
+      },
+      {
+        "command": "intellij-git.refreshChangelists",
+        "title": "Refresh Changelists",
+        "category": "IntelliJ Git",
+        "icon": "$(refresh)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "intellij-git.openLog",
+        "key": "ctrl+shift+9",
+        "mac": "cmd+9"
+      },
+      {
+        "command": "intellij-git.toggleBlame",
+        "key": "alt+b",
+        "mac": "alt+b",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "intellij-git.commitChangelist",
+        "key": "ctrl+k",
+        "mac": "cmd+k",
+        "when": "!terminalFocus"
+      }
+    ],
+    "views": {
+      "panel": [
+        {
+          "type": "webview",
+          "id": "intellij-git.logView",
+          "name": "Git Log",
+          "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "scm": [
+        {
+          "id": "intellij-git.branches",
+          "name": "Branches"
+        },
+        {
+          "id": "intellij-git.changelists",
+          "name": "Changelists",
+          "when": "scmProviderCount > 0"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "intellij-git.refreshBranches",
+          "when": "view == intellij-git.branches",
+          "group": "navigation"
+        },
+        {
+          "command": "intellij-git.createBranch",
+          "when": "view == intellij-git.branches",
+          "group": "navigation"
+        },
+        {
+          "command": "intellij-git.newChangelist",
+          "when": "view == intellij-git.changelists",
+          "group": "navigation"
+        },
+        {
+          "command": "intellij-git.refreshChangelists",
+          "when": "view == intellij-git.changelists",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "intellij-git.checkoutBranch",
+          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "intellij-git.createBranch",
+          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "intellij-git.mergeBranch",
+          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "group": "2_merge@1"
+        },
+        {
+          "command": "intellij-git.rebaseBranch",
+          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "group": "2_merge@2"
+        },
+        {
+          "command": "intellij-git.compareBranch",
+          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "group": "3_compare@1"
+        },
+        {
+          "command": "intellij-git.deleteBranch",
+          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "group": "4_delete@1"
+        },
+        {
+          "command": "intellij-git.setActiveChangelist",
+          "when": "view == intellij-git.changelists && viewItem == changelist",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "intellij-git.commitChangelist",
+          "when": "view == intellij-git.changelists && viewItem =~ /changelist/",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "intellij-git.deleteChangelist",
+          "when": "view == intellij-git.changelists && viewItem == changelist",
+          "group": "2_delete@1"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:ext && npm run build:webview",
+    "build:ext": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "build:webview": "node build-webview.mjs",
+    "watch": "concurrently \"npm run watch:ext\" \"npm run watch:webview\"",
+    "watch:ext": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "watch:webview": "node build-webview.mjs",
+    "lint": "eslint src/ --ext .ts"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tsconfig/svelte": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "concurrently": "^8.2.0",
+    "esbuild": "^0.20.0",
+    "esbuild-svelte": "0.9.4",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "^5.5.0",
+    "vite": "^6.0.0"
+  }
+}

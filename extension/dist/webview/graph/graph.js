@@ -642,6 +642,7 @@ https://svelte.dev/e/svelte_boundary_reset_noop`, bold, normal);
     if (dev_fallback_default && error instanceof Error) {
       apply_adjustments(error);
     }
+    console.error("EXACT ERROR STACK:", error && error.stack);
     throw error;
   }
   function get_adjustments(error, effect2) {
@@ -4809,18 +4810,9 @@ ${component_stack}
   // node_modules/svelte/src/internal/client/dom/css.js
   function append_styles(anchor, css) {
     effect(() => {
-      var root6 = anchor.getRootNode();
-      var target = (
-        /** @type {ShadowRoot} */
-        root6.host ? (
-          /** @type {ShadowRoot} */
-          root6
-        ) : (
-          /** @type {Document} */
-          root6.head ?? /** @type {Document} */
-          root6.ownerDocument.head
-        )
-      );
+      var root6 = (anchor && anchor.getRootNode) ? anchor.getRootNode() : document;
+      var target = (root6 && root6.host) ? root6 : ((root6 && root6.head) ?? (root6 && root6.ownerDocument && root6.ownerDocument.head) ?? document.head);
+      if (!target) target = document.head;
       if (!target.querySelector("#" + css.hash)) {
         const style = create_element("style");
         style.id = css.hash;
@@ -5725,7 +5717,7 @@ ${component_stack}
     const DOT_RADIUS = 4;
     const PADDING = 10;
     function svgWidth() {
-      return $$props$$props.graphWidth * COL_WIDTH + PADDING * 2;
+      return $$props.graphWidth * COL_WIDTH + PADDING * 2;
     }
     function svgHeight() {
       return $$props.visibleCount * $$props.rowHeight;
@@ -5990,7 +5982,7 @@ ${component_stack}
           return get(graphNodes);
         },
         get graphWidth() {
-          return $$props$$props.graphWidth;
+          return $$props.graphWidth;
         },
         get startIndex() {
           return get(startIndex);
@@ -6375,7 +6367,7 @@ ${component_stack}
           case "commits": {
             const p = msg.payload;
             set(commits, p.commits, true);
-            set(graphWidth, p$$props.graphWidth, true);
+            set(graphWidth, p.graphWidth, true);
             set(loading, false);
             break;
           }
@@ -6577,14 +6569,7 @@ ${component_stack}
     FilterBar(node, { onFilter });
     var div_1 = sibling(node, 2);
 
-    // Safely create branch-sidebar and prepend into div_1 (main-area)
-    var branch_sidebar = document.createElement("div");
-    branch_sidebar.className = "branch-sidebar svelte-1lrl78g";
-    div_1.prepend(branch_sidebar);
 
-    user_effect(() => {
-      renderSidebarContent(branch_sidebar);
-    });
 
     var div_2 = child(div_1);
     var node_1 = child(div_2);
@@ -6651,6 +6636,12 @@ ${component_stack}
       });
     }
     reset(div_1);
+    var branch_sidebar = document.createElement("div");
+    branch_sidebar.className = "branch-sidebar svelte-1lrl78g";
+    div_1.prepend(branch_sidebar);
+    user_effect(() => {
+      renderSidebarContent(branch_sidebar);
+    });
     reset(div);
     append($$anchor, div);
     pop();

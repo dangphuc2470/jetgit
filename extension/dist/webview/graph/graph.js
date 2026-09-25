@@ -5725,7 +5725,7 @@ ${component_stack}
     const DOT_RADIUS = 4;
     const PADDING = 10;
     function svgWidth() {
-      return $$props.graphWidth * COL_WIDTH + PADDING * 2;
+      return $$props$$props.graphWidth * COL_WIDTH + PADDING * 2;
     }
     function svgHeight() {
       return $$props.visibleCount * $$props.rowHeight;
@@ -5990,7 +5990,7 @@ ${component_stack}
           return get(graphNodes);
         },
         get graphWidth() {
-          return $$props.graphWidth;
+          return $$props$$props.graphWidth;
         },
         get startIndex() {
           return get(startIndex);
@@ -6037,8 +6037,8 @@ ${component_stack}
       reset(div_5);
       template_effect(
         ($0) => {
-          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg", null, classes, { selected: get(commit).hash === $props.selectedHash });
-          const gw = ($props.graphWidth || 1) * 16 + 20;
+          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg", null, classes, { selected: get(commit).hash === $$props.selectedHash });
+          const gw = ($$props.graphWidth || 1) * 16 + 20;
           set_style(span, `width: ${gw}px; min-width: ${gw}px;`);
           set_text(text2, "");
           set_attribute2(span_1, "title", get(commit).subject);
@@ -6375,7 +6375,7 @@ ${component_stack}
           case "commits": {
             const p = msg.payload;
             set(commits, p.commits, true);
-            set(graphWidth, p.graphWidth, true);
+            set(graphWidth, p$$props.graphWidth, true);
             set(loading, false);
             break;
           }

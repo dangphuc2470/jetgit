@@ -5884,12 +5884,12 @@ ${component_stack}
   }
 
   // webview/graph/CommitList.svelte
-  var root_12 = from_html(`<div role="row" tabindex="0"><span class="hash svelte-1rusxbg"> </span> <!> <span class="subject svelte-1rusxbg"> </span> <span class="author svelte-1rusxbg"> </span> <span class="date svelte-1rusxbg"> </span></div>`);
+  var root_12 = from_html(`<div role="row" tabindex="0"><span class="author svelte-1rusxbg"> </span> <span class="date svelte-1rusxbg"> </span> <span class="graph-spacer svelte-1rusxbg"></span> <!> <span class="subject svelte-1rusxbg"> </span></div>`);
   var root_32 = from_html(`<div class="context-menu svelte-1rusxbg"><button class="context-item svelte-1rusxbg">Interactively Rebase from Here...</button></div>`);
   var root3 = from_html(`<div class="commit-list-container svelte-1rusxbg"><div class="scroll-content"><div class="visible-rows svelte-1rusxbg"><div class="graph-column svelte-1rusxbg"><!></div> <div class="rows-column svelte-1rusxbg"></div></div></div></div> <!>`, 1);
   var $$css3 = {
     hash: "svelte-1rusxbg",
-    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;}.visible-rows.svelte-1rusxbg {display:flex;}.graph-column.svelte-1rusxbg {flex-shrink:0;}.rows-column.svelte-1rusxbg {flex:1;min-width:0;}.commit-row.svelte-1rusxbg {display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;overflow:hidden;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.hash.svelte-1rusxbg {font-family:var(--vscode-editor-font-family, monospace);font-size:0.9em;color:var(--vscode-textLink-foreground);flex-shrink:0;width:60px;}.subject.svelte-1rusxbg {flex:1;overflow:hidden;text-overflow:ellipsis;}.author.svelte-1rusxbg {flex-shrink:0;color:var(--vscode-descriptionForeground);font-size:0.9em;width:120px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {flex-shrink:0;color:var(--vscode-descriptionForeground);font-size:0.9em;width:80px;text-align:right;}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
+    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;}.visible-rows.svelte-1rusxbg {position:relative;display:block;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:236px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {width:100%;}.commit-row.svelte-1rusxbg {display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;overflow:hidden;position:relative;border-bottom:1px solid rgba(128,128,128,0.1);}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.author.svelte-1rusxbg {flex-shrink:0;font-weight:600;color:var(--vscode-foreground);font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {flex-shrink:0;color:var(--vscode-descriptionForeground);font-size:0.9em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.graph-spacer.svelte-1rusxbg {flex-shrink:0;display:inline-block;}.subject.svelte-1rusxbg {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
   };
   function CommitList($$anchor, $$props) {
     push($$props, true);
@@ -5925,17 +5925,21 @@ ${component_stack}
     let graphNodes = user_derived(() => $$props.commits.map((c) => c.graph));
     function formatDate(iso) {
       const d = new Date(iso);
-      const now = /* @__PURE__ */ new Date();
+      const now = new Date();
       const diffMs = now.getTime() - d.getTime();
-      const diffDays = Math.floor(diffMs / (1e3 * 60 * 60 * 24));
-      if (diffDays === 0) {
-        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      } else if (diffDays < 7) {
-        return `${diffDays}d ago`;
-      } else if (diffDays < 365) {
-        return d.toLocaleDateString([], { month: "short", day: "numeric" });
-      }
-      return d.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      if (diffMins < 1) return "Just now";
+      if (diffMins < 60) return `${diffMins} minutes ago`;
+      const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+      const isToday = d.toDateString() === now.toDateString();
+      if (isToday) return `Today ${timeStr}`;
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${timeStr}`;
+      const day = d.getDate();
+      const month = d.getMonth() + 1;
+      const year = String(d.getFullYear()).slice(-2);
+      return `${day}/${month}/${year}, ${timeStr}`;
     }
     function onContextMenu(e, hash2) {
       e.preventDefault();
@@ -5998,41 +6002,40 @@ ${component_stack}
       var div_5 = root_12();
       let classes;
       set_style(div_5, "height: 28px;");
-      var span = child(div_5);
-      var text2 = child(span, true);
-      reset(span);
-      var node_1 = sibling(span, 2);
+      var span_author = child(div_5);
+      var text_author = child(span_author, true);
+      reset(span_author);
+      var span_date = sibling(span_author, 2);
+      var text_date = child(span_date, true);
+      reset(span_date);
+      var span_spacer = sibling(span_date, 2);
+      reset(span_spacer);
+      var node_1 = sibling(span_spacer, 2);
       {
-        var consequent = ($$anchor3) => {
-          BranchLabels($$anchor3, {
+        var consequent = ($anchor3) => {
+          BranchLabels($anchor3, {
             get refs() {
               return get(commit).refs;
             }
           });
         };
-        if_block(node_1, ($$render) => {
+        if_block(node_1, ($render) => {
           if (get(commit).refs.length > 0)
-            $$render(consequent);
+            $render(consequent);
         });
       }
-      var span_1 = sibling(node_1, 2);
-      var text_1 = child(span_1, true);
-      reset(span_1);
-      var span_2 = sibling(span_1, 2);
-      var text_2 = child(span_2, true);
-      reset(span_2);
-      var span_3 = sibling(span_2, 2);
-      var text_3 = child(span_3, true);
-      reset(span_3);
+      var span_subject = sibling(node_1, 2);
+      var text_subject = child(span_subject, true);
+      reset(span_subject);
       reset(div_5);
       template_effect(
         ($0) => {
-          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg", null, classes, { selected: get(commit).hash === $$props.selectedHash });
-          set_text(text2, get(commit).abbreviatedHash);
-          set_attribute2(span_1, "title", get(commit).subject);
-          set_text(text_1, get(commit).subject);
-          set_text(text_2, get(commit).author);
-          set_text(text_3, $0);
+          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg", null, classes, { selected: get(commit).hash === $props.selectedHash });
+          set_text(text_author, get(commit).author);
+          set_text(text_date, $0);
+          set_style(span_spacer, `width: ${($props.graphWidth || 1) * 16 + 20}px; min-width: ${($props.graphWidth || 1) * 16 + 20}px;`);
+          set_attribute2(span_subject, "title", get(commit).subject);
+          set_text(text_subject, get(commit).subject);
         },
         [() => formatDate(get(commit).authorDate)]
       );
@@ -6338,21 +6341,165 @@ ${component_stack}
   var root_14 = from_html(`<div class="loading svelte-1lrl78g">Loading commits...</div>`);
   var root_23 = from_html(`<div class="empty svelte-1lrl78g">No commits found.</div>`);
   var root_43 = from_html(`<div class="detail-panel svelte-1lrl78g"><!></div>`);
-  var root5 = from_html(`<div class="app svelte-1lrl78g"><!> <div class="main-area svelte-1lrl78g"><div class="center-area svelte-1lrl78g"><!></div> <!></div></div>`);
+  var root5 = from_html(`<div class="app svelte-1lrl78g"><!> <div class="main-area svelte-1lrl78g"><div class="branch-sidebar svelte-1lrl78g"></div> <div class="center-area svelte-1lrl78g"><!></div> <!></div></div>`);
   var $$css6 = {
     hash: "svelte-1lrl78g",
-    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {width:300px;border-left:1px solid var(--vscode-panel-border);overflow-y:auto;flex-shrink:0;}"
+    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;}.branch-sidebar.svelte-1lrl78g {width:220px;min-width:180px;border-right:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background, #1e1e1e);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;flex-shrink:0;user-select:none;font-size:0.9em;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.9em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.tree-section-header, .tree-folder-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.92em;}.tree-section-header:hover, .tree-folder-header:hover {background:var(--vscode-list-hoverBackground);}.tree-item {display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--vscode-foreground);font-size:0.95em;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.active {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);font-weight:600;}.tree-item.current-head {color:#388bfd;font-weight:600;}.branch-icon {color:#388bfd;}.branch-icon.remote {color:#8957e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#dcb67a;}.arrow {font-size:0.8em;color:var(--vscode-descriptionForeground);width:10px;display:inline-block;}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {width:300px;border-left:1px solid var(--vscode-panel-border);overflow-y:auto;flex-shrink:0;}"
   };
-  function App($$anchor, $$props) {
-    push($$props, true);
-    append_styles($$anchor, $$css6);
+  function App($anchor, $props) {
+    push($props, true);
+    append_styles($anchor, $css6);
     let commits = state(proxy([]));
     let graphWidth = state(1);
     let selectedHash = state(null);
     let selectedFiles = state(proxy([]));
     let loading = state(true);
     let scrollToIndex = state(-1);
+    let branchData = state({ branches: [], tags: [], currentBranch: "" });
+    let activeBranch = state("");
+    let branchSearch = state("");
     let unsubscribe;
+
+    function renderBranchTree(container) {
+      if (!container) return;
+      const data = get(branchData);
+      const currentActive = get(activeBranch);
+      const searchQuery = get(branchSearch);
+      const { branches = [], tags = [], currentBranch = "" } = data;
+      container.innerHTML = "";
+
+      const searchBox = document.createElement("div");
+      searchBox.className = "branch-search-box";
+      searchBox.innerHTML = '<input type="text" class="branch-search-input" placeholder="Search branches..." value="' + (searchQuery || "") + '"/>';
+      const searchInput = searchBox.querySelector("input");
+      searchInput.addEventListener("input", (e) => {
+        set(branchSearch, e.target.value.toLowerCase(), true);
+      });
+      container.appendChild(searchBox);
+
+      const treeContent = document.createElement("div");
+      treeContent.className = "branch-tree-content";
+
+      const query = (searchQuery || "").toLowerCase();
+      const filterFn = (name) => !query || name.toLowerCase().includes(query);
+
+      function createSection(title, isOpenDefault = true) {
+        const section = document.createElement("div");
+        section.className = "tree-section";
+        const header = document.createElement("div");
+        header.className = "tree-section-header";
+        header.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> <span class="title">' + title + "</span>";
+        const body = document.createElement("div");
+        body.className = "tree-section-body";
+        body.style.display = isOpenDefault ? "block" : "none";
+        header.addEventListener("click", () => {
+          const open = body.style.display !== "none";
+          body.style.display = open ? "none" : "block";
+          header.querySelector(".arrow").textContent = open ? "▸" : "▾";
+        });
+        section.appendChild(header);
+        section.appendChild(body);
+        return { section, body };
+      }
+
+      if (currentBranch && filterFn(currentBranch)) {
+        const headSection = createSection("HEAD (Current Branch)", true);
+        const item = document.createElement("div");
+        item.className = "tree-item current-head" + (currentActive === currentBranch ? " active" : "");
+        item.innerHTML = '<span class="branch-tag-icon">🏷</span> <span class="name">' + currentBranch + "</span>";
+        item.addEventListener("click", () => selectBranch(currentBranch));
+        headSection.body.appendChild(item);
+        treeContent.appendChild(headSection.section);
+      }
+
+      const localBranches = branches.filter((b) => !b.remote && filterFn(b.name));
+      if (localBranches.length > 0) {
+        const localSection = createSection("Local", true);
+        const folders = {};
+        const rootBranches = [];
+        for (const b of localBranches) {
+          if (b.name.includes("/")) {
+            const parts = b.name.split("/");
+            const folderName = parts[0];
+            const subName = parts.slice(1).join("/");
+            if (!folders[folderName]) folders[folderName] = [];
+            folders[folderName].push({ ...b, displayName: subName });
+          } else {
+            rootBranches.push({ ...b, displayName: b.name });
+          }
+        }
+        for (const b of rootBranches) {
+          const item = document.createElement("div");
+          item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+          const isStar = b.name === "develop" || b.name === "main" || b.name === "master";
+          const icon = isStar ? '<span class="star-icon">★</span>' : '<span class="branch-icon">⑂</span>';
+          item.innerHTML = icon + ' <span class="name">' + b.name + "</span>";
+          item.addEventListener("click", () => selectBranch(b.name));
+          item.addEventListener("dblclick", () => checkoutBranch(b.name));
+          localSection.body.appendChild(item);
+        }
+        for (const [folderName, items] of Object.entries(folders)) {
+          const folderDiv = document.createElement("div");
+          folderDiv.className = "tree-folder";
+          const folderHeader = document.createElement("div");
+          folderHeader.className = "tree-folder-header";
+          folderHeader.innerHTML = '<span class="arrow">▾</span> <span class="folder-icon">📁</span> <span class="name">' + folderName + "</span>";
+          const folderBody = document.createElement("div");
+          folderBody.className = "tree-folder-body";
+          folderBody.style.paddingLeft = "14px";
+          folderHeader.addEventListener("click", () => {
+            const open = folderBody.style.display !== "none";
+            folderBody.style.display = open ? "none" : "block";
+            folderHeader.querySelector(".arrow").textContent = open ? "▸" : "▾";
+          });
+          for (const b of items) {
+            const item = document.createElement("div");
+            item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+            const isStar = b.displayName === "develop" || b.displayName === "main";
+            const icon = isStar ? '<span class="star-icon">★</span>' : '<span class="branch-icon">⑂</span>';
+            item.innerHTML = icon + ' <span class="name">' + b.displayName + "</span>";
+            item.title = b.name;
+            item.addEventListener("click", () => selectBranch(b.name));
+            item.addEventListener("dblclick", () => checkoutBranch(b.name));
+            folderBody.appendChild(item);
+          }
+          folderDiv.appendChild(folderHeader);
+          folderDiv.appendChild(folderBody);
+          localSection.body.appendChild(folderDiv);
+        }
+        treeContent.appendChild(localSection.section);
+      }
+
+      const remoteBranches = branches.filter((b) => b.remote || b.name.startsWith("origin/")).filter((b) => filterFn(b.name));
+      if (remoteBranches.length > 0) {
+        const remoteSection = createSection("Remote", false);
+        for (const b of remoteBranches) {
+          const item = document.createElement("div");
+          item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+          item.innerHTML = '<span class="branch-icon remote">⑂</span> <span class="name">' + b.name + "</span>";
+          item.title = b.name;
+          item.addEventListener("click", () => selectBranch(b.name));
+          remoteSection.body.appendChild(item);
+        }
+        treeContent.appendChild(remoteSection.section);
+      }
+
+      const tagList = tags.filter((t) => filterFn(t.name));
+      if (tagList.length > 0) {
+        const tagSection = createSection("Tags", false);
+        for (const t of tagList) {
+          const item = document.createElement("div");
+          item.className = "tree-item" + (currentActive === t.name ? " active" : "");
+          item.innerHTML = '<span class="tag-icon">🏷</span> <span class="name">' + t.name + "</span>";
+          item.addEventListener("click", () => selectBranch(t.name));
+          tagSection.body.appendChild(item);
+        }
+        treeContent.appendChild(tagSection.section);
+      }
+
+      container.appendChild(treeContent);
+    }
+
     onMount(() => {
       unsubscribe = onMessage((msg) => {
         switch (msg.type) {
@@ -6361,6 +6508,10 @@ ${component_stack}
             set(commits, p.commits, true);
             set(graphWidth, p.graphWidth, true);
             set(loading, false);
+            break;
+          }
+          case "branches": {
+            set(branchData, msg.payload, true);
             break;
           }
           case "commitFiles": {
@@ -6385,6 +6536,19 @@ ${component_stack}
       });
     });
     onDestroy(() => unsubscribe?.());
+
+    function selectBranch(name) {
+      if (get(activeBranch) === name || !name) {
+        set(activeBranch, "", true);
+        onFilter({});
+      } else {
+        set(activeBranch, name, true);
+        onFilter({ branch: name });
+      }
+    }
+    function checkoutBranch(name) {
+      postMessage("checkout", name);
+    }
     function onSelectCommit(hash2) {
       set(selectedHash, hash2, true);
       set(selectedFiles, [], true);
@@ -6400,12 +6564,18 @@ ${component_stack}
     function onRebaseFromHere(hash2) {
       postMessage("rebaseFromHere", hash2);
     }
+
     var div = root5();
     var node = child(div);
     FilterBar(node, { onFilter });
     var div_1 = sibling(node, 2);
-    var div_2 = child(div_1);
+    var branch_sidebar = child(div_1);
+    var div_2 = sibling(branch_sidebar, 2);
     var node_1 = child(div_2);
+
+    user_effect(() => {
+      renderBranchTree(branch_sidebar);
+    });
     {
       var consequent = ($$anchor2) => {
         var div_3 = root_14();

@@ -595,7 +595,9 @@ var GraphViewProvider = class {
       this.sendBranches(branches, tags);
     } catch (err) {
       this.log.appendLine(`Git log failed: ${err.message}`);
-      vscode2.window.showErrorMessage(`Git log failed: ${err.message}`);
+      if (!err.message?.includes('not a git repository')) {
+        vscode2.window.showErrorMessage(`Git log failed: ${err.message}`);
+      }
     }
   }
   sendCommits() {

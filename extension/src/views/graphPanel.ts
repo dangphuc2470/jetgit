@@ -52,7 +52,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       this.sendBranches(branches, tags);
     } catch (err: any) {
       this.log.appendLine(`Git log failed: ${err.message}`);
-      vscode.window.showErrorMessage(`Git log failed: ${err.message}`);
+      if (!err.message?.includes('not a git repository')) {
+        vscode.window.showErrorMessage(`Git log failed: ${err.message}`);
+      }
     }
   }
 

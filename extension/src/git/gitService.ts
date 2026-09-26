@@ -31,6 +31,8 @@ export interface BranchInfo {
   remote?: string;
   upstream?: string;
   hash: string;
+  ahead?: number;
+  behind?: number;
 }
 
 export interface TagInfo {
@@ -193,10 +195,10 @@ export class GitService {
   }
 
   async getBranches(): Promise<BranchInfo[]> {
-    // Get local branches
+    // Get local branches with ahead/behind tracking
     const localOutput = await this.exec([
       'branch', '--format',
-      '%(HEAD)%(refname:short)\t%(objectname:short)\t%(upstream:short)',
+      '%(HEAD)%(refname:short)\t%(objectname:short)\t%(upstream:short)\t%(upstream:track,nobracket)',
     ]);
     // Get remote branches
     const remoteOutput = await this.exec([
@@ -210,13 +212,23 @@ export class GitService {
       if (!line.trim()) continue;
       const current = line[0] === '*';
       const rest = line.slice(1);
-      const [name, hash, upstream] = rest.split('\t');
+      const [name, hash, upstream, track] = rest.split('\t');
+      let ahead = 0;
+      let behind = 0;
+      if (track) {
+        const aheadMatch = track.match(/ahead (\d+)/);
+        if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
+        const behindMatch = track.match(/behind (\d+)/);
+        if (behindMatch) behind = parseInt(behindMatch[1], 10);
+      }
       branches.push({
         name: name.trim(),
         current,
         remote: undefined,
         upstream: upstream || undefined,
         hash: hash.trim(),
+        ahead: ahead || undefined,
+        behind: behind || undefined,
       });
     }
 
@@ -238,6 +250,10 @@ export class GitService {
     }
 
     return branches;
+  }
+
+  async fetchAll(): Promise<string> {
+    return this.exec(['fetch', '--all', '--prune']);
   }
 
   async getTags(): Promise<TagInfo[]> {

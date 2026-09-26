@@ -6780,7 +6780,7 @@ ${component_stack}
   var root5 = from_html(`<div class="app svelte-1lrl78g"><!> <div class="main-area svelte-1lrl78g"><div class="center-area svelte-1lrl78g"><!></div> <!></div></div>`);
   var $$css6 = {
     hash: "svelte-1lrl78g",
-    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;}.branch-sidebar.svelte-1lrl78g {width:220px;min-width:180px;border-right:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background, #1e1e1e);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;flex-shrink:0;user-select:none;font-size:0.9em;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.9em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.tree-section-header, .tree-folder-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.92em;}.tree-section-header:hover, .tree-folder-header:hover {background:var(--vscode-list-hoverBackground);}.tree-item {display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--vscode-foreground);font-size:0.95em;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.active {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);font-weight:600;}.tree-item.current-head {color:#388bfd;font-weight:600;}.branch-icon {color:#388bfd;}.branch-icon.remote {color:#8957e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#dcb67a;}.arrow {font-size:0.8em;color:var(--vscode-descriptionForeground);width:10px;display:inline-block;}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {width:300px;border-left:1px solid var(--vscode-panel-border);overflow-y:auto;flex-shrink:0;}"
+    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:200px;border-right:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:0.9em;transition:width 0.12s ease;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.9em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.tree-section-header, .tree-folder-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.92em;}.tree-section-header:hover, .tree-folder-header:hover {background:var(--vscode-list-hoverBackground);}.tree-item {display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:0.95em;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.active {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);font-weight:600;}.tree-item.current-head {color:#388bfd;font-weight:600;}.branch-icon {color:#388bfd;}.branch-icon.remote {color:#8957e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#dcb67a;}.arrow {font-size:0.8em;color:var(--vscode-descriptionForeground);width:10px;display:inline-block;}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {width:300px;border-left:1px solid var(--vscode-panel-border);overflow-y:auto;flex-shrink:0;}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;}"
   };
   function App($$anchor, $$props) {
     push($$props, true);
@@ -6808,6 +6808,7 @@ ${component_stack}
           }
           case "commits": {
             const p = msg.payload;
+            document.querySelectorAll(".no-git-container").forEach(el => el.remove());
             set(noGitData, null, true);
             set(commits, p.commits, true);
             set(graphWidth, p.graphWidth, true);
@@ -6976,6 +6977,106 @@ ${component_stack}
 
       document.addEventListener("click", closeBranchContextMenu);
 
+      // 1. Vertical Strip on the left
+      const strip = document.createElement("div");
+      strip.className = "sidebar-strip";
+
+      function addStripBtn(iconSvg, title, onClick, extraClass = "") {
+        const btn = document.createElement("button");
+        btn.className = "sidebar-strip-btn " + extraClass;
+        btn.title = title;
+        btn.innerHTML = iconSvg;
+        btn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          onClick(btn);
+        });
+        strip.appendChild(btn);
+        return btn;
+      }
+
+      const collapseSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+      const expandSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+      const isCollapsed = container.classList.contains("collapsed");
+      const collapseBtn = addStripBtn(isCollapsed ? expandSvg : collapseSvg, isCollapsed ? "Expand Branches" : "Collapse Branches", (btn) => {
+        container.classList.toggle("collapsed");
+        const coll = container.classList.contains("collapsed");
+        btn.innerHTML = coll ? expandSvg : collapseSvg;
+        btn.title = coll ? "Expand Branches" : "Collapse Branches";
+      });
+
+      // New branch (+)
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch... (+)", () => {
+        const base = get(activeBranch) || currentBranch || "HEAD";
+        const name = prompt("New branch name (from '" + base + "'):");
+        if (name && name.trim()) postMessage("createBranch", { name: name.trim(), startPoint: base });
+      });
+
+      // Fetch / Update Selected Branch (↙)
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch (↙)", () => {
+        const target = get(activeBranch) || currentBranch;
+        if (target) {
+          postMessage("pull", target);
+        }
+      });
+
+      // Delete Selected Branch (🗑)
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch (🗑)", () => {
+        const target = get(activeBranch);
+        if (!target) {
+          alert("Please select a branch to delete");
+        } else if (target === currentBranch) {
+          alert("Cannot delete the currently checked out branch '" + target + "'");
+        } else if (confirm("Delete branch '" + target + "'?")) {
+          postMessage("deleteBranch", target);
+        }
+      });
+
+      // Fetch All (⇄)
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="17" x2="4" y2="17"></line><polyline points="10 11 4 17 10 23"></polyline><line x1="4" y1="7" x2="20" y2="7"></line><polyline points="14 1 20 7 14 13"></polyline></svg>', "Fetch All Remotes (⇄)", () => {
+        postMessage("fetchAll");
+      });
+
+      // Search (Q)
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', "Search Branches (Q)", () => {
+        if (container.classList.contains("collapsed")) {
+          container.classList.remove("collapsed");
+          collapseBtn.innerHTML = collapseSvg;
+          collapseBtn.title = "Collapse Branches";
+        }
+        sInput.focus();
+        sInput.select();
+      });
+
+      // Expand / Collapse all
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>', "Expand / Collapse All", () => {
+        const bodies = treeContent.querySelectorAll(".tree-section-body, .tree-folder-body");
+        let anyOpen = false;
+        bodies.forEach(b => { if (b.style.display !== "none") anyOpen = true; });
+        bodies.forEach(b => { b.style.display = anyOpen ? "none" : "block"; });
+        treeContent.querySelectorAll(".arrow").forEach(a => { a.textContent = anyOpen ? "▸" : "▾"; });
+      });
+
+      // Star / Favorites Filter
+      let favOnly = container.dataset.favOnly === "true";
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="' + (favOnly ? "#e5a50a" : "none") + '" stroke="' + (favOnly ? "#e5a50a" : "currentColor") + '" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>', "Filter Favorites (★)", () => {
+        favOnly = !favOnly;
+        container.dataset.favOnly = favOnly ? "true" : "false";
+        renderSidebarContent(container);
+      }, favOnly ? "active" : "");
+
+      // Locate Current Branch (HEAD)
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>', "Locate Current Branch (HEAD)", () => {
+        if (currentBranch) {
+          handleBranchClick(currentBranch);
+        }
+      });
+
+      container.appendChild(strip);
+
+      // 2. Main Area (Search + Tree)
+      const mainArea = document.createElement("div");
+      mainArea.className = "sidebar-main";
+
       const searchBox = document.createElement("div");
       searchBox.className = "branch-search-box";
       const sInput = document.createElement("input");
@@ -6985,13 +7086,18 @@ ${component_stack}
       sInput.value = searchQuery || "";
       sInput.addEventListener("input", (e) => set(branchSearch, e.target.value.toLowerCase(), true));
       searchBox.appendChild(sInput);
-      container.appendChild(searchBox);
+      mainArea.appendChild(searchBox);
 
       const treeContent = document.createElement("div");
       treeContent.className = "branch-tree-content";
 
       const query = (searchQuery || "").toLowerCase();
-      const filterFn = (name) => !query || name.toLowerCase().includes(query);
+      const isFavoriteBranch = (name) => name === currentBranch || name === "develop" || name === "main" || name === "master" || name.endsWith("/develop") || name.endsWith("/main");
+      const filterFn = (name) => {
+        if (query && !name.toLowerCase().includes(query)) return false;
+        if (favOnly && !isFavoriteBranch(name)) return false;
+        return true;
+      };
 
       function createSec(title, isOpenDefault = true) {
         const sec = document.createElement("div");
@@ -7022,13 +7128,31 @@ ${component_stack}
         }
       }
 
+      function getTrackingHtml(b) {
+        if (!b) return "";
+        let trackHtml = "";
+        if (b.behind || b.ahead) {
+          trackHtml = '<span class="branch-track" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:11px;font-family:var(--vscode-editor-font-family, monospace);">';
+          if (b.behind) {
+            trackHtml += '<span style="color:#58a6ff;display:inline-flex;align-items:center;gap:1px;" title="Behind ' + b.behind + '">↙ ' + b.behind + '</span>';
+          }
+          if (b.ahead) {
+            trackHtml += '<span style="color:#3fb950;display:inline-flex;align-items:center;gap:1px;" title="Ahead ' + b.ahead + '">↗ ' + b.ahead + '</span>';
+          }
+          trackHtml += '</span>';
+        }
+        return trackHtml;
+      }
+
       const svgTagIcon = '<svg width="12" height="12" viewBox="0 0 16 16" fill="#e5a50a" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>';
 
       if (currentBranch && filterFn(currentBranch)) {
         const headSec = createSec("HEAD (Current Branch)", true);
         const item = document.createElement("div");
         item.className = "tree-item current-head" + (currentActive === currentBranch ? " active" : "");
-        item.innerHTML = '<span class="branch-tag-icon">' + svgTagIcon + '</span> <span style="font-weight:600;">' + currentBranch + '</span>';
+        const curInfo = branches.find((b) => b.name === currentBranch);
+        const trackHtml = getTrackingHtml(curInfo);
+        item.innerHTML = '<span class="branch-tag-icon">' + svgTagIcon + '</span> <span class="branch-name" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + currentBranch + '</span>' + trackHtml;
         item.addEventListener("click", () => handleBranchClick(currentBranch));
         item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, currentBranch));
         headSec.bdy.appendChild(item);
@@ -7059,7 +7183,8 @@ ${component_stack}
           let icon = '<span class="branch-icon">⑂</span>';
           if (isCur) icon = '<span class="branch-tag-icon">' + svgTagIcon + '</span>';
           else if (isStar) icon = '<span class="star-icon">★</span>';
-          item.innerHTML = icon + ' <span>' + b.name + '</span>';
+          const trackHtml = getTrackingHtml(b);
+          item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.name + '</span>' + trackHtml;
           item.addEventListener("click", () => handleBranchClick(b.name));
           item.addEventListener("dblclick", () => postMessage("checkout", b.name));
           item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
@@ -7087,7 +7212,8 @@ ${component_stack}
             let icon = '<span class="branch-icon">⑂</span>';
             if (isCur) icon = '<span class="branch-tag-icon">' + svgTagIcon + '</span>';
             else if (isStar) icon = '<span class="star-icon">★</span>';
-            item.innerHTML = icon + ' <span>' + b.displayName + '</span>';
+            const trackHtml = getTrackingHtml(b);
+            item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.displayName + '</span>' + trackHtml;
             item.title = b.name;
             item.addEventListener("click", () => handleBranchClick(b.name));
             item.addEventListener("dblclick", () => postMessage("checkout", b.name));
@@ -7107,7 +7233,8 @@ ${component_stack}
         for (const b of remoteList) {
           const item = document.createElement("div");
           item.className = "tree-item" + (currentActive === b.name ? " active" : "");
-          item.innerHTML = '<span class="branch-icon remote">⑂</span> <span>' + b.name + '</span>';
+          const trackHtml = getTrackingHtml(b);
+          item.innerHTML = '<span class="branch-icon remote">⑂</span> <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.name + '</span>' + trackHtml;
           item.addEventListener("click", () => handleBranchClick(b.name));
           item.addEventListener("dblclick", () => postMessage("checkout", b.name));
           item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
@@ -7128,7 +7255,8 @@ ${component_stack}
         treeContent.appendChild(tagSec.sec);
       }
 
-      container.appendChild(treeContent);
+      mainArea.appendChild(treeContent);
+      container.appendChild(mainArea);
     }
 
     var div = root5();
@@ -7156,14 +7284,16 @@ ${component_stack}
     var node_1 = child(div_2);
     {
       var consequent = ($$anchor2) => {
+        document.querySelectorAll(".no-git-container").forEach(el => el.remove());
         var div_3 = root_14();
         append($$anchor2, div_3);
       };
       var consequent_1 = ($$anchor2) => {
+        document.querySelectorAll(".no-git-container").forEach(el => el.remove());
         if (get(noGitData)) {
           var div = document.createElement("div");
           div.className = "no-git-container";
-          div.style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;";
+          div.style.cssText = "position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;";
           
           var icon = document.createElement("div");
           icon.innerHTML = '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
@@ -7194,6 +7324,9 @@ ${component_stack}
               btn.style.cssText = "display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;border-radius:4px;background:#2e436e;color:#ffffff;border:1px solid #3e5b94;font-size:12px;font-weight:500;cursor:pointer;width:100%;";
               btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> Open repository in \"' + r.name + '\"';
               btn.addEventListener("click", () => {
+                div.remove();
+                document.querySelectorAll(".no-git-container").forEach(el => el.remove());
+                set(noGitData, null, true);
                 set(loading, true);
                 postMessage("switchRepo", r.path);
               });
@@ -7207,6 +7340,9 @@ ${component_stack}
           initBtn.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;background:var(--vscode-button-secondaryBackground, #3a3d41);color:var(--vscode-button-secondaryForeground, #ffffff);border:1px solid rgba(255,255,255,0.1);font-size:12px;cursor:pointer;";
           initBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Initialize Git Repository Here (git init)';
           initBtn.addEventListener("click", () => {
+            div.remove();
+            document.querySelectorAll(".no-git-container").forEach(el => el.remove());
+            set(noGitData, null, true);
             set(loading, true);
             postMessage("initRepo");
           });
@@ -7219,6 +7355,7 @@ ${component_stack}
         }
       };
       var alternate = ($$anchor2) => {
+        document.querySelectorAll(".no-git-container").forEach(el => el.remove());
         CommitList($$anchor2, {
           get commits() {
             return get(commits);

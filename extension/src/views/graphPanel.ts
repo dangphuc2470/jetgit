@@ -312,6 +312,17 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'fetchAll': {
+        try {
+          vscode.window.showInformationMessage('Fetching all remotes...');
+          await this.gitService.fetchAll();
+          vscode.window.showInformationMessage('Fetched all remotes successfully.');
+          this.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Fetch all failed: ${err.message}`);
+        }
+        break;
+      }
       case 'push': {
         const branch = msg.payload as string;
         try {

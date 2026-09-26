@@ -228,13 +228,13 @@ var GitService = class {
     const localOutput = await this.exec([
       "branch",
       "--format",
-      "%(HEAD)%(refname:short)	%(objectname:short)	%(upstream:short)"
+      "%(HEAD)%(refname:short)\t%(objectname:short)\t%(upstream:short)\t%(upstream:track,nobracket)"
     ]);
     const remoteOutput = await this.exec([
       "branch",
       "-r",
       "--format",
-      "%(refname:short)	%(objectname:short)"
+      "%(refname:short)\t%(objectname:short)"
     ]);
     const branches = [];
     for (const line of localOutput.split("\n")) {
@@ -242,13 +242,23 @@ var GitService = class {
         continue;
       const current = line[0] === "*";
       const rest = line.slice(1);
-      const [name, hash, upstream] = rest.split("	");
+      const [name, hash, upstream, track] = rest.split("	");
+      let ahead = 0;
+      let behind = 0;
+      if (track) {
+        const aheadMatch = track.match(/ahead (\d+)/);
+        if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
+        const behindMatch = track.match(/behind (\d+)/);
+        if (behindMatch) behind = parseInt(behindMatch[1], 10);
+      }
       branches.push({
         name: name.trim(),
         current,
         remote: void 0,
         upstream: upstream || void 0,
-        hash: hash.trim()
+        hash: hash.trim(),
+        ahead: ahead || void 0,
+        behind: behind || void 0
       });
     }
     for (const line of remoteOutput.split("\n")) {
@@ -269,6 +279,9 @@ var GitService = class {
       });
     }
     return branches;
+  }
+  async fetchAll() {
+    return this.exec(["fetch", "--all", "--prune"]);
   }
   async getTags() {
     const output = await this.exec([
@@ -915,6 +928,17 @@ var GraphViewProvider = class {
           this.loadInitialData();
         } catch (err) {
           vscode2.window.showErrorMessage(`Pull failed: ${err.message}`);
+        }
+        break;
+      }
+      case "fetchAll": {
+        try {
+          vscode2.window.showInformationMessage("Fetching all remotes...");
+          await this.gitService.fetchAll();
+          vscode2.window.showInformationMessage("Fetched all remotes successfully.");
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Fetch all failed: ${err.message}`);
         }
         break;
       }

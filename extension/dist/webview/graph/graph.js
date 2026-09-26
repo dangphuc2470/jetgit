@@ -6795,14 +6795,26 @@ ${component_stack}
     let branchData = state({ branches: [], tags: [], currentBranch: "" });
     let activeBranch = state("");
     let branchSearch = state("");
+    let noGitData = state(null);
 
     onMount(() => {
+      postMessage("ready");
       unsubscribe = onMessage((msg) => {
         switch (msg.type) {
+          case "noGitRepo": {
+            set(loading, false);
+            set(noGitData, msg.payload, true);
+            break;
+          }
           case "commits": {
             const p = msg.payload;
+            set(noGitData, null, true);
             set(commits, p.commits, true);
             set(graphWidth, p.graphWidth, true);
+            set(loading, false);
+            break;
+          }
+          case "error": {
             set(loading, false);
             break;
           }
@@ -7148,8 +7160,63 @@ ${component_stack}
         append($$anchor2, div_3);
       };
       var consequent_1 = ($$anchor2) => {
-        var div_4 = root_23();
-        append($$anchor2, div_4);
+        if (get(noGitData)) {
+          var div = document.createElement("div");
+          div.className = "no-git-container";
+          div.style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;";
+          
+          var icon = document.createElement("div");
+          icon.innerHTML = '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+          div.appendChild(icon);
+
+          var title = document.createElement("div");
+          title.style.cssText = "font-size:16px;font-weight:600;margin:14px 0 6px;";
+          title.textContent = "No Git Repository Found";
+          div.appendChild(title);
+
+          var desc = document.createElement("div");
+          desc.style.cssText = "font-size:12px;color:var(--vscode-descriptionForeground);max-width:440px;line-height:1.5;margin-bottom:20px;";
+          const data = get(noGitData) || {};
+          desc.textContent = "The folder \"" + (data.currentPath || "") + "\" is not a Git repository.";
+          div.appendChild(desc);
+
+          if (data.subRepos && data.subRepos.length > 0) {
+            var subTitle = document.createElement("div");
+            subTitle.style.cssText = "font-size:12px;font-weight:600;margin-bottom:10px;color:var(--vscode-descriptionForeground);text-transform:uppercase;letter-spacing:0.5px;";
+            subTitle.textContent = "Detected Git repository in subfolder:";
+            div.appendChild(subTitle);
+
+            var list = document.createElement("div");
+            list.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-bottom:20px;width:100%;max-width:360px;";
+            data.subRepos.forEach(r => {
+              var btn = document.createElement("button");
+              btn.className = "no-git-btn primary";
+              btn.style.cssText = "display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;border-radius:4px;background:#2e436e;color:#ffffff;border:1px solid #3e5b94;font-size:12px;font-weight:500;cursor:pointer;width:100%;";
+              btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> Open repository in \"' + r.name + '\"';
+              btn.addEventListener("click", () => {
+                set(loading, true);
+                postMessage("switchRepo", r.path);
+              });
+              list.appendChild(btn);
+            });
+            div.appendChild(list);
+          }
+
+          var initBtn = document.createElement("button");
+          initBtn.className = "no-git-btn secondary";
+          initBtn.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;background:var(--vscode-button-secondaryBackground, #3a3d41);color:var(--vscode-button-secondaryForeground, #ffffff);border:1px solid rgba(255,255,255,0.1);font-size:12px;cursor:pointer;";
+          initBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Initialize Git Repository Here (git init)';
+          initBtn.addEventListener("click", () => {
+            set(loading, true);
+            postMessage("initRepo");
+          });
+          div.appendChild(initBtn);
+
+          append($$anchor2, div);
+        } else {
+          var div_4 = root_23();
+          append($$anchor2, div_4);
+        }
       };
       var alternate = ($$anchor2) => {
         CommitList($$anchor2, {
@@ -7209,7 +7276,12 @@ ${component_stack}
     branch_sidebar.className = "branch-sidebar svelte-1lrl78g";
     div_1.prepend(branch_sidebar);
     user_effect(() => {
-      renderSidebarContent(branch_sidebar);
+      if (get(noGitData)) {
+        branch_sidebar.style.display = "none";
+      } else {
+        branch_sidebar.style.display = "";
+        renderSidebarContent(branch_sidebar);
+      }
     });
     reset(div);
     append($$anchor, div);

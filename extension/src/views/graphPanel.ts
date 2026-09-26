@@ -9,6 +9,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private allCommits: Commit[] = [];
   private graphNodes: GraphNode[] = [];
 
+  private lastBranches: BranchInfo[] = [];
+  private lastTags: TagInfo[] = [];
+
   constructor(
     private extensionUri: vscode.Uri,
     private gitService: GitService,
@@ -38,6 +41,21 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   async loadInitialData(): Promise<void> {
+    const isRepo = await this.gitService.isGitRepo();
+    if (!isRepo) {
+      this.log.appendLine('Current directory is not a git repository. Searching subfolders...');
+      const subRepos = await this.gitService.findSubRepos();
+      this.log.appendLine(`Found ${subRepos.length} sub-repositories: ${subRepos.map(r => r.name).join(', ')}`);
+      this.view?.webview.postMessage({
+        type: 'noGitRepo',
+        payload: {
+          currentPath: this.gitService.getCwd(),
+          subRepos,
+        },
+      });
+      return;
+    }
+
     try {
       this.log.appendLine('Loading git log...');
       const [commits, branches, tags] = await Promise.all([
@@ -46,15 +64,25 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         this.gitService.getTags(),
       ]);
       this.allCommits = commits;
+      this.lastBranches = branches;
+      this.lastTags = tags;
       this.log.appendLine(`Loaded ${commits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
       this.sendCommits();
       this.sendBranches(branches, tags);
     } catch (err: any) {
       this.log.appendLine(`Git log failed: ${err.message}`);
-      if (!err.message?.includes('not a git repository')) {
-        vscode.window.showErrorMessage(`Git log failed: ${err.message}`);
-      }
+      this.view?.webview.postMessage({
+        type: 'commits',
+        payload: {
+          commits: [],
+          graphWidth: 1,
+        },
+      });
+      this.view?.webview.postMessage({
+        type: 'error',
+        payload: err.message,
+      });
     }
   }
 
@@ -85,6 +113,29 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
   private async handleMessage(msg: { type: string; payload?: any }): Promise<void> {
     switch (msg.type) {
+      case 'ready': {
+        this.log.appendLine('Webview reported ready');
+        await this.loadInitialData();
+        break;
+      }
+      case 'switchRepo': {
+        const repoPath = msg.payload as string;
+        this.log.appendLine(`Switching git repository to: ${repoPath}`);
+        this.gitService.setCwd(repoPath);
+        await this.loadInitialData();
+        break;
+      }
+      case 'initRepo': {
+        this.log.appendLine('Initializing new git repository...');
+        try {
+          await this.gitService.initRepo();
+          vscode.window.showInformationMessage('Initialized Git repository successfully.');
+          await this.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Failed to init git repository: ${err.message}`);
+        }
+        break;
+      }
       case 'selectCommit': {
         const hash = msg.payload as string;
         try {

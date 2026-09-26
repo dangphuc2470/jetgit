@@ -39,6 +39,8 @@ var vscode8 = __toESM(require("vscode"));
 // src/git/gitService.ts
 var import_child_process = require("child_process");
 var import_util = require("util");
+var import_fs = require("fs");
+var import_path = require("path");
 
 // src/cache.ts
 var LRUCache = class {
@@ -105,6 +107,40 @@ var GitService = class {
   cwd;
   constructor(workspaceRoot) {
     this.cwd = workspaceRoot;
+  }
+  getCwd() {
+    return this.cwd;
+  }
+  setCwd(newCwd) {
+    this.cwd = newCwd;
+    this.commitCache.clear();
+  }
+  async isGitRepo() {
+    try {
+      await this.exec(["rev-parse", "--is-inside-work-tree"]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async findSubRepos() {
+    const results = [];
+    try {
+      const entries = import_fs.readdirSync(this.cwd, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+          const subPath = import_path.join(this.cwd, entry.name);
+          const subGit = import_path.join(subPath, ".git");
+          if (import_fs.existsSync(subGit)) {
+            results.push({ name: entry.name, path: subPath });
+          }
+        }
+      }
+    } catch {}
+    return results;
+  }
+  async initRepo() {
+    await execFileAsync("git", ["init"], { cwd: this.cwd });
   }
   async exec(args, maxBuffer = 10 * 1024 * 1024) {
     const { stdout } = await execFileAsync("git", args, {
@@ -582,7 +618,24 @@ var GraphViewProvider = class {
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
     this.loadInitialData();
   }
+  lastBranches = [];
+  lastTags = [];
   async loadInitialData() {
+    const isRepo = await this.gitService.isGitRepo();
+    if (!isRepo) {
+      this.log.appendLine("Current directory is not a git repository. Searching subfolders...");
+      const subRepos = await this.gitService.findSubRepos();
+      this.log.appendLine(`Found ${subRepos.length} sub-repositories: ${subRepos.map((r) => r.name).join(", ")}`);
+      this.view?.webview.postMessage({
+        type: "noGitRepo",
+        payload: {
+          currentPath: this.gitService.getCwd(),
+          subRepos
+        }
+      });
+      return;
+    }
+
     try {
       this.log.appendLine("Loading git log...");
       const [commits, branches, tags] = await Promise.all([
@@ -591,15 +644,25 @@ var GraphViewProvider = class {
         this.gitService.getTags()
       ]);
       this.allCommits = commits;
+      this.lastBranches = branches;
+      this.lastTags = tags;
       this.log.appendLine(`Loaded ${commits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
       this.sendCommits();
       this.sendBranches(branches, tags);
     } catch (err) {
       this.log.appendLine(`Git log failed: ${err.message}`);
-      if (!err.message?.includes('not a git repository')) {
-        vscode2.window.showErrorMessage(`Git log failed: ${err.message}`);
-      }
+      this.view?.webview.postMessage({
+        type: "commits",
+        payload: {
+          commits: [],
+          graphWidth: 1
+        }
+      });
+      this.view?.webview.postMessage({
+        type: "error",
+        payload: err.message
+      });
     }
   }
   sendCommits() {
@@ -627,6 +690,29 @@ var GraphViewProvider = class {
   }
   async handleMessage(msg) {
     switch (msg.type) {
+      case "ready": {
+        this.log.appendLine("Webview reported ready");
+        await this.loadInitialData();
+        break;
+      }
+      case "switchRepo": {
+        const repoPath = msg.payload;
+        this.log.appendLine(`Switching git repository to: ${repoPath}`);
+        this.gitService.setCwd(repoPath);
+        await this.loadInitialData();
+        break;
+      }
+      case "initRepo": {
+        this.log.appendLine("Initializing new git repository...");
+        try {
+          await this.gitService.initRepo();
+          vscode2.window.showInformationMessage("Initialized Git repository successfully.");
+          await this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Failed to init git repository: ${err.message}`);
+        }
+        break;
+      }
       case "selectCommit": {
         const hash = msg.payload;
         try {

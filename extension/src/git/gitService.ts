@@ -1,5 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { LRUCache } from '../cache';
 
@@ -63,6 +65,45 @@ export class GitService {
 
   constructor(workspaceRoot: string) {
     this.cwd = workspaceRoot;
+  }
+
+  getCwd(): string {
+    return this.cwd;
+  }
+
+  setCwd(newCwd: string): void {
+    this.cwd = newCwd;
+    this.commitCache.clear();
+  }
+
+  async isGitRepo(): Promise<boolean> {
+    try {
+      await this.exec(['rev-parse', '--is-inside-work-tree']);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async findSubRepos(): Promise<{ name: string; path: string }[]> {
+    const results: { name: string; path: string }[] = [];
+    try {
+      const entries = fs.readdirSync(this.cwd, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+          const subPath = path.join(this.cwd, entry.name);
+          const subGit = path.join(subPath, '.git');
+          if (fs.existsSync(subGit)) {
+            results.push({ name: entry.name, path: subPath });
+          }
+        }
+      }
+    } catch {}
+    return results;
+  }
+
+  async initRepo(): Promise<void> {
+    await execFileAsync('git', ['init'], { cwd: this.cwd });
   }
 
   private async exec(args: string[], maxBuffer = 10 * 1024 * 1024): Promise<string> {

@@ -302,11 +302,46 @@ var GitService = class {
   async deleteBranch(name, force = false) {
     await this.exec(["branch", force ? "-D" : "-d", name]);
   }
+  async renameBranch(oldName, newName) {
+    await this.exec(["branch", "-m", oldName, newName]);
+  }
+  async pull(branch) {
+    const args = ["pull"];
+    if (branch)
+      args.push("origin", branch);
+    return this.exec(args);
+  }
+  async push(branch) {
+    const args = ["push"];
+    if (branch)
+      args.push("origin", branch);
+    return this.exec(args);
+  }
+  async checkoutAndRebase(branch, onto) {
+    await this.checkout(branch);
+    return this.rebase(onto);
+  }
   async merge(branch) {
     return this.exec(["merge", branch]);
   }
   async rebase(onto) {
     return this.exec(["rebase", onto]);
+  }
+  async getDiffFiles(branch) {
+    const output = await this.exec(["diff", "--name-status", "-M", branch]);
+    const changes = [];
+    for (const line of output.split("\n")) {
+      if (!line.trim())
+        continue;
+      const parts = line.split("	");
+      const status = parts[0][0];
+      if (parts.length === 3) {
+        changes.push({ status, path: parts[2], oldPath: parts[1] });
+      } else {
+        changes.push({ status, path: parts[1] });
+      }
+    }
+    return changes;
   }
   async getStatus() {
     const output = await this.exec(["status", "--porcelain=v1", "-uall"]);
@@ -803,6 +838,105 @@ var GraphViewProvider = class {
           this.loadInitialData();
         } catch (err) {
           vscode2.window.showErrorMessage(`Delete failed: ${err.message}`);
+        }
+        break;
+      }
+      case "checkoutAndRebase": {
+        const { branch, onto } = msg.payload;
+        try {
+          await this.gitService.checkoutAndRebase(branch, onto);
+          vscode2.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Checkout and rebase failed: ${err.message}`);
+        }
+        break;
+      }
+      case "rebase": {
+        const branch = msg.payload;
+        try {
+          await this.gitService.rebase(branch);
+          vscode2.window.showInformationMessage(`Rebased onto ${branch}`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Rebase failed: ${err.message}`);
+        }
+        break;
+      }
+      case "compareBranch": {
+        const { branch, withBranch } = msg.payload;
+        try {
+          this.allCommits = await this.gitService.getLog({
+            branch: `${withBranch}..${branch}`,
+            all: false
+          });
+          this.graphNodes = buildGraph(this.allCommits);
+          this.sendCommits();
+          vscode2.window.showInformationMessage(`Comparing commits between ${branch} and ${withBranch}`);
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Compare failed: ${err.message}`);
+        }
+        break;
+      }
+      case "showDiff": {
+        const { branch } = msg.payload;
+        try {
+          const files = await this.gitService.getDiffFiles(branch);
+          if (files.length === 0) {
+            vscode2.window.showInformationMessage(`No differences between ${branch} and working tree.`);
+            break;
+          }
+          const items = files.map((f) => ({
+            label: `${f.status} ${f.path}`,
+            description: f.oldPath ? `from ${f.oldPath}` : "",
+            file: f
+          }));
+          const picked = await vscode2.window.showQuickPick(items, {
+            placeHolder: `Select a file changed against ${branch} to view diff`
+          });
+          if (picked) {
+            const filePath = picked.file.path;
+            const leftUri = GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
+            const path2 = require("path");
+            const rightUri = vscode2.Uri.file(path2.join(this.gitService.getCwd(), filePath));
+            const fileName = filePath.split("/").pop() || filePath;
+            await vscode2.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${branch} \u2194 Working Tree)`);
+          }
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Show diff failed: ${err.message}`);
+        }
+        break;
+      }
+      case "pull": {
+        const branch = msg.payload;
+        try {
+          const out = await this.gitService.pull(branch);
+          vscode2.window.showInformationMessage(`Pulled ${branch}: ${out || "Already up to date."}`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Pull failed: ${err.message}`);
+        }
+        break;
+      }
+      case "push": {
+        const branch = msg.payload;
+        try {
+          await this.gitService.push(branch);
+          vscode2.window.showInformationMessage(`Pushed ${branch} successfully.`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Push failed: ${err.message}`);
+        }
+        break;
+      }
+      case "renameBranch": {
+        const { oldName, newName } = msg.payload;
+        try {
+          await this.gitService.renameBranch(oldName, newName);
+          vscode2.window.showInformationMessage(`Renamed branch '${oldName}' to '${newName}'`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Rename failed: ${err.message}`);
         }
         break;
       }

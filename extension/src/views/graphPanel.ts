@@ -235,6 +235,105 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'checkoutAndRebase': {
+        const { branch, onto } = msg.payload;
+        try {
+          await this.gitService.checkoutAndRebase(branch, onto);
+          vscode.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
+          this.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Checkout and rebase failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'rebase': {
+        const branch = msg.payload as string;
+        try {
+          await this.gitService.rebase(branch);
+          vscode.window.showInformationMessage(`Rebased onto ${branch}`);
+          this.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Rebase failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'compareBranch': {
+        const { branch, withBranch } = msg.payload;
+        try {
+          this.allCommits = await this.gitService.getLog({
+            branch: `${withBranch}..${branch}`,
+            all: false,
+          });
+          this.graphNodes = buildGraph(this.allCommits);
+          this.sendCommits();
+          vscode.window.showInformationMessage(`Comparing commits between ${branch} and ${withBranch}`);
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Compare failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'showDiff': {
+        const { branch } = msg.payload;
+        try {
+          const files = await this.gitService.getDiffFiles(branch);
+          if (files.length === 0) {
+            vscode.window.showInformationMessage(`No differences between ${branch} and working tree.`);
+            break;
+          }
+          const items = files.map(f => ({
+            label: `${f.status} ${f.path}`,
+            description: f.oldPath ? `from ${f.oldPath}` : '',
+            file: f,
+          }));
+          const picked = await vscode.window.showQuickPick(items, {
+            placeHolder: `Select a file changed against ${branch} to view diff`,
+          });
+          if (picked) {
+            const filePath = picked.file.path;
+            const leftUri = GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
+            const path = require('path');
+            const rightUri = vscode.Uri.file(path.join(this.gitService.getCwd(), filePath));
+            const fileName = filePath.split('/').pop() || filePath;
+            await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${fileName} (${branch} ↔ Working Tree)`);
+          }
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Show diff failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'pull': {
+        const branch = msg.payload as string;
+        try {
+          const out = await this.gitService.pull(branch);
+          vscode.window.showInformationMessage(`Pulled ${branch}: ${out || 'Already up to date.'}`);
+          this.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Pull failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'push': {
+        const branch = msg.payload as string;
+        try {
+          await this.gitService.push(branch);
+          vscode.window.showInformationMessage(`Pushed ${branch} successfully.`);
+          this.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Push failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'renameBranch': {
+        const { oldName, newName } = msg.payload;
+        try {
+          await this.gitService.renameBranch(oldName, newName);
+          vscode.window.showInformationMessage(`Renamed branch '${oldName}' to '${newName}'`);
+          this.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Rename failed: ${err.message}`);
+        }
+        break;
+      }
       case 'mergeBranch': {
         const ref = msg.payload as string;
         try {

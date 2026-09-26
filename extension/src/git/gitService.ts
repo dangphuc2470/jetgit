@@ -272,12 +272,49 @@ export class GitService {
     await this.exec(['branch', force ? '-D' : '-d', name]);
   }
 
+  async renameBranch(oldName: string, newName: string): Promise<void> {
+    await this.exec(['branch', '-m', oldName, newName]);
+  }
+
+  async pull(branch?: string): Promise<string> {
+    const args = ['pull'];
+    if (branch) args.push('origin', branch);
+    return this.exec(args);
+  }
+
+  async push(branch?: string): Promise<string> {
+    const args = ['push'];
+    if (branch) args.push('origin', branch);
+    return this.exec(args);
+  }
+
+  async checkoutAndRebase(branch: string, onto: string): Promise<string> {
+    await this.checkout(branch);
+    return this.rebase(onto);
+  }
+
   async merge(branch: string): Promise<string> {
     return this.exec(['merge', branch]);
   }
 
   async rebase(onto: string): Promise<string> {
     return this.exec(['rebase', onto]);
+  }
+
+  async getDiffFiles(branch: string): Promise<FileChange[]> {
+    const output = await this.exec(['diff', '--name-status', '-M', branch]);
+    const changes: FileChange[] = [];
+    for (const line of output.split('\n')) {
+      if (!line.trim()) continue;
+      const parts = line.split('\t');
+      const status = parts[0][0];
+      if (parts.length === 3) {
+        changes.push({ status, path: parts[2], oldPath: parts[1] });
+      } else {
+        changes.push({ status, path: parts[1] });
+      }
+    }
+    return changes;
   }
 
   async getStatus(): Promise<StatusEntry[]> {

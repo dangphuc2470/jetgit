@@ -5676,26 +5676,22 @@ ${component_stack}
 
   // webview/shared/theme.ts
   var GRAPH_COLORS = [
-    "#4ec9b0",
-    // teal
-    "#ce9178",
-    // orange
-    "#569cd6",
-    // blue
-    "#c586c0",
-    // purple
-    "#dcdcaa",
-    // yellow
-    "#d16969",
-    // red
-    "#b5cea8",
-    // green
-    "#9cdcfe",
-    // light blue
-    "#d7ba7d",
+    "#e5a50a",
     // gold
-    "#f48771"
-    // salmon
+    "#a371f7",
+    // purple
+    "#3fb950",
+    // green
+    "#58a6ff",
+    // blue
+    "#f0883e",
+    // orange
+    "#db61a2",
+    // pink
+    "#7ee787",
+    // light green
+    "#79c0ff"
+    // light blue
   ];
   function branchColor(index2) {
     return GRAPH_COLORS[index2 % GRAPH_COLORS.length];
@@ -5752,7 +5748,8 @@ ${component_stack}
           x: cx(node.column),
           y: cy(i),
           color: branchColor(node.color),
-          hash: node.hash
+          hash: node.hash,
+          isHead: (i === 0)
         });
       }
       return result;
@@ -5820,11 +5817,24 @@ ${component_stack}
     each(node_3, 17, visibleDots, index, ($$anchor2, dot) => {
       var circle = root_4();
       set_attribute2(circle, "r", DOT_RADIUS);
+      var ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      ring.setAttribute("fill", "none");
+      ring.setAttribute("stroke-width", "1.5");
+      ring.setAttribute("r", "6.5");
       template_effect(() => {
         set_attribute2(circle, "cx", get(dot).x);
         set_attribute2(circle, "cy", get(dot).y);
         set_attribute2(circle, "fill", get(dot).color);
+        if (get(dot).isHead) {
+          ring.setAttribute("cx", get(dot).x);
+          ring.setAttribute("cy", get(dot).y);
+          ring.setAttribute("stroke", get(dot).color);
+          ring.style.display = "";
+        } else {
+          ring.style.display = "none";
+        }
       });
+      append($$anchor2, ring);
       append($$anchor2, circle);
     });
     reset(svg);
@@ -5844,21 +5854,20 @@ ${component_stack}
   var root2 = from_html(`<span class="labels svelte-et0zx2"></span>`);
   var $$css2 = {
     hash: "svelte-et0zx2",
-    code: ".labels.svelte-et0zx2 {order:5;margin-left:auto;display:inline-flex;gap:4px;flex-shrink:0;padding-right:12px;max-width:45%;overflow:hidden;align-items:center;}.label.svelte-et0zx2 {display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:0.8em;font-weight:500;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.branch.svelte-et0zx2 {background:rgba(86,156,214,0.15);color:#58a6ff;border:1px solid rgba(86,156,214,0.4);}.remote.svelte-et0zx2 {background:rgba(163,113,247,0.15);color:#bc8cff;border:1px solid rgba(163,113,247,0.4);}.tag.svelte-et0zx2 {background:rgba(210,153,34,0.15);color:#d29922;border:1px solid rgba(210,153,34,0.4);}.head.svelte-et0zx2 {background:rgba(56,139,253,0.22);color:#ffffff;border:1px solid #388bfd;font-weight:600;}"
+    code: ".labels.svelte-et0zx2 {order:5;margin-left:auto;display:inline-flex;gap:5px;flex-shrink:0;padding-right:12px;max-width:45%;overflow:hidden;align-items:center;}.label.svelte-et0zx2 {display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:0.8em;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:transparent;}.label-icon {display:inline-flex;align-items:center;vertical-align:-1px;margin-right:2px;}.branch.svelte-et0zx2 {color:#3fb950;border:1px solid #238636;}.remote.svelte-et0zx2 {color:#bc8cff;border:1px solid #8957e5;}.tag.svelte-et0zx2 {color:#d29922;border:1px solid #9e6a03;}.head.svelte-et0zx2 {color:#e5a50a;border:1px solid #e5a50a;font-weight:600;}"
   };
   function BranchLabels($$anchor, $$props) {
     append_styles($$anchor, $$css2);
     function labelClass(ref) {
-      if (ref.startsWith("tag: "))
-        return "label tag";
-      if (ref === "HEAD")
-        return "label head";
-      if (ref.includes("/"))
-        return "label remote";
+      if (ref.startsWith("tag: ")) return "label tag";
+      if (ref.startsWith("HEAD") || ref === "HEAD") return "label head";
+      if (ref.includes("/")) return "label remote";
       return "label branch";
     }
     function labelText(ref) {
-      return ref.replace(/^tag: /, "");
+      if (ref.startsWith("HEAD -> ")) return ref.slice(8);
+      if (ref.startsWith("tag: ")) return ref.slice(5);
+      return ref;
     }
     var span = root2();
     each(span, 21, () => $$props.refs, index, ($$anchor2, ref) => {
@@ -5868,7 +5877,7 @@ ${component_stack}
       template_effect(
         ($0, $1) => {
           set_class(span_1, 1, $0, "svelte-et0zx2");
-          set_text(text2, $1);
+          span_1.innerHTML = '<span class="label-icon"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + $1 + '</span>';
         },
         [
           () => clsx2(labelClass(get(ref))),
@@ -6278,9 +6287,9 @@ ${component_stack}
   var root4 = from_html(`<div class="filter-bar svelte-51df0s"><input type="text" placeholder="Branch..." class="filter-input svelte-51df0s"/> <input type="text" placeholder="Author..." class="filter-input svelte-51df0s"/> <input type="date" placeholder="After..." class="filter-input date-input svelte-51df0s"/> <input type="date" placeholder="Before..." class="filter-input date-input svelte-51df0s"/> <input type="text" placeholder="File path..." class="filter-input svelte-51df0s"/> <button class="filter-btn svelte-51df0s">Filter</button> <button class="filter-btn clear svelte-51df0s">Clear</button></div>`);
   var $$css5 = {
     hash: "svelte-51df0s",
-    code: ".filter-bar.svelte-51df0s {display:flex;gap:8px;padding:5px 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;min-height:36px;box-sizing:border-box;font-size:12px;position:relative;z-index:50;user-select:none;flex-wrap:nowrap;overflow-x:auto;}.filter-search-box {display:flex;align-items:center;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:4px;padding:0 8px;height:24px;width:170px;min-width:140px;gap:6px;flex-shrink:0;}.filter-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.filter-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;width:100%;}.filter-search-icon {color:var(--vscode-descriptionForeground);display:flex;align-items:center;}.filter-pill-container {position:relative;display:inline-block;flex-shrink:0;}.filter-pill {display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:4px;font-size:12px;color:var(--vscode-foreground);background:rgba(128, 128, 128, 0.08);border:1px solid rgba(128, 128, 128, 0.2);cursor:pointer;white-space:nowrap;transition:all 0.15s ease;}.filter-pill:hover {background:var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));border-color:rgba(128, 128, 128, 0.35);}.filter-pill.active {background:rgba(56, 139, 253, 0.15);border-color:rgba(56, 139, 253, 0.45);color:#58a6ff;font-weight:500;}.filter-pill .pill-arrow {font-size:8px;color:var(--vscode-descriptionForeground);margin-left:2px;}.filter-pill.active .pill-arrow {color:#58a6ff;}.filter-pill .pill-clear {margin-left:4px;font-size:12px;cursor:pointer;opacity:0.7;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;}.filter-pill .pill-clear:hover {opacity:1;background:rgba(255,255,255,0.15);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:5px;box-shadow:0 4px 16px rgba(0, 0, 0, 0.4);min-width:210px;max-width:320px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px 0;display:flex;flex-direction:column;}.filter-popup-search {padding:6px 8px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:3px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:5px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #ccc);cursor:pointer;font-size:12px;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #04395e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:#58a6ff;}.filter-popup-header {padding:6px 12px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-panel-border);margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground);}.filter-custom-date input {background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:3px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground);}.filter-reset-btn {margin-left:auto;background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:3px;flex-shrink:0;}.filter-reset-btn:hover {color:var(--vscode-foreground);background:rgba(128,128,128,0.15);}"
+    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:#2b2d30;border:1px solid #393b40;border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid #393b40;flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:#1e1f22;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:#dfe1e5;cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:#2e436e;color:#ffffff;}.filter-popup-item.selected {font-weight:600;color:#e5a50a;}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:#7f858e;text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:#393b40;margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:#7f858e;}.filter-custom-date input {background:#1e1f22;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:#2e436e;color:#ffffff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:#355389;}.branch-context-menu {position:fixed;background:#2b2d30;border:1px solid #393b40;border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;}.bcm-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;color:#dfe1e5;cursor:pointer;white-space:nowrap;margin:1px 0;}.bcm-item:hover {background:#2e436e;color:#ffffff;}.bcm-shortcut {font-size:11px;opacity:0.5;margin-left:28px;}.bcm-divider {height:1px;background:#393b40;margin:4px 0;}"
   };
-    function FilterBar($$anchor, $$props) {
+      function FilterBar($$anchor, $$props) {
     push($$props, true);
     append_styles($$anchor, $$css5);
 
@@ -6294,9 +6303,8 @@ ${component_stack}
     let curAfter = "";
     let curBefore = "";
     let curPath = "";
-    let openPopup = null; // 'branch' | 'user' | 'date' | 'path' | null
-    let branchSearchText = "";
-    let userSearchText = "";
+    let isRegex = false;
+    let isCase = false;
 
     function applyFilter() {
       $$props.onFilter({
@@ -6307,476 +6315,460 @@ ${component_stack}
         before: curBefore || void 0,
         path: curPath || void 0
       });
-      renderBar();
+      updateLabels();
     }
 
-    function closePopup() {
-      if (openPopup) {
-        openPopup = null;
-        renderBar();
+    // 1. Search Box with Q icon and .* Cc options
+    const searchBox = document.createElement("div");
+    searchBox.className = "as-search-box";
+    searchBox.innerHTML = '<span class="as-search-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M11.5 7a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zm-.82 4.74a6 6 0 1 0-1.06 1.06l3.79 3.79a.75.75 0 1 0 1.06-1.06l-3.79-3.79z"/></svg></span>';
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.className = "as-search-input";
+    searchInput.placeholder = "Text or hash";
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        curQuery = searchInput.value.trim();
+        applyFilter();
       }
+    });
+    searchInput.addEventListener("input", () => {
+      if (!searchInput.value && curQuery) {
+        curQuery = "";
+        applyFilter();
+      }
+    });
+    searchBox.appendChild(searchInput);
+
+    const regexBtn = document.createElement("span");
+    regexBtn.className = "as-search-opt";
+    regexBtn.textContent = ".*";
+    regexBtn.title = "Regex";
+    regexBtn.addEventListener("click", () => {
+      isRegex = !isRegex;
+      regexBtn.className = "as-search-opt" + (isRegex ? " active" : "");
+    });
+    searchBox.appendChild(regexBtn);
+
+    const caseBtn = document.createElement("span");
+    caseBtn.className = "as-search-opt";
+    caseBtn.textContent = "Cc";
+    caseBtn.title = "Match Case";
+    caseBtn.addEventListener("click", () => {
+      isCase = !isCase;
+      caseBtn.className = "as-search-opt" + (isCase ? " active" : "");
+    });
+    searchBox.appendChild(caseBtn);
+
+    bar.appendChild(searchBox);
+
+    function closeAllPopups() {
+      branchPopup.style.display = "none";
+      userPopup.style.display = "none";
+      datePopup.style.display = "none";
+      pathPopup.style.display = "none";
     }
 
     document.addEventListener("click", (e) => {
-      if (openPopup && !bar.contains(e.target)) {
-        closePopup();
+      if (!bar.contains(e.target)) {
+        closeAllPopups();
       }
     });
+
+    // 2. Branch Dropdown
+    const branchContainer = document.createElement("div");
+    branchContainer.style.position = "relative";
+    const branchLabel = document.createElement("div");
+    branchLabel.className = "as-filter-label";
+    branchContainer.appendChild(branchLabel);
+
+    const branchPopup = document.createElement("div");
+    branchPopup.className = "filter-popup";
+    branchPopup.innerHTML = '<div class="filter-popup-search"><input type="text" placeholder="Search branch..." /></div><div class="branch-popup-items" style="overflow-y:auto;flex:1;"></div>';
+    branchContainer.appendChild(branchPopup);
+    const branchSearchInput = branchPopup.querySelector("input");
+    const branchItemsContainer = branchPopup.querySelector(".branch-popup-items");
+
+    branchSearchInput.addEventListener("input", () => {
+      renderBranchItems(branchSearchInput.value.toLowerCase());
+    });
+
+    function renderBranchItems(search = "") {
+      branchItemsContainer.innerHTML = "";
+      const bData = $$props.branchData || { branches: [], currentBranch: "" };
+      const branches = bData.branches || [];
+
+      const allItem = document.createElement("div");
+      allItem.className = "filter-popup-item" + (!curBranch ? " selected" : "");
+      allItem.textContent = "All Branches";
+      allItem.addEventListener("click", () => {
+        curBranch = "";
+        if ($$props.setActiveBranch) $$props.setActiveBranch("");
+        closeAllPopups();
+        applyFilter();
+      });
+      branchItemsContainer.appendChild(allItem);
+
+      if (bData.currentBranch && (!search || bData.currentBranch.toLowerCase().includes(search))) {
+        const headItem = document.createElement("div");
+        headItem.className = "filter-popup-item" + (curBranch === bData.currentBranch ? " selected" : "");
+        headItem.innerHTML = '<span>HEAD (' + bData.currentBranch + ')</span>';
+        headItem.addEventListener("click", () => {
+          curBranch = bData.currentBranch;
+          if ($$props.setActiveBranch) $$props.setActiveBranch(curBranch);
+          closeAllPopups();
+          applyFilter();
+        });
+        branchItemsContainer.appendChild(headItem);
+      }
+
+      const localList = branches.filter(b => !b.remote && (!search || b.name.toLowerCase().includes(search)));
+      if (localList.length > 0) {
+        const hdr = document.createElement("div");
+        hdr.className = "filter-popup-header";
+        hdr.textContent = "Local";
+        branchItemsContainer.appendChild(hdr);
+        for (const b of localList) {
+          const item = document.createElement("div");
+          item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
+          item.textContent = b.name;
+          item.addEventListener("click", () => {
+            curBranch = b.name;
+            if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
+            closeAllPopups();
+            applyFilter();
+          });
+          branchItemsContainer.appendChild(item);
+        }
+      }
+
+      const remoteList = branches.filter(b => b.remote && (!search || b.name.toLowerCase().includes(search)));
+      if (remoteList.length > 0) {
+        const hdr = document.createElement("div");
+        hdr.className = "filter-popup-header";
+        hdr.textContent = "Remote";
+        branchItemsContainer.appendChild(hdr);
+        for (const b of remoteList) {
+          const item = document.createElement("div");
+          item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
+          item.textContent = b.name;
+          item.addEventListener("click", () => {
+            curBranch = b.name;
+            if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
+            closeAllPopups();
+            applyFilter();
+          });
+          branchItemsContainer.appendChild(item);
+        }
+      }
+    }
+
+    branchLabel.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = branchPopup.style.display === "flex";
+      closeAllPopups();
+      if (!open) {
+        renderBranchItems();
+        branchPopup.style.display = "flex";
+        setTimeout(() => branchSearchInput.focus(), 20);
+      }
+    });
+
+    bar.appendChild(branchContainer);
+
+    // 3. User Dropdown
+    const userContainer = document.createElement("div");
+    userContainer.style.position = "relative";
+    const userLabel = document.createElement("div");
+    userLabel.className = "as-filter-label";
+    userContainer.appendChild(userLabel);
+
+    const userPopup = document.createElement("div");
+    userPopup.className = "filter-popup";
+    userPopup.innerHTML = '<div class="filter-popup-search"><input type="text" placeholder="Type user name or email..." /></div><div class="user-popup-items" style="overflow-y:auto;flex:1;"></div>';
+    userContainer.appendChild(userPopup);
+    const userSearchInput = userPopup.querySelector("input");
+    const userItemsContainer = userPopup.querySelector(".user-popup-items");
+
+    userSearchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && userSearchInput.value.trim()) {
+        curUser = userSearchInput.value.trim();
+        closeAllPopups();
+        applyFilter();
+      }
+    });
+    userSearchInput.addEventListener("input", () => {
+      renderUserItems(userSearchInput.value.toLowerCase());
+    });
+
+    function renderUserItems(search = "") {
+      userItemsContainer.innerHTML = "";
+      const allItem = document.createElement("div");
+      allItem.className = "filter-popup-item" + (!curUser ? " selected" : "");
+      allItem.textContent = "All Users";
+      allItem.addEventListener("click", () => {
+        curUser = "";
+        closeAllPopups();
+        applyFilter();
+      });
+      userItemsContainer.appendChild(allItem);
+
+      const commitsList = $$props.commits || [];
+      const authorCounts = {};
+      for (const c of commitsList) {
+        if (c.author) authorCounts[c.author] = (authorCounts[c.author] || 0) + 1;
+      }
+      const authorNames = Object.keys(authorCounts).sort();
+      const filtered = authorNames.filter(name => !search || name.toLowerCase().includes(search));
+
+      if (filtered.length > 0) {
+        const hdr = document.createElement("div");
+        hdr.className = "filter-popup-header";
+        hdr.textContent = "Authors in repo";
+        userItemsContainer.appendChild(hdr);
+
+        for (const name of filtered) {
+          const item = document.createElement("div");
+          item.className = "filter-popup-item" + (curUser === name ? " selected" : "");
+          item.innerHTML = '<span>' + name + '</span> <span style="opacity:0.6;font-size:11px;">(' + authorCounts[name] + ')</span>';
+          item.addEventListener("click", () => {
+            curUser = name;
+            closeAllPopups();
+            applyFilter();
+          });
+          userItemsContainer.appendChild(item);
+        }
+      }
+    }
+
+    userLabel.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = userPopup.style.display === "flex";
+      closeAllPopups();
+      if (!open) {
+        renderUserItems();
+        userPopup.style.display = "flex";
+        setTimeout(() => userSearchInput.focus(), 20);
+      }
+    });
+
+    bar.appendChild(userContainer);
+
+    // 4. Date Dropdown
+    const dateContainer = document.createElement("div");
+    dateContainer.style.position = "relative";
+    const dateLabel = document.createElement("div");
+    dateLabel.className = "as-filter-label";
+    dateContainer.appendChild(dateLabel);
+
+    const datePopup = document.createElement("div");
+    datePopup.className = "filter-popup";
+    const dateOptions = [
+      { label: "All", key: "" },
+      { label: "Today", key: "today" },
+      { label: "Yesterday", key: "yesterday" },
+      { label: "Last 7 Days", key: "7days" },
+      { label: "Last 30 Days", key: "30days" }
+    ];
+    for (const opt of dateOptions) {
+      const item = document.createElement("div");
+      item.className = "filter-popup-item";
+      item.textContent = opt.label;
+      item.addEventListener("click", () => {
+        if (!opt.key) {
+          curDate = "";
+          curAfter = "";
+          curBefore = "";
+        } else if (opt.key === "today") {
+          curDate = "Today";
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          curAfter = now.toISOString();
+          curBefore = "";
+        } else if (opt.key === "yesterday") {
+          curDate = "Yesterday";
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const y = new Date(now.getTime() - 86400000);
+          curAfter = y.toISOString();
+          curBefore = now.toISOString();
+        } else if (opt.key === "7days") {
+          curDate = "Last 7 Days";
+          curAfter = new Date(Date.now() - 7 * 86400000).toISOString();
+          curBefore = "";
+        } else if (opt.key === "30days") {
+          curDate = "Last 30 Days";
+          curAfter = new Date(Date.now() - 30 * 86400000).toISOString();
+          curBefore = "";
+        }
+        closeAllPopups();
+        applyFilter();
+      });
+      datePopup.appendChild(item);
+    }
+    const divdr = document.createElement("div");
+    divdr.className = "filter-popup-divider";
+    datePopup.appendChild(divdr);
+
+    const customDateBox = document.createElement("div");
+    customDateBox.className = "filter-custom-date";
+    customDateBox.innerHTML = '<label>Custom Range:</label><input type="date" id="c-after" /><input type="date" id="c-before" /><button class="filter-apply-btn">Apply</button>';
+    const cAfter = customDateBox.querySelector("#c-after");
+    const cBefore = customDateBox.querySelector("#c-before");
+    const cApply = customDateBox.querySelector("button");
+    cApply.addEventListener("click", () => {
+      if (cAfter.value || cBefore.value) {
+        curDate = (cAfter.value || "...") + " - " + (cBefore.value || "...");
+        curAfter = cAfter.value ? new Date(cAfter.value).toISOString() : "";
+        curBefore = cBefore.value ? new Date(cBefore.value).toISOString() : "";
+      } else {
+        curDate = "";
+        curAfter = "";
+        curBefore = "";
+      }
+      closeAllPopups();
+      applyFilter();
+    });
+    datePopup.appendChild(customDateBox);
+    dateContainer.appendChild(datePopup);
+
+    dateLabel.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = datePopup.style.display === "flex";
+      closeAllPopups();
+      if (!open) {
+        datePopup.style.display = "flex";
+      }
+    });
+
+    bar.appendChild(dateContainer);
+
+    // 5. Path Dropdown (>)
+    const pathContainer = document.createElement("div");
+    pathContainer.style.position = "relative";
+    const pathLabel = document.createElement("div");
+    pathLabel.className = "as-filter-label";
+    pathContainer.appendChild(pathLabel);
+
+    const pathPopup = document.createElement("div");
+    pathPopup.className = "filter-popup";
+    pathPopup.style.padding = "8px 12px";
+    pathPopup.innerHTML = '<input type="text" placeholder="e.g. lib/models or file.dart" style="width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:3px;padding:3px 6px;font-size:11px;outline:none;margin-bottom:6px;" /><button class="filter-apply-btn">Apply</button>';
+    const pathInput = pathPopup.querySelector("input");
+    const pathBtn = pathPopup.querySelector("button");
+
+    pathBtn.addEventListener("click", () => {
+      curPath = pathInput.value.trim();
+      closeAllPopups();
+      applyFilter();
+    });
+    pathInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        curPath = pathInput.value.trim();
+        closeAllPopups();
+        applyFilter();
+      }
+    });
+    pathContainer.appendChild(pathPopup);
+
+    pathLabel.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = pathPopup.style.display === "flex";
+      closeAllPopups();
+      if (!open) {
+        pathPopup.style.display = "flex";
+        setTimeout(() => pathInput.focus(), 20);
+      }
+    });
+
+    bar.appendChild(pathContainer);
+
+    // 6. Right toolbar actions (matching Android Studio icons)
+    const tbRight = document.createElement("div");
+    tbRight.className = "as-toolbar-right";
+    tbRight.innerHTML = `
+      <span class="as-tool-icon" title="Fetch / Run"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5L4 2.5z"/></svg></span>
+      <span class="as-tool-icon" title="Refresh"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 8a6.5 6.5 0 1 1-1.9-4.6l1.4-1.4A8.5 8.5 0 1 0 16 8h-1.5z"/><path d="M16 2v5h-5l2-2 3-3z"/></svg></span>
+      <span class="as-tool-icon" title="Go to Hash / Current Revision"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 1.06L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06z"/></svg></span>
+      <span class="as-tool-icon" title="Presentation Options"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3c-4.5 0-7.5 4.5-7.5 5s3 5 7.5 5 7.5-4.5 7.5-5-3-5-7.5-5zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></span>
+      <span class="as-tool-icon" title="Settings"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M9.1 1.5a1.5 1.5 0 0 0-2.2 0l-.3.3a1.5 1.5 0 0 1-1.8.3l-.4-.2a1.5 1.5 0 0 0-2.1.8l-.1.4a1.5 1.5 0 0 1-1.3 1.3l-.4.1a1.5 1.5 0 0 0-.8 2.1l.2.4a1.5 1.5 0 0 1-.3 1.8l-.3.3a1.5 1.5 0 0 0 0 2.2l.3.3a1.5 1.5 0 0 1 .3 1.8l-.2.4a1.5 1.5 0 0 0 .8 2.1l.4.1a1.5 1.5 0 0 1 1.3 1.3l.1.4a1.5 1.5 0 0 0 2.1.8l.4-.2a1.5 1.5 0 0 1 1.8.3l.3.3a1.5 1.5 0 0 0 2.2 0l.3-.3a1.5 1.5 0 0 1 1.8-.3l.4.2a1.5 1.5 0 0 0 2.1-.8l.1-.4a1.5 1.5 0 0 1 1.3-1.3l.4-.1a1.5 1.5 0 0 0 .8-2.1l-.2-.4a1.5 1.5 0 0 1 .3-1.8l.3-.3a1.5 1.5 0 0 0 0-2.2l-.3-.3a1.5 1.5 0 0 1-.3-1.8l.2-.4a1.5 1.5 0 0 0-.8-2.1l-.4-.1a1.5 1.5 0 0 1-1.3-1.3l-.1-.4a1.5 1.5 0 0 0-2.1-.8l-.4.2a1.5 1.5 0 0 1-1.8-.3l-.3-.3zM8 10.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></span>
+    `;
+    const refreshBtn = tbRight.querySelectorAll(".as-tool-icon")[1];
+    refreshBtn.addEventListener("click", () => {
+      postMessage("refresh");
+    });
+    bar.appendChild(tbRight);
+
+    function updateLabels() {
+      // Branch Label
+      if (curBranch) {
+        branchLabel.className = "as-filter-label active";
+        branchLabel.innerHTML = '<span class="lbl-prefix">Branch:</span> <span class="lbl-val">' + curBranch + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+        branchLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+          e.stopPropagation();
+          curBranch = "";
+          if ($$props.setActiveBranch) $$props.setActiveBranch("");
+          applyFilter();
+        });
+      } else {
+        branchLabel.className = "as-filter-label";
+        branchLabel.innerHTML = '<span class="lbl-prefix">Branch</span> <span class="lbl-arrow">&#9662;</span>';
+      }
+
+      // User Label
+      if (curUser) {
+        userLabel.className = "as-filter-label active";
+        userLabel.innerHTML = '<span class="lbl-prefix">User:</span> <span class="lbl-val">' + curUser + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+        userLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+          e.stopPropagation();
+          curUser = "";
+          applyFilter();
+        });
+      } else {
+        userLabel.className = "as-filter-label";
+        userLabel.innerHTML = '<span class="lbl-prefix">User</span> <span class="lbl-arrow">&#9662;</span>';
+      }
+
+      // Date Label
+      if (curDate) {
+        dateLabel.className = "as-filter-label active";
+        dateLabel.innerHTML = '<span class="lbl-prefix">Date:</span> <span class="lbl-val">' + curDate + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+        dateLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+          e.stopPropagation();
+          curDate = "";
+          curAfter = "";
+          curBefore = "";
+          applyFilter();
+        });
+      } else {
+        dateLabel.className = "as-filter-label";
+        dateLabel.innerHTML = '<span class="lbl-prefix">Date</span> <span class="lbl-arrow">&#9662;</span>';
+      }
+
+      // Path Label
+      if (curPath) {
+        pathLabel.className = "as-filter-label active";
+        pathLabel.innerHTML = '<span class="lbl-prefix">Path:</span> <span class="lbl-val">' + curPath + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+        pathLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+          e.stopPropagation();
+          curPath = "";
+          applyFilter();
+        });
+      } else {
+        pathLabel.className = "as-filter-label";
+        pathLabel.innerHTML = '<span class="lbl-prefix">&gt;</span>';
+      }
+    }
 
     user_effect(() => {
       const extBranch = $$props.activeBranch;
       if (extBranch !== undefined && extBranch !== curBranch) {
         curBranch = extBranch || "";
-        renderBar();
+        updateLabels();
       }
     });
 
-    user_effect(() => {
-      // Re-render when branches or commits change
-      const bData = $$props.branchData;
-      const cList = $$props.commits;
-      renderBar();
-    });
-
-    function renderBar() {
-      bar.innerHTML = "";
-
-      // 1. Search Box
-      const searchBox = document.createElement("div");
-      searchBox.className = "filter-search-box";
-      searchBox.innerHTML = '<span class="filter-search-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M11.5 7a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zm-.82 4.74a6 6 0 1 0-1.06 1.06l3.79 3.79a.75.75 0 1 0 1.06-1.06l-3.79-3.79z"/></svg></span>';
-      const searchInput = document.createElement("input");
-      searchInput.type = "text";
-      searchInput.className = "filter-search-input";
-      searchInput.placeholder = "Text or hash";
-      searchInput.value = curQuery;
-      searchInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          curQuery = searchInput.value.trim();
-          applyFilter();
-        }
-      });
-      searchInput.addEventListener("input", (e) => {
-        if (!searchInput.value && curQuery) {
-          curQuery = "";
-          applyFilter();
-        }
-      });
-      searchBox.appendChild(searchInput);
-      bar.appendChild(searchBox);
-
-      // Helper to create pill container
-      function createPill(type, labelText, isActive, onClear, onTogglePopup) {
-        const container = document.createElement("div");
-        container.className = "filter-pill-container";
-
-        const pill = document.createElement("div");
-        pill.className = "filter-pill" + (isActive ? " active" : "");
-        pill.innerHTML = '<span>' + labelText + '</span><span class="pill-arrow">&#9662;</span>';
-
-        if (isActive) {
-          const clearBtn = document.createElement("span");
-          clearBtn.className = "pill-clear";
-          clearBtn.innerHTML = "&times;";
-          clearBtn.title = "Clear";
-          clearBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            onClear();
-          });
-          pill.appendChild(clearBtn);
-        }
-
-        pill.addEventListener("click", (e) => {
-          e.stopPropagation();
-          onTogglePopup();
-        });
-
-        container.appendChild(pill);
-        return { container, pill };
-      }
-
-      // 2. Branch Pill
-      const branchPillLabel = curBranch ? ("Branch: " + curBranch) : "Branch";
-      const branchPillObj = createPill(
-        "branch",
-        branchPillLabel,
-        !!curBranch,
-        () => {
-          curBranch = "";
-          if ($$props.setActiveBranch) $$props.setActiveBranch("");
-          applyFilter();
-        },
-        () => {
-          openPopup = openPopup === "branch" ? null : "branch";
-          renderBar();
-        }
-      );
-
-      if (openPopup === "branch") {
-        const popup = document.createElement("div");
-        popup.className = "filter-popup";
-
-        const pSearch = document.createElement("div");
-        pSearch.className = "filter-popup-search";
-        const bInput = document.createElement("input");
-        bInput.type = "text";
-        bInput.placeholder = "Search branch...";
-        bInput.value = branchSearchText;
-        bInput.addEventListener("input", (e) => {
-          branchSearchText = bInput.value.toLowerCase();
-          populateBranchItems(itemsDiv, branchSearchText);
-        });
-        pSearch.appendChild(bInput);
-        popup.appendChild(pSearch);
-
-        const itemsDiv = document.createElement("div");
-        itemsDiv.style.overflowY = "auto";
-        itemsDiv.style.flex = "1";
-
-        function populateBranchItems(container, search) {
-          container.innerHTML = "";
-          const bData = $$props.branchData || { branches: [], currentBranch: "" };
-          const branches = bData.branches || [];
-
-          const allItem = document.createElement("div");
-          allItem.className = "filter-popup-item" + (!curBranch ? " selected" : "");
-          allItem.textContent = "All Branches";
-          allItem.addEventListener("click", () => {
-            curBranch = "";
-            if ($$props.setActiveBranch) $$props.setActiveBranch("");
-            closePopup();
-            applyFilter();
-          });
-          container.appendChild(allItem);
-
-          if (bData.currentBranch && (!search || bData.currentBranch.toLowerCase().includes(search))) {
-            const headItem = document.createElement("div");
-            headItem.className = "filter-popup-item" + (curBranch === bData.currentBranch ? " selected" : "");
-            headItem.innerHTML = '<span>HEAD (' + bData.currentBranch + ')</span>';
-            headItem.addEventListener("click", () => {
-              curBranch = bData.currentBranch;
-              if ($$props.setActiveBranch) $$props.setActiveBranch(curBranch);
-              closePopup();
-              applyFilter();
-            });
-            container.appendChild(headItem);
-          }
-
-          const localBranches = branches.filter(b => !b.remote && (!search || b.name.toLowerCase().includes(search)));
-          if (localBranches.length > 0) {
-            const hdr = document.createElement("div");
-            hdr.className = "filter-popup-header";
-            hdr.textContent = "Local";
-            container.appendChild(hdr);
-            for (const b of localBranches) {
-              const item = document.createElement("div");
-              item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
-              item.textContent = b.name;
-              item.addEventListener("click", () => {
-                curBranch = b.name;
-                if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
-                closePopup();
-                applyFilter();
-              });
-              container.appendChild(item);
-            }
-          }
-
-          const remoteBranches = branches.filter(b => b.remote && (!search || b.name.toLowerCase().includes(search)));
-          if (remoteBranches.length > 0) {
-            const hdr = document.createElement("div");
-            hdr.className = "filter-popup-header";
-            hdr.textContent = "Remote";
-            container.appendChild(hdr);
-            for (const b of remoteBranches) {
-              const item = document.createElement("div");
-              item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
-              item.textContent = b.name;
-              item.addEventListener("click", () => {
-                curBranch = b.name;
-                if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
-                closePopup();
-                applyFilter();
-              });
-              container.appendChild(item);
-            }
-          }
-        }
-
-        populateBranchItems(itemsDiv, branchSearchText);
-        popup.appendChild(itemsDiv);
-        branchPillObj.container.appendChild(popup);
-        setTimeout(() => bInput.focus(), 20);
-      }
-      bar.appendChild(branchPillObj.container);
-
-      // 3. User Pill
-      const userPillLabel = curUser ? ("User: " + curUser) : "User";
-      const userPillObj = createPill(
-        "user",
-        userPillLabel,
-        !!curUser,
-        () => {
-          curUser = "";
-          applyFilter();
-        },
-        () => {
-          openPopup = openPopup === "user" ? null : "user";
-          renderBar();
-        }
-      );
-
-      if (openPopup === "user") {
-        const popup = document.createElement("div");
-        popup.className = "filter-popup";
-
-        const pSearch = document.createElement("div");
-        pSearch.className = "filter-popup-search";
-        const uInput = document.createElement("input");
-        uInput.type = "text";
-        uInput.placeholder = "Type author name or email...";
-        uInput.value = userSearchText;
-        uInput.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" && uInput.value.trim()) {
-            curUser = uInput.value.trim();
-            closePopup();
-            applyFilter();
-          }
-        });
-        uInput.addEventListener("input", (e) => {
-          userSearchText = uInput.value.toLowerCase();
-          populateUserItems(itemsDiv, userSearchText);
-        });
-        pSearch.appendChild(uInput);
-        popup.appendChild(pSearch);
-
-        const itemsDiv = document.createElement("div");
-        itemsDiv.style.overflowY = "auto";
-        itemsDiv.style.flex = "1";
-
-        function populateUserItems(container, search) {
-          container.innerHTML = "";
-          const allItem = document.createElement("div");
-          allItem.className = "filter-popup-item" + (!curUser ? " selected" : "");
-          allItem.textContent = "All Users";
-          allItem.addEventListener("click", () => {
-            curUser = "";
-            closePopup();
-            applyFilter();
-          });
-          container.appendChild(allItem);
-
-          const commitsList = $$props.commits || [];
-          const authorCounts = {};
-          for (const c of commitsList) {
-            if (c.author) {
-              authorCounts[c.author] = (authorCounts[c.author] || 0) + 1;
-            }
-          }
-          const authorNames = Object.keys(authorCounts).sort();
-          const filtered = authorNames.filter(name => !search || name.toLowerCase().includes(search));
-
-          if (filtered.length > 0) {
-            const hdr = document.createElement("div");
-            hdr.className = "filter-popup-header";
-            hdr.textContent = "Authors in repo";
-            container.appendChild(hdr);
-
-            for (const name of filtered) {
-              const item = document.createElement("div");
-              item.className = "filter-popup-item" + (curUser === name ? " selected" : "");
-              item.innerHTML = '<span>' + name + '</span> <span style="opacity:0.6;font-size:11px;">(' + authorCounts[name] + ')</span>';
-              item.addEventListener("click", () => {
-                curUser = name;
-                closePopup();
-                applyFilter();
-              });
-              container.appendChild(item);
-            }
-          }
-        }
-
-        populateUserItems(itemsDiv, userSearchText);
-        popup.appendChild(itemsDiv);
-        userPillObj.container.appendChild(popup);
-        setTimeout(() => uInput.focus(), 20);
-      }
-      bar.appendChild(userPillObj.container);
-
-      // 4. Date Pill
-      const datePillLabel = curDate ? ("Date: " + curDate) : "Date";
-      const datePillObj = createPill(
-        "date",
-        datePillLabel,
-        !!curDate,
-        () => {
-          curDate = "";
-          curAfter = "";
-          curBefore = "";
-          applyFilter();
-        },
-        () => {
-          openPopup = openPopup === "date" ? null : "date";
-          renderBar();
-        }
-      );
-
-      if (openPopup === "date") {
-        const popup = document.createElement("div");
-        popup.className = "filter-popup";
-
-        const options = [
-          { label: "All", key: "" },
-          { label: "Today", key: "today" },
-          { label: "Yesterday", key: "yesterday" },
-          { label: "Last 7 Days", key: "7days" },
-          { label: "Last 30 Days", key: "30days" }
-        ];
-
-        for (const opt of options) {
-          const item = document.createElement("div");
-          item.className = "filter-popup-item" + (curDate === opt.label ? " selected" : "");
-          item.textContent = opt.label;
-          item.addEventListener("click", () => {
-            if (!opt.key) {
-              curDate = "";
-              curAfter = "";
-              curBefore = "";
-            } else if (opt.key === "today") {
-              curDate = "Today";
-              const now = new Date();
-              now.setHours(0, 0, 0, 0);
-              curAfter = now.toISOString();
-              curBefore = "";
-            } else if (opt.key === "yesterday") {
-              curDate = "Yesterday";
-              const now = new Date();
-              now.setHours(0, 0, 0, 0);
-              const yesterday = new Date(now.getTime() - 86400000);
-              curAfter = yesterday.toISOString();
-              curBefore = now.toISOString();
-            } else if (opt.key === "7days") {
-              curDate = "Last 7 Days";
-              const d = new Date(Date.now() - 7 * 86400000);
-              curAfter = d.toISOString();
-              curBefore = "";
-            } else if (opt.key === "30days") {
-              curDate = "Last 30 Days";
-              const d = new Date(Date.now() - 30 * 86400000);
-              curAfter = d.toISOString();
-              curBefore = "";
-            }
-            closePopup();
-            applyFilter();
-          });
-          popup.appendChild(item);
-        }
-
-        const divdr = document.createElement("div");
-        divdr.className = "filter-popup-divider";
-        popup.appendChild(divdr);
-
-        const customBox = document.createElement("div");
-        customBox.className = "filter-custom-date";
-        customBox.innerHTML = '<label>Custom Range:</label><input type="date" id="custom-after" /><input type="date" id="custom-before" /><button class="filter-apply-btn">Apply</button>';
-        const afterInput = customBox.querySelector("#custom-after");
-        const beforeInput = customBox.querySelector("#custom-before");
-        const applyBtn = customBox.querySelector("button");
-
-        if (curAfter && curAfter.includes("T")) afterInput.value = curAfter.split("T")[0];
-        if (curBefore && curBefore.includes("T")) beforeInput.value = curBefore.split("T")[0];
-
-        applyBtn.addEventListener("click", () => {
-          if (afterInput.value || beforeInput.value) {
-            curDate = (afterInput.value || "...") + " - " + (beforeInput.value || "...");
-            curAfter = afterInput.value ? new Date(afterInput.value).toISOString() : "";
-            curBefore = beforeInput.value ? new Date(beforeInput.value).toISOString() : "";
-          } else {
-            curDate = "";
-            curAfter = "";
-            curBefore = "";
-          }
-          closePopup();
-          applyFilter();
-        });
-        popup.appendChild(customBox);
-
-        datePillObj.container.appendChild(popup);
-      }
-      bar.appendChild(datePillObj.container);
-
-      // 5. Path Pill
-      const pathPillLabel = curPath ? ("Path: " + curPath) : "Path";
-      const pathPillObj = createPill(
-        "path",
-        pathPillLabel,
-        !!curPath,
-        () => {
-          curPath = "";
-          applyFilter();
-        },
-        () => {
-          openPopup = openPopup === "path" ? null : "path";
-          renderBar();
-        }
-      );
-
-      if (openPopup === "path") {
-        const popup = document.createElement("div");
-        popup.className = "filter-popup";
-        popup.style.padding = "8px 12px";
-
-        const pInput = document.createElement("input");
-        pInput.type = "text";
-        pInput.className = "branch-search-input";
-        pInput.placeholder = "e.g. lib/models or file.dart";
-        pInput.value = curPath;
-        pInput.style.marginBottom = "6px";
-
-        const btn = document.createElement("button");
-        btn.className = "filter-apply-btn";
-        btn.textContent = "Apply";
-        btn.addEventListener("click", () => {
-          curPath = pInput.value.trim();
-          closePopup();
-          applyFilter();
-        });
-        pInput.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            curPath = pInput.value.trim();
-            closePopup();
-            applyFilter();
-          }
-        });
-
-        popup.appendChild(pInput);
-        popup.appendChild(btn);
-        pathPillObj.container.appendChild(popup);
-        setTimeout(() => pInput.focus(), 20);
-      }
-      bar.appendChild(pathPillObj.container);
-
-      // 6. Reset All Button (if any filter active)
-      if (curQuery || curBranch || curUser || curDate || curPath) {
-        const resetBtn = document.createElement("button");
-        resetBtn.className = "filter-reset-btn";
-        resetBtn.textContent = "Reset All";
-        resetBtn.addEventListener("click", () => {
-          curQuery = "";
-          curBranch = "";
-          curUser = "";
-          curDate = "";
-          curAfter = "";
-          curBefore = "";
-          curPath = "";
-          if ($$props.setActiveBranch) $$props.setActiveBranch("");
-          applyFilter();
-        });
-        bar.appendChild(resetBtn);
-      }
-    }
-
-    renderBar();
+    updateLabels();
     append($$anchor, bar);
     pop();
   }
@@ -6863,6 +6855,115 @@ ${component_stack}
       const { branches = [], tags = [], currentBranch = "" } = data;
       container.innerHTML = "";
 
+      // Close any open context menu
+      function closeBranchContextMenu() {
+        const old = document.querySelector(".branch-context-menu");
+        if (old) old.remove();
+      }
+
+      function showBranchContextMenu(e, branchName) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeBranchContextMenu();
+
+        const isCurrent = (branchName === currentBranch);
+        const menu = document.createElement("div");
+        menu.className = "branch-context-menu";
+
+        function addItem(label, shortcut, onClick) {
+          const it = document.createElement("div");
+          it.className = "bcm-item";
+          it.innerHTML = '<span>' + label + '</span>' + (shortcut ? '<span class="bcm-shortcut">' + shortcut + '</span>' : '');
+          it.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            closeBranchContextMenu();
+            onClick();
+          });
+          menu.appendChild(it);
+        }
+
+        function addDivider() {
+          const d = document.createElement("div");
+          d.className = "bcm-divider";
+          menu.appendChild(d);
+        }
+
+        if (isCurrent) {
+          addItem("New Branch from '" + branchName + "'...", "", () => {
+            const name = prompt("New branch name:");
+            if (name) postMessage("createBranch", { name, startPoint: branchName });
+          });
+          addItem("Show Diff with Working Tree", "", () => {
+            postMessage("showDiff", { branch: branchName });
+          });
+          addDivider();
+          addItem("Update", "", () => {
+            postMessage("pull", branchName);
+          });
+          addItem("Push...", "", () => {
+            postMessage("push", branchName);
+          });
+          addDivider();
+          addItem("Rename...", "F2", () => {
+            const newName = prompt("Rename branch '" + branchName + "' to:", branchName);
+            if (newName && newName !== branchName) postMessage("renameBranch", { oldName: branchName, newName });
+          });
+        } else {
+          addItem("Checkout", "", () => {
+            postMessage("checkout", branchName);
+          });
+          addItem("New Branch from '" + branchName + "'...", "", () => {
+            const name = prompt("New branch name:");
+            if (name) postMessage("createBranch", { name, startPoint: branchName });
+          });
+          addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
+            postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
+          });
+          addDivider();
+          addItem("Compare with '" + (currentBranch || "HEAD") + "'", "", () => {
+            postMessage("compareBranch", { branch: branchName, withBranch: currentBranch });
+          });
+          addItem("Show Diff with Working Tree", "", () => {
+            postMessage("showDiff", { branch: branchName });
+          });
+          addDivider();
+          addItem("Rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'", "", () => {
+            postMessage("rebase", branchName);
+          });
+          addItem("Merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'", "", () => {
+            postMessage("mergeBranch", branchName);
+          });
+          addDivider();
+          addItem("Update", "", () => {
+            postMessage("pull", branchName);
+          });
+          addItem("Push...", "", () => {
+            postMessage("push", branchName);
+          });
+          addDivider();
+          addItem("Rename...", "F2", () => {
+            const newName = prompt("Rename branch '" + branchName + "' to:", branchName);
+            if (newName && newName !== branchName) postMessage("renameBranch", { oldName: branchName, newName });
+          });
+          addItem("Delete", "", () => {
+            if (confirm("Delete branch '" + branchName + "'?")) {
+              postMessage("deleteBranch", branchName);
+            }
+          });
+        }
+
+        document.body.appendChild(menu);
+        let x = e.clientX;
+        let y = e.clientY;
+        const rect = menu.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+        menu.style.left = Math.max(0, x) + "px";
+        menu.style.top = Math.max(0, y) + "px";
+      }
+
+      document.addEventListener("click", closeBranchContextMenu);
+
       const searchBox = document.createElement("div");
       searchBox.className = "branch-search-box";
       const sInput = document.createElement("input");
@@ -6909,12 +7010,15 @@ ${component_stack}
         }
       }
 
+      const svgTagIcon = '<svg width="12" height="12" viewBox="0 0 16 16" fill="#e5a50a" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>';
+
       if (currentBranch && filterFn(currentBranch)) {
         const headSec = createSec("HEAD (Current Branch)", true);
         const item = document.createElement("div");
         item.className = "tree-item current-head" + (currentActive === currentBranch ? " active" : "");
-        item.innerHTML = '<span class="branch-tag-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:2px;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + currentBranch + '</span>';
+        item.innerHTML = '<span class="branch-tag-icon">' + svgTagIcon + '</span> <span style="font-weight:600;">' + currentBranch + '</span>';
         item.addEventListener("click", () => handleBranchClick(currentBranch));
+        item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, currentBranch));
         headSec.bdy.appendChild(item);
         treeContent.appendChild(headSec.sec);
       }
@@ -6938,11 +7042,15 @@ ${component_stack}
         for (const b of roots) {
           const item = document.createElement("div");
           item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+          const isCur = (b.name === currentBranch);
           const isStar = b.name === "develop" || b.name === "main" || b.name === "master";
-          const icon = isStar ? '<span class="star-icon">★</span>' : '<span class="branch-icon">⑂</span>';
+          let icon = '<span class="branch-icon">⑂</span>';
+          if (isCur) icon = '<span class="branch-tag-icon">' + svgTagIcon + '</span>';
+          else if (isStar) icon = '<span class="star-icon">★</span>';
           item.innerHTML = icon + ' <span>' + b.name + '</span>';
           item.addEventListener("click", () => handleBranchClick(b.name));
           item.addEventListener("dblclick", () => postMessage("checkout", b.name));
+          item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
           localSec.bdy.appendChild(item);
         }
         for (const [fn, items] of Object.entries(folders)) {
@@ -6962,12 +7070,16 @@ ${component_stack}
           for (const b of items) {
             const item = document.createElement("div");
             item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+            const isCur = (b.name === currentBranch);
             const isStar = b.displayName === "develop" || b.displayName === "main";
-            const icon = isStar ? '<span class="star-icon">★</span>' : '<span class="branch-icon">⑂</span>';
+            let icon = '<span class="branch-icon">⑂</span>';
+            if (isCur) icon = '<span class="branch-tag-icon">' + svgTagIcon + '</span>';
+            else if (isStar) icon = '<span class="star-icon">★</span>';
             item.innerHTML = icon + ' <span>' + b.displayName + '</span>';
             item.title = b.name;
             item.addEventListener("click", () => handleBranchClick(b.name));
             item.addEventListener("dblclick", () => postMessage("checkout", b.name));
+            item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
             fBdy.appendChild(item);
           }
           fDiv.appendChild(fHdr);
@@ -6979,25 +7091,25 @@ ${component_stack}
 
       const remoteList = branches.filter((b) => b.remote || b.name.startsWith("origin/")).filter((b) => filterFn(b.name));
       if (remoteList.length > 0) {
-        const remSec = createSec("Remote", false);
+        const remoteSec = createSec("Remote", true);
         for (const b of remoteList) {
           const item = document.createElement("div");
           item.className = "tree-item" + (currentActive === b.name ? " active" : "");
           item.innerHTML = '<span class="branch-icon remote">⑂</span> <span>' + b.name + '</span>';
-          item.title = b.name;
           item.addEventListener("click", () => handleBranchClick(b.name));
-          remSec.bdy.appendChild(item);
+          item.addEventListener("dblclick", () => postMessage("checkout", b.name));
+          item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
+          remoteSec.bdy.appendChild(item);
         }
-        treeContent.appendChild(remSec.sec);
+        treeContent.appendChild(remoteSec.sec);
       }
 
-      const tagList = tags.filter((t) => filterFn(t.name));
-      if (tagList.length > 0) {
+      if (tags.length > 0) {
         const tagSec = createSec("Tags", false);
-        for (const t of tagList) {
+        for (const t of tags.filter((t) => filterFn(t.name))) {
           const item = document.createElement("div");
-          item.className = "tree-item" + (currentActive === t.name ? " active" : "");
-          item.innerHTML = '<span class="tag-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:2px;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + t.name + '</span>';
+          item.className = "tree-item";
+          item.innerHTML = '<span class="tag-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="#d29922" style="display:inline-block;vertical-align:-1px;margin-right:2px;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + t.name + '</span>';
           item.addEventListener("click", () => handleBranchClick(t.name));
           tagSec.bdy.appendChild(item);
         }

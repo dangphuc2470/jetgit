@@ -50,7 +50,7 @@ export interface StatusEntry {
 // Field separator unlikely to appear in commit messages
 const SEP = '\x1e';
 const LOG_FORMAT = [
-  '%H',   // hash
+  '%x00%H', // hash with null byte commit delimiter
   '%h',   // abbreviated hash
   '%P',   // parent hashes
   '%an',  // author name
@@ -152,15 +152,15 @@ export class GitService {
     const output = await this.exec(args);
     const commits: Commit[] = [];
 
-    for (const line of output.split('\n')) {
-      if (!line.trim()) continue;
-      const parts = line.split(SEP);
+    for (const chunk of output.split('\0')) {
+      if (!chunk.trim()) continue;
+      const parts = chunk.split(SEP);
       if (parts.length < 9) continue;
 
       const commit: Commit = {
-        hash: parts[0],
+        hash: parts[0].trim(),
         abbreviatedHash: parts[1],
-        parents: parts[2] ? parts[2].split(' ') : [],
+        parents: parts[2] ? parts[2].split(' ').filter(Boolean) : [],
         author: parts[3],
         authorEmail: parts[4],
         authorDate: parts[5],

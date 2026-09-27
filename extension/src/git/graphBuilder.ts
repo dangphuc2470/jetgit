@@ -58,31 +58,29 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
 
     // Process parents
     const parents = commit.parents.filter(p => hashToRow.has(p));
+    const usedColsThisRow = new Set<number>();
 
     for (let pi = 0; pi < parents.length; pi++) {
       const parentHash = parents[pi];
-      const parentRow = hashToRow.get(parentHash)!;
-
-      // Determine which column the parent will land in
       let parentCol = columns.indexOf(parentHash);
 
       if (parentCol !== -1) {
-        // Parent already has a reserved column — draw line to it
+        // Parent already has a reserved column — draw line to it on next row
         const lineColor = colorMap.get(parentHash) ?? color;
         lines.push({
           fromColumn: col,
           fromRow: row,
           toColumn: parentCol,
-          toRow: parentRow,
+          toRow: row + 1,
           color: lineColor,
         });
+        usedColsThisRow.add(parentCol);
       } else {
-        // First parent continues in the same column, others fork
+        // First parent continues in the same column if free, others fork
         let targetCol: number;
-        if (pi === 0) {
+        if (pi === 0 && col !== -1 && !columns[col]) {
           targetCol = col;
         } else {
-          // Find an empty slot for the branch
           targetCol = columns.indexOf(null);
           if (targetCol === -1) {
             targetCol = columns.length;
@@ -101,15 +99,16 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
           fromColumn: col,
           fromRow: row,
           toColumn: targetCol,
-          toRow: parentRow,
+          toRow: row + 1,
           color: lineColor,
         });
+        usedColsThisRow.add(targetCol);
       }
     }
 
     // Continuation lines: columns that pass through this row unchanged
     for (let c = 0; c < columns.length; c++) {
-      if (columns[c] !== null && c !== col) {
+      if (columns[c] !== null && !usedColsThisRow.has(c)) {
         const targetHash = columns[c]!;
         const targetRow = hashToRow.get(targetHash);
         if (targetRow !== undefined && targetRow > row) {

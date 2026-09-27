@@ -83,7 +83,7 @@ var LRUCache = class {
 var execFileAsync = (0, import_util.promisify)(import_child_process.execFile);
 var SEP = "";
 var LOG_FORMAT = [
-  "%H",
+  "%x00%H",
   // hash
   "%h",
   // abbreviated hash
@@ -179,16 +179,16 @@ var GitService = class {
     }
     const output = await this.exec(args);
     const commits = [];
-    for (const line of output.split("\n")) {
-      if (!line.trim())
+    for (const chunk of output.split("\0")) {
+      if (!chunk.trim())
         continue;
-      const parts = line.split(SEP);
+      const parts = chunk.split(SEP);
       if (parts.length < 9)
         continue;
       const commit = {
-        hash: parts[0],
+        hash: parts[0].trim(),
         abbreviatedHash: parts[1],
-        parents: parts[2] ? parts[2].split(" ") : [],
+        parents: parts[2] ? parts[2].split(" ").filter(Boolean) : [],
         author: parts[3],
         authorEmail: parts[4],
         authorDate: parts[5],
@@ -533,9 +533,9 @@ function buildGraph(commits) {
     const color = colorMap.get(commit.hash);
     columns[col] = null;
     const parents = commit.parents.filter((p) => hashToRow.has(p));
+    const usedColsThisRow = new Set();
     for (let pi = 0; pi < parents.length; pi++) {
       const parentHash = parents[pi];
-      const parentRow = hashToRow.get(parentHash);
       let parentCol = columns.indexOf(parentHash);
       if (parentCol !== -1) {
         const lineColor = colorMap.get(parentHash) ?? color;
@@ -543,12 +543,13 @@ function buildGraph(commits) {
           fromColumn: col,
           fromRow: row,
           toColumn: parentCol,
-          toRow: parentRow,
+          toRow: row + 1,
           color: lineColor
         });
+        usedColsThisRow.add(parentCol);
       } else {
         let targetCol;
-        if (pi === 0) {
+        if (pi === 0 && col !== -1 && !columns[col]) {
           targetCol = col;
         } else {
           targetCol = columns.indexOf(null);
@@ -566,13 +567,14 @@ function buildGraph(commits) {
           fromColumn: col,
           fromRow: row,
           toColumn: targetCol,
-          toRow: parentRow,
+          toRow: row + 1,
           color: lineColor
         });
+        usedColsThisRow.add(targetCol);
       }
     }
     for (let c = 0; c < columns.length; c++) {
-      if (columns[c] !== null && c !== col) {
+      if (columns[c] !== null && !usedColsThisRow.has(c)) {
         const targetHash = columns[c];
         const targetRow = hashToRow.get(targetHash);
         if (targetRow !== void 0 && targetRow > row) {

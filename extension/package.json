@@ -60,13 +60,30 @@
   "activationEvents": [
     "workspaceContains:.git",
     "onCommand:intellij-git.openLog",
+    "onCommand:intellij-git.openCommit",
     "onCommand:intellij-git.toggleBlame",
+    "onView:intellij-git.commitView",
     "onView:intellij-git.branches",
     "onView:intellij-git.changelists"
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "intellij-git-commit",
+          "title": "Commit",
+          "icon": "resources/commit.svg"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "intellij-git.openCommit",
+        "title": "Open Commit Tool Window",
+        "category": "IntelliJ Git",
+        "icon": "$(check)"
+      },
       {
         "command": "intellij-git.openLog",
         "title": "Open Git Log",
@@ -173,13 +190,20 @@
         "when": "editorTextFocus"
       },
       {
-        "command": "intellij-git.commitChangelist",
+        "command": "intellij-git.openCommit",
         "key": "ctrl+k",
         "mac": "cmd+k",
         "when": "!terminalFocus"
       }
     ],
     "views": {
+      "intellij-git-commit": [
+        {
+          "type": "webview",
+          "id": "intellij-git.commitView",
+          "name": "Commit"
+        }
+      ],
       "panel": [
         {
           "type": "webview",

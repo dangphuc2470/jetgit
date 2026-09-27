@@ -1,0 +1,905 @@
+(function() {
+  const vscode = acquireVsCodeApi();
+
+  // State
+  let state = {
+    activeTab: 'commit', // 'commit' | 'shelf' | 'stash'
+    files: [], // { path, name, dir, status, staged, isUntracked }
+    changesCount: 0,
+    unversionedCount: 0,
+    selectedFile: null,
+    checkedFiles: new Set(), // paths of checked files
+    showDiff: false,
+    diffData: null, // { path, diff, hunks }
+    commitMessage: '',
+    isAmend: false,
+    recentMessages: [],
+    stashes: [],
+    expandChanges: true,
+    expandUnversioned: true,
+    showPaths: true,
+    commitOptionsOpen: false,
+    recentOpen: false,
+    splitRatio: 0.6 // 60% file tree, 40% commit box
+  };
+
+  const app = document.getElementById('app');
+
+  // File type icons
+  function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const base = filename.toLowerCase();
+
+    if (ext === 'dart') {
+      return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4.5 12L12 4.5L19.5 12L12 19.5L4.5 12Z" stroke="#4fc3f7" stroke-width="2.5" fill="#0288d1"/><circle cx="12" cy="12" r="3" fill="#ffffff"/></svg>';
+    }
+    if (ext === 'sh' || ext === 'bash') {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#80cbc4"><rect x="1" y="2" width="14" height="12" rx="2" fill="#263238" stroke="#80cbc4" stroke-width="1.2"/><path d="M4 6L6.5 8L4 10" stroke="#80cbc4" stroke-width="1.2" stroke-linecap="round"/><line x1="8" y1="10" x2="11" y2="10" stroke="#80cbc4" stroke-width="1.2"/></svg>';
+    }
+    if (base === 'fastfile' || base === 'podfile' || base === 'gemfile' || base.endsWith('.lock')) {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#e57373"><path d="M8 2L13 6L8 14L3 6L8 2Z" stroke="#ef5350" stroke-width="1.2" fill="#c62828"/></svg>';
+    }
+    if (ext === 'pbxproj' || ext === 'xcscheme' || ext === 'xcworkspacedata') {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#64b5f6"><rect x="2" y="2" width="12" height="12" rx="2" fill="#1565c0"/><path d="M5 8H11M8 5V11" stroke="#ffffff" stroke-width="1.5"/></svg>';
+    }
+    if (ext === 'yaml' || ext === 'yml') {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#ffb74d"><rect x="2" y="2" width="12" height="12" rx="2" fill="#ef6c00"/><text x="4" y="11" fill="#ffffff" font-size="8" font-weight="bold">Y</text></svg>';
+    }
+    if (ext === 'json') {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#ce93d8"><text x="2" y="12" fill="#ab47bc" font-size="12" font-weight="bold">{ }</text></svg>';
+    }
+    if (ext === 'der' || ext === 'cer' || ext === 'crt' || ext === 'pem') {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#ffd54f"><rect x="3" y="2" width="10" height="12" rx="1" fill="#f57f17"/><circle cx="8" cy="8" r="2" fill="#ffffff"/></svg>';
+    }
+    // Default file icon
+    return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#90a4ae"><path d="M3 2h7l3 3v9H3V2z" fill="#37474f" stroke="#78909c" stroke-width="1.2"/><path d="M10 2v3h3" fill="none" stroke="#78909c" stroke-width="1.2"/></svg>';
+  }
+
+  // Parse diff into hunks with lines
+  function parseDiff(rawDiff, filePath) {
+    if (!rawDiff || !rawDiff.trim()) return [];
+    const lines = rawDiff.split('\n');
+    const hunks = [];
+    let currentHunk = null;
+    let oldLine = 0;
+    let newLine = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith('@@')) {
+        const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (match) {
+          oldLine = parseInt(match[1], 10);
+          newLine = parseInt(match[2], 10);
+        }
+        currentHunk = {
+          header: line,
+          lines: [],
+          rawLines: [line],
+          staged: true
+        };
+        hunks.push(currentHunk);
+      } else if (currentHunk) {
+        currentHunk.rawLines.push(line);
+        if (line.startsWith('+')) {
+          currentHunk.lines.push({
+            type: 'add',
+            oldNum: '',
+            newNum: newLine++,
+            text: line.slice(1),
+            raw: line,
+            staged: true
+          });
+        } else if (line.startsWith('-')) {
+          currentHunk.lines.push({
+            type: 'del',
+            oldNum: oldLine++,
+            newNum: '',
+            text: line.slice(1),
+            raw: line,
+            staged: true
+          });
+        } else {
+          currentHunk.lines.push({
+            type: 'ctx',
+            oldNum: oldLine++,
+            newNum: newLine++,
+            text: line.startsWith(' ') ? line.slice(1) : line,
+            raw: line,
+            staged: true
+          });
+        }
+      }
+    }
+    return hunks;
+  }
+
+  // Render main UI
+  function render() {
+    app.innerHTML = '';
+
+    // Root container
+    const container = document.createElement('div');
+    container.className = 'commit-window';
+
+    // 1. Tab Bar
+    const tabBar = document.createElement('div');
+    tabBar.className = 'tab-bar';
+    tabBar.innerHTML = `
+      <div class="tab-items">
+        <button class="tab-btn ${state.activeTab === 'commit' ? 'active' : ''}" data-tab="commit">Commit</button>
+        <button class="tab-btn ${state.activeTab === 'shelf' ? 'active' : ''}" data-tab="shelf">Shelf</button>
+        <button class="tab-btn ${state.activeTab === 'stash' ? 'active' : ''}" data-tab="stash">Stash</button>
+      </div>
+      <div class="tab-actions">
+        <button class="icon-btn" id="btn-tab-menu" title="More Options">⋮</button>
+        <button class="icon-btn" id="btn-tab-collapse" title="Collapse / Minimize">—</button>
+      </div>
+    `;
+    container.appendChild(tabBar);
+
+    // If shelf tab
+    if (state.activeTab === 'shelf') {
+      const shelfContent = document.createElement('div');
+      shelfContent.className = 'shelf-view';
+      shelfContent.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📁</div>
+          <div class="empty-title">No Shelved Changes</div>
+          <div class="empty-sub">Shelve changes to temporarily set them aside without committing.</div>
+          <button class="action-btn-primary" id="btn-create-shelf">Shelf Changes...</button>
+        </div>
+      `;
+      container.appendChild(shelfContent);
+      attachTabEvents(container);
+      app.appendChild(container);
+      return;
+    }
+
+    // If stash tab
+    if (state.activeTab === 'stash') {
+      const stashContent = document.createElement('div');
+      stashContent.className = 'stash-view';
+      let stashItems = state.stashes.map(s => `
+        <div class="stash-row">
+          <div class="stash-info">
+            <span class="stash-idx">${s.index}</span>
+            <span class="stash-msg">${escapeHtml(s.message || 'WIP on branch')}</span>
+            <span class="stash-date">${s.date || ''}</span>
+          </div>
+          <div class="stash-actions">
+            <button class="stash-btn" data-act="pop" data-idx="${s.index}">Pop</button>
+            <button class="stash-btn" data-act="apply" data-idx="${s.index}">Apply</button>
+            <button class="stash-btn danger" data-act="drop" data-idx="${s.index}">Drop</button>
+          </div>
+        </div>
+      `).join('');
+
+      if (state.stashes.length === 0) {
+        stashItems = `
+          <div class="empty-state">
+            <div class="empty-title">No Stashes</div>
+            <div class="empty-sub">Use git stash to save local uncommitted changes.</div>
+          </div>
+        `;
+      }
+
+      stashContent.innerHTML = `
+        <div class="stash-header">
+          <span class="stash-title">Git Stashes (${state.stashes.length})</span>
+          <button class="action-btn-primary" id="btn-create-stash">+ New Stash...</button>
+        </div>
+        <div class="stash-list">${stashItems}</div>
+      `;
+      container.appendChild(stashContent);
+      attachTabEvents(container);
+      attachStashEvents(stashContent);
+      app.appendChild(container);
+      return;
+    }
+
+    // 2. Toolbar
+    const toolbar = document.createElement('div');
+    toolbar.className = 'commit-toolbar';
+    toolbar.innerHTML = `
+      <div class="tool-left">
+        <button class="tool-btn" id="btn-refresh" title="Refresh (Cmd+R)">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.65 2.35A7.958 7.958 0 0 0 8 0a8 8 0 1 0 8 8h-2a6 6 0 1 1-1.76-4.24l-2.24 2.24H16V0l-2.35 2.35z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-rollback" title="Rollback (Cmd+Alt+Z)">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 6.5A5.5 5.5 0 1 1 9 12h-1a4.5 4.5 0 1 0-4.5-4.5H6L2.5 3 0 6.5h3.5z"/></svg>
+        </button>
+        <button class="tool-btn ${state.showDiff ? 'active' : ''}" id="btn-show-diff" title="Show Diff / Review (Cmd+D)">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1v14h8V1H4zm1 2h6v10H5V3zm2 2v2h2V5H7zm0 4v2h2V9H7z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-view-options" title="View Options">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="3"/><path d="M8 2.5C4 2.5 1 8 1 8s3 5.5 7 5.5 7-5.5 7-5.5-3-5.5-7-5.5zm0 9C5.5 11.5 3 8 3 8s2.5-3.5 5-3.5 5 3.5 5 3.5-2.5 3.5-5 3.5z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-toggle-expand" title="Expand / Collapse All">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1L4 5h8L8 1zM8 15l4-4H4l4 4z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-clear" title="Clear / Deselect All">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
+      </div>
+    `;
+    container.appendChild(toolbar);
+
+    // 3. Body: Split into Left (File Tree + Commit Box) and Optional Right (Diff Viewer)
+    const mainBody = document.createElement('div');
+    mainBody.className = `commit-body ${state.showDiff ? 'with-diff' : ''}`;
+
+    // Left Panel
+    const leftPanel = document.createElement('div');
+    leftPanel.className = 'commit-left-panel';
+
+    // File Tree Container
+    const treeContainer = document.createElement('div');
+    treeContainer.className = 'file-tree-container';
+    treeContainer.style.flex = `${state.splitRatio}`;
+
+    // Render Changes group
+    const changesFiles = state.files.filter(f => !f.isUntracked);
+    const unversionedFiles = state.files.filter(f => f.isUntracked);
+
+    const changesGroup = renderFileGroup(
+      'Changes',
+      changesFiles,
+      state.expandChanges,
+      'toggleChanges',
+      'checkAllChanges'
+    );
+    treeContainer.appendChild(changesGroup);
+
+    // Render Unversioned group
+    const unversionedGroup = renderFileGroup(
+      'Unversioned Files',
+      unversionedFiles,
+      state.expandUnversioned,
+      'toggleUnversioned',
+      'checkAllUnversioned'
+    );
+    treeContainer.appendChild(unversionedGroup);
+
+    leftPanel.appendChild(treeContainer);
+
+    // Horizontal Splitter between file list and commit box
+    const hSplitter = document.createElement('div');
+    hSplitter.className = 'h-splitter';
+    hSplitter.innerHTML = `<div class="splitter-line"></div>`;
+    attachHSplitter(hSplitter, treeContainer, leftPanel);
+    leftPanel.appendChild(hSplitter);
+
+    // Commit Message & Actions Box
+    const commitBox = document.createElement('div');
+    commitBox.className = 'commit-box';
+    commitBox.style.flex = `${1 - state.splitRatio}`;
+
+    commitBox.innerHTML = `
+      <div class="commit-options-bar">
+        <label class="checkbox-label amend-label">
+          <input type="checkbox" id="chk-amend" ${state.isAmend ? 'checked' : ''}/>
+          <span>Amend</span>
+        </label>
+        <div class="commit-icon-tools">
+          <button class="tool-btn-sm" id="btn-recent-msgs" title="Recent Commit Messages">
+            🕒
+          </button>
+          <button class="tool-btn-sm" id="btn-edit-template" title="Edit Template">
+            ✎
+          </button>
+        </div>
+      </div>
+
+      <div class="commit-input-wrapper">
+        <textarea id="commit-message-input" placeholder="Commit message...">${escapeHtml(state.commitMessage)}</textarea>
+        ${state.recentOpen ? renderRecentMessagesDropdown() : ''}
+      </div>
+
+      <div class="commit-actions-bar">
+        <div class="action-buttons-group">
+          <button class="btn-commit-primary" id="btn-commit">Commit</button>
+          <button class="btn-commit-secondary" id="btn-commit-push">Commit and Push...</button>
+        </div>
+        <div class="commit-gear-wrapper">
+          <button class="tool-btn-sm" id="btn-commit-gear" title="Before Commit Settings">⚙</button>
+          ${state.commitOptionsOpen ? renderCommitGearDropdown() : ''}
+        </div>
+      </div>
+    `;
+    leftPanel.appendChild(commitBox);
+    mainBody.appendChild(leftPanel);
+
+    // Right Panel: Diff & Line-by-Line Reviewer (if showDiff is true)
+    if (state.showDiff) {
+      const rightPanel = document.createElement('div');
+      rightPanel.className = 'commit-right-panel';
+      rightPanel.appendChild(renderDiffViewer());
+      mainBody.appendChild(rightPanel);
+    }
+
+    container.appendChild(mainBody);
+    app.appendChild(container);
+
+    // Attach all event listeners
+    attachTabEvents(container);
+    attachToolbarEvents(toolbar);
+    attachTreeEvents(treeContainer);
+    attachCommitBoxEvents(commitBox);
+  }
+
+  // Render a group in the tree
+  function renderFileGroup(title, files, expanded, toggleAction, checkAllAction) {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'tree-group';
+
+    const allChecked = files.length > 0 && files.every(f => state.checkedFiles.has(f.path));
+    const someChecked = !allChecked && files.some(f => state.checkedFiles.has(f.path));
+
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = `
+      <span class="group-arrow ${expanded ? 'expanded' : ''}">▶</span>
+      <input type="checkbox" class="group-chk" ${allChecked ? 'checked' : ''}/>
+      <span class="group-title">${title}</span>
+      <span class="group-count">${files.length} files</span>
+    `;
+
+    const chk = header.querySelector('.group-chk');
+    chk.indeterminate = someChecked;
+
+    chk.addEventListener('change', (e) => {
+      e.stopPropagation();
+      const check = chk.checked;
+      files.forEach(f => {
+        if (check) {
+          state.checkedFiles.add(f.path);
+        } else {
+          state.checkedFiles.delete(f.path);
+        }
+      });
+      render();
+    });
+
+    header.addEventListener('click', (e) => {
+      if (e.target === chk) return;
+      if (toggleAction === 'toggleChanges') {
+        state.expandChanges = !state.expandChanges;
+      } else {
+        state.expandUnversioned = !state.expandUnversioned;
+      }
+      render();
+    });
+
+    groupEl.appendChild(header);
+
+    if (expanded) {
+      const itemsContainer = document.createElement('div');
+      itemsContainer.className = 'group-items';
+
+      files.forEach(file => {
+        const itemEl = document.createElement('div');
+        const isSelected = state.selectedFile === file.path;
+        const isChecked = state.checkedFiles.has(file.path);
+        itemEl.className = `file-item ${isSelected ? 'selected' : ''}`;
+
+        const isUnversioned = file.isUntracked;
+        const nameColorClass = isUnversioned ? 'name-unversioned' : 'name-modified';
+
+        itemEl.innerHTML = `
+          <input type="checkbox" class="file-chk" ${isChecked ? 'checked' : ''}/>
+          <span class="file-icon">${getFileIcon(file.name)}</span>
+          <span class="file-name ${nameColorClass}">${escapeHtml(file.name)}</span>
+          ${state.showPaths && file.dir ? `<span class="file-dir">${escapeHtml(file.dir)}</span>` : ''}
+        `;
+
+        const fileChk = itemEl.querySelector('.file-chk');
+        fileChk.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (fileChk.checked) {
+            state.checkedFiles.add(file.path);
+            vscode.postMessage({ type: 'stageFile', payload: file.path });
+          } else {
+            state.checkedFiles.delete(file.path);
+            vscode.postMessage({ type: 'unstageFile', payload: file.path });
+          }
+          render();
+        });
+
+        itemEl.addEventListener('click', (e) => {
+          if (e.target === fileChk) return;
+          state.selectedFile = file.path;
+          vscode.postMessage({ type: 'getFileDiff', payload: file.path });
+          render();
+        });
+
+        itemEl.addEventListener('dblclick', (e) => {
+          if (e.target === fileChk) return;
+          state.selectedFile = file.path;
+          state.showDiff = true;
+          vscode.postMessage({ type: 'getFileDiff', payload: file.path });
+          render();
+        });
+
+        itemsContainer.appendChild(itemEl);
+      });
+
+      groupEl.appendChild(itemsContainer);
+    }
+
+    return groupEl;
+  }
+
+  // Render Diff Viewer with Line-by-Line Tick checkboxes
+  function renderDiffViewer() {
+    const diffContainer = document.createElement('div');
+    diffContainer.className = 'diff-viewer-wrapper';
+
+    const selectedFile = state.selectedFile || (state.files[0] ? state.files[0].path : '');
+    const fileName = selectedFile.split('/').pop() || '';
+    const fileDir = selectedFile.split('/').slice(0, -1).join('/');
+
+    // Header bar
+    const diffHeader = document.createElement('div');
+    diffHeader.className = 'diff-header-bar';
+    diffHeader.innerHTML = `
+      <div class="diff-title-info">
+        <span class="diff-file-name">${escapeHtml(fileName)}</span>
+        <span class="diff-file-dir">${escapeHtml(fileDir)}</span>
+      </div>
+      <div class="diff-actions">
+        <button class="diff-tool-btn" id="btn-revert-hunk" title="Revert Hunk">↶</button>
+        <button class="diff-tool-btn" id="btn-prev-diff" title="Previous Difference (Cmd+Shift+Up)">▲</button>
+        <button class="diff-tool-btn" id="btn-next-diff" title="Next Difference (Cmd+Shift+Down)">▼</button>
+        <button class="diff-tool-btn" id="btn-open-editor" title="Open in VS Code Diff Editor">↗</button>
+        <button class="diff-tool-btn" id="btn-close-diff" title="Close Diff (Esc)">✕</button>
+      </div>
+    `;
+    diffContainer.appendChild(diffHeader);
+
+    // Diff Content
+    const diffContent = document.createElement('div');
+    diffContent.className = 'diff-content-scroll';
+
+    if (!state.diffData || !state.diffData.diff) {
+      diffContent.innerHTML = `
+        <div class="diff-loading">
+          <span>Loading diff for ${escapeHtml(fileName)}...</span>
+        </div>
+      `;
+      diffContainer.appendChild(diffContent);
+      return diffContainer;
+    }
+
+    const hunks = parseDiff(state.diffData.diff, selectedFile);
+    if (hunks.length === 0) {
+      diffContent.innerHTML = `
+        <div class="diff-empty">
+          <span>No text differences found.</span>
+        </div>
+      `;
+      diffContainer.appendChild(diffContent);
+      return diffContainer;
+    }
+
+    hunks.forEach((hunk, hIdx) => {
+      // Hunk separator bar with Hunk Checkbox
+      const hunkHeader = document.createElement('div');
+      hunkHeader.className = 'hunk-header-bar';
+      hunkHeader.innerHTML = `
+        <label class="hunk-chk-label">
+          <input type="checkbox" class="hunk-chk" data-hunk="${hIdx}" checked/>
+          <span class="hunk-title">${escapeHtml(hunk.header)}</span>
+        </label>
+      `;
+
+      const hunkChk = hunkHeader.querySelector('.hunk-chk');
+      hunkChk.addEventListener('change', () => {
+        const patchContent = constructHunkPatch(selectedFile, hunk);
+        if (hunkChk.checked) {
+          vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: false } });
+        } else {
+          vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: true } });
+        }
+      });
+
+      diffContent.appendChild(hunkHeader);
+
+      // Render lines in this hunk
+      hunk.lines.forEach((l, lIdx) => {
+        const lineRow = document.createElement('div');
+        lineRow.className = `diff-line diff-${l.type}`;
+
+        const isChanged = l.type === 'add' || l.type === 'del';
+        lineRow.innerHTML = `
+          <div class="gutter">
+            <span class="line-num old-num">${l.oldNum !== undefined ? l.oldNum : ''}</span>
+            <span class="line-num new-num">${l.newNum !== undefined ? l.newNum : ''}</span>
+            ${isChanged ? `
+              <input type="checkbox" class="line-chk" title="Stage / Unstage line" checked data-hunk="${hIdx}" data-line="${lIdx}"/>
+            ` : '<span class="gutter-spacer"></span>'}
+          </div>
+          <div class="line-prefix">${l.type === 'add' ? '+' : l.type === 'del' ? '-' : ' '}</div>
+          <div class="line-text">${escapeHtml(l.text)}</div>
+        `;
+
+        if (isChanged) {
+          const lineChk = lineRow.querySelector('.line-chk');
+          lineChk.addEventListener('change', () => {
+            // Apply single line or partial hunk
+            const singleLinePatch = constructSingleLinePatch(selectedFile, hunk, l);
+            if (lineChk.checked) {
+              vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: singleLinePatch, reverse: false } });
+            } else {
+              vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: singleLinePatch, reverse: true } });
+            }
+          });
+        }
+
+        diffContent.appendChild(lineRow);
+      });
+    });
+
+    diffContainer.appendChild(diffContent);
+
+    // Header actions
+    diffHeader.querySelector('#btn-close-diff').addEventListener('click', () => {
+      state.showDiff = false;
+      render();
+    });
+
+    diffHeader.querySelector('#btn-open-editor').addEventListener('click', () => {
+      vscode.postMessage({ type: 'openDiffInEditor', payload: selectedFile });
+    });
+
+    return diffContainer;
+  }
+
+  // Construct a git unified patch for a hunk
+  function constructHunkPatch(filePath, hunk) {
+    let patch = `--- a/${filePath}\n+++ b/${filePath}\n`;
+    patch += hunk.rawLines.join('\n') + '\n';
+    return patch;
+  }
+
+  // Construct a single line patch
+  function constructSingleLinePatch(filePath, hunk, lineItem) {
+    let patch = `--- a/${filePath}\n+++ b/${filePath}\n`;
+    patch += `${hunk.header}\n`;
+    hunk.lines.forEach(l => {
+      if (l === lineItem) {
+        patch += `${l.raw}\n`;
+      } else if (l.type === 'ctx') {
+        patch += `${l.raw}\n`;
+      }
+    });
+    return patch;
+  }
+
+  // Render recent commit messages dropdown
+  function renderRecentMessagesDropdown() {
+    let listHtml = state.recentMessages.map(msg => `
+      <div class="recent-msg-item" data-msg="${escapeAttr(msg)}">
+        <span class="recent-clock">🕒</span>
+        <span class="recent-text">${escapeHtml(msg)}</span>
+      </div>
+    `).join('');
+
+    if (state.recentMessages.length === 0) {
+      listHtml = '<div class="recent-msg-empty">No recent commit messages</div>';
+    }
+
+    return `
+      <div class="recent-messages-dropdown" id="recent-dropdown">
+        <div class="recent-dropdown-title">Recent Commit Messages</div>
+        <div class="recent-list">${listHtml}</div>
+      </div>
+    `;
+  }
+
+  // Render gear options dropdown
+  function renderCommitGearDropdown() {
+    return `
+      <div class="commit-gear-dropdown" id="gear-dropdown">
+        <div class="gear-title">Before Commit</div>
+        <label class="gear-item"><input type="checkbox"/> Reformat code</label>
+        <label class="gear-item"><input type="checkbox"/> Rearrange code</label>
+        <label class="gear-item"><input type="checkbox"/> Optimize imports</label>
+        <label class="gear-item"><input type="checkbox"/> Clean up</label>
+        <div class="gear-divider"></div>
+        <label class="gear-item"><input type="checkbox"/> Check TODO (0)</label>
+      </div>
+    `;
+  }
+
+  // Attach tab switching events
+  function attachTabEvents(container) {
+    container.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.activeTab = btn.getAttribute('data-tab');
+        render();
+      });
+    });
+
+    const btnTabMenu = container.querySelector('#btn-tab-menu');
+    if (btnTabMenu) {
+      btnTabMenu.addEventListener('click', () => {
+        vscode.postMessage({ type: 'openLog' });
+      });
+    }
+
+    const btnTabCollapse = container.querySelector('#btn-tab-collapse');
+    if (btnTabCollapse) {
+      btnTabCollapse.addEventListener('click', () => {
+        vscode.postMessage({ type: 'collapseView' });
+      });
+    }
+  }
+
+  // Attach toolbar events
+  function attachToolbarEvents(toolbar) {
+    toolbar.querySelector('#btn-refresh').addEventListener('click', () => {
+      vscode.postMessage({ type: 'refresh' });
+    });
+
+    toolbar.querySelector('#btn-rollback').addEventListener('click', () => {
+      const selected = Array.from(state.checkedFiles);
+      if (selected.length === 0 && state.selectedFile) {
+        selected.push(state.selectedFile);
+      }
+      if (selected.length === 0) return;
+      vscode.postMessage({ type: 'rollbackFiles', payload: selected });
+    });
+
+    toolbar.querySelector('#btn-show-diff').addEventListener('click', () => {
+      state.showDiff = !state.showDiff;
+      if (state.showDiff && !state.diffData && (state.selectedFile || state.files[0])) {
+        const path = state.selectedFile || state.files[0].path;
+        vscode.postMessage({ type: 'getFileDiff', payload: path });
+      }
+      render();
+    });
+
+    toolbar.querySelector('#btn-view-options').addEventListener('click', () => {
+      state.showPaths = !state.showPaths;
+      render();
+    });
+
+    toolbar.querySelector('#btn-toggle-expand').addEventListener('click', () => {
+      const anyExpanded = state.expandChanges || state.expandUnversioned;
+      state.expandChanges = !anyExpanded;
+      state.expandUnversioned = !anyExpanded;
+      render();
+    });
+
+    toolbar.querySelector('#btn-clear').addEventListener('click', () => {
+      state.checkedFiles.clear();
+      render();
+    });
+  }
+
+  // Attach tree events
+  function attachTreeEvents(treeContainer) {
+    // Tree clicks are handled per item
+  }
+
+  // Attach commit box events
+  function attachCommitBoxEvents(commitBox) {
+    const textarea = commitBox.querySelector('#commit-message-input');
+    textarea.addEventListener('input', () => {
+      state.commitMessage = textarea.value;
+    });
+
+    const chkAmend = commitBox.querySelector('#chk-amend');
+    chkAmend.addEventListener('change', () => {
+      state.isAmend = chkAmend.checked;
+      if (state.isAmend && (!state.commitMessage || !state.commitMessage.trim())) {
+        if (state.recentMessages.length > 0) {
+          state.commitMessage = state.recentMessages[0];
+          textarea.value = state.commitMessage;
+        }
+      }
+    });
+
+    const btnRecent = commitBox.querySelector('#btn-recent-msgs');
+    btnRecent.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.recentOpen = !state.recentOpen;
+      state.commitOptionsOpen = false;
+      render();
+    });
+
+    const btnGear = commitBox.querySelector('#btn-commit-gear');
+    btnGear.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.commitOptionsOpen = !state.commitOptionsOpen;
+      state.recentOpen = false;
+      render();
+    });
+
+    const btnCommit = commitBox.querySelector('#btn-commit');
+    btnCommit.addEventListener('click', () => {
+      doCommit(false);
+    });
+
+    const btnCommitPush = commitBox.querySelector('#btn-commit-push');
+    btnCommitPush.addEventListener('click', () => {
+      doCommit(true);
+    });
+
+    // Recent items click
+    const dropdown = commitBox.querySelector('#recent-dropdown');
+    if (dropdown) {
+      dropdown.querySelectorAll('.recent-msg-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const msg = item.getAttribute('data-msg');
+          state.commitMessage = msg;
+          state.recentOpen = false;
+          render();
+        });
+      });
+    }
+
+    // Close dropdowns on outside click
+    document.addEventListener('click', (e) => {
+      if (state.recentOpen || state.commitOptionsOpen) {
+        if (!e.target.closest('#recent-dropdown') && !e.target.closest('#btn-recent-msgs') &&
+            !e.target.closest('#gear-dropdown') && !e.target.closest('#btn-commit-gear')) {
+          state.recentOpen = false;
+          state.commitOptionsOpen = false;
+          render();
+        }
+      }
+    });
+  }
+
+  // Handle Commit / Commit and Push
+  function doCommit(push) {
+    if (!state.commitMessage || !state.commitMessage.trim()) {
+      textareaFocus();
+      return;
+    }
+    const filesToCommit = Array.from(state.checkedFiles);
+    vscode.postMessage({
+      type: push ? 'commitAndPush' : 'commit',
+      payload: {
+        message: state.commitMessage.trim(),
+        files: filesToCommit,
+        amend: state.isAmend
+      }
+    });
+  }
+
+  function textareaFocus() {
+    const ta = document.getElementById('commit-message-input');
+    if (ta) {
+      ta.focus();
+      ta.classList.add('error-pulse');
+      setTimeout(() => ta.classList.remove('error-pulse'), 1000);
+    }
+  }
+
+  // Stash events
+  function attachStashEvents(stashContent) {
+    const btnNewStash = stashContent.querySelector('#btn-create-stash');
+    if (btnNewStash) {
+      btnNewStash.addEventListener('click', () => {
+        vscode.postMessage({ type: 'createStash' });
+      });
+    }
+
+    stashContent.querySelectorAll('.stash-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.getAttribute('data-act');
+        const idx = btn.getAttribute('data-idx');
+        if (act === 'pop') vscode.postMessage({ type: 'stashPop', payload: idx });
+        if (act === 'apply') vscode.postMessage({ type: 'stashApply', payload: idx });
+        if (act === 'drop') vscode.postMessage({ type: 'stashDrop', payload: idx });
+      });
+    });
+  }
+
+  // Horizontal splitter dragging
+  function attachHSplitter(splitter, topEl, container) {
+    let isDragging = false;
+    let startY = 0;
+    let startRatio = state.splitRatio;
+
+    splitter.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startY = e.clientY;
+      startRatio = state.splitRatio;
+      document.body.classList.add('resizing-h');
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const containerHeight = container.getBoundingClientRect().height;
+      if (containerHeight <= 0) return;
+      const dy = e.clientY - startY;
+      const dRatio = dy / containerHeight;
+      let newRatio = Math.max(0.2, Math.min(0.8, startRatio + dRatio));
+      state.splitRatio = newRatio;
+      topEl.style.flex = `${newRatio}`;
+      topEl.nextElementSibling.nextElementSibling.style.flex = `${1 - newRatio}`;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.classList.remove('resizing-h');
+      }
+    });
+  }
+
+  // Helper escape functions
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function escapeAttr(str) {
+    if (!str) return '';
+    return str.replace(/"/g, '&quot;');
+  }
+
+  // Message listener from extension
+  window.addEventListener('message', (event) => {
+    const msg = event.data;
+    switch (msg.type) {
+      case 'init':
+      case 'status': {
+        const data = msg.payload;
+        state.files = data.files || [];
+        state.changesCount = data.changesCount || 0;
+        state.unversionedCount = data.unversionedCount || 0;
+        state.recentMessages = data.recentMessages || [];
+        state.stashes = data.stashes || [];
+
+        // Pre-check files that are staged or modified
+        if (!state.checkedFiles || state.checkedFiles.size === 0) {
+          state.files.forEach(f => {
+            if (!f.isUntracked) {
+              state.checkedFiles.add(f.path);
+            }
+          });
+        }
+
+        // Set default commit message if empty
+        if (!state.commitMessage && data.defaultCommitMessage) {
+          state.commitMessage = data.defaultCommitMessage;
+        }
+
+        // Auto select first file if none selected
+        if (!state.selectedFile && state.files.length > 0) {
+          state.selectedFile = state.files[0].path;
+          if (state.showDiff) {
+            vscode.postMessage({ type: 'getFileDiff', payload: state.selectedFile });
+          }
+        }
+
+        render();
+        break;
+      }
+      case 'fileDiff': {
+        state.diffData = msg.payload; // { path, diff }
+        if (state.showDiff) {
+          render();
+        }
+        break;
+      }
+      case 'commitSuccess': {
+        state.commitMessage = '';
+        state.isAmend = false;
+        state.checkedFiles.clear();
+        state.diffData = null;
+        render();
+        break;
+      }
+    }
+  });
+
+  // Ready message to request initial data
+  vscode.postMessage({ type: 'ready' });
+})();

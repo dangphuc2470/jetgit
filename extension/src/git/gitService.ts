@@ -368,6 +368,151 @@ export class GitService {
     await this.exec(['add', '--', ...paths]);
   }
 
+  async unstageFile(path: string): Promise<void> {
+    await this.exec(['reset', 'HEAD', '--', path]);
+  }
+
+  async unstageFiles(paths: string[]): Promise<void> {
+    await this.exec(['reset', 'HEAD', '--', ...paths]);
+  }
+
+  async rollbackFiles(paths: string[]): Promise<void> {
+    const status = await this.getStatus();
+    const untracked = new Set(status.filter(s => s.x === '?' && s.y === '?').map(s => s.path));
+    const toClean: string[] = [];
+    const toRestore: string[] = [];
+    for (const p of paths) {
+      if (untracked.has(p)) {
+        toClean.push(p);
+      } else {
+        toRestore.push(p);
+      }
+    }
+    if (toRestore.length > 0) {
+      try {
+        await this.exec(['checkout', 'HEAD', '--', ...toRestore]);
+      } catch {
+        await this.exec(['restore', '--staged', '--worktree', '--', ...toRestore]);
+      }
+    }
+    for (const p of toClean) {
+      try {
+        const fullPath = path.join(this.cwd, p);
+        if (fs.existsSync(fullPath)) {
+          if (fs.statSync(fullPath).isDirectory()) {
+            fs.rmSync(fullPath, { recursive: true, force: true });
+          } else {
+            fs.unlinkSync(fullPath);
+          }
+        }
+      } catch {}
+    }
+  }
+
+  async getFileDiff(filePath: string): Promise<string> {
+    const status = await this.getStatus();
+    const entry = status.find(s => s.path === filePath);
+    if (entry && entry.x === '?' && entry.y === '?') {
+      try {
+        const fullPath = path.join(this.cwd, filePath);
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const lines = content.split('\n');
+        const diffHeader = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
+        return diffHeader + lines.map(l => `+${l}`).join('\n');
+      } catch {
+        return '';
+      }
+    }
+    try {
+      const diff = await this.exec(['diff', 'HEAD', '--', filePath]);
+      if (diff.trim()) return diff;
+      return await this.exec(['diff', '--', filePath]);
+    } catch {
+      return await this.exec(['diff', '--', filePath]);
+    }
+  }
+
+  async applyHunkPatch(patchContent: string, reverse = false): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const args = ['apply', '--cached', '--recount', '--whitespace=nowarn'];
+      if (reverse) args.push('--reverse');
+      args.push('-');
+      const proc = execFile('git', args, { cwd: this.cwd }, (err, stdout, stderr) => {
+        if (err) return reject(new Error(stderr || err.message));
+        resolve(stdout);
+      });
+      proc.stdin?.write(patchContent);
+      proc.stdin?.end();
+    });
+  }
+
+  async getRecentCommitMessages(count = 10): Promise<string[]> {
+    try {
+      const out = await this.exec(['log', `-n${count}`, '--pretty=%s']);
+      return out.split('\n').map(s => s.trim()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  async getMergeMessage(): Promise<string> {
+    try {
+      const mergeMsgPath = path.join(this.cwd, '.git', 'MERGE_MSG');
+      if (fs.existsSync(mergeMsgPath)) {
+        return fs.readFileSync(mergeMsgPath, 'utf8').trim();
+      }
+    } catch {}
+    return '';
+  }
+
+  async getStashes(): Promise<{ index: string; message: string; date: string }[]> {
+    try {
+      const out = await this.exec(['stash', 'list', '--format=%gd\x1e%gs\x1e%cr']);
+      const list: { index: string; message: string; date: string }[] = [];
+      for (const line of out.split('\n')) {
+        if (!line.trim()) continue;
+        const [index, message, date] = line.split('\x1e');
+        list.push({ index: index?.trim(), message: message?.trim(), date: date?.trim() });
+      }
+      return list;
+    } catch {
+      return [];
+    }
+  }
+
+  async stashSave(message?: string): Promise<string> {
+    const args = ['stash', 'push'];
+    if (message) args.push('-m', message);
+    return this.exec(args);
+  }
+
+  async stashPop(index = 'stash@{0}'): Promise<string> {
+    return this.exec(['stash', 'pop', index]);
+  }
+
+  async stashApply(index = 'stash@{0}'): Promise<string> {
+    return this.exec(['stash', 'apply', index]);
+  }
+
+  async stashDrop(index = 'stash@{0}'): Promise<string> {
+    return this.exec(['stash', 'drop', index]);
+  }
+
+  async commitFiles(message: string, filesToStage?: string[], amend = false): Promise<void> {
+    if (filesToStage && filesToStage.length > 0) {
+      await this.stageFiles(filesToStage);
+    }
+    const args = ['commit'];
+    if (amend) args.push('--amend');
+    args.push('-m', message);
+    await this.exec(args);
+  }
+
+  async commitAndPush(message: string, filesToStage?: string[], amend = false): Promise<string> {
+    await this.commitFiles(message, filesToStage, amend);
+    return await this.push();
+  }
+
   async commit(message: string): Promise<void> {
     await this.exec(['commit', '-m', message]);
   }

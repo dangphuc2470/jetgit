@@ -1,0 +1,810 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #1e1f22;
+  color: #bcbec4;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.commit-window {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #1e1f22;
+}
+
+/* 1. Tab Bar */
+.tab-bar {
+  height: 32px;
+  background: #2b2d30;
+  border-bottom: 1px solid #1e1f22;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.tab-items {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #9aa0a6;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+  color: #dfe1e5;
+  background: #393b40;
+}
+
+.tab-btn.active {
+  color: #ffffff;
+  background: #2b3950;
+  border: 1px solid #3574f0;
+}
+
+.tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #8c8c8c;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  background: #393b40;
+  color: #dfe1e5;
+}
+
+/* 2. Toolbar */
+.commit-toolbar {
+  height: 28px;
+  background: #2b2d30;
+  border-bottom: 1px solid #393b40;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.tool-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-btn {
+  background: transparent;
+  border: none;
+  color: #9aa0a6;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  transition: all 0.12s;
+}
+
+.tool-btn:hover {
+  background: #393b40;
+  color: #dfe1e5;
+}
+
+.tool-btn.active {
+  background: #3574f0;
+  color: #ffffff;
+}
+
+/* 3. Main Body */
+.commit-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.commit-left-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.commit-right-panel {
+  flex: 1.2;
+  border-left: 1px solid #393b40;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1e1f22;
+  overflow: hidden;
+}
+
+/* File Tree */
+.file-tree-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+  min-height: 80px;
+}
+
+.tree-group {
+  margin-bottom: 2px;
+}
+
+.group-header {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  cursor: pointer;
+  gap: 6px;
+  user-select: none;
+}
+
+.group-header:hover {
+  background: #2b2d30;
+}
+
+.group-arrow {
+  font-size: 8px;
+  color: #8c8c8c;
+  display: inline-block;
+  transition: transform 0.12s;
+  width: 10px;
+  text-align: center;
+}
+
+.group-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.group-title {
+  font-weight: 600;
+  color: #dfe1e5;
+  font-size: 12px;
+}
+
+.group-count {
+  color: #7f848e;
+  font-size: 11px;
+}
+
+.group-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-item {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 24px;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-item:hover {
+  background: #2b2d30;
+}
+
+.file-item.selected {
+  background: #2e436e !important;
+}
+
+.file-chk, .group-chk, .line-chk, .hunk-chk {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border: 1px solid #5a5d63;
+  border-radius: 2px;
+  background: #1e1f22;
+  cursor: pointer;
+  position: relative;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.file-chk:checked, .group-chk:checked, .line-chk:checked, .hunk-chk:checked {
+  background: #3574f0;
+  border-color: #3574f0;
+}
+
+.file-chk:checked::after, .group-chk:checked::after, .line-chk:checked::after, .hunk-chk:checked::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 3px;
+  height: 7px;
+  border: solid #ffffff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.group-chk:indeterminate {
+  background: #3574f0;
+  border-color: #3574f0;
+}
+
+.group-chk:indeterminate::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 2px;
+  width: 7px;
+  height: 2px;
+  background: #ffffff;
+}
+
+.file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.file-name {
+  font-size: 12px;
+}
+
+.name-modified {
+  color: #589df6; /* IntelliJ Blue for modified */
+}
+
+.name-unversioned {
+  color: #ce9178; /* IntelliJ olive/tan for unversioned */
+}
+
+.file-dir {
+  color: #7f848e;
+  font-size: 11px;
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Horizontal Splitter */
+.h-splitter {
+  height: 5px;
+  background: #2b2d30;
+  border-top: 1px solid #393b40;
+  border-bottom: 1px solid #393b40;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.splitter-line {
+  width: 28px;
+  height: 2px;
+  background: #4e5157;
+  border-radius: 1px;
+}
+
+.resizing-h {
+  cursor: row-resize !important;
+}
+
+/* Commit Box */
+.commit-box {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  background: #1e1f22;
+  overflow: hidden;
+  min-height: 120px;
+}
+
+.commit-options-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  height: 20px;
+}
+
+.amend-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #dfe1e5;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.commit-icon-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-btn-sm {
+  background: transparent;
+  border: none;
+  color: #8c8c8c;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.tool-btn-sm:hover {
+  background: #393b40;
+  color: #dfe1e5;
+}
+
+.commit-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+#commit-message-input {
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  background: #1e1f22;
+  border: 1px solid #393b40;
+  border-radius: 4px;
+  color: #dfe1e5;
+  font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  padding: 6px 8px;
+  resize: none;
+  outline: none;
+}
+
+#commit-message-input:focus {
+  border-color: #3574f0;
+}
+
+.error-pulse {
+  border-color: #e53935 !important;
+  box-shadow: 0 0 5px rgba(229, 57, 53, 0.5);
+}
+
+.commit-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.action-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-commit-primary {
+  background: #3574f0;
+  color: #ffffff;
+  border: none;
+  padding: 5px 14px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.btn-commit-primary:hover {
+  background: #3069db;
+}
+
+.btn-commit-secondary {
+  background: #2b2d30;
+  color: #dfe1e5;
+  border: 1px solid #4e5157;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.btn-commit-secondary:hover {
+  background: #393b40;
+  border-color: #5c6168;
+}
+
+.commit-gear-wrapper {
+  position: relative;
+}
+
+/* Dropdowns */
+.recent-messages-dropdown, .commit-gear-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: #2b2d30;
+  border: 1px solid #393b40;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 100;
+  margin-bottom: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.commit-gear-dropdown {
+  left: auto;
+  right: 0;
+  width: 170px;
+  padding: 6px 8px;
+}
+
+.recent-dropdown-title, .gear-title {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8c8c8c;
+  border-bottom: 1px solid #393b40;
+  text-transform: uppercase;
+}
+
+.recent-msg-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #232528;
+}
+
+.recent-msg-item:hover {
+  background: #3574f0;
+  color: #ffffff;
+}
+
+.recent-msg-empty {
+  padding: 10px;
+  color: #7f848e;
+  text-align: center;
+}
+
+.gear-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  color: #dfe1e5;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gear-divider {
+  height: 1px;
+  background: #393b40;
+  margin: 4px 0;
+}
+
+/* 4. Diff & Line-by-Line Reviewer */
+.diff-viewer-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.diff-header-bar {
+  height: 32px;
+  background: #2b2d30;
+  border-bottom: 1px solid #393b40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.diff-title-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.diff-file-name {
+  font-weight: 600;
+  color: #dfe1e5;
+}
+
+.diff-file-dir {
+  color: #7f848e;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.diff-tool-btn {
+  background: transparent;
+  border: none;
+  color: #8c8c8c;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.diff-tool-btn:hover {
+  background: #393b40;
+  color: #dfe1e5;
+}
+
+.diff-content-scroll {
+  flex: 1;
+  overflow: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: #1e1f22;
+}
+
+.diff-loading, .diff-empty {
+  padding: 30px;
+  text-align: center;
+  color: #7f848e;
+}
+
+.hunk-header-bar {
+  background: #26282b;
+  border-top: 1px solid #393b40;
+  border-bottom: 1px solid #393b40;
+  padding: 3px 8px;
+  color: #7f848e;
+  font-size: 11px;
+}
+
+.hunk-chk-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.diff-line {
+  display: flex;
+  line-height: 20px;
+  height: 20px;
+  white-space: pre;
+}
+
+.diff-line:hover {
+  filter: brightness(1.15);
+}
+
+.diff-add {
+  background: rgba(46, 125, 50, 0.22);
+  color: #a3e7a6;
+}
+
+.diff-del {
+  background: rgba(198, 40, 40, 0.22);
+  color: #f7a8a5;
+}
+
+.diff-ctx {
+  color: #bcbec4;
+}
+
+.gutter {
+  width: 90px;
+  display: flex;
+  align-items: center;
+  background: #232528;
+  border-right: 1px solid #2d3034;
+  padding: 0 4px;
+  color: #5c6168;
+  font-size: 11px;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.line-num {
+  width: 32px;
+  text-align: right;
+}
+
+.gutter-spacer {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.line-prefix {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.line-text {
+  flex: 1;
+  padding-left: 4px;
+  user-select: text;
+}
+
+/* Stash and Shelf Views */
+.stash-view, .shelf-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.stash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.stash-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #dfe1e5;
+}
+
+.stash-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stash-row {
+  background: #2b2d30;
+  border: 1px solid #393b40;
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stash-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stash-idx {
+  color: #589df6;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.stash-msg {
+  color: #dfe1e5;
+  font-size: 12px;
+}
+
+.stash-date {
+  color: #7f848e;
+  font-size: 11px;
+}
+
+.stash-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stash-btn {
+  background: #1e1f22;
+  border: 1px solid #4e5157;
+  color: #dfe1e5;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.stash-btn:hover {
+  background: #393b40;
+}
+
+.stash-btn.danger {
+  color: #ef5350;
+  border-color: #7f2323;
+}
+
+.stash-btn.danger:hover {
+  background: #4a1c1c;
+}
+
+.empty-state {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 20px;
+}
+
+.empty-icon {
+  font-size: 32px;
+}
+
+.empty-title {
+  font-weight: 600;
+  color: #dfe1e5;
+  font-size: 14px;
+}
+
+.empty-sub {
+  color: #7f848e;
+  font-size: 12px;
+  max-width: 240px;
+}
+
+.action-btn-primary {
+  margin-top: 8px;
+  background: #3574f0;
+  color: #ffffff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}

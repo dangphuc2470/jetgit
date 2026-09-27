@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { GitService } from './git/gitService';
 import { RebaseHandler } from './git/rebaseHandler';
 import { GraphViewProvider } from './views/graphPanel';
+import { CommitViewProvider } from './views/commitPanel';
 import { RebasePanel } from './views/rebasePanel';
 import { BranchTreeProvider } from './views/branchTree';
 import { ChangelistTreeProvider } from './views/changelistTree';
@@ -53,6 +54,16 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
   );
 
+  // --- Commit Tool Window (activitybar) ---
+  const commitViewProvider = new CommitViewProvider(context.extensionUri, gitService, log);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      CommitViewProvider.viewType,
+      commitViewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } },
+    ),
+  );
+
   // --- Branch Tree Sidebar (left) ---
   const branchTree = new BranchTreeProvider(gitService);
   const branchTreeView = vscode.window.createTreeView('intellij-git.branches', {
@@ -78,6 +89,13 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(mergeProvider);
 
   // --- Commands ---
+
+  // Commit Tool Window — reveal / focus (Cmd+K)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('intellij-git.openCommit', () => {
+      vscode.commands.executeCommand('intellij-git.commitView.focus');
+    }),
+  );
 
   // Git Log — focus/reveal the bottom panel
   context.subscriptions.push(
@@ -286,6 +304,7 @@ export function activate(context: vscode.ExtensionContext): void {
   gitWatcher.onDidChange(() => {
     branchTree.refresh();
     graphViewProvider.refresh();
+    commitViewProvider.refresh();
   });
   context.subscriptions.push(gitWatcher);
 

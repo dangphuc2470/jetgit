@@ -7211,87 +7211,103 @@ ${component_stack}
         treeContent.appendChild(headSec.sec);
       }
 
-      const localList = branches.filter((b) => !b.remote && filterFn(b.name));
-      if (localList.length > 0) {
-        const localSec = createSec("Local", true);
-        const folders = {};
-        const roots = [];
-        for (const b of localList) {
-          if (b.name.includes("/")) {
-            const p = b.name.split("/");
-            const fn = p[0];
-            const sn = p.slice(1).join("/");
-            if (!folders[fn]) folders[fn] = [];
-            folders[fn].push({ ...b, displayName: sn });
-          } else {
-            roots.push({ ...b, displayName: b.name });
+      function createTreeNode(name = "", fullPath = "") {
+        return { name, fullPath, folders: {}, branches: [] };
+      }
+
+      function insertBranchIntoTree(root, parts, branchObj) {
+        let current = root;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          if (!current.folders[part]) {
+            const nextPath = current.fullPath ? current.fullPath + "/" + part : part;
+            current.folders[part] = createTreeNode(part, nextPath);
           }
+          current = current.folders[part];
         }
-        for (const b of roots) {
-          const item = document.createElement("div");
-          item.className = "tree-item" + (currentActive === b.name ? " active" : "");
-          const isCur = (b.name === currentBranch);
-          const isStar = b.name === "develop" || b.name === "main" || b.name === "master";
-          let icon = '<span class="branch-icon">⑂</span>';
-          if (isCur) icon = '<span class="branch-tag-icon">' + svgTagIcon + '</span>';
-          else if (isStar) icon = '<span class="star-icon">★</span>';
-          const trackHtml = getTrackingHtml(b);
-          item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.name + '</span>' + trackHtml;
-          item.addEventListener("click", () => handleBranchClick(b.name));
-          item.addEventListener("dblclick", () => postMessage("checkout", b.name));
-          item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
-          localSec.bdy.appendChild(item);
-        }
-        for (const [fn, items] of Object.entries(folders)) {
+        const leafName = parts[parts.length - 1];
+        current.branches.push({ ...branchObj, leafName });
+      }
+
+      function renderTreeLevel(container, node, isOpenDefault = true) {
+        // 1. Subfolders sorted alphabetically
+        const folderKeys = Object.keys(node.folders).sort((a, b) => a.localeCompare(b));
+        for (const fk of folderKeys) {
+          const subNode = node.folders[fk];
           const fDiv = document.createElement("div");
           fDiv.className = "tree-folder";
+
           const fHdr = document.createElement("div");
           fHdr.className = "tree-folder-header";
-          fHdr.innerHTML = '<span class="arrow">▾</span> <span class="folder-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:2px;color:#dcb67a;"><path d="M1.75 2.5h3.69a1.75 1.75 0 0 1 1.24.51l.8.8H14.25c.97 0 1.75.78 1.75 1.75v7.69c0 .97-.78 1.75-1.75 1.75H1.75A1.75 1.75 0 0 1 0 13.25V4.25c0-.97.78-1.75 1.75-1.75z"/></svg></span> <span>' + fn + '</span>';
+          const folderIconSvg = '<span class="folder-icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:-1px;margin-right:2px;color:#dcb67a;"><path d="M1.75 2.5h3.69a1.75 1.75 0 0 1 1.24.51l.8.8H14.25c.97 0 1.75.78 1.75 1.75v7.69c0 .97-.78 1.75-1.75 1.75H1.75A1.75 1.75 0 0 1 0 13.25V4.25c0-.97.78-1.75 1.75-1.75z"/></svg></span>';
+          fHdr.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> ' + folderIconSvg + ' <span>' + fk + '</span>';
+
           const fBdy = document.createElement("div");
           fBdy.className = "tree-folder-body";
           fBdy.style.paddingLeft = "14px";
+          fBdy.style.display = isOpenDefault ? "block" : "none";
+
           fHdr.addEventListener("click", () => {
             const open = fBdy.style.display !== "none";
             fBdy.style.display = open ? "none" : "block";
             fHdr.querySelector(".arrow").textContent = open ? "▸" : "▾";
           });
-          for (const b of items) {
-            const item = document.createElement("div");
-            item.className = "tree-item" + (currentActive === b.name ? " active" : "");
-            const isCur = (b.name === currentBranch);
-            const isStar = b.displayName === "develop" || b.displayName === "main";
-            let icon = '<span class="branch-icon">⑂</span>';
-            if (isCur) icon = '<span class="branch-tag-icon">' + svgTagIcon + '</span>';
-            else if (isStar) icon = '<span class="star-icon">★</span>';
-            const trackHtml = getTrackingHtml(b);
-            item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.displayName + '</span>' + trackHtml;
-            item.title = b.name;
-            item.addEventListener("click", () => handleBranchClick(b.name));
-            item.addEventListener("dblclick", () => postMessage("checkout", b.name));
-            item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
-            fBdy.appendChild(item);
-          }
+
           fDiv.appendChild(fHdr);
+          renderTreeLevel(fBdy, subNode, isOpenDefault);
           fDiv.appendChild(fBdy);
-          localSec.bdy.appendChild(fDiv);
+          container.appendChild(fDiv);
         }
+
+        // 2. Branch leaf items (sorted alphabetically, current branch at top if present)
+        const sortedBranches = node.branches.slice().sort((a, b) => {
+          if (a.name === currentBranch) return -1;
+          if (b.name === currentBranch) return 1;
+          return a.leafName.localeCompare(b.leafName);
+        });
+
+        for (const b of sortedBranches) {
+          const item = document.createElement("div");
+          item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+
+          const isCur = (b.name === currentBranch);
+          const isStar = b.leafName === "develop" || b.leafName === "main" || b.leafName === "master";
+
+          let icon = '<span class="branch-icon' + (b.remote ? ' remote' : '') + '">⑂</span>';
+          if (isCur) icon = '<span class="branch-tag-icon">' + svgTagIcon + '</span>';
+          else if (isStar) icon = '<span class="star-icon">★</span>';
+
+          const trackHtml = getTrackingHtml(b);
+          item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
+          item.title = b.name;
+          item.addEventListener("click", () => handleBranchClick(b.name));
+          item.addEventListener("dblclick", () => postMessage("checkout", b.name));
+          item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
+          container.appendChild(item);
+        }
+      }
+
+      const localList = branches.filter((b) => !b.remote && !b.name.startsWith("origin/") && filterFn(b.name));
+      if (localList.length > 0) {
+        const localSec = createSec("Local", true);
+        const localTree = createTreeNode();
+        for (const b of localList) {
+          const parts = b.name.split("/");
+          insertBranchIntoTree(localTree, parts, b);
+        }
+        renderTreeLevel(localSec.bdy, localTree, true);
         treeContent.appendChild(localSec.sec);
       }
 
       const remoteList = branches.filter((b) => b.remote || b.name.startsWith("origin/")).filter((b) => filterFn(b.name));
       if (remoteList.length > 0) {
         const remoteSec = createSec("Remote", true);
+        const remoteTree = createTreeNode();
         for (const b of remoteList) {
-          const item = document.createElement("div");
-          item.className = "tree-item" + (currentActive === b.name ? " active" : "");
-          const trackHtml = getTrackingHtml(b);
-          item.innerHTML = '<span class="branch-icon remote">⑂</span> <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.name + '</span>' + trackHtml;
-          item.addEventListener("click", () => handleBranchClick(b.name));
-          item.addEventListener("dblclick", () => postMessage("checkout", b.name));
-          item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
-          remoteSec.bdy.appendChild(item);
+          const parts = b.name.split("/");
+          insertBranchIntoTree(remoteTree, parts, { ...b, remote: true });
         }
+        renderTreeLevel(remoteSec.bdy, remoteTree, true);
         treeContent.appendChild(remoteSec.sec);
       }
 

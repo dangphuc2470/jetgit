@@ -511,87 +511,96 @@ function buildGraph(commits) {
   if (commits.length === 0)
     return [];
   const nodes = [];
-  const columns = [];
+  const lanes = [];
   const colorMap = /* @__PURE__ */ new Map();
   let nextColor = 0;
-  const hashToRow = /* @__PURE__ */ new Map();
-  commits.forEach((c, i) => hashToRow.set(c.hash, i));
   for (let row = 0; row < commits.length; row++) {
     const commit = commits[row];
     const lines = [];
-    let col = columns.indexOf(commit.hash);
+    let col = lanes.indexOf(commit.hash);
     if (col === -1) {
-      col = columns.indexOf(null);
+      col = lanes.indexOf(null);
       if (col === -1) {
-        col = columns.length;
-        columns.push(null);
+        col = lanes.length;
+        lanes.push(null);
       }
+      lanes[col] = commit.hash;
     }
     if (!colorMap.has(commit.hash)) {
       colorMap.set(commit.hash, nextColor++);
     }
     const color = colorMap.get(commit.hash);
-    columns[col] = null;
-    const parents = commit.parents.filter((p) => hashToRow.has(p));
-    const usedColsThisRow = new Set();
-    for (let pi = 0; pi < parents.length; pi++) {
-      const parentHash = parents[pi];
-      let parentCol = columns.indexOf(parentHash);
-      if (parentCol !== -1) {
-        const lineColor = colorMap.get(parentHash) ?? color;
+    const prevLanes = [...lanes];
+    const parents = commit.parents;
+    if (parents.length === 0) {
+      lanes[col] = null;
+    } else {
+      const p0 = parents[0];
+      const p0Col = lanes.indexOf(p0);
+      if (p0Col !== -1 && p0Col !== col) {
         lines.push({
           fromColumn: col,
           fromRow: row,
-          toColumn: parentCol,
+          toColumn: p0Col,
           toRow: row + 1,
-          color: lineColor
+          color: colorMap.get(p0) ?? color
         });
-        usedColsThisRow.add(parentCol);
+        lanes[col] = null;
       } else {
-        let targetCol;
-        if (pi === 0 && col !== -1 && !columns[col]) {
-          targetCol = col;
-        } else {
-          targetCol = columns.indexOf(null);
-          if (targetCol === -1) {
-            targetCol = columns.length;
-            columns.push(null);
-          }
-        }
-        columns[targetCol] = parentHash;
-        if (!colorMap.has(parentHash)) {
-          colorMap.set(parentHash, pi === 0 ? color : nextColor++);
-        }
-        const lineColor = colorMap.get(parentHash);
+        lanes[col] = p0;
+        if (!colorMap.has(p0))
+          colorMap.set(p0, color);
         lines.push({
           fromColumn: col,
           fromRow: row,
-          toColumn: targetCol,
+          toColumn: col,
           toRow: row + 1,
-          color: lineColor
+          color: colorMap.get(p0)
         });
-        usedColsThisRow.add(targetCol);
       }
-    }
-    for (let c = 0; c < columns.length; c++) {
-      if (columns[c] !== null && !usedColsThisRow.has(c)) {
-        const targetHash = columns[c];
-        const targetRow = hashToRow.get(targetHash);
-        if (targetRow !== void 0 && targetRow > row) {
-          const lineColor = colorMap.get(targetHash) ?? 0;
+      for (let pi = 1; pi < parents.length; pi++) {
+        const p = parents[pi];
+        let pCol = lanes.indexOf(p);
+        if (pCol !== -1) {
           lines.push({
-            fromColumn: c,
+            fromColumn: col,
             fromRow: row,
-            toColumn: c,
+            toColumn: pCol,
             toRow: row + 1,
-            color: lineColor
+            color: colorMap.get(p) ?? color
+          });
+        } else {
+          pCol = lanes.indexOf(null);
+          if (pCol === -1) {
+            pCol = lanes.length;
+            lanes.push(null);
+          }
+          lanes[pCol] = p;
+          if (!colorMap.has(p))
+            colorMap.set(p, nextColor++);
+          lines.push({
+            fromColumn: col,
+            fromRow: row,
+            toColumn: pCol,
+            toRow: row + 1,
+            color: colorMap.get(p)
           });
         }
       }
     }
+    for (let c = 0; c < prevLanes.length; c++) {
+      if (c !== col && prevLanes[c] !== null && lanes[c] !== null) {
+        lines.push({
+          fromColumn: c,
+          fromRow: row,
+          toColumn: c,
+          toRow: row + 1,
+          color: colorMap.get(lanes[c]) ?? 0
+        });
+      }
+    }
     nodes.push({ hash: commit.hash, column: col, color, lines });
   }
-  const maxCol = Math.max(0, ...nodes.map((n) => n.column));
   return nodes;
 }
 function graphWidth(nodes) {

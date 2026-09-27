@@ -23,113 +23,104 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
   if (commits.length === 0) return [];
 
   const nodes: GraphNode[] = [];
-  // Active columns: each slot holds the hash of the next expected commit, or null if empty
-  const columns: (string | null)[] = [];
-  // Map hash -> color index for consistent branch coloring
+  const lanes: (string | null)[] = [];
   const colorMap = new Map<string, number>();
   let nextColor = 0;
-
-  const hashToRow = new Map<string, number>();
-  commits.forEach((c, i) => hashToRow.set(c.hash, i));
 
   for (let row = 0; row < commits.length; row++) {
     const commit = commits[row];
     const lines: GraphLine[] = [];
 
-    // Find which column this commit occupies
-    let col = columns.indexOf(commit.hash);
+    // 1. Find or create lane for this commit
+    let col = lanes.indexOf(commit.hash);
     if (col === -1) {
-      // New branch — find first empty slot or append
-      col = columns.indexOf(null);
+      col = lanes.indexOf(null);
       if (col === -1) {
-        col = columns.length;
-        columns.push(null);
+        col = lanes.length;
+        lanes.push(null);
       }
+      lanes[col] = commit.hash;
     }
 
-    // Assign color
     if (!colorMap.has(commit.hash)) {
       colorMap.set(commit.hash, nextColor++);
     }
     const color = colorMap.get(commit.hash)!;
+    const prevLanes = [...lanes];
 
-    // Clear this column slot
-    columns[col] = null;
-
-    // Process parents
-    const parents = commit.parents.filter(p => hashToRow.has(p));
-    const usedColsThisRow = new Set<number>();
-
-    for (let pi = 0; pi < parents.length; pi++) {
-      const parentHash = parents[pi];
-      let parentCol = columns.indexOf(parentHash);
-
-      if (parentCol !== -1) {
-        // Parent already has a reserved column — draw line to it on next row
-        const lineColor = colorMap.get(parentHash) ?? color;
+    // 2. Process parents
+    const parents = commit.parents;
+    if (parents.length === 0) {
+      lanes[col] = null;
+    } else {
+      const p0 = parents[0];
+      const p0Col = lanes.indexOf(p0);
+      if (p0Col !== -1 && p0Col !== col) {
         lines.push({
           fromColumn: col,
           fromRow: row,
-          toColumn: parentCol,
+          toColumn: p0Col,
           toRow: row + 1,
-          color: lineColor,
+          color: colorMap.get(p0) ?? color,
         });
-        usedColsThisRow.add(parentCol);
+        lanes[col] = null;
       } else {
-        // First parent continues in the same column if free, others fork
-        let targetCol: number;
-        if (pi === 0 && col !== -1 && !columns[col]) {
-          targetCol = col;
-        } else {
-          targetCol = columns.indexOf(null);
-          if (targetCol === -1) {
-            targetCol = columns.length;
-            columns.push(null);
-          }
-        }
-        columns[targetCol] = parentHash;
-
-        // Assign color to parent if new branch
-        if (!colorMap.has(parentHash)) {
-          colorMap.set(parentHash, pi === 0 ? color : nextColor++);
-        }
-
-        const lineColor = colorMap.get(parentHash)!;
+        lanes[col] = p0;
+        if (!colorMap.has(p0)) colorMap.set(p0, color);
         lines.push({
           fromColumn: col,
           fromRow: row,
-          toColumn: targetCol,
+          toColumn: col,
           toRow: row + 1,
-          color: lineColor,
+          color: colorMap.get(p0)!,
         });
-        usedColsThisRow.add(targetCol);
       }
-    }
 
-    // Continuation lines: columns that pass through this row unchanged
-    for (let c = 0; c < columns.length; c++) {
-      if (columns[c] !== null && !usedColsThisRow.has(c)) {
-        const targetHash = columns[c]!;
-        const targetRow = hashToRow.get(targetHash);
-        if (targetRow !== undefined && targetRow > row) {
-          const lineColor = colorMap.get(targetHash) ?? 0;
+      for (let pi = 1; pi < parents.length; pi++) {
+        const p = parents[pi];
+        let pCol = lanes.indexOf(p);
+        if (pCol !== -1) {
           lines.push({
-            fromColumn: c,
+            fromColumn: col,
             fromRow: row,
-            toColumn: c,
+            toColumn: pCol,
             toRow: row + 1,
-            color: lineColor,
+            color: colorMap.get(p) ?? color,
+          });
+        } else {
+          pCol = lanes.indexOf(null);
+          if (pCol === -1) {
+            pCol = lanes.length;
+            lanes.push(null);
+          }
+          lanes[pCol] = p;
+          if (!colorMap.has(p)) colorMap.set(p, nextColor++);
+          lines.push({
+            fromColumn: col,
+            fromRow: row,
+            toColumn: pCol,
+            toRow: row + 1,
+            color: colorMap.get(p)!,
           });
         }
       }
     }
 
+    // 3. Continuation lines for all other active lanes
+    for (let c = 0; c < prevLanes.length; c++) {
+      if (c !== col && prevLanes[c] !== null && lanes[c] !== null) {
+        lines.push({
+          fromColumn: c,
+          fromRow: row,
+          toColumn: c,
+          toRow: row + 1,
+          color: colorMap.get(lanes[c]!) ?? 0,
+        });
+      }
+    }
+
     nodes.push({ hash: commit.hash, column: col, color, lines });
   }
-
-  // Trim unused columns from the right
-  const maxCol = Math.max(0, ...nodes.map(n => n.column));
-  // No need to trim, the renderer handles dynamic width
 
   return nodes;
 }

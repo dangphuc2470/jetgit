@@ -6780,7 +6780,7 @@ ${component_stack}
   var root5 = from_html(`<div class="app svelte-1lrl78g"><!> <div class="main-area svelte-1lrl78g"><div class="center-area svelte-1lrl78g"><!></div> <!></div></div>`);
   var $$css6 = {
     hash: "svelte-1lrl78g",
-    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:200px;border-right:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:0.9em;transition:width 0.12s ease;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.9em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.tree-section-header, .tree-folder-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.92em;}.tree-section-header:hover, .tree-folder-header:hover {background:var(--vscode-list-hoverBackground);}.tree-item {display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:0.95em;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.active {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);font-weight:600;}.tree-item.current-head {color:#388bfd;font-weight:600;}.branch-icon {color:#388bfd;}.branch-icon.remote {color:#8957e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#dcb67a;}.arrow {font-size:0.8em;color:var(--vscode-descriptionForeground);width:10px;display:inline-block;}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {width:300px;border-left:1px solid var(--vscode-panel-border);overflow-y:auto;flex-shrink:0;}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;}"
+    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:200px;border-right:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:0.9em;transition:width 0.12s ease;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.9em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.tree-section-header, .tree-folder-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.92em;}.tree-section-header:hover, .tree-folder-header:hover {background:var(--vscode-list-hoverBackground);}.tree-item {display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:0.95em;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.active {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);font-weight:600;}.tree-item.current-head {color:#388bfd;font-weight:600;}.branch-icon {color:#388bfd;}.branch-icon.remote {color:#8957e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#dcb67a;}.arrow {font-size:0.8em;color:var(--vscode-descriptionForeground);width:10px;display:inline-block;}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {width:300px;border-left:1px solid var(--vscode-panel-border);overflow-y:auto;flex-shrink:0;}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;}.app-tooltip {position:fixed;z-index:99999;pointer-events:none;background:var(--vscode-editorHoverWidget-background, #252526);color:var(--vscode-editorHoverWidget-foreground, #cccccc);border:1px solid var(--vscode-editorHoverWidget-border, #454545);box-shadow:0 4px 14px rgba(0,0,0,0.45);padding:4px 8px;border-radius:4px;font-size:11px;font-family:var(--vscode-font-family, system-ui, sans-serif);line-height:1.4;white-space:nowrap;opacity:0;visibility:hidden;transition:opacity 0.12s ease, visibility 0.12s ease;}.app-tooltip.visible {opacity:1;visibility:visible;}.app-tooltip .tooltip-shortcut {margin-left:6px;opacity:0.65;font-size:10px;background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);}.app-tooltip::before {content:\"\";position:absolute;top:50%;left:-5px;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--vscode-editorHoverWidget-border, #454545);}"
   };
   function App($$anchor, $$props) {
     push($$props, true);
@@ -6977,15 +6977,65 @@ ${component_stack}
 
       document.addEventListener("click", closeBranchContextMenu);
 
-      // 1. Vertical Strip on the left
+      // 1. Tooltip system attached to document.body
+      let tooltipEl = document.querySelector(".app-tooltip");
+      if (!tooltipEl) {
+        tooltipEl = document.createElement("div");
+        tooltipEl.className = "app-tooltip";
+        document.body.appendChild(tooltipEl);
+      }
+
+      function updateTooltip(el, text, shortcut = "") {
+        el.dataset.tooltip = text;
+        if (shortcut) el.dataset.shortcut = shortcut;
+        el.title = text + (shortcut ? " (" + shortcut + ")" : "");
+      }
+
+      function attachTooltip(el, text, shortcut = "", side = "right") {
+        updateTooltip(el, text, shortcut);
+        let timer;
+        el.addEventListener("mouseenter", () => {
+          const currentText = el.dataset.tooltip || el.title;
+          const currentShortcut = el.dataset.shortcut || "";
+          if (!currentText) return;
+          timer = setTimeout(() => {
+            const rect = el.getBoundingClientRect();
+            tooltipEl.innerHTML = currentText + (currentShortcut ? '<span class="tooltip-shortcut">' + currentShortcut + '</span>' : '');
+            if (side === "bottom") {
+              let left = rect.left + (rect.width / 2);
+              let top = rect.bottom + 6;
+              tooltipEl.style.left = left + "px";
+              tooltipEl.style.top = top + "px";
+              tooltipEl.style.transform = "translateX(-50%)";
+            } else {
+              let left = rect.right + 7;
+              let top = rect.top + (rect.height / 2);
+              tooltipEl.style.left = left + "px";
+              tooltipEl.style.top = top + "px";
+              tooltipEl.style.transform = "translateY(-50%)";
+            }
+            tooltipEl.classList.add("visible");
+          }, 80);
+        });
+        el.addEventListener("mouseleave", () => {
+          clearTimeout(timer);
+          tooltipEl.classList.remove("visible");
+        });
+        el.addEventListener("click", () => {
+          clearTimeout(timer);
+          tooltipEl.classList.remove("visible");
+        });
+      }
+
+      // Vertical Strip on the left
       const strip = document.createElement("div");
       strip.className = "sidebar-strip";
 
-      function addStripBtn(iconSvg, title, onClick, extraClass = "") {
+      function addStripBtn(iconSvg, title, onClick, extraClass = "", shortcut = "") {
         const btn = document.createElement("button");
         btn.className = "sidebar-strip-btn " + extraClass;
-        btn.title = title;
         btn.innerHTML = iconSvg;
+        attachTooltip(btn, title, shortcut);
         btn.addEventListener("click", (ev) => {
           ev.stopPropagation();
           onClick(btn);
@@ -7001,26 +7051,26 @@ ${component_stack}
         container.classList.toggle("collapsed");
         const coll = container.classList.contains("collapsed");
         btn.innerHTML = coll ? expandSvg : collapseSvg;
-        btn.title = coll ? "Expand Branches" : "Collapse Branches";
+        updateTooltip(btn, coll ? "Expand Branches" : "Collapse Branches");
       });
 
       // New branch (+)
-      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch... (+)", () => {
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch...", () => {
         const base = get(activeBranch) || currentBranch || "HEAD";
         const name = prompt("New branch name (from '" + base + "'):");
         if (name && name.trim()) postMessage("createBranch", { name: name.trim(), startPoint: base });
-      });
+      }, "", "+");
 
       // Fetch / Update Selected Branch (↙)
-      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch (↙)", () => {
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch", () => {
         const target = get(activeBranch) || currentBranch;
         if (target) {
           postMessage("pull", target);
         }
-      });
+      }, "", "Fetch/Pull");
 
       // Delete Selected Branch (🗑)
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch (🗑)", () => {
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch", () => {
         const target = get(activeBranch);
         if (!target) {
           alert("Please select a branch to delete");
@@ -7029,26 +7079,26 @@ ${component_stack}
         } else if (confirm("Delete branch '" + target + "'?")) {
           postMessage("deleteBranch", target);
         }
-      });
+      }, "", "Delete");
 
       // Fetch All (⇄)
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="17" x2="4" y2="17"></line><polyline points="10 11 4 17 10 23"></polyline><line x1="4" y1="7" x2="20" y2="7"></line><polyline points="14 1 20 7 14 13"></polyline></svg>', "Fetch All Remotes (⇄)", () => {
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="17" x2="4" y2="17"></line><polyline points="10 11 4 17 10 23"></polyline><line x1="4" y1="7" x2="20" y2="7"></line><polyline points="14 1 20 7 14 13"></polyline></svg>', "Fetch All Remotes", () => {
         postMessage("fetchAll");
-      });
+      }, "", "git fetch --all");
 
       // Search (Q)
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', "Search Branches (Q)", () => {
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', "Search Branches", () => {
         if (container.classList.contains("collapsed")) {
           container.classList.remove("collapsed");
           collapseBtn.innerHTML = collapseSvg;
-          collapseBtn.title = "Collapse Branches";
+          updateTooltip(collapseBtn, "Collapse Branches");
         }
         sInput.focus();
         sInput.select();
-      });
+      }, "", "Search");
 
       // Expand / Collapse all
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>', "Expand / Collapse All", () => {
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>', "Expand / Collapse All Folders", () => {
         const bodies = treeContent.querySelectorAll(".tree-section-body, .tree-folder-body");
         let anyOpen = false;
         bodies.forEach(b => { if (b.style.display !== "none") anyOpen = true; });
@@ -7058,7 +7108,7 @@ ${component_stack}
 
       // Star / Favorites Filter
       let favOnly = container.dataset.favOnly === "true";
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="' + (favOnly ? "#e5a50a" : "none") + '" stroke="' + (favOnly ? "#e5a50a" : "currentColor") + '" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>', "Filter Favorites (★)", () => {
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="' + (favOnly ? "#e5a50a" : "none") + '" stroke="' + (favOnly ? "#e5a50a" : "currentColor") + '" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>', favOnly ? "Show All Branches" : "Filter Favorite Branches (★)", () => {
         favOnly = !favOnly;
         container.dataset.favOnly = favOnly ? "true" : "false";
         renderSidebarContent(container);
@@ -7134,10 +7184,12 @@ ${component_stack}
         if (b.behind || b.ahead) {
           trackHtml = '<span class="branch-track" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:11px;font-family:var(--vscode-editor-font-family, monospace);">';
           if (b.behind) {
-            trackHtml += '<span style="color:#58a6ff;display:inline-flex;align-items:center;gap:1px;" title="Behind ' + b.behind + '">↙ ' + b.behind + '</span>';
+            const behindTxt = "Behind remote by " + b.behind + " commit" + (b.behind > 1 ? "s" : "");
+            trackHtml += '<span class="track-badge behind" style="color:#58a6ff;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + behindTxt + '" title="' + behindTxt + '">↙ ' + b.behind + '</span>';
           }
           if (b.ahead) {
-            trackHtml += '<span style="color:#3fb950;display:inline-flex;align-items:center;gap:1px;" title="Ahead ' + b.ahead + '">↗ ' + b.ahead + '</span>';
+            const aheadTxt = "Ahead of remote by " + b.ahead + " commit" + (b.ahead > 1 ? "s" : "");
+            trackHtml += '<span class="track-badge ahead" style="color:#3fb950;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + aheadTxt + '" title="' + aheadTxt + '">↗ ' + b.ahead + '</span>';
           }
           trackHtml += '</span>';
         }
@@ -7257,6 +7309,10 @@ ${component_stack}
 
       mainArea.appendChild(treeContent);
       container.appendChild(mainArea);
+
+      treeContent.querySelectorAll(".track-badge").forEach((badge) => {
+        attachTooltip(badge, badge.dataset.tooltip || badge.title || "", "", "bottom");
+      });
     }
 
     var div = root5();

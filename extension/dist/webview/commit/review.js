@@ -22,18 +22,68 @@
 
   const app = document.getElementById('app');
 
-  // Tokenize string into words, symbols, whitespace
-  function tokenize(str) {
-    if (!str) return [];
-    return str.match(/[a-zA-Z0-9_]+|[^\sa-zA-Z0-9_]+|\s+/g) || [str];
+  const TOKEN_REGEX = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b(?:0x[0-9a-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b)|(@[a-zA-Z_$][a-zA-Z0-9_$]*)|(\b(?:abstract|as|assert|async|await|break|case|catch|class|const|continue|covariant|default|deferred|do|dynamic|else|enum|export|extends|extension|external|factory|final|finally|for|Function|get|hide|if|implements|import|in|interface|is|late|library|mixin|native|new|of|on|operator|part|rethrow|return|set|show|static|super|switch|sync|this|throw|try|typedef|var|void|while|with|yield|let|function|package|public|private|protected)\b)|(\b(?:true|false|null|undefined|nil|None)\b)|(\b(?:int|double|num|bool|boolean|String|string|List|Map|Set|Iterable|Future|Stream|Duration|DateTime|Uri|Object|Never|any|number|char|float|long|short|byte)\b)|(\b[a-zA-Z_$][a-zA-Z0-9_$]*(?=\s*\())|(\b[A-Z][a-zA-Z0-9_$]*\b)|(\b[a-zA-Z_$][a-zA-Z0-9_$]*\b)/g;
+
+  function highlightCode(code) {
+    if (!code) return '';
+    let result = '';
+    let lastIndex = 0;
+    TOKEN_REGEX.lastIndex = 0;
+
+    let match;
+    while ((match = TOKEN_REGEX.exec(code)) !== null) {
+      if (match.index > lastIndex) {
+        result += escapeHtml(code.slice(lastIndex, match.index));
+      }
+      lastIndex = TOKEN_REGEX.lastIndex;
+
+      const [full, comment, str, num, anno, kwd, constVal, builtinType, fnName, pascalType, ident] = match;
+
+      if (comment) {
+        result += `<span class="syn-comment">${escapeHtml(comment)}</span>`;
+      } else if (str) {
+        result += `<span class="syn-str">${escapeHtml(str)}</span>`;
+      } else if (num) {
+        result += `<span class="syn-num">${escapeHtml(num)}</span>`;
+      } else if (anno) {
+        result += `<span class="syn-anno">${escapeHtml(anno)}</span>`;
+      } else if (kwd) {
+        result += `<span class="syn-kwd">${escapeHtml(kwd)}</span>`;
+      } else if (constVal) {
+        result += `<span class="syn-const">${escapeHtml(constVal)}</span>`;
+      } else if (builtinType) {
+        result += `<span class="syn-type">${escapeHtml(builtinType)}</span>`;
+      } else if (fnName) {
+        result += `<span class="syn-fn">${escapeHtml(fnName)}</span>`;
+      } else if (pascalType) {
+        result += `<span class="syn-type">${escapeHtml(pascalType)}</span>`;
+      } else if (ident) {
+        result += `<span class="syn-var">${escapeHtml(ident)}</span>`;
+      } else {
+        result += escapeHtml(full);
+      }
+    }
+
+    if (lastIndex < code.length) {
+      result += escapeHtml(code.slice(lastIndex));
+    }
+
+    return result;
   }
 
-  // Word-level diff for modified lines
+  // Tokenize string into words, strings, comments, symbols, whitespace
+  function tokenize(str) {
+    if (!str) return [];
+    const regex = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|([a-zA-Z0-9_$]+|[^\sa-zA-Z0-9_$]+|\s+)/g;
+    return str.match(regex) || [str];
+  }
+
+  // Word-level diff for modified lines with syntax highlighting
   function computeWordDiff(leftStr, rightStr) {
     if (!state.highlightWords) {
       return {
-        leftHtml: escapeHtml(leftStr),
-        rightHtml: escapeHtml(rightStr)
+        leftHtml: highlightCode(leftStr),
+        rightHtml: highlightCode(rightStr)
       };
     }
 
@@ -54,11 +104,12 @@
     const render = (tokens, changeStart, changeEnd, cls) => {
       let html = '';
       for (let i = 0; i < tokens.length; i++) {
-        const text = escapeHtml(tokens[i]);
+        const text = tokens[i];
+        const highlighted = highlightCode(text);
         if (i >= changeStart && i <= changeEnd) {
-          html += `<span class="${cls}">${text}</span>`;
+          html += `<span class="${cls}">${highlighted}</span>`;
         } else {
-          html += text;
+          html += highlighted;
         }
       }
       return html;
@@ -469,12 +520,12 @@
       const lineNum = idx + 1;
       const b = leftLineMap[lineNum];
       let rowClass = 'editor-line';
-      let contentHtml = escapeHtml(line);
+      let contentHtml = highlightCode(line);
 
       if (b) {
         if (b.type === 'del') {
           rowClass += ' line-del';
-          contentHtml = escapeHtml(line);
+          contentHtml = highlightCode(line);
         } else if (b.type === 'mod') {
           rowClass += ' line-mod';
           const rOffset = lineNum - b.leftStart;
@@ -510,12 +561,12 @@
       const lineNum = idx + 1;
       const b = rightLineMap[lineNum];
       let rowClass = 'editor-line';
-      let contentHtml = escapeHtml(line);
+      let contentHtml = highlightCode(line);
 
       if (b) {
         if (b.type === 'add') {
           rowClass += ' line-add';
-          contentHtml = escapeHtml(line);
+          contentHtml = highlightCode(line);
         } else if (b.type === 'mod') {
           rowClass += ' line-mod';
           const lOffset = lineNum - b.rightStart;

@@ -1185,7 +1185,6 @@ body, html {
 
 .diff-word-mod-left {
   background: #245e75 !important;
-  color: #8ee0ff !important;
   display: inline-block;
   height: 20px;
   line-height: 20px;
@@ -1197,7 +1196,6 @@ body, html {
 
 .diff-word-mod-right {
   background: #2c728e !important;
-  color: #b8eeff !important;
   display: inline-block;
   height: 20px;
   line-height: 20px;
@@ -1212,17 +1210,9 @@ body, html {
   background: #1d3c2a !important;
 }
 
-.line-add .line-content {
-  color: #cbfadc;
-}
-
 /* 3. DELETED LINES (Xám / Gray - Android Studio) */
 .line-del {
   background: #36383e !important;
-}
-
-.line-del .line-content {
-  color: #9aa0a6 !important;
 }
 
 .diff-word-add,
@@ -1232,6 +1222,50 @@ body, html {
   padding: 0;
   margin: 0;
   border-radius: 0;
+}
+
+/* ==========================================================================
+   Code Syntax Highlighting (Editor Standard Colors - "màu bình thường như lúc code bên ngoài")
+   ========================================================================== */
+.syn-kwd {
+  color: #c586c0; /* Keywords (static, void, return, try, final...): purple */
+}
+
+.syn-type {
+  color: #4ec9b0; /* Types & Classes (String, GlobalConnection, Widget...): teal */
+}
+
+.syn-fn {
+  color: #dcdcaa; /* Methods & Functions: yellow */
+}
+
+.syn-str {
+  color: #ce9178; /* Strings: warm terracotta orange */
+}
+
+.syn-num {
+  color: #b5cea8; /* Numbers: sage green */
+}
+
+.syn-const {
+  color: #569cd6; /* Booleans & null (true, false, null): blue */
+}
+
+.syn-var {
+  color: #9cdcfe; /* Variables & identifiers: light sky blue */
+}
+
+.syn-comment {
+  color: #6a9955; /* Comments (//, /*): comment green */
+  font-style: italic;
+}
+
+.syn-anno {
+  color: #dcdcaa; /* Annotations (@override): gold */
+}
+
+.syn-punct {
+  color: #d4d4d4; /* Operators & punctuation */
 }
 
 /* Far Right Overview Ruler (Diff Minimap) */

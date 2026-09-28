@@ -693,7 +693,7 @@ function buildGraph(commits) {
             fromRow: row,
             toColumn: pCol,
             toRow: row + 1,
-            color
+            color: colorMap.get(p) ?? color
           });
         } else {
           pCol = lanes.indexOf(null);
@@ -708,7 +708,7 @@ function buildGraph(commits) {
             fromRow: row,
             toColumn: pCol,
             toRow: row + 1,
-            color
+            color: colorMap.get(p)
           });
         }
       }

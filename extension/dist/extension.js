@@ -1242,28 +1242,21 @@ var CommitReviewPanel = class _CommitReviewPanel {
     const fileName = path3.basename(filePath);
     this.panel.title = `Diff: ${fileName}`;
     try {
-      const diff = await this.gitService.getFileDiff(filePath);
-      let baseContent = "";
-      try {
-        baseContent = await this.gitService.exec(["show", `HEAD:${filePath}`]);
-      } catch {
-        baseContent = "";
-      }
-      let currentContent = "";
-      try {
-        const fullPath = path3.join(this.gitService.getCwd(), filePath);
-        if (require("fs").existsSync(fullPath)) {
-          currentContent = require("fs").readFileSync(fullPath, "utf8");
-        }
-      } catch {
-        currentContent = "";
-      }
-      let stagedDiff = "";
-      try {
-        stagedDiff = await this.gitService.exec(["diff", "--cached", "--", filePath]);
-      } catch {
-        stagedDiff = "";
-      }
+      const fullPath = path3.join(this.gitService.getCwd(), filePath);
+      const [diff, baseContent, currentContent, stagedDiff] = await Promise.all([
+        this.gitService.getFileDiff(filePath).catch(() => ""),
+        this.gitService.exec(["show", `HEAD:${filePath}`]).catch(() => ""),
+        (async () => {
+          try {
+            if (fs3.existsSync(fullPath)) {
+              return fs3.readFileSync(fullPath, "utf8");
+            }
+          } catch {
+          }
+          return "";
+        })(),
+        this.gitService.exec(["diff", "--cached", "--", filePath]).catch(() => "")
+      ]);
       const currentFileIndex = this.filesList.indexOf(filePath);
       this.panel.webview.postMessage({
         type: "fileDiff",
@@ -1340,7 +1333,6 @@ var CommitReviewPanel = class _CommitReviewPanel {
           fs3.writeFileSync(fullPath, newContent, "utf8");
           if (this.onStageChange) this.onStageChange();
           await this.loadFile(this.currentFilePath, this.filesList, this.isReadOnly);
-          vscode3.window.showInformationMessage("Reverted change block.");
         } catch (err) {
           vscode3.window.showErrorMessage(`Revert failed: ${err.message}`);
         }

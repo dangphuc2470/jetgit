@@ -1351,22 +1351,11 @@ body, html {
 
 /* Editable right pane styling */
 .right-pane .line-content[contenteditable="plaintext-only"] {
-  outline: none;
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
   cursor: text;
   min-height: 20px;
-}
-
-.right-pane .editor-line:focus-within {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.right-pane .editor-line.line-editing {
-  background: rgba(53, 116, 240, 0.12) !important;
-}
-
-.right-pane .editor-line.line-editing .line-content {
-  box-shadow: 0 0 0 1px rgba(53, 116, 240, 0.6);
-  border-radius: 2px;
 }
 
 .editable-badge {

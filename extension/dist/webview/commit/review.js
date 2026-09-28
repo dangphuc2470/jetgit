@@ -215,6 +215,11 @@
     currentLines.splice(replaceStart, replaceCount, ...insertLines);
     const newContent = currentLines.join('\n');
 
+    // Optimistic UI update: Immediate 0ms local response
+    state.currentLines = currentLines;
+    state.currentContent = newContent;
+    render();
+
     vscode.postMessage({
       type: 'revertBlockContent',
       payload: {
@@ -867,12 +872,10 @@
         const lineNum = parseInt(lineRow.getAttribute('data-line'), 10);
 
         span.addEventListener('focus', () => {
-          lineRow.classList.add('line-editing');
           isEditingSession = false;
         });
 
         span.addEventListener('blur', () => {
-          lineRow.classList.remove('line-editing');
           isEditingSession = false;
           const curText = span.textContent.replace(/\u00A0/g, ' ');
           if (state.currentLines[lineNum - 1] !== curText) {
@@ -907,6 +910,31 @@
             e.preventDefault();
             performRedo();
             return;
+          }
+
+          // Cut whole line on Ctrl+X / Cmd+X if no text is selected (like Android Studio / VS Code)
+          if ((e.metaKey || e.ctrlKey) && (e.key === 'x' || e.key === 'X')) {
+            const sel = window.getSelection();
+            const selectedText = sel ? sel.toString() : '';
+            if (!selectedText) {
+              e.preventDefault();
+              pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
+              const lineText = state.currentLines[lineNum - 1] || '';
+
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(lineText + '\n').catch(() => {});
+              }
+
+              if (state.currentLines.length > 1) {
+                state.currentLines.splice(lineNum - 1, 1);
+              } else {
+                state.currentLines[0] = '';
+              }
+
+              const nextLine = Math.min(lineNum, state.currentLines.length);
+              triggerSave(nextLine, 0);
+              return;
+            }
           }
 
           if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.keyCode === 83)) {

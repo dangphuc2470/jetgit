@@ -1240,9 +1240,58 @@
     highlightActiveBlock(b.id);
   }
 
+  let pendingNextFile = false;
+  let pendingPrevFile = false;
+  let hintTimeout = null;
+
+  function hideDiffNavigationHint() {
+    pendingNextFile = false;
+    pendingPrevFile = false;
+    if (hintTimeout) {
+      clearTimeout(hintTimeout);
+      hintTimeout = null;
+    }
+    const el = document.getElementById('diff-nav-hint');
+    if (el) {
+      el.style.opacity = '0';
+      el.style.transform = 'translate(-50%, 8px)';
+      setTimeout(() => { if (el && el.parentNode) el.parentNode.removeChild(el); }, 200);
+    }
+  }
+
+  function showDiffNavigationHint(kbdText, messageText, duration = 3500) {
+    if (hintTimeout) {
+      clearTimeout(hintTimeout);
+      hintTimeout = null;
+    }
+    let el = document.getElementById('diff-nav-hint');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'diff-nav-hint';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = `<span class="hint-kbd">${escapeHtml(kbdText)}</span><span class="hint-msg">${escapeHtml(messageText)}</span>`;
+    el.style.opacity = '1';
+    el.style.transform = 'translate(-50%, 0)';
+    hintTimeout = setTimeout(() => {
+      hideDiffNavigationHint();
+    }, duration);
+  }
+
   // Jump to diff block relative to current scroll position (F7 / Shift+F7)
   function jumpDiff(direction) {
-    if (!state.blocks || state.blocks.length === 0) return;
+    if (!state.blocks || state.blocks.length === 0) {
+      if (direction > 0 && state.currentFileIndex < state.filesList.length - 1) {
+        if (pendingNextFile) {
+          hideDiffNavigationHint();
+          vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex + 1 });
+        } else {
+          pendingNextFile = true;
+          showDiffNavigationHint('F7', 'Nhấn F7 lần nữa để qua file tiếp theo');
+        }
+      }
+      return;
+    }
 
     const rightPane = document.querySelector('.editor-pane.right-pane');
     const currentScroll = rightPane ? rightPane.scrollTop : 0;
@@ -1253,10 +1302,23 @@
 
     if (direction > 0) {
       let targetIdx = state.blocks.findIndex(b => getBlockY(b) > currentScroll + 70);
-      if (targetIdx === -1) {
-        targetIdx = 0;
+      if (targetIdx !== -1) {
+        hideDiffNavigationHint();
+        jumpToBlock(targetIdx);
+      } else {
+        const hasNextFile = state.currentFileIndex < state.filesList.length - 1;
+        if (hasNextFile) {
+          if (pendingNextFile) {
+            hideDiffNavigationHint();
+            vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex + 1 });
+          } else {
+            pendingNextFile = true;
+            showDiffNavigationHint('F7', 'Nhấn F7 lần nữa để qua file tiếp theo');
+          }
+        } else {
+          showDiffNavigationHint('F7', 'Đã ở thay đổi cuối cùng của file cuối cùng');
+        }
       }
-      jumpToBlock(targetIdx);
     } else {
       let targetIdx = -1;
       for (let i = state.blocks.length - 1; i >= 0; i--) {
@@ -1265,10 +1327,23 @@
           break;
         }
       }
-      if (targetIdx === -1) {
-        targetIdx = state.blocks.length - 1;
+      if (targetIdx !== -1) {
+        hideDiffNavigationHint();
+        jumpToBlock(targetIdx);
+      } else {
+        const hasPrevFile = state.currentFileIndex > 0;
+        if (hasPrevFile) {
+          if (pendingPrevFile) {
+            hideDiffNavigationHint();
+            vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex - 1 });
+          } else {
+            pendingPrevFile = true;
+            showDiffNavigationHint('Shift+F7', 'Nhấn Shift+F7 lần nữa để về file trước đó');
+          }
+        } else {
+          showDiffNavigationHint('Shift+F7', 'Đã ở thay đổi đầu tiên của file đầu tiên');
+        }
       }
-      jumpToBlock(targetIdx);
     }
   }
 
@@ -1397,6 +1472,7 @@
     const msg = event.data;
     switch (msg.type) {
       case 'fileDiff': {
+        hideDiffNavigationHint();
         const data = msg.payload;
         const isSameFile = (state.filePath && state.filePath === (data.path || ''));
         if (!isSameFile) {

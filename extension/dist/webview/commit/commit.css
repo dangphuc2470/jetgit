@@ -1403,3 +1403,54 @@ body, html {
   align-items: center;
 }
 
+/* Difference Navigation Hint Toast */
+#diff-nav-hint {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  background: #2b2d30;
+  color: #dfe1e5;
+  border: 1px solid #4e5157;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  animation: diffHintPop 0.2s ease-out;
+}
+
+#diff-nav-hint .hint-kbd {
+  background: #393b40;
+  color: #ffffff;
+  border: 1px solid #5a5d63;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: "JetBrains Mono", Consolas, monospace;
+}
+
+#diff-nav-hint .hint-msg {
+  font-weight: 500;
+  color: #dfe1e5;
+}
+
+@keyframes diffHintPop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+

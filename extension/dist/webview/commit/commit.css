@@ -1187,6 +1187,37 @@ body, html {
   accent-color: #3574f0;
 }
 
+.block-revert-btn {
+  position: absolute;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  pointer-events: auto;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  color: var(--vscode-foreground, #ccc);
+  cursor: pointer;
+  padding: 0;
+  box-sizing: border-box;
+  transition: all 0.12s ease;
+}
+
+.block-revert-btn:hover {
+  background: #3574f0;
+  border-color: #3574f0;
+  color: #ffffff;
+  transform: scale(1.15);
+}
+
+.block-revert-btn svg {
+  pointer-events: none;
+}
+
 /* ==========================================================================
    Android Studio Exact Color Palette:
    - Modified (Blue / Cyan / Teal): #173542 line, #245e75 word

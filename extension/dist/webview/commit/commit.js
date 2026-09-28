@@ -967,15 +967,13 @@
         state.recentMessages = data.recentMessages || [];
         state.stashes = data.stashes || [];
 
-        // Default is unchecked; only prune paths that are no longer in status
-        if (state.checkedFiles && state.checkedFiles.size > 0) {
-          const validPaths = new Set(state.files.map(f => f.path));
-          for (const p of Array.from(state.checkedFiles)) {
-            if (!validPaths.has(p)) {
-              state.checkedFiles.delete(p);
-            }
+        // Synchronize checked files strictly with actual git staged status
+        state.checkedFiles.clear();
+        state.files.forEach(f => {
+          if (f.staged && !f.partiallyStaged) {
+            state.checkedFiles.add(f.path);
           }
-        }
+        });
 
         // Set default commit message if empty
         if (!state.commitMessage && data.defaultCommitMessage) {

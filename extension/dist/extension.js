@@ -1,4 +1,3 @@
-"use strict";
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -34,19 +33,20 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode8 = __toESM(require("vscode"));
+var vscode10 = __toESM(require("vscode"));
 
 // src/git/gitService.ts
 var import_child_process = require("child_process");
 var import_util = require("util");
-var import_fs = require("fs");
-var import_path = require("path");
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
 
 // src/cache.ts
 var LRUCache = class {
   constructor(maxSize) {
     this.maxSize = maxSize;
   }
+  maxSize;
   map = /* @__PURE__ */ new Map();
   get(key) {
     const value = this.map.get(key);
@@ -84,7 +84,7 @@ var execFileAsync = (0, import_util.promisify)(import_child_process.execFile);
 var SEP = "";
 var LOG_FORMAT = [
   "%x00%H",
-  // hash
+  // hash with null byte commit delimiter
   "%h",
   // abbreviated hash
   "%P",
@@ -126,17 +126,18 @@ var GitService = class {
   async findSubRepos() {
     const results = [];
     try {
-      const entries = import_fs.readdirSync(this.cwd, { withFileTypes: true });
+      const entries = fs.readdirSync(this.cwd, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-          const subPath = import_path.join(this.cwd, entry.name);
-          const subGit = import_path.join(subPath, ".git");
-          if (import_fs.existsSync(subGit)) {
+          const subPath = path.join(this.cwd, entry.name);
+          const subGit = path.join(subPath, ".git");
+          if (fs.existsSync(subGit)) {
             results.push({ name: entry.name, path: subPath });
           }
         }
       }
-    } catch {}
+    } catch {
+    }
     return results;
   }
   async initRepo() {
@@ -159,20 +160,12 @@ var GitService = class {
       args.push("--all");
     }
     args.push("--decorate=full");
-    if (options.maxCount)
-      args.push(`-n${options.maxCount}`);
-    if (options.skip)
-      args.push(`--skip=${options.skip}`);
-    if (options.author)
-      args.push(`--author=${options.author}`);
-    if (options.after)
-      args.push(`--after=${options.after}`);
-    if (options.before)
-      args.push(`--before=${options.before}`);
-    if (options.branch)
-      args.push(options.branch);
-    if (options.query)
-      args.push(`--grep=${options.query}`, "-i");
+    if (options.maxCount) args.push(`-n${options.maxCount}`);
+    if (options.skip) args.push(`--skip=${options.skip}`);
+    if (options.author) args.push(`--author=${options.author}`);
+    if (options.after) args.push(`--after=${options.after}`);
+    if (options.before) args.push(`--before=${options.before}`);
+    if (options.branch) args.push(options.branch);
     if (options.path) {
       args.push("--");
       args.push(options.path);
@@ -180,11 +173,9 @@ var GitService = class {
     const output = await this.exec(args);
     const commits = [];
     for (const chunk of output.split("\0")) {
-      if (!chunk.trim())
-        continue;
+      if (!chunk.trim()) continue;
       const parts = chunk.split(SEP);
-      if (parts.length < 9)
-        continue;
+      if (parts.length < 9) continue;
       const commit = {
         hash: parts[0].trim(),
         abbreviatedHash: parts[1],
@@ -212,8 +203,7 @@ var GitService = class {
     ]);
     const changes = [];
     for (const line of output.split("\n")) {
-      if (!line.trim())
-        continue;
+      if (!line.trim()) continue;
       const parts = line.split("	");
       const status = parts[0][0];
       if (parts.length === 3) {
@@ -228,18 +218,17 @@ var GitService = class {
     const localOutput = await this.exec([
       "branch",
       "--format",
-      "%(HEAD)%(refname:short)\t%(objectname:short)\t%(upstream:short)\t%(upstream:track,nobracket)"
+      "%(HEAD)%(refname:short)	%(objectname:short)	%(upstream:short)	%(upstream:track,nobracket)"
     ]);
     const remoteOutput = await this.exec([
       "branch",
       "-r",
       "--format",
-      "%(refname:short)\t%(objectname:short)"
+      "%(refname:short)	%(objectname:short)"
     ]);
     const branches = [];
     for (const line of localOutput.split("\n")) {
-      if (!line.trim())
-        continue;
+      if (!line.trim()) continue;
       const current = line[0] === "*";
       const rest = line.slice(1);
       const [name, hash, upstream, track] = rest.split("	");
@@ -262,10 +251,8 @@ var GitService = class {
       });
     }
     for (const line of remoteOutput.split("\n")) {
-      if (!line.trim())
-        continue;
-      if (line.includes(" -> "))
-        continue;
+      if (!line.trim()) continue;
+      if (line.includes(" -> ")) continue;
       const [name, hash] = line.split("	");
       const trimmedName = name.trim();
       const slashIdx = trimmedName.indexOf("/");
@@ -292,8 +279,7 @@ var GitService = class {
     ]);
     const tags = [];
     for (const line of output.split("\n")) {
-      if (!line.trim())
-        continue;
+      if (!line.trim()) continue;
       const [name, hash] = line.split("	");
       tags.push({ name, hash });
     }
@@ -308,8 +294,7 @@ var GitService = class {
   }
   async createBranch(name, startPoint) {
     const args = ["checkout", "-b", name];
-    if (startPoint)
-      args.push(startPoint);
+    if (startPoint) args.push(startPoint);
     await this.exec(args);
   }
   async deleteBranch(name, force = false) {
@@ -320,14 +305,12 @@ var GitService = class {
   }
   async pull(branch) {
     const args = ["pull"];
-    if (branch)
-      args.push("origin", branch);
+    if (branch) args.push("origin", branch);
     return this.exec(args);
   }
   async push(branch) {
     const args = ["push"];
-    if (branch)
-      args.push("origin", branch);
+    if (branch) args.push("origin", branch);
     return this.exec(args);
   }
   async checkoutAndRebase(branch, onto) {
@@ -344,8 +327,7 @@ var GitService = class {
     const output = await this.exec(["diff", "--name-status", "-M", branch]);
     const changes = [];
     for (const line of output.split("\n")) {
-      if (!line.trim())
-        continue;
+      if (!line.trim()) continue;
       const parts = line.split("	");
       const status = parts[0][0];
       if (parts.length === 3) {
@@ -360,8 +342,7 @@ var GitService = class {
     const output = await this.exec(["status", "--porcelain=v1", "-uall"]);
     const entries = [];
     for (const line of output.split("\n")) {
-      if (!line)
-        continue;
+      if (!line) continue;
       const x = line[0];
       const y = line[1];
       const rest = line.slice(3);
@@ -383,8 +364,8 @@ var GitService = class {
     const output = await this.exec(["diff", "--name-only", "--diff-filter=U"]);
     return output.split("\n").filter((l) => l.trim());
   }
-  async stageFile(path3) {
-    await this.exec(["add", path3]);
+  async stageFile(path6) {
+    await this.exec(["add", path6]);
   }
   async stageFiles(paths) {
     await this.exec(["add", "--", ...paths]);
@@ -394,31 +375,17 @@ var GitService = class {
       const proc = (0, import_child_process.execFile)("git", ["hash-object", "-w", "--stdin"], { cwd: this.cwd }, (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr || err.message));
         const sha = stdout.trim();
-        this.exec(["update-index", "--cacheinfo", `100644,${sha},${filePath}`])
-          .then(() => resolve())
-          .catch(reject);
+        this.exec(["update-index", "--cacheinfo", `100644,${sha},${filePath}`]).then(() => resolve()).catch(reject);
       });
       proc.stdin?.write(content);
       proc.stdin?.end();
     });
   }
-  async commit(message) {
-    await this.exec(["commit", "-m", message]);
+  async unstageFile(path6) {
+    await this.exec(["reset", "HEAD", "--", path6]);
   }
-  async showFileAtCommit(hash, filePath) {
-    return this.exec(["show", `${hash}:${filePath}`]);
-  }
-  async diff(ref1, ref2) {
-    return this.exec(["diff", ref1, ref2]);
-  }
-  async getLogRange(base, head = "HEAD") {
-    return this.getLog({ all: false, branch: `${base}..${head}` });
-  }
-  async unstageFile(filePath) {
-    await this.exec(["reset", "HEAD", "--", filePath]);
-  }
-  async unstageFiles(filePaths) {
-    await this.exec(["reset", "HEAD", "--", ...filePaths]);
+  async unstageFiles(paths) {
+    await this.exec(["reset", "HEAD", "--", ...paths]);
   }
   async rollbackFiles(paths) {
     const status = await this.getStatus();
@@ -441,15 +408,16 @@ var GitService = class {
     }
     for (const p of toClean) {
       try {
-        const fullPath = import_path.join(this.cwd, p);
-        if (import_fs.existsSync(fullPath)) {
-          if (import_fs.statSync(fullPath).isDirectory()) {
-            import_fs.rmSync(fullPath, { recursive: true, force: true });
+        const fullPath = path.join(this.cwd, p);
+        if (fs.existsSync(fullPath)) {
+          if (fs.statSync(fullPath).isDirectory()) {
+            fs.rmSync(fullPath, { recursive: true, force: true });
           } else {
-            import_fs.unlinkSync(fullPath);
+            fs.unlinkSync(fullPath);
           }
         }
-      } catch {}
+      } catch {
+      }
     }
   }
   async getFileDiff(filePath) {
@@ -457,8 +425,8 @@ var GitService = class {
     const entry = status.find((s) => s.path === filePath);
     if (entry && entry.x === "?" && entry.y === "?") {
       try {
-        const fullPath = import_path.join(this.cwd, filePath);
-        const content = import_fs.readFileSync(fullPath, "utf8");
+        const fullPath = path.join(this.cwd, filePath);
+        const content = fs.readFileSync(fullPath, "utf8");
         const lines = content.split("\n");
         const diffHeader = `--- /dev/null
 +++ b/${filePath}
@@ -471,8 +439,7 @@ var GitService = class {
     }
     try {
       const diff = await this.exec(["diff", "HEAD", "--", filePath]);
-      if (diff.trim())
-        return diff;
+      if (diff.trim()) return diff;
       return await this.exec(["diff", "--", filePath]);
     } catch {
       return await this.exec(["diff", "--", filePath]);
@@ -481,12 +448,10 @@ var GitService = class {
   async applyHunkPatch(patchContent, reverse = false) {
     return new Promise((resolve, reject) => {
       const args = ["apply", "--cached", "--recount", "--whitespace=nowarn"];
-      if (reverse)
-        args.push("--reverse");
+      if (reverse) args.push("--reverse");
       args.push("-");
       const proc = (0, import_child_process.execFile)("git", args, { cwd: this.cwd }, (err, stdout, stderr) => {
-        if (err)
-          return reject(new Error(stderr || err.message));
+        if (err) return reject(new Error(stderr || err.message));
         resolve(stdout);
       });
       proc.stdin?.write(patchContent);
@@ -503,21 +468,21 @@ var GitService = class {
   }
   async getMergeMessage() {
     try {
-      const mergeMsgPath = import_path.join(this.cwd, ".git", "MERGE_MSG");
-      if (import_fs.existsSync(mergeMsgPath)) {
-        return import_fs.readFileSync(mergeMsgPath, "utf8").trim();
+      const mergeMsgPath = path.join(this.cwd, ".git", "MERGE_MSG");
+      if (fs.existsSync(mergeMsgPath)) {
+        return fs.readFileSync(mergeMsgPath, "utf8").trim();
       }
-    } catch {}
+    } catch {
+    }
     return "";
   }
   async getStashes() {
     try {
-      const out = await this.exec(["stash", "list", "--format=%gd\x1e%gs\x1e%cr"]);
+      const out = await this.exec(["stash", "list", "--format=%gd%gs%cr"]);
       const list = [];
       for (const line of out.split("\n")) {
-        if (!line.trim())
-          continue;
-        const [index, message, date] = line.split("\x1e");
+        if (!line.trim()) continue;
+        const [index, message, date] = line.split("");
         list.push({ index: index?.trim(), message: message?.trim(), date: date?.trim() });
       }
       return list;
@@ -527,8 +492,7 @@ var GitService = class {
   }
   async stashSave(message) {
     const args = ["stash", "push"];
-    if (message)
-      args.push("-m", message);
+    if (message) args.push("-m", message);
     return this.exec(args);
   }
   async stashPop(index = "stash@{0}") {
@@ -545,8 +509,7 @@ var GitService = class {
       await this.stageFiles(filesToStage);
     }
     const args = ["commit"];
-    if (amend)
-      args.push("--amend");
+    if (amend) args.push("--amend");
     args.push("-m", message);
     await this.exec(args);
   }
@@ -554,13 +517,24 @@ var GitService = class {
     await this.commitFiles(message, filesToStage, amend);
     return await this.push();
   }
+  async commit(message) {
+    await this.exec(["commit", "-m", message]);
+  }
+  async showFileAtCommit(hash, filePath) {
+    return this.exec(["show", `${hash}:${filePath}`]);
+  }
+  async diff(ref1, ref2) {
+    return this.exec(["diff", ref1, ref2]);
+  }
+  async getLogRange(base, head = "HEAD") {
+    return this.getLog({ all: false, branch: `${base}..${head}` });
+  }
   clearCache() {
     this.commitCache.clear();
   }
 };
 function parseRefs(raw) {
-  if (!raw.trim())
-    return [];
+  if (!raw.trim()) return [];
   return raw.split(",").map((r) => {
     r = r.trim();
     r = r.replace(/^HEAD -> /, "");
@@ -574,27 +548,28 @@ function parseRefs(raw) {
 // src/git/rebaseHandler.ts
 var import_child_process2 = require("child_process");
 var import_util2 = require("util");
-var fs = __toESM(require("fs"));
-var path = __toESM(require("path"));
+var fs2 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
 var os = __toESM(require("os"));
 var execFileAsync2 = (0, import_util2.promisify)(import_child_process2.execFile);
-var writeFileAsync = (0, import_util2.promisify)(fs.writeFile);
-var mkdtempAsync = (0, import_util2.promisify)(fs.mkdtemp);
-var unlinkAsync = (0, import_util2.promisify)(fs.unlink);
-var rmdirAsync = (0, import_util2.promisify)(fs.rmdir);
+var writeFileAsync = (0, import_util2.promisify)(fs2.writeFile);
+var mkdtempAsync = (0, import_util2.promisify)(fs2.mkdtemp);
+var unlinkAsync = (0, import_util2.promisify)(fs2.unlink);
+var rmdirAsync = (0, import_util2.promisify)(fs2.rmdir);
 var RebaseHandler = class {
   constructor(cwd) {
     this.cwd = cwd;
   }
+  cwd;
   /**
    * Execute an interactive rebase using a custom GIT_SEQUENCE_EDITOR
    * that writes the todo list we provide.
    */
   async executeRebase(base, todoItems) {
     const todoContent = todoItems.map((item) => `${item.action} ${item.hash} ${item.message}`).join("\n") + "\n";
-    const tmpDir = await mkdtempAsync(path.join(os.tmpdir(), "ijgit-rebase-"));
-    const todoPath = path.join(tmpDir, "todo");
-    const scriptPath = path.join(tmpDir, "editor.sh");
+    const tmpDir = await mkdtempAsync(path2.join(os.tmpdir(), "ijgit-rebase-"));
+    const todoPath = path2.join(tmpDir, "todo");
+    const scriptPath = path2.join(tmpDir, "editor.sh");
     try {
       await writeFileAsync(todoPath, todoContent, "utf-8");
       await writeFileAsync(scriptPath, `#!/bin/sh
@@ -647,9 +622,9 @@ cp "${todoPath}" "$1"
   }
   async isRebaseInProgress() {
     try {
-      const rebaseMergePath = path.join(this.cwd, ".git", "rebase-merge");
-      const rebaseApplyPath = path.join(this.cwd, ".git", "rebase-apply");
-      return fs.existsSync(rebaseMergePath) || fs.existsSync(rebaseApplyPath);
+      const rebaseMergePath = path2.join(this.cwd, ".git", "rebase-merge");
+      const rebaseApplyPath = path2.join(this.cwd, ".git", "rebase-apply");
+      return fs2.existsSync(rebaseMergePath) || fs2.existsSync(rebaseApplyPath);
     } catch {
       return false;
     }
@@ -661,8 +636,7 @@ var vscode2 = __toESM(require("vscode"));
 
 // src/git/graphBuilder.ts
 function buildGraph(commits) {
-  if (commits.length === 0)
-    return [];
+  if (commits.length === 0) return [];
   const nodes = [];
   const lanes = [];
   const colorMap = /* @__PURE__ */ new Map();
@@ -701,8 +675,7 @@ function buildGraph(commits) {
         lanes[col] = null;
       } else {
         lanes[col] = p0;
-        if (!colorMap.has(p0))
-          colorMap.set(p0, color);
+        if (!colorMap.has(p0)) colorMap.set(p0, color);
         lines.push({
           fromColumn: col,
           fromRow: row,
@@ -729,8 +702,7 @@ function buildGraph(commits) {
             lanes.push(null);
           }
           lanes[pCol] = p;
-          if (!colorMap.has(p))
-            colorMap.set(p, nextColor++);
+          if (!colorMap.has(p)) colorMap.set(p, nextColor++);
           lines.push({
             fromColumn: col,
             fromRow: row,
@@ -757,17 +729,13 @@ function buildGraph(commits) {
   return nodes;
 }
 function graphWidth(nodes) {
-  if (nodes.length === 0)
-    return 1;
+  if (nodes.length === 0) return 1;
   let max = 0;
   for (const node of nodes) {
-    if (node.column > max)
-      max = node.column;
+    if (node.column > max) max = node.column;
     for (const line of node.lines) {
-      if (line.fromColumn > max)
-        max = line.fromColumn;
-      if (line.toColumn > max)
-        max = line.toColumn;
+      if (line.fromColumn > max) max = line.fromColumn;
+      if (line.toColumn > max) max = line.toColumn;
     }
   }
   return max + 1;
@@ -779,13 +747,12 @@ var GitContentProvider = class _GitContentProvider {
   constructor(gitService) {
     this.gitService = gitService;
   }
+  gitService;
   static scheme = "intellij-git";
   async provideTextDocumentContent(uri) {
-    if (uri.path === "/empty")
-      return "";
+    if (uri.path === "/empty") return "";
     const match = uri.path.match(/^\/([^/]+)\/(.+)$/);
-    if (!match)
-      return "";
+    if (!match) return "";
     const [, hash, filePath] = match;
     try {
       return await this.gitService.showFileAtCommit(hash, filePath);
@@ -814,10 +781,15 @@ var GraphViewProvider = class {
     this.gitService = gitService;
     this.log = log2;
   }
+  extensionUri;
+  gitService;
+  log;
   static viewType = "intellij-git.logView";
   view;
   allCommits = [];
   graphNodes = [];
+  lastBranches = [];
+  lastTags = [];
   resolveWebviewView(webviewView, _context, _token) {
     this.view = webviewView;
     webviewView.webview.options = {
@@ -828,10 +800,13 @@ var GraphViewProvider = class {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        this.loadInitialData();
+      }
+    });
     this.loadInitialData();
   }
-  lastBranches = [];
-  lastTags = [];
   async loadInitialData() {
     const isRepo = await this.gitService.isGitRepo();
     if (!isRepo) {
@@ -847,7 +822,6 @@ var GraphViewProvider = class {
       });
       return;
     }
-
     try {
       this.log.appendLine("Loading git log...");
       const [commits, branches, tags] = await Promise.all([
@@ -967,7 +941,7 @@ var GraphViewProvider = class {
         break;
       }
       case "filter": {
-        const { branch, author, after, before, path: filePath, query } = msg.payload;
+        const { branch, author, after, before, path: filePath } = msg.payload;
         try {
           this.allCommits = await this.gitService.getLog({
             maxCount: 300,
@@ -976,8 +950,7 @@ var GraphViewProvider = class {
             author: author || void 0,
             after: after || void 0,
             before: before || void 0,
-            path: filePath || void 0,
-            query: query || void 0
+            path: filePath || void 0
           });
           this.graphNodes = buildGraph(this.allCommits);
           this.sendCommits();
@@ -1074,8 +1047,8 @@ var GraphViewProvider = class {
           if (picked) {
             const filePath = picked.file.path;
             const leftUri = GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
-            const path2 = require("path");
-            const rightUri = vscode2.Uri.file(path2.join(this.gitService.getCwd(), filePath));
+            const path6 = require("path");
+            const rightUri = vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
             const fileName = filePath.split("/").pop() || filePath;
             await vscode2.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${branch} \u2194 Working Tree)`);
           }
@@ -1190,8 +1163,717 @@ function getNonce() {
   return text;
 }
 
-// src/views/rebasePanel.ts
+// src/views/commitPanel.ts
+var vscode4 = __toESM(require("vscode"));
+var path4 = __toESM(require("path"));
+
+// src/views/commitReviewPanel.ts
 var vscode3 = __toESM(require("vscode"));
+var path3 = __toESM(require("path"));
+var fs3 = __toESM(require("fs"));
+var CommitReviewPanel = class _CommitReviewPanel {
+  constructor(panel, extensionUri, gitService, onStageChange) {
+    this.extensionUri = extensionUri;
+    this.gitService = gitService;
+    this.onStageChange = onStageChange;
+    this.panel = panel;
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    vscode3.window.onDidChangeActiveColorTheme(
+      () => this.sendThemeTokens(),
+      null,
+      this.disposables
+    );
+    this.panel.webview.html = this.getHtml();
+    this.panel.webview.onDidReceiveMessage(
+      (msg) => this.handleMessage(msg),
+      null,
+      this.disposables
+    );
+  }
+  extensionUri;
+  gitService;
+  onStageChange;
+  static currentPanel;
+  static viewType = "intellij-git.commitReview";
+  panel;
+  disposables = [];
+  currentFilePath = "";
+  filesList = [];
+  static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange) {
+    const fileName = path3.basename(filePath);
+    if (_CommitReviewPanel.currentPanel) {
+      if (onStageChange) {
+        _CommitReviewPanel.currentPanel.onStageChange = onStageChange;
+      }
+      _CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
+      _CommitReviewPanel.currentPanel.panel.reveal(vscode3.ViewColumn.Active, true);
+      _CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
+      return _CommitReviewPanel.currentPanel;
+    }
+    const panel = vscode3.window.createWebviewPanel(
+      _CommitReviewPanel.viewType,
+      `Diff: ${fileName}`,
+      vscode3.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode3.Uri.joinPath(extensionUri, "dist", "webview")
+        ]
+      }
+    );
+    _CommitReviewPanel.currentPanel = new _CommitReviewPanel(
+      panel,
+      extensionUri,
+      gitService,
+      onStageChange
+    );
+    _CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
+    return _CommitReviewPanel.currentPanel;
+  }
+  async loadFile(filePath, filesList) {
+    this.currentFilePath = filePath;
+    if (filesList) this.filesList = filesList;
+    const fileName = path3.basename(filePath);
+    this.panel.title = `Diff: ${fileName}`;
+    try {
+      const diff = await this.gitService.getFileDiff(filePath);
+      let baseContent = "";
+      try {
+        baseContent = await this.gitService.exec(["show", `HEAD:${filePath}`]);
+      } catch {
+        baseContent = "";
+      }
+      let currentContent = "";
+      try {
+        const fullPath = path3.join(this.gitService.getCwd(), filePath);
+        if (require("fs").existsSync(fullPath)) {
+          currentContent = require("fs").readFileSync(fullPath, "utf8");
+        }
+      } catch {
+        currentContent = "";
+      }
+      let stagedDiff = "";
+      try {
+        stagedDiff = await this.gitService.exec(["diff", "--cached", "--", filePath]);
+      } catch {
+        stagedDiff = "";
+      }
+      const currentFileIndex = this.filesList.indexOf(filePath);
+      this.panel.webview.postMessage({
+        type: "fileDiff",
+        payload: {
+          path: filePath,
+          fileName,
+          fileDir: path3.dirname(filePath) === "." ? "" : path3.dirname(filePath),
+          diff,
+          stagedDiff,
+          baseContent,
+          currentContent,
+          filesList: this.filesList,
+          currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0
+        }
+      });
+    } catch (err) {
+      vscode3.window.showErrorMessage(`Failed to load diff: ${err.message}`);
+    }
+  }
+  async handleMessage(msg) {
+    switch (msg.type) {
+      case "ready": {
+        this.sendThemeTokens();
+        if (this.currentFilePath) {
+          this.loadFile(this.currentFilePath, this.filesList);
+        }
+        break;
+      }
+      case "refreshDiff": {
+        const filePath = msg.payload || this.currentFilePath;
+        this.loadFile(filePath, this.filesList);
+        break;
+      }
+      case "navigateFile": {
+        const newIndex = msg.payload;
+        if (newIndex >= 0 && newIndex < this.filesList.length) {
+          const newPath = this.filesList[newIndex];
+          this.loadFile(newPath, this.filesList);
+        }
+        break;
+      }
+      case "updateBlockStage": {
+        const { filePath, stagedContent, stagedCount, totalCount } = msg.payload;
+        try {
+          if (stagedCount === 0) {
+            await this.gitService.unstageFile(filePath);
+          } else if (stagedCount === totalCount) {
+            await this.gitService.stageFile(filePath);
+          } else {
+            await this.gitService.stageFileContent(filePath, stagedContent);
+          }
+          if (this.onStageChange) this.onStageChange();
+          let stagedDiff = "";
+          try {
+            stagedDiff = await this.gitService.exec(["diff", "--cached", "--", filePath]);
+          } catch {
+            stagedDiff = "";
+          }
+          this.panel.webview.postMessage({
+            type: "stagedDiffUpdated",
+            payload: { stagedDiff }
+          });
+        } catch (err) {
+          vscode3.window.showErrorMessage(`Update stage failed: ${err.message}`);
+        }
+        break;
+      }
+      case "revertBlockContent": {
+        const { filePath, newContent } = msg.payload;
+        try {
+          const fullPath = path3.join(this.gitService.getCwd(), filePath);
+          fs3.writeFileSync(fullPath, newContent, "utf8");
+          if (this.onStageChange) this.onStageChange();
+          await this.loadFile(this.currentFilePath, this.filesList);
+          vscode3.window.showInformationMessage("Reverted change block.");
+        } catch (err) {
+          vscode3.window.showErrorMessage(`Revert failed: ${err.message}`);
+        }
+        break;
+      }
+      case "applyHunkPatch": {
+        const { patch, reverse } = msg.payload;
+        try {
+          await this.gitService.applyHunkPatch(patch, reverse);
+          if (this.onStageChange) this.onStageChange();
+          this.loadFile(this.currentFilePath, this.filesList);
+        } catch (err) {
+          vscode3.window.showErrorMessage(`Apply patch failed: ${err.message}`);
+        }
+        break;
+      }
+      case "openFile": {
+        const filePath = msg.payload;
+        if (filePath) {
+          const fullPath = path3.join(this.gitService.getCwd(), filePath);
+          vscode3.commands.executeCommand("vscode.open", vscode3.Uri.file(fullPath));
+        }
+        break;
+      }
+      case "rollbackHunk": {
+        const { patch } = msg.payload;
+        try {
+          await this.gitService.applyHunkPatch(patch, true);
+          if (this.onStageChange) this.onStageChange();
+          this.loadFile(this.currentFilePath, this.filesList);
+          vscode3.window.showInformationMessage("Hunk rolled back.");
+        } catch (err) {
+          vscode3.window.showErrorMessage(`Rollback hunk failed: ${err.message}`);
+        }
+        break;
+      }
+    }
+  }
+  getCurrentFilePath() {
+    return this.currentFilePath;
+  }
+  refresh() {
+    if (this.currentFilePath) {
+      this.loadFile(this.currentFilePath, this.filesList);
+    }
+  }
+  sendThemeTokens() {
+    const tokens = this.getThemeTokens();
+    this.panel.webview.postMessage({
+      type: "themeTokens",
+      payload: tokens
+    });
+  }
+  getThemeTokens() {
+    const defaultTokens = {
+      kwd: "#fd6883",
+      type: "#85dacc",
+      fn: "#adda78",
+      str: "#f9cc6c",
+      num: "#a8a9eb",
+      constVal: "#a8a9eb",
+      varVal: "#fff1f3",
+      comment: "#72696a",
+      anno: "#85dacc",
+      punct: "#948a8b"
+    };
+    try {
+      const activeThemeName = vscode3.workspace.getConfiguration("workbench").get("colorTheme");
+      if (!activeThemeName) return defaultTokens;
+      for (const ext of vscode3.extensions.all) {
+        const themes = ext.packageJSON?.contributes?.themes;
+        if (!Array.isArray(themes)) continue;
+        const matched = themes.find((t) => t.label === activeThemeName || t.id === activeThemeName);
+        if (!matched || !matched.path) continue;
+        const themePath = path3.join(ext.extensionPath, matched.path);
+        if (!fs3.existsSync(themePath)) continue;
+        let content = fs3.readFileSync(themePath, "utf8");
+        content = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
+        const themeJson = JSON.parse(content);
+        const tc = themeJson.tokenColors || [];
+        const findColor = (targetScopes) => {
+          for (const target of targetScopes) {
+            for (const rule of tc) {
+              if (!rule.settings || !rule.settings.foreground) continue;
+              const scopes = Array.isArray(rule.scope) ? rule.scope : typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : [];
+              if (scopes.includes(target)) return rule.settings.foreground;
+            }
+          }
+          for (const target of targetScopes) {
+            for (const rule of tc) {
+              if (!rule.settings || !rule.settings.foreground) continue;
+              const scopes = Array.isArray(rule.scope) ? rule.scope : typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : [];
+              for (const s of scopes) {
+                if (!s.includes(" ") && s.startsWith(target + ".")) return rule.settings.foreground;
+              }
+            }
+          }
+          return null;
+        };
+        const kwd = findColor(["keyword"]) || defaultTokens.kwd;
+        const type = findColor(["entity.name.type", "support.type", "storage.type"]) || defaultTokens.type;
+        const fn = findColor(["entity.name.function", "support.function"]) || defaultTokens.fn;
+        const str = findColor(["string"]) || defaultTokens.str;
+        const num = findColor(["constant.numeric"]) || defaultTokens.num;
+        const constVal = findColor(["constant.language"]) || defaultTokens.constVal;
+        const comment = findColor(["comment"]) || defaultTokens.comment;
+        const varVal = findColor(["variable"]) || defaultTokens.varVal;
+        const anno = findColor(["punctuation.definition.annotation", "meta.annotation"]) || type;
+        const punct = findColor(["punctuation"]) || defaultTokens.punct;
+        return { kwd, type, fn, str, num, constVal, varVal, comment, anno, punct };
+      }
+    } catch {
+    }
+    return defaultTokens;
+  }
+  getHtml() {
+    const scriptUri = this.panel.webview.asWebviewUri(
+      vscode3.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "review.js")
+    );
+    const styleUri = this.panel.webview.asWebviewUri(
+      vscode3.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
+    );
+    const nonce = getNonce2();
+    const tokens = this.getThemeTokens();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="${styleUri}">
+  <style id="dynamic-syntax-tokens">
+    :root {
+      --syn-kwd: ${tokens.kwd} !important;
+      --syn-type: ${tokens.type} !important;
+      --syn-fn: ${tokens.fn} !important;
+      --syn-str: ${tokens.str} !important;
+      --syn-num: ${tokens.num} !important;
+      --syn-const: ${tokens.constVal} !important;
+      --syn-var: ${tokens.varVal} !important;
+      --syn-comment: ${tokens.comment} !important;
+      --syn-anno: ${tokens.anno} !important;
+      --syn-punct: ${tokens.punct} !important;
+    }
+  </style>
+  <title>Code Review</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
+  }
+  dispose() {
+    _CommitReviewPanel.currentPanel = void 0;
+    for (const d of this.disposables) d.dispose();
+  }
+};
+function getNonce2() {
+  let text = "";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return text;
+}
+
+// src/views/commitPanel.ts
+var CommitViewProvider = class {
+  constructor(extensionUri, gitService, log2) {
+    this.extensionUri = extensionUri;
+    this.gitService = gitService;
+    this.log = log2;
+  }
+  extensionUri;
+  gitService;
+  log;
+  static viewType = "intellij-git.commitView";
+  view;
+  allFilePaths = [];
+  resolveWebviewView(webviewView, _context, _token) {
+    this.view = webviewView;
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode4.Uri.joinPath(this.extensionUri, "dist", "webview")
+      ]
+    };
+    webviewView.webview.html = this.getHtml(webviewView.webview);
+    webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        this.refresh();
+      }
+    });
+    this.refresh();
+  }
+  async refresh() {
+    if (!this.view) return;
+    const isRepo = await this.gitService.isGitRepo();
+    if (!isRepo) {
+      this.view.webview.postMessage({
+        type: "status",
+        payload: {
+          files: [],
+          changesCount: 0,
+          unversionedCount: 0,
+          recentMessages: [],
+          stashes: []
+        }
+      });
+      return;
+    }
+    try {
+      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
+        this.gitService.getStatus(),
+        this.gitService.getMergeMessage(),
+        this.gitService.getRecentCommitMessages(10),
+        this.gitService.getStashes(),
+        this.gitService.exec(["diff", "HEAD"]).catch(() => ""),
+        this.gitService.exec(["diff", "--cached"]).catch(() => "")
+      ]);
+      const totalChangesMap = this.parseChangesPerFile(totalDiff);
+      const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
+      const files = statusEntries.map((entry) => {
+        const filePath = entry.path;
+        const fileName = path4.basename(filePath);
+        const fileDir = path4.dirname(filePath);
+        const isUntracked = entry.x === "?" && entry.y === "?";
+        const isStaged = entry.x !== " " && entry.x !== "?";
+        const totalChanges = totalChangesMap.get(filePath) || 0;
+        const stagedChanges = stagedChangesMap.get(filePath) || 0;
+        const isPartiallyStaged = totalChanges > 0 && stagedChanges > 0 && stagedChanges < totalChanges;
+        return {
+          path: filePath,
+          name: fileName,
+          dir: fileDir === "." ? "" : fileDir,
+          status: entry.y !== " " ? entry.y : entry.x,
+          staged: isStaged,
+          isUntracked,
+          totalChanges,
+          stagedChanges,
+          partiallyStaged: isPartiallyStaged
+        };
+      });
+      files.sort((a, b) => {
+        const nameA = a.name.toLowerCase();
+        const nameB = b.name.toLowerCase();
+        if (nameA !== nameB) return nameA.localeCompare(nameB);
+        return a.path.localeCompare(b.path);
+      });
+      const changesCount = files.filter((f) => !f.isUntracked).length;
+      const unversionedCount = files.filter((f) => f.isUntracked).length;
+      this.allFilePaths = files.map((f) => f.path);
+      this.view.webview.postMessage({
+        type: "status",
+        payload: {
+          files,
+          changesCount,
+          unversionedCount,
+          defaultCommitMessage: mergeMsg || "",
+          recentMessages,
+          stashes
+        }
+      });
+    } catch (err) {
+      this.log.appendLine(`Commit panel status fetch failed: ${err.message}`);
+    }
+  }
+  parseChangesPerFile(diffText) {
+    const map = /* @__PURE__ */ new Map();
+    if (!diffText || !diffText.trim()) return map;
+    const fileSections = diffText.split(/^diff --git /m);
+    for (const section of fileSections) {
+      if (!section.trim()) continue;
+      const match = section.match(/^a\/(.*?)\s+b\/(.*?)(?:\n|$)/);
+      if (!match) continue;
+      const filePath = match[2];
+      const lines = section.split("\n");
+      let count = 0;
+      let inHunk = false;
+      let inDiffBlock = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith("@@")) {
+          inHunk = true;
+          inDiffBlock = false;
+        } else if (inHunk) {
+          if (line.startsWith("+") || line.startsWith("-")) {
+            if (!inDiffBlock) {
+              count++;
+              inDiffBlock = true;
+            }
+          } else if (line.startsWith(" ")) {
+            inDiffBlock = false;
+          }
+        }
+      }
+      map.set(filePath, count);
+    }
+    return map;
+  }
+  async handleMessage(msg) {
+    switch (msg.type) {
+      case "ready":
+      case "refresh": {
+        await this.refresh();
+        break;
+      }
+      case "selectFile": {
+        const filePath = msg.payload;
+        if (CommitReviewPanel.currentPanel) {
+          CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+        }
+        break;
+      }
+      case "openReviewInCenter": {
+        const filePath = msg.payload;
+        if (filePath) {
+          CommitReviewPanel.createOrShow(
+            this.extensionUri,
+            this.gitService,
+            filePath,
+            this.allFilePaths,
+            () => this.refresh()
+          );
+        }
+        break;
+      }
+      case "stageFile": {
+        const filePath = msg.payload;
+        try {
+          await this.gitService.stageFile(filePath);
+          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
+            await CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+          }
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Stage failed: ${err.message}`);
+        }
+        break;
+      }
+      case "unstageFile": {
+        const filePath = msg.payload;
+        try {
+          await this.gitService.unstageFile(filePath);
+          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
+            await CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+          }
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Unstage failed: ${err.message}`);
+        }
+        break;
+      }
+      case "rollbackFiles": {
+        const filePaths = msg.payload;
+        if (!filePaths || filePaths.length === 0) return;
+        const confirm = await vscode4.window.showWarningMessage(
+          `Rollback changes in ${filePaths.length} file(s)? This cannot be undone.`,
+          { modal: true },
+          "Rollback"
+        );
+        if (confirm !== "Rollback") return;
+        try {
+          await this.gitService.rollbackFiles(filePaths);
+          vscode4.window.showInformationMessage(`Rolled back ${filePaths.length} file(s).`);
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Rollback failed: ${err.message}`);
+        }
+        break;
+      }
+      case "getFileDiff": {
+        const filePath = msg.payload;
+        try {
+          const diff = await this.gitService.getFileDiff(filePath);
+          this.view?.webview.postMessage({
+            type: "fileDiff",
+            payload: { path: filePath, diff }
+          });
+        } catch (err) {
+          this.log.appendLine(`Get diff failed: ${err.message}`);
+        }
+        break;
+      }
+      case "applyHunkPatch": {
+        const { patch, reverse } = msg.payload;
+        try {
+          await this.gitService.applyHunkPatch(patch, reverse);
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Apply patch failed: ${err.message}`);
+        }
+        break;
+      }
+      case "commit": {
+        const { message, files, amend } = msg.payload;
+        try {
+          await this.gitService.commitFiles(message, files, amend);
+          vscode4.window.showInformationMessage("Committed successfully.");
+          this.view?.webview.postMessage({ type: "commitSuccess" });
+          await this.refresh();
+          vscode4.commands.executeCommand("intellij-git.refreshBranches");
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Commit failed: ${err.message}`);
+        }
+        break;
+      }
+      case "commitAndPush": {
+        const { message, files, amend } = msg.payload;
+        try {
+          await this.gitService.commitAndPush(message, files, amend);
+          vscode4.window.showInformationMessage("Committed and pushed successfully.");
+          this.view?.webview.postMessage({ type: "commitSuccess" });
+          await this.refresh();
+          vscode4.commands.executeCommand("intellij-git.refreshBranches");
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Commit and Push failed: ${err.message}`);
+        }
+        break;
+      }
+      case "openDiffInEditor": {
+        const filePath = msg.payload;
+        try {
+          const leftUri = GitContentProvider.makeUri("HEAD", filePath);
+          const rightUri = vscode4.Uri.file(path4.join(this.gitService.getCwd(), filePath));
+          const fileName = path4.basename(filePath);
+          await vscode4.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (HEAD \u2194 Working Tree)`);
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Open diff editor failed: ${err.message}`);
+        }
+        break;
+      }
+      case "createStash": {
+        const msgText = await vscode4.window.showInputBox({
+          prompt: "Stash message (optional)",
+          placeHolder: "WIP on feature..."
+        });
+        if (msgText === void 0) return;
+        try {
+          await this.gitService.stashSave(msgText);
+          vscode4.window.showInformationMessage("Stashed local changes.");
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Stash failed: ${err.message}`);
+        }
+        break;
+      }
+      case "stashPop": {
+        const idx = msg.payload;
+        try {
+          await this.gitService.stashPop(idx);
+          vscode4.window.showInformationMessage(`Applied and dropped ${idx}`);
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+        }
+        break;
+      }
+      case "stashApply": {
+        const idx = msg.payload;
+        try {
+          await this.gitService.stashApply(idx);
+          vscode4.window.showInformationMessage(`Applied ${idx}`);
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+        }
+        break;
+      }
+      case "stashDrop": {
+        const idx = msg.payload;
+        const confirm = await vscode4.window.showWarningMessage(
+          `Drop stash ${idx}?`,
+          { modal: true },
+          "Drop"
+        );
+        if (confirm !== "Drop") return;
+        try {
+          await this.gitService.stashDrop(idx);
+          vscode4.window.showInformationMessage(`Dropped ${idx}`);
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Stash drop failed: ${err.message}`);
+        }
+        break;
+      }
+      case "openLog": {
+        vscode4.commands.executeCommand("intellij-git.openLog");
+        break;
+      }
+      case "collapseView": {
+        vscode4.commands.executeCommand("workbench.action.toggleSidebarVisibility");
+        break;
+      }
+    }
+  }
+  show() {
+    if (this.view) {
+      this.view.show(true);
+    }
+  }
+  getHtml(webview) {
+    const scriptUri = webview.asWebviewUri(
+      vscode4.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.js")
+    );
+    const styleUri = webview.asWebviewUri(
+      vscode4.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
+    );
+    const nonce = getNonce3();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="${styleUri}">
+  <title>Commit</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
+  }
+};
+function getNonce3() {
+  let text = "";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return text;
+}
+
+// src/views/rebasePanel.ts
+var vscode5 = __toESM(require("vscode"));
 var RebasePanel = class _RebasePanel {
   constructor(panel, extensionUri, gitService, rebaseHandler, baseHash) {
     this.extensionUri = extensionUri;
@@ -1208,6 +1890,10 @@ var RebasePanel = class _RebasePanel {
     );
     this.loadCommits();
   }
+  extensionUri;
+  gitService;
+  rebaseHandler;
+  baseHash;
   static currentPanel;
   static viewType = "intellij-git.rebasePanel";
   panel;
@@ -1217,15 +1903,15 @@ var RebasePanel = class _RebasePanel {
       _RebasePanel.currentPanel.panel.reveal();
       return;
     }
-    const panel = vscode3.window.createWebviewPanel(
+    const panel = vscode5.window.createWebviewPanel(
       _RebasePanel.viewType,
       "Interactive Rebase",
-      vscode3.ViewColumn.One,
+      vscode5.ViewColumn.One,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [
-          vscode3.Uri.joinPath(extensionUri, "dist", "webview")
+          vscode5.Uri.joinPath(extensionUri, "dist", "webview")
         ]
       }
     );
@@ -1252,7 +1938,7 @@ var RebasePanel = class _RebasePanel {
         }))
       });
     } catch (err) {
-      vscode3.window.showErrorMessage(`Failed to load commits for rebase: ${err.message}`);
+      vscode5.window.showErrorMessage(`Failed to load commits for rebase: ${err.message}`);
     }
   }
   async handleMessage(msg) {
@@ -1262,20 +1948,20 @@ var RebasePanel = class _RebasePanel {
         this.panel.webview.postMessage({ type: "rebaseStarted" });
         const result = await this.rebaseHandler.executeRebase(this.baseHash, todoItems);
         if (result.success) {
-          vscode3.window.showInformationMessage("Rebase completed successfully.");
+          vscode5.window.showInformationMessage("Rebase completed successfully.");
           this.panel.dispose();
         } else if (result.error === "conflict") {
-          vscode3.window.showWarningMessage(
+          vscode5.window.showWarningMessage(
             "Rebase paused due to conflicts. Resolve them and continue.",
             "Open Merge Editor"
           ).then((choice) => {
             if (choice === "Open Merge Editor") {
-              vscode3.commands.executeCommand("intellij-git.resolveConflicts");
+              vscode5.commands.executeCommand("intellij-git.resolveConflicts");
             }
           });
           this.panel.dispose();
         } else {
-          vscode3.window.showErrorMessage(`Rebase failed: ${result.error}`);
+          vscode5.window.showErrorMessage(`Rebase failed: ${result.error}`);
           this.panel.webview.postMessage({
             type: "rebaseError",
             payload: result.error
@@ -1286,7 +1972,7 @@ var RebasePanel = class _RebasePanel {
       case "abort": {
         try {
           await this.rebaseHandler.abortRebase();
-          vscode3.window.showInformationMessage("Rebase aborted.");
+          vscode5.window.showInformationMessage("Rebase aborted.");
         } catch {
         }
         this.panel.dispose();
@@ -1297,9 +1983,9 @@ var RebasePanel = class _RebasePanel {
   getHtml() {
     const webview = this.panel.webview;
     const scriptUri = webview.asWebviewUri(
-      vscode3.Uri.joinPath(this.extensionUri, "dist", "webview", "rebase", "rebase.js")
+      vscode5.Uri.joinPath(this.extensionUri, "dist", "webview", "rebase", "rebase.js")
     );
-    const nonce = getNonce2();
+    const nonce = getNonce4();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1318,11 +2004,10 @@ var RebasePanel = class _RebasePanel {
   dispose() {
     _RebasePanel.currentPanel = void 0;
     this.panel.dispose();
-    for (const d of this.disposables)
-      d.dispose();
+    for (const d of this.disposables) d.dispose();
   }
 };
-function getNonce2() {
+function getNonce4() {
   let text = "";
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
@@ -1332,45 +2017,46 @@ function getNonce2() {
 }
 
 // src/views/branchTree.ts
-var vscode4 = __toESM(require("vscode"));
+var vscode6 = __toESM(require("vscode"));
 var BranchTreeProvider = class {
   constructor(gitService) {
     this.gitService = gitService;
   }
-  _onDidChangeTreeData = new vscode4.EventEmitter();
+  gitService;
+  _onDidChangeTreeData = new vscode6.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   refresh() {
     this._onDidChangeTreeData.fire(void 0);
   }
   getTreeItem(element) {
-    const collapsible = element.children ? vscode4.TreeItemCollapsibleState.Expanded : vscode4.TreeItemCollapsibleState.None;
-    const item = new vscode4.TreeItem(element.label, collapsible);
+    const collapsible = element.children ? vscode6.TreeItemCollapsibleState.Expanded : vscode6.TreeItemCollapsibleState.None;
+    const item = new vscode6.TreeItem(element.label, collapsible);
     switch (element.type) {
       case "category":
-        item.iconPath = new vscode4.ThemeIcon(
+        item.iconPath = new vscode6.ThemeIcon(
           element.label === "Tags" ? "tag" : "git-branch"
         );
         break;
       case "remote-group":
-        item.iconPath = new vscode4.ThemeIcon("cloud");
+        item.iconPath = new vscode6.ThemeIcon("cloud");
         break;
       case "branch-current":
-        item.iconPath = new vscode4.ThemeIcon("star-full");
+        item.iconPath = new vscode6.ThemeIcon("star-full");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "branch-current";
         break;
       case "branch-local":
-        item.iconPath = new vscode4.ThemeIcon("git-branch");
+        item.iconPath = new vscode6.ThemeIcon("git-branch");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "branch-local";
         break;
       case "branch-remote":
-        item.iconPath = new vscode4.ThemeIcon("git-branch");
+        item.iconPath = new vscode6.ThemeIcon("git-branch");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "branch-remote";
         break;
       case "tag":
-        item.iconPath = new vscode4.ThemeIcon("tag");
+        item.iconPath = new vscode6.ThemeIcon("tag");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "tag";
         break;
@@ -1458,9 +2144,9 @@ var BranchTreeProvider = class {
 };
 
 // src/views/changelistTree.ts
-var vscode5 = __toESM(require("vscode"));
-var path2 = __toESM(require("path"));
-var fs2 = __toESM(require("fs"));
+var vscode7 = __toESM(require("vscode"));
+var path5 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
 var DEFAULT_DATA = {
   changelists: [{ name: "Default", files: [] }],
   active: "Default"
@@ -1469,13 +2155,15 @@ var ChangelistTreeProvider = class {
   constructor(gitService, workspaceRoot) {
     this.gitService = gitService;
     this.workspaceRoot = workspaceRoot;
-    const vscodePath = path2.join(workspaceRoot, ".vscode");
-    this.dataPath = path2.join(vscodePath, "changelists.json");
+    const vscodePath = path5.join(workspaceRoot, ".vscode");
+    this.dataPath = path5.join(vscodePath, "changelists.json");
     this.load();
-    vscode5.workspace.onDidCreateFiles(() => this.syncWithGitStatus());
-    vscode5.workspace.onDidSaveTextDocument(() => this.syncWithGitStatus());
+    vscode7.workspace.onDidCreateFiles(() => this.syncWithGitStatus());
+    vscode7.workspace.onDidSaveTextDocument(() => this.syncWithGitStatus());
   }
-  _onDidChangeTreeData = new vscode5.EventEmitter();
+  gitService;
+  workspaceRoot;
+  _onDidChangeTreeData = new vscode7.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   data = DEFAULT_DATA;
   dataPath;
@@ -1485,12 +2173,12 @@ var ChangelistTreeProvider = class {
   }
   getTreeItem(element) {
     if (element.type === "changelist") {
-      const item = new vscode5.TreeItem(
+      const item = new vscode7.TreeItem(
         element.name,
-        vscode5.TreeItemCollapsibleState.Expanded
+        vscode7.TreeItemCollapsibleState.Expanded
       );
       item.contextValue = element.active ? "changelist-active" : "changelist";
-      item.iconPath = new vscode5.ThemeIcon(
+      item.iconPath = new vscode7.ThemeIcon(
         element.active ? "folder-active" : "folder"
       );
       if (element.active) {
@@ -1498,14 +2186,14 @@ var ChangelistTreeProvider = class {
       }
       return item;
     } else {
-      const item = new vscode5.TreeItem(
-        path2.basename(element.path),
-        vscode5.TreeItemCollapsibleState.None
+      const item = new vscode7.TreeItem(
+        path5.basename(element.path),
+        vscode7.TreeItemCollapsibleState.None
       );
-      item.description = path2.dirname(element.path);
+      item.description = path5.dirname(element.path);
       item.contextValue = "changelist-file";
-      item.resourceUri = vscode5.Uri.joinPath(
-        vscode5.Uri.file(this.workspaceRoot),
+      item.resourceUri = vscode7.Uri.joinPath(
+        vscode7.Uri.file(this.workspaceRoot),
         element.path
       );
       item.command = {
@@ -1536,15 +2224,14 @@ var ChangelistTreeProvider = class {
   }
   async createChangelist(name) {
     if (!name) {
-      name = await vscode5.window.showInputBox({
+      name = await vscode7.window.showInputBox({
         prompt: "Changelist name",
         placeHolder: "Feature: ..."
       });
     }
-    if (!name)
-      return;
+    if (!name) return;
     if (this.data.changelists.some((c) => c.name === name)) {
-      vscode5.window.showWarningMessage(`Changelist "${name}" already exists.`);
+      vscode7.window.showWarningMessage(`Changelist "${name}" already exists.`);
       return;
     }
     this.data.changelists.push({ name, files: [] });
@@ -1553,12 +2240,11 @@ var ChangelistTreeProvider = class {
   }
   async deleteChangelist(name) {
     if (name === "Default") {
-      vscode5.window.showWarningMessage("Cannot delete the Default changelist.");
+      vscode7.window.showWarningMessage("Cannot delete the Default changelist.");
       return;
     }
     const cl = this.data.changelists.find((c) => c.name === name);
-    if (!cl)
-      return;
+    if (!cl) return;
     const defaultCl = this.data.changelists.find((c) => c.name === "Default");
     if (defaultCl && cl.files.length > 0) {
       defaultCl.files.push(...cl.files);
@@ -1579,25 +2265,24 @@ var ChangelistTreeProvider = class {
     const clName = name || this.data.active;
     const cl = this.data.changelists.find((c) => c.name === clName);
     if (!cl || cl.files.length === 0) {
-      vscode5.window.showWarningMessage(`Changelist "${clName}" has no files.`);
+      vscode7.window.showWarningMessage(`Changelist "${clName}" has no files.`);
       return;
     }
-    const message = await vscode5.window.showInputBox({
+    const message = await vscode7.window.showInputBox({
       prompt: "Commit message",
       placeHolder: clName === "Default" ? "Commit message..." : clName,
       value: clName === "Default" ? "" : clName
     });
-    if (!message)
-      return;
+    if (!message) return;
     try {
       await this.gitService.stageFiles(cl.files);
       await this.gitService.commit(message);
       cl.files = [];
       this.save();
       this._onDidChangeTreeData.fire(void 0);
-      vscode5.window.showInformationMessage(`Committed changelist "${clName}".`);
+      vscode7.window.showInformationMessage(`Committed changelist "${clName}".`);
     } catch (err) {
-      vscode5.window.showErrorMessage(`Commit failed: ${err.message}`);
+      vscode7.window.showErrorMessage(`Commit failed: ${err.message}`);
     }
   }
   /**
@@ -1609,12 +2294,10 @@ var ChangelistTreeProvider = class {
       const status = await this.gitService.getStatus();
       const allFiles = /* @__PURE__ */ new Set();
       for (const cl of this.data.changelists) {
-        for (const f of cl.files)
-          allFiles.add(f);
+        for (const f of cl.files) allFiles.add(f);
       }
       const activeCl = this.data.changelists.find((c) => c.name === this.data.active);
-      if (!activeCl)
-        return;
+      if (!activeCl) return;
       let changed = false;
       for (const entry of status) {
         if (!allFiles.has(entry.path)) {
@@ -1626,8 +2309,7 @@ var ChangelistTreeProvider = class {
       for (const cl of this.data.changelists) {
         const before = cl.files.length;
         cl.files = cl.files.filter((f) => statusPaths.has(f));
-        if (cl.files.length !== before)
-          changed = true;
+        if (cl.files.length !== before) changed = true;
       }
       if (changed) {
         this.save();
@@ -1638,8 +2320,8 @@ var ChangelistTreeProvider = class {
   }
   load() {
     try {
-      if (fs2.existsSync(this.dataPath)) {
-        const raw = fs2.readFileSync(this.dataPath, "utf-8");
+      if (fs4.existsSync(this.dataPath)) {
+        const raw = fs4.readFileSync(this.dataPath, "utf-8");
         this.data = JSON.parse(raw);
       }
     } catch {
@@ -1651,18 +2333,18 @@ var ChangelistTreeProvider = class {
   }
   save() {
     try {
-      const dir = path2.dirname(this.dataPath);
-      if (!fs2.existsSync(dir)) {
-        fs2.mkdirSync(dir, { recursive: true });
+      const dir = path5.dirname(this.dataPath);
+      if (!fs4.existsSync(dir)) {
+        fs4.mkdirSync(dir, { recursive: true });
       }
-      fs2.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2), "utf-8");
+      fs4.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2), "utf-8");
     } catch {
     }
   }
 };
 
 // src/providers/blameDecorations.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 
 // src/git/blameParser.ts
 var import_child_process3 = require("child_process");
@@ -1675,8 +2357,7 @@ function invalidateBlameCache(file) {
 async function getBlame(cwd, file) {
   const cacheKey = `${cwd}:${file}`;
   const cached = blameCache.get(cacheKey);
-  if (cached)
-    return cached;
+  if (cached) return cached;
   const { stdout } = await execFileAsync3("git", [
     "blame",
     "--line-porcelain",
@@ -1749,7 +2430,7 @@ var blameEnabled = /* @__PURE__ */ new Map();
 var decorationType;
 function getOrCreateDecorationType() {
   if (!decorationType) {
-    decorationType = vscode6.window.createTextEditorDecorationType({
+    decorationType = vscode8.window.createTextEditorDecorationType({
       before: {
         width: "22ch",
         fontStyle: "normal"
@@ -1779,18 +2460,18 @@ var BlameDecorationProvider = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
     this.disposables.push(
-      vscode6.window.onDidChangeTextEditorVisibleRanges((e) => {
+      vscode8.window.onDidChangeTextEditorVisibleRanges((e) => {
         if (this.isEnabled(e.textEditor)) {
           this.updateDecorations(e.textEditor);
         }
       })
     );
     this.disposables.push(
-      vscode6.workspace.onDidSaveTextDocument((doc) => {
-        const relativePath = vscode6.workspace.asRelativePath(doc.uri);
+      vscode8.workspace.onDidSaveTextDocument((doc) => {
+        const relativePath = vscode8.workspace.asRelativePath(doc.uri);
         invalidateBlameCache(relativePath);
         this.blameData.delete(doc.uri.toString());
-        const editor = vscode6.window.visibleTextEditors.find(
+        const editor = vscode8.window.visibleTextEditors.find(
           (e) => e.document.uri.toString() === doc.uri.toString()
         );
         if (editor && this.isEnabled(editor)) {
@@ -1799,39 +2480,34 @@ var BlameDecorationProvider = class {
       })
     );
     this.disposables.push(
-      vscode6.window.onDidChangeActiveTextEditor((editor) => {
+      vscode8.window.onDidChangeActiveTextEditor((editor) => {
         if (editor && this.isEnabled(editor)) {
           this.updateDecorations(editor);
         }
       })
     );
     this.disposables.push(
-      vscode6.window.onDidChangeTextEditorSelection((e) => {
-        if (e.kind !== vscode6.TextEditorSelectionChangeKind.Mouse)
-          return;
-        if (!this.isEnabled(e.textEditor))
-          return;
+      vscode8.window.onDidChangeTextEditorSelection((e) => {
+        if (e.kind !== vscode8.TextEditorSelectionChangeKind.Mouse) return;
+        if (!this.isEnabled(e.textEditor)) return;
         const sel = e.selections[0];
-        if (!sel || !sel.isEmpty)
-          return;
-        if (sel.active.character > 0)
-          return;
+        if (!sel || !sel.isEmpty) return;
+        if (sel.active.character > 0) return;
         const uri = e.textEditor.document.uri.toString();
         const lines = this.blameData.get(uri);
-        if (!lines)
-          return;
+        if (!lines) return;
         const blameLine = lines.find((l) => l.lineNumber === sel.active.line + 1);
-        if (!blameLine || blameLine.hash.startsWith("0000000"))
-          return;
-        vscode6.commands.executeCommand("intellij-git.showCommitInLog", blameLine.hash);
+        if (!blameLine || blameLine.hash.startsWith("0000000")) return;
+        vscode8.commands.executeCommand("intellij-git.showCommitInLog", blameLine.hash);
       })
     );
     this.disposables.push(
-      vscode6.languages.registerHoverProvider("*", {
+      vscode8.languages.registerHoverProvider("*", {
         provideHover: (doc, pos) => this.provideHover(doc, pos)
       })
     );
   }
+  workspaceRoot;
   disposables = [];
   blameData = /* @__PURE__ */ new Map();
   isEnabled(editor) {
@@ -1850,9 +2526,8 @@ var BlameDecorationProvider = class {
   }
   async updateDecorations(editor) {
     const uri = editor.document.uri.toString();
-    if (!blameEnabled.get(uri))
-      return;
-    const relativePath = vscode6.workspace.asRelativePath(editor.document.uri);
+    if (!blameEnabled.get(uri)) return;
+    const relativePath = vscode8.workspace.asRelativePath(editor.document.uri);
     let lines = this.blameData.get(uri);
     if (!lines) {
       try {
@@ -1869,15 +2544,13 @@ var BlameDecorationProvider = class {
     for (const range of visibleRanges) {
       for (let lineNum = range.start.line; lineNum <= range.end.line; lineNum++) {
         const blameLine = lines.find((l) => l.lineNumber === lineNum + 1);
-        if (!blameLine)
-          continue;
-        if (blameLine.hash.startsWith("0000000"))
-          continue;
+        if (!blameLine) continue;
+        if (blameLine.hash.startsWith("0000000")) continue;
         const date = formatShortDate(blameLine.authorDate);
         const author = blameLine.author.length > 10 ? blameLine.author.slice(0, 10) : blameLine.author.padEnd(10);
         const text = `${date}  ${author}`;
         decorations.push({
-          range: new vscode6.Range(lineNum, 0, lineNum, 0),
+          range: new vscode8.Range(lineNum, 0, lineNum, 0),
           renderOptions: {
             before: {
               contentText: text,
@@ -1895,15 +2568,12 @@ var BlameDecorationProvider = class {
   }
   provideHover(document, position) {
     const uri = document.uri.toString();
-    if (!blameEnabled.get(uri))
-      return void 0;
+    if (!blameEnabled.get(uri)) return void 0;
     const lines = this.blameData.get(uri);
-    if (!lines)
-      return void 0;
+    if (!lines) return void 0;
     const blameLine = lines.find((l) => l.lineNumber === position.line + 1);
-    if (!blameLine || blameLine.hash.startsWith("0000000"))
-      return void 0;
-    const md = new vscode6.MarkdownString();
+    if (!blameLine || blameLine.hash.startsWith("0000000")) return void 0;
+    const md = new vscode8.MarkdownString();
     md.appendMarkdown(`**${blameLine.summary}**
 
 `);
@@ -1913,11 +2583,10 @@ var BlameDecorationProvider = class {
 `);
     md.appendMarkdown(`- **Commit:** \`${blameLine.hash.slice(0, 10)}\`
 `);
-    return new vscode6.Hover(md);
+    return new vscode8.Hover(md);
   }
   dispose() {
-    for (const d of this.disposables)
-      d.dispose();
+    for (const d of this.disposables) d.dispose();
     if (decorationType) {
       decorationType.dispose();
       decorationType = void 0;
@@ -1928,13 +2597,13 @@ var BlameDecorationProvider = class {
 };
 
 // src/providers/mergeProvider.ts
-var vscode7 = __toESM(require("vscode"));
+var vscode9 = __toESM(require("vscode"));
 var MergeProvider = class {
   constructor(gitService, workspaceRoot) {
     this.gitService = gitService;
     this.workspaceRoot = workspaceRoot;
-    this.statusBarItem = vscode7.window.createStatusBarItem(
-      vscode7.StatusBarAlignment.Left,
+    this.statusBarItem = vscode9.window.createStatusBarItem(
+      vscode9.StatusBarAlignment.Left,
       100
     );
     this.statusBarItem.command = "intellij-git.resolveConflicts";
@@ -1943,6 +2612,8 @@ var MergeProvider = class {
     this.disposables.push(this.statusBarItem);
     this.checkForConflicts();
   }
+  gitService;
+  workspaceRoot;
   disposables = [];
   statusBarItem;
   async checkForConflicts() {
@@ -1951,7 +2622,7 @@ var MergeProvider = class {
       if (unmerged.length > 0) {
         this.statusBarItem.text = `$(git-merge) ${unmerged.length} conflict${unmerged.length > 1 ? "s" : ""}`;
         this.statusBarItem.tooltip = `${unmerged.length} unresolved merge conflict(s). Click to resolve.`;
-        this.statusBarItem.backgroundColor = new vscode7.ThemeColor(
+        this.statusBarItem.backgroundColor = new vscode9.ThemeColor(
           "statusBarItem.warningBackground"
         );
         this.statusBarItem.show();
@@ -1965,23 +2636,23 @@ var MergeProvider = class {
   async resolveConflicts() {
     const unmerged = await this.gitService.getUnmergedFiles();
     if (unmerged.length === 0) {
-      vscode7.window.showInformationMessage("No merge conflicts to resolve.");
+      vscode9.window.showInformationMessage("No merge conflicts to resolve.");
       return;
     }
     const items = unmerged.map((f) => ({
       label: f,
       description: "Unresolved conflict"
     }));
-    const selected = await vscode7.window.showQuickPick(items, {
+    const selected = await vscode9.window.showQuickPick(items, {
       placeHolder: `${unmerged.length} file(s) with conflicts \u2014 select to resolve`,
       canPickMany: false
     });
     if (selected) {
-      const fileUri = vscode7.Uri.joinPath(
-        vscode7.Uri.file(this.workspaceRoot),
+      const fileUri = vscode9.Uri.joinPath(
+        vscode9.Uri.file(this.workspaceRoot),
         selected.label
       );
-      await vscode7.commands.executeCommand("vscode.open", fileUri);
+      await vscode9.commands.executeCommand("vscode.open", fileUri);
     }
   }
   async acceptAllNonConflicting() {
@@ -1995,685 +2666,24 @@ var MergeProvider = class {
         }
       }
       if (staged > 0) {
-        vscode7.window.showInformationMessage(`Auto-staged ${staged} resolved file(s).`);
+        vscode9.window.showInformationMessage(`Auto-staged ${staged} resolved file(s).`);
       }
     } catch (err) {
-      vscode7.window.showErrorMessage(`Failed: ${err.message}`);
+      vscode9.window.showErrorMessage(`Failed: ${err.message}`);
     }
   }
   dispose() {
-    for (const d of this.disposables)
-      d.dispose();
-  }
-};
-
-// src/views/commitReviewPanel.ts
-var CommitReviewPanel = class {
-  static currentPanel;
-  static viewType = "intellij-git.commitReview";
-  panel;
-  disposables = [];
-  currentFilePath = "";
-  filesList = [];
-  constructor(panel, extensionUri, gitService, onStageChange) {
-    this.panel = panel;
-    this.extensionUri = extensionUri;
-    this.gitService = gitService;
-    this.onStageChange = onStageChange;
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    vscode8.window.onDidChangeActiveColorTheme(
-      () => this.sendThemeTokens(),
-      null,
-      this.disposables
-    );
-    this.panel.webview.html = this.getHtml();
-    this.panel.webview.onDidReceiveMessage(
-      (msg) => this.handleMessage(msg),
-      null,
-      this.disposables
-    );
-  }
-  static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange) {
-    const fileName = import_path.basename(filePath);
-    if (CommitReviewPanel.currentPanel) {
-      if (onStageChange) {
-        CommitReviewPanel.currentPanel.onStageChange = onStageChange;
-      }
-      CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
-      CommitReviewPanel.currentPanel.panel.reveal(vscode8.ViewColumn.Active, true);
-      CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
-      return CommitReviewPanel.currentPanel;
-    }
-    const panel = vscode8.window.createWebviewPanel(
-      CommitReviewPanel.viewType,
-      `Diff: ${fileName}`,
-      vscode8.ViewColumn.Active,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode8.Uri.joinPath(extensionUri, "dist", "webview")
-        ]
-      }
-    );
-    CommitReviewPanel.currentPanel = new CommitReviewPanel(
-      panel,
-      extensionUri,
-      gitService,
-      onStageChange
-    );
-    CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
-    return CommitReviewPanel.currentPanel;
-  }
-  async loadFile(filePath, filesList) {
-    this.currentFilePath = filePath;
-    if (filesList) this.filesList = filesList;
-    const fileName = import_path.basename(filePath);
-    this.panel.title = `Diff: ${fileName}`;
-    try {
-      const diff = await this.gitService.getFileDiff(filePath);
-      let baseContent = "";
-      try {
-        baseContent = await this.gitService.exec(["show", `HEAD:${filePath}`]);
-      } catch {
-        baseContent = "";
-      }
-      let currentContent = "";
-      try {
-        const fullPath = import_path.join(this.gitService.getCwd(), filePath);
-        if (import_fs.existsSync(fullPath)) {
-          currentContent = import_fs.readFileSync(fullPath, "utf8");
-        }
-      } catch {
-        currentContent = "";
-      }
-      let stagedDiff = "";
-      try {
-        stagedDiff = await this.gitService.exec(["diff", "--cached", "--", filePath]);
-      } catch {
-        stagedDiff = "";
-      }
-      const currentFileIndex = this.filesList.indexOf(filePath);
-      this.panel.webview.postMessage({
-        type: "fileDiff",
-        payload: {
-          path: filePath,
-          fileName,
-          fileDir: import_path.dirname(filePath) === "." ? "" : import_path.dirname(filePath),
-          diff,
-          stagedDiff,
-          baseContent,
-          currentContent,
-          filesList: this.filesList,
-          currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0
-        }
-      });
-    } catch (err) {
-      vscode8.window.showErrorMessage(`Failed to load diff: ${err.message}`);
-    }
-  }
-  async handleMessage(msg) {
-    switch (msg.type) {
-      case "ready": {
-        this.sendThemeTokens();
-        if (this.currentFilePath) {
-          this.loadFile(this.currentFilePath, this.filesList);
-        }
-        break;
-      }
-      case "refreshDiff": {
-        const filePath = msg.payload || this.currentFilePath;
-        if (filePath) {
-          this.loadFile(filePath, this.filesList);
-        }
-        break;
-      }
-      case "navigateFile": {
-        const newIndex = msg.payload;
-        if (newIndex >= 0 && newIndex < this.filesList.length) {
-          const newPath = this.filesList[newIndex];
-          this.loadFile(newPath, this.filesList);
-        }
-        break;
-      }
-      case "updateBlockStage": {
-        const { filePath, stagedContent, stagedCount, totalCount } = msg.payload;
-        try {
-          if (stagedCount === 0) {
-            await this.gitService.unstageFile(filePath);
-          } else if (stagedCount === totalCount) {
-            await this.gitService.stageFile(filePath);
-          } else {
-            await this.gitService.stageFileContent(filePath, stagedContent);
-          }
-          if (this.onStageChange) this.onStageChange();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Update stage failed: ${err.message}`);
-        }
-        break;
-      }
-      case "applyHunkPatch": {
-        const { patch, reverse } = msg.payload;
-        try {
-          await this.gitService.applyHunkPatch(patch, reverse);
-          if (this.onStageChange) this.onStageChange();
-          await this.loadFile(this.currentFilePath, this.filesList);
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Apply patch failed: ${err.message}`);
-        }
-        break;
-      }
-      case "openFile": {
-        const filePath = msg.payload;
-        if (filePath) {
-          const fullPath = import_path.join(this.gitService.getCwd(), filePath);
-          vscode8.commands.executeCommand("vscode.open", vscode8.Uri.file(fullPath));
-        }
-        break;
-      }
-      case "rollbackHunk": {
-        const { patch } = msg.payload;
-        try {
-          await this.gitService.applyHunkPatch(patch, true);
-          if (this.onStageChange) this.onStageChange();
-          await this.loadFile(this.currentFilePath, this.filesList);
-          vscode8.window.showInformationMessage("Hunk reverted successfully.");
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Rollback hunk failed: ${err.message}`);
-        }
-        break;
-      }
-    }
-  }
-  sendThemeTokens() {
-    const tokens = this.getThemeTokens();
-    this.panel.webview.postMessage({
-      type: "themeTokens",
-      payload: tokens
-    });
-  }
-  getThemeTokens() {
-    const defaultTokens = {
-      kwd: "#fd6883",
-      type: "#85dacc",
-      fn: "#adda78",
-      str: "#f9cc6c",
-      num: "#a8a9eb",
-      constVal: "#a8a9eb",
-      varVal: "#fff1f3",
-      comment: "#72696a",
-      anno: "#85dacc",
-      punct: "#948a8b"
-    };
-    try {
-      const activeThemeName = vscode8.workspace.getConfiguration("workbench").get("colorTheme");
-      if (!activeThemeName) return defaultTokens;
-
-      for (const ext of vscode8.extensions.all) {
-        const themes = ext.packageJSON?.contributes?.themes;
-        if (!Array.isArray(themes)) continue;
-        const matched = themes.find((t) => t.label === activeThemeName || t.id === activeThemeName);
-        if (!matched || !matched.path) continue;
-
-        const themePath = import_path.join(ext.extensionPath, matched.path);
-        if (!import_fs.existsSync(themePath)) continue;
-
-        let content = import_fs.readFileSync(themePath, "utf8");
-        content = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
-        const themeJson = JSON.parse(content);
-        const tc = themeJson.tokenColors || [];
-
-        const findColor = (targetScopes) => {
-          for (const target of targetScopes) {
-            for (const rule of tc) {
-              if (!rule.settings || !rule.settings.foreground) continue;
-              const scopes = Array.isArray(rule.scope) ? rule.scope : (typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : []);
-              if (scopes.includes(target)) return rule.settings.foreground;
-            }
-          }
-          for (const target of targetScopes) {
-            for (const rule of tc) {
-              if (!rule.settings || !rule.settings.foreground) continue;
-              const scopes = Array.isArray(rule.scope) ? rule.scope : (typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : []);
-              for (const s of scopes) {
-                if (!s.includes(" ") && s.startsWith(target + ".")) return rule.settings.foreground;
-              }
-            }
-          }
-          return null;
-        };
-
-        const kwd = findColor(["keyword"]) || defaultTokens.kwd;
-        const type = findColor(["entity.name.type", "support.type", "storage.type"]) || defaultTokens.type;
-        const fn = findColor(["entity.name.function", "support.function"]) || defaultTokens.fn;
-        const str = findColor(["string"]) || defaultTokens.str;
-        const num = findColor(["constant.numeric"]) || defaultTokens.num;
-        const constVal = findColor(["constant.language"]) || defaultTokens.constVal;
-        const comment = findColor(["comment"]) || defaultTokens.comment;
-        const varVal = findColor(["variable"]) || defaultTokens.varVal;
-        const anno = findColor(["punctuation.definition.annotation", "meta.annotation"]) || type;
-        const punct = findColor(["punctuation"]) || defaultTokens.punct;
-
-        return { kwd, type, fn, str, num, constVal, varVal, comment, anno, punct };
-      }
-    } catch {
-      // Fall back to defaults
-    }
-    return defaultTokens;
-  }
-  getHtml() {
-    const scriptUri = this.panel.webview.asWebviewUri(
-      vscode8.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "review.js")
-    );
-    const styleUri = this.panel.webview.asWebviewUri(
-      vscode8.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
-    );
-    const nonce = getNonceReview();
-    const tokens = this.getThemeTokens();
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}';">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="${styleUri}">
-  <style id="dynamic-syntax-tokens">
-    :root {
-      --syn-kwd: ${tokens.kwd} !important;
-      --syn-type: ${tokens.type} !important;
-      --syn-fn: ${tokens.fn} !important;
-      --syn-str: ${tokens.str} !important;
-      --syn-num: ${tokens.num} !important;
-      --syn-const: ${tokens.constVal} !important;
-      --syn-var: ${tokens.varVal} !important;
-      --syn-comment: ${tokens.comment} !important;
-      --syn-anno: ${tokens.anno} !important;
-      --syn-punct: ${tokens.punct} !important;
-    }
-  </style>
-  <title>Code Review</title>
-</head>
-<body>
-  <div id="app"></div>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
-  }
-  dispose() {
-    CommitReviewPanel.currentPanel = void 0;
     for (const d of this.disposables) d.dispose();
-  }
-};
-function getNonceReview() {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
-}
-
-// src/views/commitPanel.ts
-var CommitViewProvider = class {
-  static viewType = "intellij-git.commitView";
-  view;
-  allFilePaths = [];
-  constructor(extensionUri, gitService, log2) {
-    this.extensionUri = extensionUri;
-    this.gitService = gitService;
-    this.log = log2;
-  }
-  resolveWebviewView(webviewView, _context, _token) {
-    this.view = webviewView;
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [
-        vscode8.Uri.joinPath(this.extensionUri, "dist", "webview")
-      ]
-    };
-    webviewView.webview.html = this.getHtml(webviewView.webview);
-    webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
-    this.refresh();
-  }
-  async refresh() {
-    if (!this.view)
-      return;
-    const isRepo = await this.gitService.isGitRepo();
-    if (!isRepo) {
-      this.view.webview.postMessage({
-        type: "status",
-        payload: {
-          files: [],
-          changesCount: 0,
-          unversionedCount: 0,
-          recentMessages: [],
-          stashes: []
-        }
-      });
-      return;
-    }
-    try {
-      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
-        this.gitService.getStatus(),
-        this.gitService.getMergeMessage(),
-        this.gitService.getRecentCommitMessages(10),
-        this.gitService.getStashes(),
-        this.gitService.exec(["diff", "HEAD"]).catch(() => ""),
-        this.gitService.exec(["diff", "--cached"]).catch(() => "")
-      ]);
-      const totalChangesMap = this.parseChangesPerFile(totalDiff);
-      const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
-      const files = statusEntries.map((entry) => {
-        const filePath = entry.path;
-        const fileName = import_path.basename(filePath);
-        const fileDir = import_path.dirname(filePath);
-        const isUntracked = entry.x === "?" && entry.y === "?";
-        const isStaged = entry.x !== " " && entry.x !== "?";
-        const totalChanges = totalChangesMap.get(filePath) || 0;
-        const stagedChanges = stagedChangesMap.get(filePath) || 0;
-        const isPartiallyStaged = totalChanges > 0 && stagedChanges > 0 && stagedChanges < totalChanges;
-        return {
-          path: filePath,
-          name: fileName,
-          dir: fileDir === "." ? "" : fileDir,
-          status: entry.y !== " " ? entry.y : entry.x,
-          staged: isStaged,
-          isUntracked,
-          totalChanges,
-          stagedChanges,
-          partiallyStaged: isPartiallyStaged
-        };
-      });
-      files.sort((a, b) => {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-        if (nameA !== nameB) return nameA.localeCompare(nameB);
-        return a.path.localeCompare(b.path);
-      });
-      const changesCount = files.filter((f) => !f.isUntracked).length;
-      const unversionedCount = files.filter((f) => f.isUntracked).length;
-      this.allFilePaths = files.map((f) => f.path);
-      this.view.webview.postMessage({
-        type: "status",
-        payload: {
-          files,
-          changesCount,
-          unversionedCount,
-          defaultCommitMessage: mergeMsg || "",
-          recentMessages,
-          stashes
-        }
-      });
-    } catch (err) {
-      this.log.appendLine(`Commit panel status fetch failed: ${err.message}`);
-    }
-  }
-  parseChangesPerFile(diffText) {
-    const map = new Map();
-    if (!diffText || !diffText.trim()) return map;
-    const fileSections = diffText.split(/^diff --git /m);
-    for (const section of fileSections) {
-      if (!section.trim()) continue;
-      const match = section.match(/^a\/(.*?)\s+b\/(.*?)(?:\n|$)/);
-      if (!match) continue;
-      const filePath = match[2];
-      const lines = section.split("\n");
-      let count = 0;
-      let inHunk = false;
-      let inDiffBlock = false;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.startsWith("@@")) {
-          inHunk = true;
-          inDiffBlock = false;
-        } else if (inHunk) {
-          if (line.startsWith("+") || line.startsWith("-")) {
-            if (!inDiffBlock) {
-              count++;
-              inDiffBlock = true;
-            }
-          } else if (line.startsWith(" ")) {
-            inDiffBlock = false;
-          }
-        }
-      }
-      map.set(filePath, count);
-    }
-    return map;
-  }
-  async handleMessage(msg) {
-    switch (msg.type) {
-      case "ready":
-      case "refresh": {
-        await this.refresh();
-        break;
-      }
-      case "selectFile": {
-        const filePath = msg.payload;
-        if (CommitReviewPanel.currentPanel) {
-          CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
-        }
-        break;
-      }
-      case "openReviewInCenter": {
-        const filePath = msg.payload;
-        if (filePath) {
-          CommitReviewPanel.createOrShow(
-            this.extensionUri,
-            this.gitService,
-            filePath,
-            this.allFilePaths,
-            () => this.refresh()
-          );
-        }
-        break;
-      }
-      case "stageFile": {
-        const filePath = msg.payload;
-        try {
-          await this.gitService.stageFile(filePath);
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Stage failed: ${err.message}`);
-        }
-        break;
-      }
-      case "unstageFile": {
-        const filePath = msg.payload;
-        try {
-          await this.gitService.unstageFile(filePath);
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Unstage failed: ${err.message}`);
-        }
-        break;
-      }
-      case "rollbackFiles": {
-        const filePaths = msg.payload;
-        if (!filePaths || filePaths.length === 0)
-          return;
-        const confirm = await vscode8.window.showWarningMessage(
-          `Rollback changes in ${filePaths.length} file(s)? This cannot be undone.`,
-          { modal: true },
-          "Rollback"
-        );
-        if (confirm !== "Rollback")
-          return;
-        try {
-          await this.gitService.rollbackFiles(filePaths);
-          vscode8.window.showInformationMessage(`Rolled back ${filePaths.length} file(s).`);
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Rollback failed: ${err.message}`);
-        }
-        break;
-      }
-      case "getFileDiff": {
-        const filePath = msg.payload;
-        try {
-          const diff = await this.gitService.getFileDiff(filePath);
-          this.view?.webview.postMessage({
-            type: "fileDiff",
-            payload: { path: filePath, diff }
-          });
-        } catch (err) {
-          this.log.appendLine(`Get diff failed: ${err.message}`);
-        }
-        break;
-      }
-      case "applyHunkPatch": {
-        const { patch, reverse } = msg.payload;
-        try {
-          await this.gitService.applyHunkPatch(patch, reverse);
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Apply patch failed: ${err.message}`);
-        }
-        break;
-      }
-      case "commit": {
-        const { message, files, amend } = msg.payload;
-        try {
-          await this.gitService.commitFiles(message, files, amend);
-          vscode8.window.showInformationMessage("Committed successfully.");
-          this.view?.webview.postMessage({ type: "commitSuccess" });
-          await this.refresh();
-          vscode8.commands.executeCommand("intellij-git.refreshBranches");
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Commit failed: ${err.message}`);
-        }
-        break;
-      }
-      case "commitAndPush": {
-        const { message, files, amend } = msg.payload;
-        try {
-          await this.gitService.commitAndPush(message, files, amend);
-          vscode8.window.showInformationMessage("Committed and pushed successfully.");
-          this.view?.webview.postMessage({ type: "commitSuccess" });
-          await this.refresh();
-          vscode8.commands.executeCommand("intellij-git.refreshBranches");
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Commit and Push failed: ${err.message}`);
-        }
-        break;
-      }
-      case "openDiffInEditor": {
-        const filePath = msg.payload;
-        try {
-          const leftUri = GitContentProvider.makeUri("HEAD", filePath);
-          const rightUri = vscode8.Uri.file(import_path.join(this.gitService.getCwd(), filePath));
-          const fileName = import_path.basename(filePath);
-          await vscode8.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (HEAD \u2194 Working Tree)`);
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Open diff editor failed: ${err.message}`);
-        }
-        break;
-      }
-      case "createStash": {
-        const msgText = await vscode8.window.showInputBox({
-          prompt: "Stash message (optional)",
-          placeHolder: "WIP on feature..."
-        });
-        if (msgText === void 0)
-          return;
-        try {
-          await this.gitService.stashSave(msgText);
-          vscode8.window.showInformationMessage("Stashed local changes.");
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Stash failed: ${err.message}`);
-        }
-        break;
-      }
-      case "stashPop": {
-        const idx = msg.payload;
-        try {
-          await this.gitService.stashPop(idx);
-          vscode8.window.showInformationMessage(`Applied and dropped ${idx}`);
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Stash pop failed: ${err.message}`);
-        }
-        break;
-      }
-      case "stashApply": {
-        const idx = msg.payload;
-        try {
-          await this.gitService.stashApply(idx);
-          vscode8.window.showInformationMessage(`Applied ${idx}`);
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Stash apply failed: ${err.message}`);
-        }
-        break;
-      }
-      case "stashDrop": {
-        const idx = msg.payload;
-        const confirm = await vscode8.window.showWarningMessage(
-          `Drop stash ${idx}?`,
-          { modal: true },
-          "Drop"
-        );
-        if (confirm !== "Drop")
-          return;
-        try {
-          await this.gitService.stashDrop(idx);
-          vscode8.window.showInformationMessage(`Dropped ${idx}`);
-          await this.refresh();
-        } catch (err) {
-          vscode8.window.showErrorMessage(`Stash drop failed: ${err.message}`);
-        }
-        break;
-      }
-      case "openLog": {
-        vscode8.commands.executeCommand("intellij-git.openLog");
-        break;
-      }
-      case "collapseView": {
-        vscode8.commands.executeCommand("workbench.action.toggleSidebarVisibility");
-        break;
-      }
-    }
-  }
-  show() {
-    if (this.view) {
-      this.view.show(true);
-    }
-  }
-  getHtml(webview) {
-    const scriptUri = webview.asWebviewUri(
-      vscode8.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.js")
-    );
-    const styleUri = webview.asWebviewUri(
-      vscode8.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
-    );
-    const nonce = getNonce();
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}';">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="${styleUri}">
-  <title>Commit</title>
-</head>
-<body>
-  <div id="app"></div>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
   }
 };
 
 // src/extension.ts
 var log;
 function activate(context) {
-  log = vscode8.window.createOutputChannel("IntelliJ Git");
+  log = vscode10.window.createOutputChannel("IntelliJ Git");
   context.subscriptions.push(log);
   log.appendLine("IntelliJ Git extension activating...");
-  const workspaceFolder = vscode8.workspace.workspaceFolders?.[0];
+  const workspaceFolder = vscode10.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) {
     log.appendLine("No workspace folder found \u2014 aborting activation.");
     return;
@@ -2684,7 +2694,7 @@ function activate(context) {
   const rebaseHandler = new RebaseHandler(workspaceRoot);
   const gitContentProvider = new GitContentProvider(gitService);
   context.subscriptions.push(
-    vscode8.workspace.registerTextDocumentContentProvider(
+    vscode10.workspace.registerTextDocumentContentProvider(
       GitContentProvider.scheme,
       gitContentProvider
     )
@@ -2695,7 +2705,7 @@ function activate(context) {
   );
   const graphViewProvider = new GraphViewProvider(context.extensionUri, gitService, log);
   context.subscriptions.push(
-    vscode8.window.registerWebviewViewProvider(
+    vscode10.window.registerWebviewViewProvider(
       GraphViewProvider.viewType,
       graphViewProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
@@ -2703,20 +2713,20 @@ function activate(context) {
   );
   const commitViewProvider = new CommitViewProvider(context.extensionUri, gitService, log);
   context.subscriptions.push(
-    vscode8.window.registerWebviewViewProvider(
+    vscode10.window.registerWebviewViewProvider(
       CommitViewProvider.viewType,
       commitViewProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
   const branchTree = new BranchTreeProvider(gitService);
-  const branchTreeView = vscode8.window.createTreeView("intellij-git.branches", {
+  const branchTreeView = vscode10.window.createTreeView("intellij-git.branches", {
     treeDataProvider: branchTree,
     showCollapseAll: true
   });
   context.subscriptions.push(branchTreeView);
   const changelistTree = new ChangelistTreeProvider(gitService, workspaceRoot);
-  const changelistTreeView = vscode8.window.createTreeView("intellij-git.changelists", {
+  const changelistTreeView = vscode10.window.createTreeView("intellij-git.changelists", {
     treeDataProvider: changelistTree,
     showCollapseAll: true
   });
@@ -2726,216 +2736,226 @@ function activate(context) {
   const mergeProvider = new MergeProvider(gitService, workspaceRoot);
   context.subscriptions.push(mergeProvider);
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.openCommit", () => {
-      vscode8.commands.executeCommand("intellij-git.commitView.focus");
+    vscode10.commands.registerCommand("intellij-git.openCommit", () => {
+      vscode10.commands.executeCommand("intellij-git.commitView.focus");
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.openCommitReview", (filePath) => {
-      const target = filePath || (commitViewProvider.allFilePaths.length > 0 ? commitViewProvider.allFilePaths[0] : "");
-      if (target) {
-        CommitReviewPanel.createOrShow(
-          context.extensionUri,
-          gitService,
-          target,
-          commitViewProvider.allFilePaths,
-          () => commitViewProvider.refresh()
-        );
-      }
+    vscode10.commands.registerCommand("intellij-git.openLog", () => {
+      vscode10.commands.executeCommand("intellij-git.logView.focus");
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.openLog", () => {
-      vscode8.commands.executeCommand("intellij-git.logView.focus");
-    })
-  );
-  context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.showCommitInLog", (hash) => {
-      vscode8.commands.executeCommand("intellij-git.logView.focus");
+    vscode10.commands.registerCommand("intellij-git.showCommitInLog", (hash) => {
+      vscode10.commands.executeCommand("intellij-git.logView.focus");
       graphViewProvider.selectCommit(hash);
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.toggleBlame", () => {
-      const editor = vscode8.window.activeTextEditor;
+    vscode10.commands.registerCommand("intellij-git.toggleBlame", () => {
+      const editor = vscode10.window.activeTextEditor;
       if (editor) {
         log.appendLine(`Toggling blame on ${editor.document.uri.fsPath}`);
         blameProvider.toggle(editor);
       } else {
-        vscode8.window.showWarningMessage("No active text editor for blame.");
+        vscode10.window.showWarningMessage("No active text editor for blame.");
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.interactiveRebase", async (baseHash) => {
+    vscode10.commands.registerCommand("intellij-git.interactiveRebase", async (baseHash) => {
       if (!baseHash) {
-        baseHash = await vscode8.window.showInputBox({
+        baseHash = await vscode10.window.showInputBox({
           prompt: "Base commit hash (rebase from this point)",
           placeHolder: "e.g. HEAD~5 or a commit hash"
         });
       }
-      if (!baseHash)
-        return;
+      if (!baseHash) return;
       RebasePanel.createOrShow(context.extensionUri, gitService, rebaseHandler, baseHash);
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.refreshBranches", () => {
+    vscode10.commands.registerCommand("intellij-git.refreshBranches", () => {
       branchTree.refresh();
       graphViewProvider.refresh();
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.checkoutBranch", async (node) => {
+    vscode10.commands.registerCommand("intellij-git.checkoutBranch", async (node) => {
       const ref = node?.ref;
-      if (!ref)
-        return;
+      if (!ref) return;
       try {
         await gitService.checkout(ref);
         graphViewProvider.refresh();
-        vscode8.window.showInformationMessage(`Checked out ${ref}`);
+        vscode10.window.showInformationMessage(`Checked out ${ref}`);
       } catch (err) {
-        vscode8.window.showErrorMessage(`Checkout failed: ${err.message}`);
+        vscode10.window.showErrorMessage(`Checkout failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.createBranch", async (node) => {
-      const name = await vscode8.window.showInputBox({
+    vscode10.commands.registerCommand("intellij-git.createBranch", async (node) => {
+      const name = await vscode10.window.showInputBox({
         prompt: "New branch name",
         placeHolder: "feature/..."
       });
-      if (!name)
-        return;
+      if (!name) return;
       try {
         await gitService.createBranch(name, node?.ref);
         graphViewProvider.refresh();
-        vscode8.window.showInformationMessage(`Created and checked out ${name}`);
+        vscode10.window.showInformationMessage(`Created and checked out ${name}`);
       } catch (err) {
-        vscode8.window.showErrorMessage(`Create branch failed: ${err.message}`);
+        vscode10.window.showErrorMessage(`Create branch failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.deleteBranch", async (node) => {
+    vscode10.commands.registerCommand("intellij-git.deleteBranch", async (node) => {
       const ref = node?.ref;
-      if (!ref)
-        return;
-      const confirm = await vscode8.window.showWarningMessage(
+      if (!ref) return;
+      const confirm = await vscode10.window.showWarningMessage(
         `Delete branch "${ref}"?`,
         { modal: true },
         "Delete"
       );
-      if (confirm !== "Delete")
-        return;
+      if (confirm !== "Delete") return;
       try {
         await gitService.deleteBranch(ref);
         graphViewProvider.refresh();
       } catch (err) {
-        vscode8.window.showErrorMessage(`Delete failed: ${err.message}`);
+        vscode10.window.showErrorMessage(`Delete failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.mergeBranch", async (node) => {
+    vscode10.commands.registerCommand("intellij-git.mergeBranch", async (node) => {
       const ref = node?.ref;
-      if (!ref)
-        return;
+      if (!ref) return;
       try {
         await gitService.merge(ref);
         graphViewProvider.refresh();
-        vscode8.window.showInformationMessage(`Merged ${ref} into current branch.`);
+        vscode10.window.showInformationMessage(`Merged ${ref} into current branch.`);
       } catch (err) {
         if (err.message?.includes("CONFLICT")) {
-          vscode8.window.showWarningMessage(
+          vscode10.window.showWarningMessage(
             `Merge conflicts detected. Resolve them to complete the merge.`,
             "Resolve"
           ).then((choice) => {
             if (choice === "Resolve") {
-              vscode8.commands.executeCommand("intellij-git.resolveConflicts");
+              vscode10.commands.executeCommand("intellij-git.resolveConflicts");
             }
           });
         } else {
-          vscode8.window.showErrorMessage(`Merge failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Merge failed: ${err.message}`);
         }
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.rebaseBranch", async (node) => {
+    vscode10.commands.registerCommand("intellij-git.rebaseBranch", async (node) => {
       const ref = node?.ref;
-      if (!ref)
-        return;
+      if (!ref) return;
       try {
         await gitService.rebase(ref);
         graphViewProvider.refresh();
-        vscode8.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
+        vscode10.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
       } catch (err) {
-        vscode8.window.showErrorMessage(`Rebase failed: ${err.message}`);
+        vscode10.window.showErrorMessage(`Rebase failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.compareBranch", async (node) => {
+    vscode10.commands.registerCommand("intellij-git.compareBranch", async (node) => {
       const ref = node?.ref;
-      if (!ref)
-        return;
+      if (!ref) return;
       try {
         const current = await gitService.getCurrentBranch();
-        await vscode8.commands.executeCommand("git.branchCompare", ref, current);
+        await vscode10.commands.executeCommand("git.branchCompare", ref, current);
       } catch (err) {
-        vscode8.window.showErrorMessage(`Compare failed: ${err.message}`);
+        vscode10.window.showErrorMessage(`Compare failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.resolveConflicts", () => {
+    vscode10.commands.registerCommand("intellij-git.resolveConflicts", () => {
       mergeProvider.resolveConflicts();
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.acceptAllNonConflicting", () => {
+    vscode10.commands.registerCommand("intellij-git.acceptAllNonConflicting", () => {
       mergeProvider.acceptAllNonConflicting();
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.newChangelist", () => {
+    vscode10.commands.registerCommand("intellij-git.newChangelist", () => {
       changelistTree.createChangelist();
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.deleteChangelist", (node) => {
+    vscode10.commands.registerCommand("intellij-git.deleteChangelist", (node) => {
       if (node?.name) {
         changelistTree.deleteChangelist(node.name);
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.setActiveChangelist", (node) => {
+    vscode10.commands.registerCommand("intellij-git.setActiveChangelist", (node) => {
       if (node?.name) {
         changelistTree.setActive(node.name);
       }
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.commitChangelist", (node) => {
+    vscode10.commands.registerCommand("intellij-git.commitChangelist", (node) => {
       changelistTree.commitChangelist(node?.name);
     })
   );
   context.subscriptions.push(
-    vscode8.commands.registerCommand("intellij-git.refreshChangelists", () => {
+    vscode10.commands.registerCommand("intellij-git.refreshChangelists", () => {
       changelistTree.refresh();
     })
   );
-  const gitWatcher = vscode8.workspace.createFileSystemWatcher(
-    new vscode8.RelativePattern(workspaceRoot, ".git/{HEAD,refs/**,index}")
+  function debounce(fn, delay = 250) {
+    let timer;
+    return (...args) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  }
+  const gitWatcher = vscode10.workspace.createFileSystemWatcher(
+    new vscode10.RelativePattern(workspaceRoot, ".git/{HEAD,refs/**,index,logs/**}")
   );
-  gitWatcher.onDidChange(() => {
+  const onGitChange = debounce(() => {
+    log.appendLine("Git change detected \u2014 refreshing views...");
     branchTree.refresh();
     graphViewProvider.refresh();
     commitViewProvider.refresh();
-  });
+    if (CommitReviewPanel.currentPanel) {
+      CommitReviewPanel.currentPanel.refresh();
+    }
+  }, 200);
+  gitWatcher.onDidChange(onGitChange);
+  gitWatcher.onDidCreate(onGitChange);
+  gitWatcher.onDidDelete(onGitChange);
   context.subscriptions.push(gitWatcher);
+  context.subscriptions.push(
+    vscode10.workspace.onDidSaveTextDocument((doc) => {
+      if (doc.uri.scheme === "file") {
+        commitViewProvider.refresh();
+        if (CommitReviewPanel.currentPanel && doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())) {
+          CommitReviewPanel.currentPanel.refresh();
+        }
+      }
+    })
+  );
+  const workspaceWatcher = vscode10.workspace.createFileSystemWatcher("**/*");
+  const onWorkspaceFsChange = debounce((uri) => {
+    if (uri.fsPath.includes("/.git/") || uri.fsPath.includes("/node_modules/")) return;
+    commitViewProvider.refresh();
+  }, 400);
+  workspaceWatcher.onDidCreate(onWorkspaceFsChange);
+  workspaceWatcher.onDidDelete(onWorkspaceFsChange);
+  context.subscriptions.push(workspaceWatcher);
   log.appendLine("IntelliJ Git extension activated.");
 }
 function deactivate() {

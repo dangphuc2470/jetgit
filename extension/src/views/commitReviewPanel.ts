@@ -156,8 +156,31 @@ export class CommitReviewPanel {
             await this.gitService.stageFileContent(filePath, stagedContent);
           }
           if (this.onStageChange) this.onStageChange();
+          let stagedDiff = '';
+          try {
+            stagedDiff = await this.gitService.exec(['diff', '--cached', '--', filePath]);
+          } catch {
+            stagedDiff = '';
+          }
+          this.panel.webview.postMessage({
+            type: 'stagedDiffUpdated',
+            payload: { stagedDiff },
+          });
         } catch (err: any) {
           vscode.window.showErrorMessage(`Update stage failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'revertBlockContent': {
+        const { filePath, newContent } = msg.payload;
+        try {
+          const fullPath = path.join(this.gitService.getCwd(), filePath);
+          fs.writeFileSync(fullPath, newContent, 'utf8');
+          if (this.onStageChange) this.onStageChange();
+          await this.loadFile(this.currentFilePath, this.filesList);
+          vscode.window.showInformationMessage('Reverted change block.');
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Revert failed: ${err.message}`);
         }
         break;
       }
@@ -192,6 +215,16 @@ export class CommitReviewPanel {
         }
         break;
       }
+    }
+  }
+
+  public getCurrentFilePath(): string {
+    return this.currentFilePath;
+  }
+
+  public refresh(): void {
+    if (this.currentFilePath) {
+      this.loadFile(this.currentFilePath, this.filesList);
     }
   }
 

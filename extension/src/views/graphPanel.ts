@@ -36,6 +36,12 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage(msg => this.handleMessage(msg));
 
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        this.loadInitialData();
+      }
+    });
+
     // Load data once the webview is ready
     this.loadInitialData();
   }

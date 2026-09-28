@@ -187,6 +187,35 @@
     return result.join('\n');
   }
 
+  function revertBlock(block) {
+    const currentLines = [...state.currentLines];
+    const baseLines = [...state.baseLines];
+
+    const replaceStart = block.rightStart - 1;
+    const replaceCount = block.isRightEmpty ? 0 : (block.addCount || 0);
+
+    const insertLines = [];
+    if (!block.isLeftEmpty && block.delCount > 0) {
+      for (let i = 0; i < block.delCount; i++) {
+        const bIdx = (block.leftStart - 1) + i;
+        if (bIdx >= 0 && bIdx < baseLines.length) {
+          insertLines.push(baseLines[bIdx]);
+        }
+      }
+    }
+
+    currentLines.splice(replaceStart, replaceCount, ...insertLines);
+    const newContent = currentLines.join('\n');
+
+    vscode.postMessage({
+      type: 'revertBlockContent',
+      payload: {
+        filePath: state.filePath,
+        newContent
+      }
+    });
+  }
+
   function parseDiffData(rawDiff) {
     state.baseLines = state.baseContent ? state.baseContent.split('\n') : [];
     state.currentLines = state.currentContent ? state.currentContent.split('\n') : [];
@@ -739,6 +768,15 @@
 
         // Checkbox positioned neatly in a straight vertical column aligned with Android Studio
         const checkY = b.isRightEmpty ? (y3 - 7) : (y3 + 3);
+        const revertY = b.isLeftEmpty ? (y1 - 7) : (y1 + 3);
+
+        if (revertY >= -15 && revertY <= viewH + 15) {
+          ctrlHtml += `
+            <button class="block-revert-btn" style="top: ${revertY}px;" title="Revert change (Accept base revision)" data-block-id="${b.id}">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          `;
+        }
         if (checkY >= -15 && checkY <= viewH + 15) {
           ctrlHtml += `
             <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">
@@ -750,6 +788,18 @@
 
       svgEl.innerHTML = svgHtml;
       controlsContainer.innerHTML = ctrlHtml;
+
+      // Re-attach revert button event listeners
+      controlsContainer.querySelectorAll('.block-revert-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const blockId = parseInt(btn.getAttribute('data-block-id'), 10);
+          const block = state.blocks.find(b => b.id === blockId);
+          if (block) {
+            revertBlock(block);
+          }
+        });
+      });
 
       // Re-attach checkbox event listener for visible controls
       controlsContainer.querySelectorAll('.block-chk').forEach(chk => {
@@ -1014,6 +1064,21 @@
         state.currentFileIndex = data.currentFileIndex || 0;
         state.currentDiffIndex = 0;
         render();
+        break;
+      }
+      case 'stagedDiffUpdated': {
+        state.stagedDiff = msg.payload.stagedDiff || '';
+        state.blocks.forEach(b => {
+          b.staged = isBlockStaged(b, state.stagedDiff, state.baseLines, state.currentLines);
+        });
+        const masterChk = document.querySelector('#chk-master-version');
+        if (masterChk) {
+          const stagedCount = state.blocks.filter(b => b.staged).length;
+          const totalCount = state.blocks.length;
+          masterChk.checked = stagedCount === totalCount && totalCount > 0;
+          masterChk.indeterminate = stagedCount > 0 && stagedCount < totalCount;
+        }
+        updateRibbons();
         break;
       }
       case 'themeTokens': {

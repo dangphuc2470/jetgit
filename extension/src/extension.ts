@@ -3,6 +3,7 @@ import { GitService } from './git/gitService';
 import { RebaseHandler } from './git/rebaseHandler';
 import { GraphViewProvider } from './views/graphPanel';
 import { CommitViewProvider } from './views/commitPanel';
+import { CommitReviewPanel } from './views/commitReviewPanel';
 import { RebasePanel } from './views/rebasePanel';
 import { BranchTreeProvider } from './views/branchTree';
 import { ChangelistTreeProvider } from './views/changelistTree';
@@ -297,16 +298,57 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // Watch for git changes to refresh views
+  // Helper for debouncing frequent events
+  function debounce(fn: (...args: any[]) => void, delay = 250): (...args: any[]) => void {
+    let timer: NodeJS.Timeout | undefined;
+    return (...args: any[]) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  }
+
+  // 1. Watch for git changes (commits, branches, index, tags, logs) to refresh views in real-time
   const gitWatcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(workspaceRoot, '.git/{HEAD,refs/**,index}'),
+    new vscode.RelativePattern(workspaceRoot, '.git/{HEAD,refs/**,index,logs/**}'),
   );
-  gitWatcher.onDidChange(() => {
+  const onGitChange = debounce(() => {
+    log.appendLine('Git change detected — refreshing views...');
     branchTree.refresh();
     graphViewProvider.refresh();
     commitViewProvider.refresh();
-  });
+    if (CommitReviewPanel.currentPanel) {
+      CommitReviewPanel.currentPanel.refresh();
+    }
+  }, 200);
+  gitWatcher.onDidChange(onGitChange);
+  gitWatcher.onDidCreate(onGitChange);
+  gitWatcher.onDidDelete(onGitChange);
   context.subscriptions.push(gitWatcher);
+
+  // 2. Watch for file saves across workspace to update Commit changes in real-time
+  context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument(doc => {
+      if (doc.uri.scheme === 'file') {
+        commitViewProvider.refresh();
+        if (
+          CommitReviewPanel.currentPanel &&
+          doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())
+        ) {
+          CommitReviewPanel.currentPanel.refresh();
+        }
+      }
+    }),
+  );
+
+  // 3. Watch for workspace file create / delete to update untracked files in real-time
+  const workspaceWatcher = vscode.workspace.createFileSystemWatcher('**/*');
+  const onWorkspaceFsChange = debounce((uri: vscode.Uri) => {
+    if (uri.fsPath.includes('/.git/') || uri.fsPath.includes('/node_modules/')) return;
+    commitViewProvider.refresh();
+  }, 400);
+  workspaceWatcher.onDidCreate(onWorkspaceFsChange);
+  workspaceWatcher.onDidDelete(onWorkspaceFsChange);
+  context.subscriptions.push(workspaceWatcher);
 
   log.appendLine('IntelliJ Git extension activated.');
 }

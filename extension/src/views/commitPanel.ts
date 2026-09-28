@@ -34,6 +34,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage(msg => this.handleMessage(msg));
 
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        this.refresh();
+      }
+    });
+
     this.refresh();
   }
 
@@ -187,6 +193,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const filePath = msg.payload as string;
         try {
           await this.gitService.stageFile(filePath);
+          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
+            await CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+          }
           await this.refresh();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Stage failed: ${err.message}`);
@@ -197,6 +206,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const filePath = msg.payload as string;
         try {
           await this.gitService.unstageFile(filePath);
+          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
+            await CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+          }
           await this.refresh();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Unstage failed: ${err.message}`);

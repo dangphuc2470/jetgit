@@ -61,7 +61,7 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
           fromRow: row,
           toColumn: p0Col,
           toRow: row + 1,
-          color: color,
+          color,
         });
         lanes[col] = null;
       } else {
@@ -85,7 +85,7 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
             fromRow: row,
             toColumn: pCol,
             toRow: row + 1,
-            color: colorMap.get(p) ?? color,
+            color,
           });
         } else {
           pCol = lanes.indexOf(null);
@@ -100,7 +100,7 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
             fromRow: row,
             toColumn: pCol,
             toRow: row + 1,
-            color: colorMap.get(p)!,
+            color,
           });
         }
       }

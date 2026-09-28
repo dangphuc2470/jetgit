@@ -5692,8 +5692,6 @@ ${component_stack}
   }
 
   // webview/graph/CommitGraph.svelte
-  const DOT_RADIUS_LINE = 3.8;
-
   function computeAngularPath(x1, y1, x2, y2) {
     if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return "";
     const dx = x2 - x1;
@@ -5701,30 +5699,18 @@ ${component_stack}
     const absDx = Math.abs(dx);
 
     if (absDx < 0.5) {
-      // Straight vertical: shrink both ends by DOT_RADIUS so line starts/ends at circle edge
-      return `M ${x1} ${y1 + DOT_RADIUS_LINE} L ${x2} ${y2 - DOT_RADIUS_LINE}`;
+      return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
 
-    // Angular path: vertical drop at top/bottom, diagonal in middle
-    // Shrink start downward and end upward by DOT_RADIUS so lines touch circle edges
-    const ay1 = y1 + DOT_RADIUS_LINE;
-    const ay2 = y2 - DOT_RADIUS_LINE;
-    const ady = ay2 - ay1;
+    const diagH = Math.min(absDx, dy);
 
-    if (ady <= 0) {
-      return `M ${x1} ${ay1} L ${x2} ${ay2}`;
+    if (dx > 0) {
+      const cornerY = y1 + diagH;
+      return `M ${x1} ${y1} L ${x2} ${cornerY} L ${x2} ${y2}`;
+    } else {
+      const cornerY = y2 - diagH;
+      return `M ${x1} ${y1} L ${x1} ${cornerY} L ${x2} ${y2}`;
     }
-
-    const maxDiagH = ady > 6 ? ady - 6 : ady;
-    const diagH = Math.min(absDx, maxDiagH);
-    const vH = Math.max(0, (ady - diagH) / 2);
-
-    const bx = x1;
-    const by = ay1 + vH;
-    const cx_pt = x2;
-    const cy_pt = ay2 - vH;
-
-    return `M ${x1} ${ay1} L ${bx} ${by} L ${cx_pt} ${cy_pt} L ${x2} ${ay2}`;
   }
 
 
@@ -5790,23 +5776,49 @@ ${component_stack}
       var fragment = comment();
       var node_2 = first_child(fragment);
       {
-        var path_l = root_3();
-        template_effect(
-          ($0, $1, $2, $3) => {
-            set_attribute2(path_l, "d", computeAngularPath($0, $1, $2, $3));
-            set_attribute2(path_l, "stroke", color());
-          },
-          [
-            () => cx(line().fromColumn),
-            () => cy(line().fromRow),
-            () => cx(line().toColumn),
-            () => cy(line().toRow)
-          ]
-        );
-        append(node_2, path_l);
+        var consequent = ($$anchor3) => {
+          var line_1 = root_2();
+          template_effect(
+            ($0, $1, $2, $3) => {
+              set_attribute2(line_1, "x1", $0);
+              set_attribute2(line_1, "y1", $1);
+              set_attribute2(line_1, "x2", $2);
+              set_attribute2(line_1, "y2", $3);
+              set_attribute2(line_1, "stroke", color());
+            },
+            [
+              () => cx(line().fromColumn),
+              () => cy(line().fromRow),
+              () => cx(line().toColumn),
+              () => cy(line().toRow)
+            ]
+          );
+          append($$anchor3, line_1);
+        };
+        var alternate = ($$anchor3) => {
+          var path = root_3();
+          template_effect(
+            ($0, $1, $2, $3) => {
+              set_attribute2(path, "d", computeAngularPath($0, $1, $2, $3));
+              set_attribute2(path, "stroke", color());
+            },
+            [
+              () => cx(line().fromColumn),
+              () => cy(line().fromRow),
+              () => cx(line().toColumn),
+              () => cy(line().toRow)
+            ]
+          );
+          append($$anchor3, path);
+        };
+        if_block(node_2, ($$render) => {
+          if (line().fromColumn === line().toColumn)
+            $$render(consequent);
+          else
+            $$render(alternate, false);
+        });
       }
       append($$anchor2, fragment);
-
     });
     var node_3 = sibling(node_1);
     each(node_3, 17, visibleDots, index, ($$anchor2, dot) => {

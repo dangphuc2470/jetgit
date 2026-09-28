@@ -5983,6 +5983,11 @@ ${component_stack}
       menus.forEach(m => m.remove());
     }
 
+    function closeBranchContextMenu() {
+      const old = document.querySelector(".branch-context-menu");
+      if (old) old.remove();
+    }
+
     function showCommitContextMenu(e, commit) {
       e.preventDefault();
       e.stopPropagation();
@@ -6256,7 +6261,8 @@ ${component_stack}
       };
 
       const mousedownHandler = (ev) => {
-        if (!ev.target.closest(".commit-context-menu") && !ev.target.closest(".branch-context-menu")) {
+        const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target?.parentElement;
+        if (!target || (!target.closest?.(".commit-context-menu") && !target.closest?.(".branch-context-menu"))) {
           closeAllMenus();
         }
       };

@@ -8,6 +8,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private allCommits: Commit[] = [];
   private graphNodes: GraphNode[] = [];
+  private isLoadingMore = false;
+  private hasReachedEnd = false;
 
   private lastBranches: BranchInfo[] = [];
   private lastTags: TagInfo[] = [];
@@ -63,16 +65,23 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
+      this.hasReachedEnd = false;
+      this.isLoadingMore = false;
       this.log.appendLine('Loading git log...');
       const [commits, branches, tags] = await Promise.all([
         this.gitService.getLog({ maxCount: 300, all: true }),
         this.gitService.getBranches(),
         this.gitService.getTags(),
       ]);
-      this.allCommits = commits;
+      const seen = new Set<string>();
+      this.allCommits = commits.filter(c => {
+        if (seen.has(c.hash)) return false;
+        seen.add(c.hash);
+        return true;
+      });
       this.lastBranches = branches;
       this.lastTags = tags;
-      this.log.appendLine(`Loaded ${commits.length} commits, ${branches.length} branches, ${tags.length} tags`);
+      this.log.appendLine(`Loaded ${this.allCommits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
       this.sendCommits();
       this.sendBranches(branches, tags);
@@ -179,21 +188,35 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'loadMore': {
+        if (this.isLoadingMore || this.hasReachedEnd) break;
+        this.isLoadingMore = true;
         const skip = this.allCommits.length;
         try {
           const more = await this.gitService.getLog({ maxCount: 100, skip, all: true });
-          if (more.length > 0) {
-            this.allCommits.push(...more);
+          const existingHashes = new Set(this.allCommits.map(c => c.hash));
+          const uniqueMore = more.filter(c => !existingHashes.has(c.hash));
+          if (uniqueMore.length > 0) {
+            this.allCommits.push(...uniqueMore);
             this.graphNodes = buildGraph(this.allCommits);
             this.sendCommits();
+          } else {
+            this.hasReachedEnd = true;
+            this.view?.webview.postMessage({ type: 'reachedEnd' });
           }
-        } catch { /* end of history */ }
+        } catch {
+          this.hasReachedEnd = true;
+          this.view?.webview.postMessage({ type: 'reachedEnd' });
+        } finally {
+          this.isLoadingMore = false;
+        }
         break;
       }
       case 'filter': {
         const { branch, author, after, before, path: filePath } = msg.payload;
+        this.hasReachedEnd = false;
+        this.isLoadingMore = false;
         try {
-          this.allCommits = await this.gitService.getLog({
+          const commits = await this.gitService.getLog({
             maxCount: 300,
             all: !branch,
             branch: branch || undefined,
@@ -201,6 +224,12 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
             after: after || undefined,
             before: before || undefined,
             path: filePath || undefined,
+          });
+          const seen = new Set<string>();
+          this.allCommits = commits.filter(c => {
+            if (seen.has(c.hash)) return false;
+            seen.add(c.hash);
+            return true;
           });
           this.graphNodes = buildGraph(this.allCommits);
           this.sendCommits();

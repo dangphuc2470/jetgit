@@ -788,6 +788,8 @@ var GraphViewProvider = class {
   view;
   allCommits = [];
   graphNodes = [];
+  isLoadingMore = false;
+  hasReachedEnd = false;
   lastBranches = [];
   lastTags = [];
   resolveWebviewView(webviewView, _context, _token) {
@@ -823,16 +825,23 @@ var GraphViewProvider = class {
       return;
     }
     try {
+      this.hasReachedEnd = false;
+      this.isLoadingMore = false;
       this.log.appendLine("Loading git log...");
       const [commits, branches, tags] = await Promise.all([
         this.gitService.getLog({ maxCount: 300, all: true }),
         this.gitService.getBranches(),
         this.gitService.getTags()
       ]);
-      this.allCommits = commits;
+      const seen = /* @__PURE__ */ new Set();
+      this.allCommits = commits.filter((c) => {
+        if (seen.has(c.hash)) return false;
+        seen.add(c.hash);
+        return true;
+      });
       this.lastBranches = branches;
       this.lastTags = tags;
-      this.log.appendLine(`Loaded ${commits.length} commits, ${branches.length} branches, ${tags.length} tags`);
+      this.log.appendLine(`Loaded ${this.allCommits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
       this.sendCommits();
       this.sendBranches(branches, tags);
@@ -928,22 +937,35 @@ var GraphViewProvider = class {
         break;
       }
       case "loadMore": {
+        if (this.isLoadingMore || this.hasReachedEnd) break;
+        this.isLoadingMore = true;
         const skip = this.allCommits.length;
         try {
           const more = await this.gitService.getLog({ maxCount: 100, skip, all: true });
-          if (more.length > 0) {
-            this.allCommits.push(...more);
+          const existingHashes = new Set(this.allCommits.map((c) => c.hash));
+          const uniqueMore = more.filter((c) => !existingHashes.has(c.hash));
+          if (uniqueMore.length > 0) {
+            this.allCommits.push(...uniqueMore);
             this.graphNodes = buildGraph(this.allCommits);
             this.sendCommits();
+          } else {
+            this.hasReachedEnd = true;
+            this.view?.webview.postMessage({ type: "reachedEnd" });
           }
         } catch {
+          this.hasReachedEnd = true;
+          this.view?.webview.postMessage({ type: "reachedEnd" });
+        } finally {
+          this.isLoadingMore = false;
         }
         break;
       }
       case "filter": {
         const { branch, author, after, before, path: filePath } = msg.payload;
+        this.hasReachedEnd = false;
+        this.isLoadingMore = false;
         try {
-          this.allCommits = await this.gitService.getLog({
+          const commits = await this.gitService.getLog({
             maxCount: 300,
             all: !branch,
             branch: branch || void 0,
@@ -951,6 +973,12 @@ var GraphViewProvider = class {
             after: after || void 0,
             before: before || void 0,
             path: filePath || void 0
+          });
+          const seen = /* @__PURE__ */ new Set();
+          this.allCommits = commits.filter((c) => {
+            if (seen.has(c.hash)) return false;
+            seen.add(c.hash);
+            return true;
           });
           this.graphNodes = buildGraph(this.allCommits);
           this.sendCommits();

@@ -5915,11 +5915,14 @@ ${component_stack}
       obs.observe(get(containerEl));
       return () => obs.disconnect();
     });
+    let isLoadingMore = false;
+    let hasReachedEnd = false;
     function onScroll(e) {
       const el = e.target;
       set(scrollTop, el.scrollTop, true);
       const totalHeight = $$props.commits.length * ROW_HEIGHT;
-      if (el.scrollTop + get(containerHeight) > totalHeight - 500) {
+      if (!isLoadingMore && !hasReachedEnd && $$props.commits.length >= 100 && el.scrollTop + get(containerHeight) > totalHeight - 150) {
+        isLoadingMore = true;
         $$props.onLoadMore();
       }
     }
@@ -6817,10 +6820,23 @@ ${component_stack}
           case "commits": {
             const p = msg.payload;
             document.querySelectorAll(".no-git-container").forEach(el => el.remove());
+            const seen = new Set();
+            const unique = [];
+            if (p.commits) {
+              for (const c of p.commits) {
+                if (!seen.has(c.hash)) {
+                  seen.add(c.hash);
+                  unique.push(c);
+                }
+              }
+            }
             set(noGitData, null, true);
-            set(commits, p.commits, true);
+            set(commits, unique, true);
             set(graphWidth, p.graphWidth, true);
             set(loading, false);
+            break;
+          }
+          case "reachedEnd": {
             break;
           }
           case "error": {

@@ -5676,22 +5676,16 @@ ${component_stack}
 
   // webview/shared/theme.ts
   var GRAPH_COLORS = [
-    "#e5a50a",
-    // gold
-    "#a371f7",
-    // purple
-    "#58a6ff",
-    // blue
-    "#3fb950",
-    // green
-    "#f0883e",
-    // orange
-    "#db61a2",
-    // pink
-    "#7ee787",
-    // light green
-    "#79c0ff"
-    // light blue
+    "#a6823c", // Android Studio gold/ocher
+    "#399478", // Android Studio teal
+    "#4a67a8", // Android Studio indigo/blue
+    "#4e8e52", // Android Studio green
+    "#7d57a6", // Android Studio purple
+    "#b36939", // Android Studio amber/brown
+    "#327e99", // Android Studio cerulean/cyan
+    "#9c4949", // Android Studio muted red
+    "#857930", // Android Studio olive
+    "#4f728c"  // Android Studio slate
   ];
   function branchColor(index2) {
     return GRAPH_COLORS[index2 % GRAPH_COLORS.length];

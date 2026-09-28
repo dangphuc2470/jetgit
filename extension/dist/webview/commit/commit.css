@@ -9,9 +9,9 @@ body, html {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #1e1f22;
-  color: #bcbec4;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--vscode-editor-background, #1e1f22);
+  color: var(--vscode-editor-foreground, #bcbec4);
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-size: 12px;
 }
 
@@ -27,14 +27,14 @@ body, html {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #1e1f22;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1f22));
 }
 
 /* 1. Tab Bar */
 .tab-bar {
   height: 32px;
-  background: #2b2d30;
-  border-bottom: 1px solid #1e1f22;
+  background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorGroupHeader-tabsBackground, #2b2d30));
+  border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-sideBar-border, #1e1f22));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -99,8 +99,8 @@ body, html {
 /* 2. Toolbar */
 .commit-toolbar {
   height: 28px;
-  background: #2b2d30;
-  border-bottom: 1px solid #393b40;
+  background: var(--vscode-sideBarSectionHeader-background, var(--vscode-sideBar-background, #2b2d30));
+  border-bottom: 1px solid var(--vscode-panel-border, #393b40);
   display: flex;
   align-items: center;
   padding: 0 8px;
@@ -339,7 +339,7 @@ body, html {
   display: flex;
   flex-direction: column;
   padding: 8px 10px;
-  background: #1e1f22;
+  background: var(--vscode-sideBar-background, #1e1f22);
   overflow: hidden;
   min-height: 120px;
 }
@@ -394,11 +394,11 @@ body, html {
   width: 100%;
   height: 100%;
   min-height: 60px;
-  background: #1e1f22;
-  border: 1px solid #393b40;
+  background: var(--vscode-input-background, #1e1f22);
+  border: 1px solid var(--vscode-input-border, #393b40);
   border-radius: 4px;
-  color: #dfe1e5;
-  font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Consolas, monospace;
+  color: var(--vscode-input-foreground, #dfe1e5);
+  font-family: "JetBrains Mono", "JetBrains Mono NL", JetBrainsMono, Consolas, monospace;
   font-size: 12px;
   padding: 6px 8px;
   resize: none;
@@ -846,18 +846,18 @@ body, html {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background: #1e1f22;
-  color: #bcbec4;
+  background: var(--vscode-editor-background, #1e1f22);
+  color: var(--vscode-editor-foreground, #bcbec4);
   overflow: hidden;
   user-select: text;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
 }
 
 .studio-toolbar {
   height: 38px;
   min-height: 38px;
-  background: #2b2d30;
-  border-bottom: 1px solid #1e1f22;
+  background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-sideBar-background, #2b2d30));
+  border-bottom: 1px solid var(--vscode-panel-border, #1e1f22);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -877,19 +877,19 @@ body, html {
   align-items: center;
   gap: 6px;
   padding: 3px 9px;
-  background: #1e1f22;
-  border: 1px solid #4e5157;
+  background: var(--vscode-input-background, #1e1f22);
+  border: 1px solid var(--vscode-input-border, #4e5157);
   border-radius: 4px;
   font-size: 11px;
-  color: #dfe1e5;
+  color: var(--vscode-input-foreground, #dfe1e5);
   cursor: pointer;
   user-select: none;
   transition: all 0.1s;
 }
 
 .dropdown-pill:hover {
-  background: #393b40;
-  border-color: #3574f0;
+  background: var(--vscode-list-hoverBackground, #393b40);
+  border-color: var(--vscode-focusBorder, #3574f0);
 }
 
 .pill-arrow {
@@ -991,11 +991,11 @@ body, html {
 .studio-diff-columns-header {
   display: flex;
   height: 24px;
-  background: #232528;
-  border-bottom: 1px solid #2f3136;
+  background: var(--vscode-editorGroupHeader-tabsBackground, #232528);
+  border-bottom: 1px solid var(--vscode-panel-border, #2f3136);
   font-size: 11px;
   font-weight: 600;
-  color: #7f848e;
+  color: var(--vscode-descriptionForeground, #7f848e);
   user-select: none;
 }
 
@@ -1010,9 +1010,9 @@ body, html {
   width: 54px;
   min-width: 54px;
   max-width: 54px;
-  background: #1e1f22;
-  border-left: 1px solid #2b2d30;
-  border-right: 1px solid #2b2d30;
+  background: var(--vscode-editorGutter-background, var(--vscode-editor-background, #1e1f22));
+  border-left: 1px solid var(--vscode-panel-border, #2b2d30);
+  border-right: 1px solid var(--vscode-panel-border, #2b2d30);
 }
 
 .studio-diff-viewport-wrapper {
@@ -1020,14 +1020,14 @@ body, html {
   display: flex;
   position: relative;
   overflow: hidden;
-  background: #1e1f22;
+  background: var(--vscode-editor-background, #1e1f22);
 }
 
 /* Continuous Side-by-side Editor Panes */
 .editor-pane {
   flex: 1;
   overflow: auto;
-  background: #1e1f22;
+  background: var(--vscode-editor-background, #1e1f22);
 }
 
 .editor-lines-container {
@@ -1042,9 +1042,9 @@ body, html {
   line-height: 20px;
   display: flex;
   align-items: center;
-  font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Menlo, Consolas, monospace;
-  font-size: 12px;
-  color: #bcbec4;
+  font-family: "JetBrains Mono", "JetBrains Mono NL", JetBrainsMono, Consolas, Menlo, Monaco, monospace !important;
+  font-size: var(--vscode-editor-font-size, 12px);
+  color: var(--vscode-editor-foreground, #bcbec4);
   white-space: pre;
 }
 
@@ -1053,9 +1053,10 @@ body, html {
   min-width: 44px;
   text-align: right;
   padding-right: 12px;
-  color: #5a5d63;
+  color: var(--vscode-editorLineNumber-foreground, #5a5d63);
   user-select: none;
   font-size: 11px;
+  font-family: "JetBrains Mono", "JetBrains Mono NL", monospace;
 }
 
 .editor-line .line-content {
@@ -1064,6 +1065,7 @@ body, html {
   white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: "JetBrains Mono", "JetBrains Mono NL", JetBrainsMono, Consolas, Menlo, Monaco, monospace !important;
 }
 
 /* Middle Gutter with Curved SVG Ribbons */
@@ -1074,9 +1076,9 @@ body, html {
   height: 100%;
   overflow: hidden;
   position: relative;
-  background: #1e1f22;
-  border-left: 1px solid #2b2d30;
-  border-right: 1px solid #2b2d30;
+  background: var(--vscode-editorGutter-background, var(--vscode-editor-background, #1e1f22));
+  border-left: 1px solid var(--vscode-panel-border, #2b2d30);
+  border-right: 1px solid var(--vscode-panel-border, #2b2d30);
   user-select: none;
 }
 

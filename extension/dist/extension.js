@@ -2118,6 +2118,14 @@ var CommitReviewPanel = class {
         }
         break;
       }
+      case "openFile": {
+        const filePath = msg.payload;
+        if (filePath) {
+          const fullPath = import_path.join(this.gitService.getCwd(), filePath);
+          vscode8.commands.executeCommand("vscode.open", vscode8.Uri.file(fullPath));
+        }
+        break;
+      }
       case "rollbackHunk": {
         const { patch } = msg.payload;
         try {

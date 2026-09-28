@@ -139,6 +139,14 @@ export class CommitReviewPanel {
         }
         break;
       }
+      case 'openFile': {
+        const filePath = msg.payload as string;
+        if (filePath) {
+          const fullPath = path.join(this.gitService.getCwd(), filePath);
+          vscode.commands.executeCommand('vscode.open', vscode.Uri.file(fullPath));
+        }
+        break;
+      }
       case 'rollbackHunk': {
         const { patch } = msg.payload;
         try {

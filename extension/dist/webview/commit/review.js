@@ -403,14 +403,15 @@
       <div class="toolbar-right-group">
         <div class="diff-counter-pill">
           <span class="counter-text">${diffCount} ${diffCount === 1 ? 'difference' : 'differences'}</span>
-          <button class="arrow-btn" id="btn-prev-diff" title="Previous Difference (F7)">▲</button>
-          <button class="arrow-btn" id="btn-next-diff" title="Next Difference (Shift+F7)">▼</button>
+          <button class="arrow-btn" id="btn-prev-diff" title="Previous Difference (Shift+F7)">▲</button>
+          <button class="arrow-btn" id="btn-next-diff" title="Next Difference (F7)">▼</button>
         </div>
         <div class="toolbar-divider"></div>
         <label class="current-version-label" title="Stage / Unstage entire file">
           <input type="checkbox" id="chk-master-version" checked/>
           <span>Current version</span>
         </label>
+        <button class="icon-tool-btn" id="btn-open-file" title="Jump to Source / Open in Editor (F4)">↗</button>
         <button class="icon-tool-btn" id="btn-rollback-all" title="Rollback All Changes in File">↶</button>
         <div class="toolbar-divider"></div>
         <button class="icon-tool-btn ${!hasPrev ? 'disabled' : ''}" id="btn-prev-file" title="Previous File (Alt+Left)">◀</button>
@@ -739,6 +740,16 @@
       });
     }
 
+    // Open file in editor (F4)
+    const btnOpenFile = toolbar.querySelector('#btn-open-file');
+    if (btnOpenFile) {
+      btnOpenFile.addEventListener('click', () => {
+        if (state.filePath) {
+          vscode.postMessage({ type: 'openFile', payload: state.filePath });
+        }
+      });
+    }
+
     // Rollback all in file
     const btnRollbackAll = toolbar.querySelector('#btn-rollback-all');
     if (btnRollbackAll) {
@@ -749,6 +760,23 @@
       });
     }
   }
+
+  // Global Keyboard shortcuts: F4 = Open in editor, F7 = Next diff, Shift+F7 = Prev diff
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'F4' || e.keyCode === 115) {
+      e.preventDefault();
+      if (state.filePath) {
+        vscode.postMessage({ type: 'openFile', payload: state.filePath });
+      }
+    } else if (e.key === 'F7' || e.keyCode === 118) {
+      e.preventDefault();
+      if (e.shiftKey) {
+        jumpDiff(-1); // Shift+F7 = Prev diff
+      } else {
+        jumpDiff(1);  // F7 = Next diff
+      }
+    }
+  });
 
   function escapeHtml(str) {
     if (!str) return '';

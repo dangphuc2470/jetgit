@@ -1140,7 +1140,7 @@ body, html {
 /* Opposing insertion and deletion indicator lines */
 .diff-insertion-line {
   position: absolute;
-  left: 0;
+  left: 56px;
   right: 0;
   height: 2px;
   pointer-events: none;
@@ -1149,13 +1149,11 @@ body, html {
 }
 
 .insertion-add {
-  background-color: #3e9157;
-  box-shadow: 0 0 2px rgba(62, 145, 87, 0.6);
+  background-color: #2b5438;
 }
 
 .insertion-del {
-  background-color: #787d87;
-  box-shadow: 0 0 2px rgba(120, 125, 135, 0.6);
+  background-color: #434750;
 }
 
 .gutter-controls-layer {

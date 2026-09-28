@@ -190,6 +190,12 @@
   }
 
   function revertBlock(block) {
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    if (rightPane) {
+      savedScrollTop = rightPane.scrollTop;
+    }
+    pushHistoryState(state.currentLines.join('\n'), savedScrollTop || 0);
+
     const currentLines = [...state.currentLines];
     const baseLines = [...state.baseLines];
 
@@ -566,6 +572,76 @@
     return caretOffset;
   }
 
+  let savedScrollTop = null;
+  const undoStack = [];
+  const redoStack = [];
+  const MAX_HISTORY = 50;
+
+  function pushHistoryState(content, scrollY) {
+    if (!content) return;
+    if (undoStack.length > 0 && undoStack[undoStack.length - 1].content === content) {
+      return;
+    }
+    undoStack.push({
+      content,
+      scrollTop: scrollY !== undefined && scrollY !== null ? scrollY : (savedScrollTop || 0)
+    });
+    if (undoStack.length > MAX_HISTORY) {
+      undoStack.shift();
+    }
+    redoStack.length = 0;
+  }
+
+  function performUndo() {
+    if (state.readOnly || undoStack.length === 0) return;
+    const curContent = state.currentLines.join('\n');
+    const prevState = undoStack.pop();
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    const curScroll = rightPane ? rightPane.scrollTop : (savedScrollTop || 0);
+    redoStack.push({
+      content: curContent,
+      scrollTop: curScroll
+    });
+
+    savedScrollTop = prevState.scrollTop;
+    state.currentLines = prevState.content.split('\n');
+    state.currentContent = prevState.content;
+    vscode.postMessage({
+      type: 'saveFileContent',
+      payload: {
+        filePath: state.filePath,
+        content: prevState.content,
+        focusLine: null,
+        focusOffset: null
+      }
+    });
+  }
+
+  function performRedo() {
+    if (state.readOnly || redoStack.length === 0) return;
+    const curContent = state.currentLines.join('\n');
+    const nextState = redoStack.pop();
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    const curScroll = rightPane ? rightPane.scrollTop : (savedScrollTop || 0);
+    undoStack.push({
+      content: curContent,
+      scrollTop: curScroll
+    });
+
+    savedScrollTop = nextState.scrollTop;
+    state.currentLines = nextState.content.split('\n');
+    state.currentContent = nextState.content;
+    vscode.postMessage({
+      type: 'saveFileContent',
+      payload: {
+        filePath: state.filePath,
+        content: nextState.content,
+        focusLine: null,
+        focusOffset: null
+      }
+    });
+  }
+
   let saveTimer = null;
   function triggerSave(focusLine, focusOffset) {
     if (saveTimer) {
@@ -573,6 +649,10 @@
       saveTimer = null;
     }
     if (state.readOnly || !state.filePath) return;
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    if (rightPane) {
+      savedScrollTop = rightPane.scrollTop;
+    }
     const newContent = state.currentLines.join('\n');
     state.currentContent = newContent;
     vscode.postMessage({
@@ -780,30 +860,55 @@
 
     // Attach inline editing events if editable
     if (!state.readOnly) {
+      let isEditingSession = false;
+
       rightPane.querySelectorAll('.line-content').forEach(span => {
         const lineRow = span.closest('.editor-line');
         const lineNum = parseInt(lineRow.getAttribute('data-line'), 10);
 
         span.addEventListener('focus', () => {
           lineRow.classList.add('line-editing');
+          isEditingSession = false;
         });
 
         span.addEventListener('blur', () => {
           lineRow.classList.remove('line-editing');
+          isEditingSession = false;
           const curText = span.textContent.replace(/\u00A0/g, ' ');
           if (state.currentLines[lineNum - 1] !== curText) {
+            pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
             state.currentLines[lineNum - 1] = curText;
             triggerSave();
           }
         });
 
         span.addEventListener('input', () => {
+          if (!isEditingSession) {
+            pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
+            isEditingSession = true;
+          }
           const curText = span.textContent.replace(/\u00A0/g, ' ');
           state.currentLines[lineNum - 1] = curText;
           queueDebouncedSave(lineNum, getCaretOffset(span));
         });
 
         span.addEventListener('keydown', (e) => {
+          const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z');
+          const isRedo = ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) ||
+                         ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y'));
+
+          if (isUndo) {
+            e.preventDefault();
+            performUndo();
+            return;
+          }
+
+          if (isRedo) {
+            e.preventDefault();
+            performRedo();
+            return;
+          }
+
           if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.keyCode === 83)) {
             e.preventDefault();
             const curText = span.textContent.replace(/\u00A0/g, ' ');
@@ -814,6 +919,7 @@
 
           if (e.key === 'Tab') {
             e.preventDefault();
+            pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
             const caret = getCaretOffset(span);
             const fullText = state.currentLines[lineNum - 1] || '';
             const updated = fullText.slice(0, caret) + '  ' + fullText.slice(caret);
@@ -826,6 +932,7 @@
 
           if (e.key === 'Enter') {
             e.preventDefault();
+            pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
             const caret = getCaretOffset(span);
             const fullText = state.currentLines[lineNum - 1] || '';
             const before = fullText.slice(0, caret);
@@ -846,6 +953,7 @@
             const caret = getCaretOffset(span);
             if (caret === 0 && lineNum > 1) {
               e.preventDefault();
+              pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
               const prevText = state.currentLines[lineNum - 2] || '';
               const curText = state.currentLines[lineNum - 1] || '';
               const merged = prevText + curText;
@@ -1011,11 +1119,13 @@
       if (isSyncing) return;
       isSyncing = true;
       rightPane.scrollTop = mapLeftToRight(leftPane.scrollTop);
+      savedScrollTop = rightPane.scrollTop;
       updateRibbons();
       isSyncing = false;
     }, { passive: true });
 
     rightPane.addEventListener('scroll', () => {
+      savedScrollTop = rightPane.scrollTop;
       if (isSyncing) return;
       isSyncing = true;
       leftPane.scrollTop = mapRightToLeft(rightPane.scrollTop);
@@ -1023,11 +1133,19 @@
       isSyncing = false;
     }, { passive: true });
 
-    // Initial draw and auto jump to first change
+    // Initial draw or restore scroll position
     requestAnimationFrame(() => {
-      updateRibbons();
-      if (state.blocks && state.blocks.length > 0) {
-        jumpToBlock(0);
+      if (savedScrollTop !== null) {
+        isSyncing = true;
+        rightPane.scrollTop = savedScrollTop;
+        leftPane.scrollTop = mapRightToLeft(savedScrollTop);
+        updateRibbons();
+        isSyncing = false;
+      } else {
+        updateRibbons();
+        if (state.blocks && state.blocks.length > 0) {
+          jumpToBlock(0);
+        }
       }
     });
 
@@ -1208,8 +1326,24 @@
     }
   }
 
-  // Global Keyboard shortcuts: F4 = Open in editor, F7 = Next diff, Shift+F7 = Prev diff
+  // Global Keyboard shortcuts: F4 = Open in editor, F7 = Next diff, Shift+F7 = Prev diff, Cmd/Ctrl+Z = Undo, Cmd+Shift+Z/Ctrl+Y = Redo
   window.addEventListener('keydown', (e) => {
+    if (!state.readOnly) {
+      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z');
+      const isRedo = ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) ||
+                     ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y'));
+      if (isUndo) {
+        e.preventDefault();
+        performUndo();
+        return;
+      }
+      if (isRedo) {
+        e.preventDefault();
+        performRedo();
+        return;
+      }
+    }
+
     if (e.key === 'F4' || e.keyCode === 115) {
       e.preventDefault();
       if (state.filePath) {
@@ -1236,6 +1370,15 @@
     switch (msg.type) {
       case 'fileDiff': {
         const data = msg.payload;
+        const isSameFile = (state.filePath && state.filePath === (data.path || ''));
+        if (!isSameFile) {
+          savedScrollTop = null;
+          undoStack.length = 0;
+          redoStack.length = 0;
+        } else if (savedScrollTop === null) {
+          const rPane = document.querySelector('.editor-pane.right-pane');
+          if (rPane) savedScrollTop = rPane.scrollTop;
+        }
         state.filePath = data.path || '';
         state.fileName = data.fileName || state.filePath.split('/').pop() || '';
         state.fileDir = data.fileDir || state.filePath.split('/').slice(0, -1).join('/');

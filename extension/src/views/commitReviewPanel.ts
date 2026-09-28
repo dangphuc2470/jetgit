@@ -73,12 +73,31 @@ export class CommitReviewPanel {
 
     try {
       const diff = await this.gitService.getFileDiff(filePath);
+      let baseContent = '';
+      try {
+        baseContent = await this.gitService.exec(['show', `HEAD:${filePath}`]);
+      } catch {
+        baseContent = '';
+      }
+      let currentContent = '';
+      try {
+        const fullPath = path.join(this.gitService.getCwd(), filePath);
+        if (require('fs').existsSync(fullPath)) {
+          currentContent = require('fs').readFileSync(fullPath, 'utf8');
+        }
+      } catch {
+        currentContent = '';
+      }
       const currentFileIndex = this.filesList.indexOf(filePath);
       this.panel.webview.postMessage({
         type: 'fileDiff',
         payload: {
           path: filePath,
+          fileName,
+          fileDir: path.dirname(filePath) === '.' ? '' : path.dirname(filePath),
           diff,
+          baseContent,
+          currentContent,
           filesList: this.filesList,
           currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0,
         },

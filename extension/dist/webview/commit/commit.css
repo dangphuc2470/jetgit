@@ -837,85 +837,388 @@ body, html {
   gap: 8px;
 }
 
-.nav-btn {
+/* ==========================================================================
+   Android Studio Side-by-Side Full-File Diff Viewer
+   ========================================================================== */
+
+.studio-diff-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
   background: #1e1f22;
-  border: 1px solid #4e5157;
-  color: #dfe1e5;
-  width: 26px;
-  height: 26px;
-  border-radius: 4px;
-  cursor: pointer;
+  color: #bcbec4;
+  overflow: hidden;
+  user-select: text;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.studio-toolbar {
+  height: 38px;
+  min-height: 38px;
+  background: #2b2d30;
+  border-bottom: 1px solid #1e1f22;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 10;
+}
+
+.toolbar-left-group,
+.toolbar-right-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropdown-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  background: #1e1f22;
+  border: 1px solid #4e5157;
+  border-radius: 4px;
   font-size: 11px;
+  color: #dfe1e5;
+  cursor: pointer;
+  user-select: none;
   transition: all 0.1s;
 }
 
-.nav-btn:hover:not(.disabled) {
+.dropdown-pill:hover {
   background: #393b40;
   border-color: #3574f0;
 }
 
-.nav-btn.disabled {
-  opacity: 0.35;
-  cursor: default;
+.pill-arrow {
+  font-size: 9px;
+  color: #8c8c8c;
 }
 
-.review-file-title {
+.file-breadcrumb {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-left: 4px;
+  margin-left: 6px;
 }
 
-.file-name-bold {
+.file-name-main {
   font-weight: 600;
   font-size: 13px;
   color: #dfe1e5;
 }
 
-.file-dir-muted {
+.file-dir-sub {
   font-size: 11px;
   color: #7f848e;
 }
 
-.review-actions {
+.diff-counter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #1e1f22;
+  border: 1px solid #4e5157;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #bcbec4;
+}
+
+.arrow-btn {
+  background: none;
+  border: none;
+  color: #8c8c8c;
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-size: 9px;
+}
+
+.arrow-btn:hover {
+  background: #393b40;
+  color: #ffffff;
+}
+
+.current-version-label {
   display: flex;
   align-items: center;
   gap: 6px;
+  font-size: 12px;
+  color: #dfe1e5;
+  cursor: pointer;
+  margin: 0 4px;
+  user-select: none;
 }
 
-.action-btn {
-  background: #1e1f22;
-  border: 1px solid #4e5157;
-  color: #dfe1e5;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 11px;
+.current-version-label input {
+  accent-color: #3574f0;
   cursor: pointer;
-  transition: all 0.12s;
+}
+
+.icon-tool-btn {
+  background: none;
+  border: none;
+  color: #8c8c8c;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-tool-btn:hover:not(.disabled) {
+  background: #393b40;
+  color: #dfe1e5;
+}
+
+.icon-tool-btn.disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: #3e4147;
+  margin: 0 2px;
+}
+
+.studio-diff-columns-header {
+  display: flex;
+  height: 24px;
+  background: #232528;
+  border-bottom: 1px solid #2f3136;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7f848e;
+  user-select: none;
+}
+
+.col-header-pane {
+  flex: 1;
+  padding: 3px 16px;
   display: flex;
   align-items: center;
-  gap: 4px;
 }
 
-.action-btn:hover {
-  background: #393b40;
-  border-color: #3574f0;
+.col-header-gutter {
+  width: 76px;
+  min-width: 76px;
+  max-width: 76px;
+  background: #1e1f22;
+  border-left: 1px solid #2b2d30;
+  border-right: 1px solid #2b2d30;
 }
 
-.review-diff-scroll {
+.studio-diff-viewport-wrapper {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.studio-diff-scroll {
   flex: 1;
   overflow: auto;
   font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Menlo, Consolas, monospace;
   font-size: 12px;
+  line-height: 20px;
   background: #1e1f22;
 }
 
-.diff-empty-state {
-  margin: auto;
-  padding: 40px;
-  text-align: center;
-  color: #7f848e;
+.studio-diff-table {
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
 }
+
+.studio-diff-row {
+  display: flex;
+  min-height: 20px;
+  height: 20px;
+}
+
+.diff-cell {
+  flex: 1;
+  padding: 0 12px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  background: #1e1f22;
+}
+
+.code-line {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Filler row for empty lines when opposite side is added/deleted */
+.cell-filler {
+  background: #17181a repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255, 255, 255, 0.015) 5px, rgba(255, 255, 255, 0.015) 10px) !important;
+}
+
+/* Middle gutter with line numbers and stage checkbox */
+.diff-gutter-cell {
+  width: 76px;
+  min-width: 76px;
+  max-width: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #191a1c;
+  border-left: 1px solid #2b2d30;
+  border-right: 1px solid #2b2d30;
+  user-select: none;
+  padding: 0 4px;
+}
+
+.gutter-num {
+  font-size: 11px;
+  color: #5e626a;
+  min-width: 24px;
+  text-align: right;
+}
+
+.gutter-center-col {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gutter-action-box {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.block-chk {
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: #3574f0;
+}
+
+.gutter-revert-btn {
+  background: none;
+  border: none;
+  color: #7f848e;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  line-height: 1;
+}
+
+.gutter-revert-btn:hover {
+  color: #3574f0;
+}
+
+/* ==========================================================================
+   Android Studio JetBrains Exact Diff Colors:
+   - Modified (Blue / Cyan / Teal): #16323f line, #246580 word
+   - Added (Green): #1b3827 line, #2f7847 word
+   - Deleted (Red): #3d2024 line, #6e2830 word
+   ========================================================================== */
+
+/* 1. MODIFIED LINES (Xanh dương / Cyan / Teal) */
+.row-mod .diff-cell.cell-mod {
+  background: #173542 !important;
+}
+
+.row-mod .diff-gutter-cell {
+  background: #1b323d !important;
+  border-color: #244957 !important;
+}
+
+.diff-word-mod-left {
+  background: #245e75 !important;
+  color: #8ee0ff !important;
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.diff-word-mod-right {
+  background: #2c728e !important;
+  color: #b8eeff !important;
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+/* 2. ADDED LINES (Xanh lá / Green) */
+.row-add .diff-cell.right-cell.cell-add {
+  background: #1d3c2a !important;
+}
+
+.row-add .diff-gutter-cell {
+  background: #182e21 !important;
+  border-color: #244b33 !important;
+}
+
+.diff-word-add {
+  background: #2c6e43 !important;
+  color: #99f3b5 !important;
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+/* 3. DELETED LINES (Đỏ / Red) */
+.row-del .diff-cell.left-cell.cell-del {
+  background: #3e2226 !important;
+}
+
+.row-del .diff-gutter-cell {
+  background: #2f1c1f !important;
+  border-color: #4b282d !important;
+}
+
+.diff-word-del {
+  background: #6e2830 !important;
+  color: #ffa3ac !important;
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+/* Far Right Overview Ruler (Diff Minimap) */
+.studio-overview-ruler {
+  width: 14px;
+  min-width: 14px;
+  background: #202124;
+  border-left: 1px solid #2b2d30;
+  position: relative;
+  user-select: none;
+}
+
+.ruler-stripe {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  border-radius: 1px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.ruler-stripe:hover {
+  opacity: 1;
+  filter: brightness(1.25);
+}
+
+.stripe-mod {
+  background: #2d7796;
+}
+
+.stripe-add {
+  background: #3e9157;
+}
+
+.stripe-del {
+  background: #a33b45;
+}
+

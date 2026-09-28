@@ -2051,12 +2051,31 @@ var CommitReviewPanel = class {
     this.panel.title = `Diff: ${fileName}`;
     try {
       const diff = await this.gitService.getFileDiff(filePath);
+      let baseContent = "";
+      try {
+        baseContent = await this.gitService.exec(["show", `HEAD:${filePath}`]);
+      } catch {
+        baseContent = "";
+      }
+      let currentContent = "";
+      try {
+        const fullPath = import_path.join(this.gitService.getCwd(), filePath);
+        if (import_fs.existsSync(fullPath)) {
+          currentContent = import_fs.readFileSync(fullPath, "utf8");
+        }
+      } catch {
+        currentContent = "";
+      }
       const currentFileIndex = this.filesList.indexOf(filePath);
       this.panel.webview.postMessage({
         type: "fileDiff",
         payload: {
           path: filePath,
+          fileName,
+          fileDir: import_path.dirname(filePath) === "." ? "" : import_path.dirname(filePath),
           diff,
+          baseContent,
+          currentContent,
           filesList: this.filesList,
           currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0
         }

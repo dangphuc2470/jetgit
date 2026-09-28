@@ -1172,11 +1172,12 @@ var vscode3 = __toESM(require("vscode"));
 var path3 = __toESM(require("path"));
 var fs3 = __toESM(require("fs"));
 var CommitReviewPanel = class _CommitReviewPanel {
-  constructor(panel, extensionUri, gitService, onStageChange) {
+  constructor(panel, extensionUri, gitService, onStageChange, readOnly = false) {
     this.extensionUri = extensionUri;
     this.gitService = gitService;
     this.onStageChange = onStageChange;
     this.panel = panel;
+    this.isReadOnly = readOnly;
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     vscode3.window.onDidChangeActiveColorTheme(
       () => this.sendThemeTokens(),
@@ -1199,15 +1200,17 @@ var CommitReviewPanel = class _CommitReviewPanel {
   disposables = [];
   currentFilePath = "";
   filesList = [];
-  static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange) {
+  isReadOnly = false;
+  static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange, readOnly = false) {
     const fileName = path3.basename(filePath);
     if (_CommitReviewPanel.currentPanel) {
       if (onStageChange) {
         _CommitReviewPanel.currentPanel.onStageChange = onStageChange;
       }
+      _CommitReviewPanel.currentPanel.isReadOnly = readOnly;
       _CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
       _CommitReviewPanel.currentPanel.panel.reveal(vscode3.ViewColumn.Active, true);
-      _CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
+      _CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
       return _CommitReviewPanel.currentPanel;
     }
     const panel = vscode3.window.createWebviewPanel(
@@ -1226,14 +1229,16 @@ var CommitReviewPanel = class _CommitReviewPanel {
       panel,
       extensionUri,
       gitService,
-      onStageChange
+      onStageChange,
+      readOnly
     );
-    _CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
+    _CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
     return _CommitReviewPanel.currentPanel;
   }
-  async loadFile(filePath, filesList) {
+  async loadFile(filePath, filesList, readOnly, focusTarget) {
     this.currentFilePath = filePath;
     if (filesList) this.filesList = filesList;
+    if (readOnly !== void 0) this.isReadOnly = readOnly;
     const fileName = path3.basename(filePath);
     this.panel.title = `Diff: ${fileName}`;
     try {
@@ -1271,7 +1276,9 @@ var CommitReviewPanel = class _CommitReviewPanel {
           baseContent,
           currentContent,
           filesList: this.filesList,
-          currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0
+          currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0,
+          readOnly: this.isReadOnly,
+          focusTarget
         }
       });
     } catch (err) {
@@ -1332,10 +1339,22 @@ var CommitReviewPanel = class _CommitReviewPanel {
           const fullPath = path3.join(this.gitService.getCwd(), filePath);
           fs3.writeFileSync(fullPath, newContent, "utf8");
           if (this.onStageChange) this.onStageChange();
-          await this.loadFile(this.currentFilePath, this.filesList);
+          await this.loadFile(this.currentFilePath, this.filesList, this.isReadOnly);
           vscode3.window.showInformationMessage("Reverted change block.");
         } catch (err) {
           vscode3.window.showErrorMessage(`Revert failed: ${err.message}`);
+        }
+        break;
+      }
+      case "saveFileContent": {
+        const { filePath, content, focusLine, focusOffset } = msg.payload;
+        try {
+          const fullPath = path3.join(this.gitService.getCwd(), filePath);
+          fs3.writeFileSync(fullPath, content, "utf8");
+          if (this.onStageChange) this.onStageChange();
+          await this.loadFile(this.currentFilePath, this.filesList, this.isReadOnly, { focusLine, focusOffset });
+        } catch (err) {
+          vscode3.window.showErrorMessage(`Save failed: ${err.message}`);
         }
         break;
       }

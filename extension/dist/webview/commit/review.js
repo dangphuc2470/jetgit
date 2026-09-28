@@ -17,7 +17,9 @@
     highlightWords: true,
     blocks: [],
     segments: [],
-    currentDiffIndex: 0
+    currentDiffIndex: 0,
+    readOnly: false,
+    focusTarget: null
   };
 
   const app = document.getElementById('app');
@@ -513,6 +515,84 @@
     return last ? (last.leftY + last.hLeft) : sRight;
   }
 
+  function setCaretPosition(el, offset) {
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const range = document.createRange();
+    let charCount = 0;
+    let nodeToSet = el;
+    let nodeOffset = 0;
+
+    function traverse(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const nextCharCount = charCount + node.length;
+        if (!nodeToSet || nodeToSet === el) {
+          if (offset <= nextCharCount) {
+            nodeToSet = node;
+            nodeOffset = Math.max(0, offset - charCount);
+            return true;
+          }
+        }
+        charCount = nextCharCount;
+      } else {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          if (traverse(node.childNodes[i])) return true;
+        }
+      }
+      return false;
+    }
+    traverse(el);
+    try {
+      range.setStart(nodeToSet, Math.min(nodeOffset, (nodeToSet.nodeValue || '').length));
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
+  }
+
+  function getCaretOffset(element) {
+    let caretOffset = 0;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      try {
+        const range = sel.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        caretOffset = preCaretRange.toString().length;
+      } catch (e) {}
+    }
+    return caretOffset;
+  }
+
+  let saveTimer = null;
+  function triggerSave(focusLine, focusOffset) {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    if (state.readOnly || !state.filePath) return;
+    const newContent = state.currentLines.join('\n');
+    state.currentContent = newContent;
+    vscode.postMessage({
+      type: 'saveFileContent',
+      payload: {
+        filePath: state.filePath,
+        content: newContent,
+        focusLine: focusLine || null,
+        focusOffset: focusOffset !== undefined ? focusOffset : null
+      }
+    });
+  }
+
+  function queueDebouncedSave(focusLine, focusOffset) {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      triggerSave(focusLine, focusOffset);
+    }, 1200);
+  }
+
   // Render the whole review interface
   function render() {
     app.innerHTML = '';
@@ -554,12 +634,14 @@
           <button class="arrow-btn" id="btn-next-diff" title="Next Difference (F7)">▼</button>
         </div>
         <div class="toolbar-divider"></div>
+        ${!state.readOnly ? `
         <label class="current-version-label" title="Stage / Unstage entire file">
           <input type="checkbox" id="chk-master-version" checked/>
           <span>Current version</span>
         </label>
+        ` : ''}
         <button class="icon-tool-btn" id="btn-open-file" title="Jump to Source / Open in Editor (F4)">↗</button>
-        <button class="icon-tool-btn" id="btn-rollback-all" title="Rollback All Changes in File">↶</button>
+        ${!state.readOnly ? `<button class="icon-tool-btn" id="btn-rollback-all" title="Rollback All Changes in File">↶</button>` : ''}
         <div class="toolbar-divider"></div>
         <button class="icon-tool-btn ${!hasPrev ? 'disabled' : ''}" id="btn-prev-file" title="Previous File (Alt+Left)">◀</button>
         <button class="icon-tool-btn ${!hasNext ? 'disabled' : ''}" id="btn-next-file" title="Next File (Alt+Right)">▶</button>
@@ -578,6 +660,7 @@
       <div class="col-header-gutter"></div>
       <div class="col-header-pane right-header">
         <span class="pane-title">Current version</span>
+        ${state.readOnly ? '<span class="readonly-badge" title="Historical commit is read-only">Read-only</span>' : '<span class="editable-badge" title="You can edit this file directly">✎ Editable</span>'}
       </div>
     `;
     root.appendChild(colHeader);
@@ -675,10 +758,13 @@
         }
       }
 
+      const isEditable = !state.readOnly;
+      const editableAttr = isEditable ? 'contenteditable="plaintext-only" spellcheck="false"' : '';
+
       rightHtml += `
         <div class="${rowClass}" data-line="${lineNum}">
           <span class="gutter-num">${lineNum}</span>
-          <span class="line-content">${contentHtml || '&nbsp;'}</span>
+          <span class="line-content" ${editableAttr}>${contentHtml || '&nbsp;'}</span>
         </div>
       `;
     });
@@ -691,6 +777,89 @@
       }
     });
     rightPane.innerHTML = `<div class="editor-lines-container">${rightHtml}${rightInsertionsHtml}</div>`;
+
+    // Attach inline editing events if editable
+    if (!state.readOnly) {
+      rightPane.querySelectorAll('.line-content').forEach(span => {
+        const lineRow = span.closest('.editor-line');
+        const lineNum = parseInt(lineRow.getAttribute('data-line'), 10);
+
+        span.addEventListener('focus', () => {
+          lineRow.classList.add('line-editing');
+        });
+
+        span.addEventListener('blur', () => {
+          lineRow.classList.remove('line-editing');
+          const curText = span.textContent.replace(/\u00A0/g, ' ');
+          if (state.currentLines[lineNum - 1] !== curText) {
+            state.currentLines[lineNum - 1] = curText;
+            triggerSave();
+          }
+        });
+
+        span.addEventListener('input', () => {
+          const curText = span.textContent.replace(/\u00A0/g, ' ');
+          state.currentLines[lineNum - 1] = curText;
+          queueDebouncedSave(lineNum, getCaretOffset(span));
+        });
+
+        span.addEventListener('keydown', (e) => {
+          if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.keyCode === 83)) {
+            e.preventDefault();
+            const curText = span.textContent.replace(/\u00A0/g, ' ');
+            state.currentLines[lineNum - 1] = curText;
+            triggerSave(lineNum, getCaretOffset(span));
+            return;
+          }
+
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            const caret = getCaretOffset(span);
+            const fullText = state.currentLines[lineNum - 1] || '';
+            const updated = fullText.slice(0, caret) + '  ' + fullText.slice(caret);
+            state.currentLines[lineNum - 1] = updated;
+            span.textContent = updated;
+            setCaretPosition(span, caret + 2);
+            queueDebouncedSave(lineNum, caret + 2);
+            return;
+          }
+
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const caret = getCaretOffset(span);
+            const fullText = state.currentLines[lineNum - 1] || '';
+            const before = fullText.slice(0, caret);
+            const after = fullText.slice(caret);
+
+            const matchIndent = before.match(/^(\s*)/);
+            const indent = matchIndent ? matchIndent[1] : '';
+            const newLineText = indent + after;
+
+            state.currentLines[lineNum - 1] = before;
+            state.currentLines.splice(lineNum, 0, newLineText);
+
+            triggerSave(lineNum + 1, indent.length);
+            return;
+          }
+
+          if (e.key === 'Backspace') {
+            const caret = getCaretOffset(span);
+            if (caret === 0 && lineNum > 1) {
+              e.preventDefault();
+              const prevText = state.currentLines[lineNum - 2] || '';
+              const curText = state.currentLines[lineNum - 1] || '';
+              const merged = prevText + curText;
+
+              state.currentLines[lineNum - 2] = merged;
+              state.currentLines.splice(lineNum - 1, 1);
+
+              triggerSave(lineNum - 1, prevText.length);
+              return;
+            }
+          }
+        });
+      });
+    }
 
     // Middle Gutter with Viewport SVG curved ribbons
     const middleGutter = document.createElement('div');
@@ -766,23 +935,24 @@
 
         svgHtml += `<path d="${d}" class="diff-ribbon ${fillClass}" data-block-id="${b.id}"/>`;
 
-        // Checkbox positioned neatly in a straight vertical column aligned with Android Studio
-        const checkY = b.isRightEmpty ? (y3 - 7) : (y3 + 3);
-        const revertY = b.isLeftEmpty ? (y1 - 7) : (y1 + 3);
+        if (!state.readOnly) {
+          const checkY = b.isRightEmpty ? (y3 - 7) : (y3 + 3);
+          const revertY = b.isLeftEmpty ? (y1 - 7) : (y1 + 3);
 
-        if (revertY >= -15 && revertY <= viewH + 15) {
-          ctrlHtml += `
-            <button class="block-revert-btn" style="top: ${revertY}px;" title="Revert change (Accept base revision)" data-block-id="${b.id}">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          `;
-        }
-        if (checkY >= -15 && checkY <= viewH + 15) {
-          ctrlHtml += `
-            <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">
-              <input type="checkbox" class="block-chk" title="Stage / Unstage block" ${b.staged ? 'checked' : ''} data-block-id="${b.id}"/>
-            </div>
-          `;
+          if (revertY >= -15 && revertY <= viewH + 15) {
+            ctrlHtml += `
+              <button class="block-revert-btn" style="top: ${revertY}px;" title="Revert change (Accept base revision)" data-block-id="${b.id}">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            `;
+          }
+          if (checkY >= -15 && checkY <= viewH + 15) {
+            ctrlHtml += `
+              <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">
+                <input type="checkbox" class="block-chk" title="Stage / Unstage block" ${b.staged ? 'checked' : ''} data-block-id="${b.id}"/>
+              </div>
+            `;
+          }
         }
       });
 
@@ -863,6 +1033,19 @@
 
     // Attach toolbar events
     attachToolbarEvents(toolbar);
+
+    // Restore focus if target specified
+    if (state.focusTarget) {
+      const target = state.focusTarget;
+      state.focusTarget = null;
+      requestAnimationFrame(() => {
+        const lineEl = rightPane.querySelector(`.editor-line[data-line="${target.focusLine}"] .line-content`);
+        if (lineEl) {
+          lineEl.focus();
+          setCaretPosition(lineEl, target.focusOffset || 0);
+        }
+      });
+    }
   }
 
   function highlightActiveBlock(blockId) {
@@ -1063,6 +1246,10 @@
         state.filesList = data.filesList || [];
         state.currentFileIndex = data.currentFileIndex || 0;
         state.currentDiffIndex = 0;
+        state.readOnly = data.readOnly === true;
+        if (data.focusTarget) {
+          state.focusTarget = data.focusTarget;
+        }
         render();
         break;
       }

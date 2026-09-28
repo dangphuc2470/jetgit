@@ -1351,3 +1351,51 @@ body, html {
   background: #787d87;
 }
 
+/* Editable right pane styling */
+.right-pane .line-content[contenteditable="plaintext-only"] {
+  outline: none;
+  cursor: text;
+  min-height: 20px;
+}
+
+.right-pane .editor-line:focus-within {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.right-pane .editor-line.line-editing {
+  background: rgba(53, 116, 240, 0.12) !important;
+}
+
+.right-pane .editor-line.line-editing .line-content {
+  box-shadow: 0 0 0 1px rgba(53, 116, 240, 0.6);
+  border-radius: 2px;
+}
+
+.editable-badge {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(53, 116, 240, 0.18);
+  color: #58a6ff;
+  border: 1px solid rgba(53, 116, 240, 0.35);
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+}
+
+.readonly-badge {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #8c8c8c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+}
+

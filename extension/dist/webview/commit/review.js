@@ -201,11 +201,11 @@
           blocks.push({
             id: blocks.length,
             type: blockType,
-            leftStart: delCount > 0 ? startLeft : Math.max(1, startLeft - 1),
-            leftEnd: delCount > 0 ? (startLeft + delCount - 1) : Math.max(1, startLeft - 1),
+            leftStart: startLeft,
+            leftEnd: delCount > 0 ? (startLeft + delCount - 1) : startLeft,
             isLeftEmpty: delCount === 0,
-            rightStart: addCount > 0 ? startRight : Math.max(1, startRight - 1),
-            rightEnd: addCount > 0 ? (startRight + addCount - 1) : Math.max(1, startRight - 1),
+            rightStart: startRight,
+            rightEnd: addCount > 0 ? (startRight + addCount - 1) : startRight,
             isRightEmpty: addCount === 0,
             delCount,
             addCount,
@@ -474,7 +474,7 @@
       if (b) {
         if (b.type === 'del') {
           rowClass += ' line-del';
-          contentHtml = `<span class="diff-word-del">${contentHtml}</span>`;
+          contentHtml = escapeHtml(line);
         } else if (b.type === 'mod') {
           rowClass += ' line-mod';
           const rOffset = lineNum - b.leftStart;
@@ -494,7 +494,15 @@
         </div>
       `;
     });
-    leftPane.innerHTML = `<div class="editor-lines-container">${leftHtml}</div>`;
+
+    let leftInsertionsHtml = '';
+    state.blocks.forEach(b => {
+      if (b.isLeftEmpty) {
+        const topY = (b.leftStart - 1) * LINE_HEIGHT;
+        leftInsertionsHtml += `<div class="diff-insertion-line insertion-add" style="top: ${topY}px;"></div>`;
+      }
+    });
+    leftPane.innerHTML = `<div class="editor-lines-container">${leftHtml}${leftInsertionsHtml}</div>`;
 
     // Render Right Lines (Pure code, NO fake dummy filler rows!)
     let rightHtml = '';
@@ -507,7 +515,7 @@
       if (b) {
         if (b.type === 'add') {
           rowClass += ' line-add';
-          contentHtml = `<span class="diff-word-add">${contentHtml}</span>`;
+          contentHtml = escapeHtml(line);
         } else if (b.type === 'mod') {
           rowClass += ' line-mod';
           const lOffset = lineNum - b.rightStart;
@@ -527,7 +535,15 @@
         </div>
       `;
     });
-    rightPane.innerHTML = `<div class="editor-lines-container">${rightHtml}</div>`;
+
+    let rightInsertionsHtml = '';
+    state.blocks.forEach(b => {
+      if (b.isRightEmpty) {
+        const topY = (b.rightStart - 1) * LINE_HEIGHT;
+        rightInsertionsHtml += `<div class="diff-insertion-line insertion-del" style="top: ${topY}px;"></div>`;
+      }
+    });
+    rightPane.innerHTML = `<div class="editor-lines-container">${rightHtml}${rightInsertionsHtml}</div>`;
 
     // Middle Gutter with Viewport SVG curved ribbons
     const middleGutter = document.createElement('div');
@@ -597,13 +613,16 @@
           return;
         }
 
-        const d = `M 0,${y1} C ${W * 0.45},${y1} ${W * 0.55},${y3} ${W},${y3} L ${W},${y4} C ${W * 0.55},${y4} ${W * 0.45},${y2} 0,${y2} Z`;
+        const flat = 10;
+        const d = `M 0,${y1} L ${flat},${y1} C ${flat + 10},${y1} ${W - flat - 10},${y3} ${W - flat},${y3} L ${W},${y3} L ${W},${y4} L ${W - flat},${y4} C ${W - flat - 10},${y4} ${flat + 10},${y2} ${flat},${y2} L 0,${y2} Z`;
         const fillClass = `ribbon-${b.type}`;
 
         svgHtml += `<path d="${d}" class="diff-ribbon ${fillClass}" data-block-id="${b.id}"/>`;
 
-        // Checkbox positioned at the vertical center of the right block (or left block)
-        const checkY = (y3 + y4) / 2 - 7;
+        // Checkbox positioned at the vertical visual center of the ribbon
+        const midLeft = (y1 + y2) / 2;
+        const midRight = (y3 + y4) / 2;
+        const checkY = (midLeft + midRight) / 2 - 7;
         if (checkY >= -15 && checkY <= viewH + 15) {
           ctrlHtml += `
             <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">

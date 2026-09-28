@@ -5958,11 +5958,259 @@ ${component_stack}
       const year = String(d.getFullYear()).slice(-2);
       return `${day}/${month}/${year}, ${timeStr}`;
     }
-    function onContextMenu(e, hash2) {
+    const ICON_COPY = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>`;
+    const ICON_PLUS = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/></svg>`;
+    const ICON_CHERRY = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="4.5" cy="11.5" r="2.5"/><circle cx="11.5" cy="11.5" r="2.5"/><path d="M5.5 9.5C6.5 6 9 3 13 2c-1.5 3-1.5 6-1.5 7"/></svg>`;
+    const ICON_RESET = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`;
+    const ICON_WEB = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>`;
+
+    function showToast(text) {
+      const old = document.querySelector(".as-mini-toast");
+      if (old) old.remove();
+      const t = document.createElement("div");
+      t.className = "as-mini-toast";
+      t.innerText = text;
+      document.body.appendChild(t);
+      setTimeout(() => t.classList.add("visible"), 10);
+      setTimeout(() => {
+        t.classList.remove("visible");
+        setTimeout(() => t.remove(), 250);
+      }, 2000);
+    }
+
+    function closeCommitContextMenu() {
+      const menus = document.querySelectorAll(".commit-context-menu");
+      menus.forEach(m => m.remove());
+    }
+
+    function showCommitContextMenu(e, commit) {
       e.preventDefault();
-      set(contextMenuHash, hash2, true);
-      set(contextMenuPos, { x: e.clientX, y: e.clientY }, true);
-      set(showContextMenu, true);
+      e.stopPropagation();
+      closeCommitContextMenu();
+      const oldBranch = document.querySelector(".branch-context-menu");
+      if (oldBranch) oldBranch.remove();
+
+      $$props.onSelectCommit(commit.hash);
+
+      const commits = $$props.commits || [];
+      const isHead = commits.length > 0 && commits[0].hash === commit.hash;
+      const menu = document.createElement("div");
+      menu.className = "commit-context-menu";
+
+      function addItem(label, shortcut, iconSvg, onClick, disabled = false) {
+        const it = document.createElement("div");
+        it.className = "ccm-item" + (disabled ? " disabled" : "");
+
+        const iconSpan = document.createElement("span");
+        iconSpan.className = "ccm-icon";
+        if (iconSvg) iconSpan.innerHTML = iconSvg;
+        it.appendChild(iconSpan);
+
+        const lblSpan = document.createElement("span");
+        lblSpan.className = "ccm-label";
+        lblSpan.innerText = label;
+        it.appendChild(lblSpan);
+
+        if (shortcut) {
+          const scSpan = document.createElement("span");
+          scSpan.className = "ccm-shortcut";
+          scSpan.innerText = shortcut;
+          it.appendChild(scSpan);
+        }
+
+        if (!disabled && onClick) {
+          it.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            closeCommitContextMenu();
+            onClick();
+          });
+        }
+        menu.appendChild(it);
+        return it;
+      }
+
+      function addDivider() {
+        const d = document.createElement("div");
+        d.className = "ccm-divider";
+        menu.appendChild(d);
+      }
+
+      // 1. Copy Revision Number
+      addItem("Copy Revision Number", "⌥⇧⌘C", ICON_COPY, () => {
+        navigator.clipboard.writeText(commit.hash);
+        showToast("Copied " + commit.hash.slice(0, 8) + " to clipboard");
+      });
+
+      // 2. Create Patch...
+      addItem("Create Patch...", "", ICON_PLUS, () => {
+        postMessage("createPatch", { hash: commit.hash });
+      });
+
+      // 3. Cherry-Pick
+      addItem("Cherry-Pick", "", ICON_CHERRY, () => {
+        postMessage("cherryPick", { hash: commit.hash });
+      });
+
+      addDivider();
+
+      // 4. Checkout Revision
+      addItem("Checkout Revision", "", "", () => {
+        postMessage("checkout", commit.hash);
+      });
+
+      // 5. Show Repository at Revision
+      addItem("Show Repository at Revision", "", "", () => {
+        postMessage("showRepoAtRevision", { hash: commit.hash });
+      });
+
+      // 6. Compare with Local
+      addItem("Compare with Local", "", "", () => {
+        postMessage("compareWithLocal", { hash: commit.hash });
+      });
+
+      addDivider();
+
+      // 7. Reset Current Branch to Here...
+      addItem("Reset Current Branch to Here...", "", ICON_RESET, () => {
+        postMessage("resetToCommit", { hash: commit.hash });
+      });
+
+      // 8. Revert Commit
+      addItem("Revert Commit", "", "", () => {
+        postMessage("revertCommit", { hash: commit.hash });
+      });
+
+      // 9. Undo Commit... (enabled only if HEAD)
+      addItem("Undo Commit...", "", "", () => {
+        postMessage("undoCommit", { hash: commit.hash });
+      }, !isHead);
+
+      addDivider();
+
+      // 10. Edit Commit Message...
+      addItem("Edit Commit Message...", "F2", "", () => {
+        postMessage("editCommitMessage", { hash: commit.hash, subject: commit.subject });
+      });
+
+      // 11. Fixup...
+      addItem("Fixup...", "", "", () => {
+        postMessage("rebaseFromHere", commit.hash);
+      });
+
+      // 12. Squash Into...
+      addItem("Squash Into...", "", "", () => {
+        postMessage("rebaseFromHere", commit.hash);
+      });
+
+      // 13. Drop Commit
+      addItem("Drop Commit", "", "", () => {
+        postMessage("dropCommit", { hash: commit.hash });
+      });
+
+      // 14. Interactively Rebase from Here...
+      addItem("Interactively Rebase from Here...", "", "", () => {
+        postMessage("rebaseFromHere", commit.hash);
+      });
+
+      // 15. Push All up to Here...
+      addItem("Push All up to Here...", "", "", () => {
+        postMessage("pushUpToHere", { hash: commit.hash });
+      });
+
+      addDivider();
+
+      // 16. Branch '<name>' Submenu
+      const branchRef = (commit.refs || []).find(r => !r.startsWith("tag: ") && r !== "HEAD") || (commit.refs && commit.refs[0]);
+      if (branchRef) {
+        const cleanBranch = branchRef.replace(/^HEAD -> /, '');
+        const branchItem = document.createElement("div");
+        branchItem.className = "ccm-item has-submenu";
+        branchItem.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">Branch '${cleanBranch}'</span><span class="ccm-arrow">›</span>`;
+
+        const subMenu = document.createElement("div");
+        subMenu.className = "commit-context-menu ccm-submenu";
+
+        function addSubItem(label, onClick) {
+          const it = document.createElement("div");
+          it.className = "ccm-item";
+          it.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">${label}</span>`;
+          it.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            closeCommitContextMenu();
+            onClick();
+          });
+          subMenu.appendChild(it);
+        }
+
+        addSubItem("Checkout", () => postMessage("checkout", cleanBranch));
+        addSubItem("Show Diff with Working Tree", () => postMessage("showDiff", { branch: cleanBranch }));
+        addSubItem("Update", () => postMessage("pull", cleanBranch));
+        addSubItem("Push...", () => postMessage("push", cleanBranch));
+        addSubItem("Rename...", () => {
+          const newName = prompt("Rename branch '" + cleanBranch + "' to:", cleanBranch);
+          if (newName && newName !== cleanBranch) postMessage("renameBranch", { oldName: cleanBranch, newName });
+        });
+
+        branchItem.appendChild(subMenu);
+        branchItem.addEventListener("mouseenter", () => {
+          subMenu.style.display = "block";
+          const sRect = subMenu.getBoundingClientRect();
+          if (sRect.right > window.innerWidth) {
+            subMenu.style.left = "auto";
+            subMenu.style.right = "100%";
+          }
+        });
+        branchItem.addEventListener("mouseleave", () => {
+          subMenu.style.display = "none";
+        });
+        menu.appendChild(branchItem);
+      }
+
+      // 17. New Branch...
+      addItem("New Branch...", "⌥⌘N", "", () => {
+        const name = prompt("New branch name:", "");
+        if (name && name.trim()) postMessage("createBranch", { name: name.trim(), startPoint: commit.hash });
+      });
+
+      // 18. New Tag...
+      addItem("New Tag...", "", "", () => {
+        const name = prompt("New tag name:", "");
+        if (name && name.trim()) postMessage("createTag", { name: name.trim(), hash: commit.hash });
+      });
+
+      addDivider();
+
+      // 19. Go to Child Commit
+      let childCommit = commits.find(c => c.parents && c.parents.includes(commit.hash));
+      addItem("Go to Child Commit", "←", "", () => {
+        if (childCommit) $$props.onSelectCommit(childCommit.hash);
+      }, !childCommit);
+
+      // 20. Go to Parent Commit
+      const hasParent = commit.parents && commit.parents.length > 0;
+      addItem("Go to Parent Commit", "→", "", () => {
+        if (hasParent) $$props.onSelectCommit(commit.parents[0]);
+      }, !hasParent);
+
+      addDivider();
+
+      // 21. View in browser
+      addItem("View in browser", "", ICON_WEB, () => {
+        postMessage("openInBrowser", { hash: commit.hash });
+      });
+
+      document.body.appendChild(menu);
+      let x = e.clientX;
+      let y = e.clientY;
+      const rect = menu.getBoundingClientRect();
+      if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+      if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+      menu.style.left = Math.max(0, x) + "px";
+      menu.style.top = Math.max(0, y) + "px";
+    }
+
+    function onContextMenu(e, commit) {
+      showCommitContextMenu(e, commit);
     }
     function closeContextMenu() {
       set(showContextMenu, false);
@@ -5984,7 +6232,10 @@ ${component_stack}
       }
     });
     onMount(() => {
-      const handler = () => closeContextMenu();
+      const handler = () => {
+        closeContextMenu();
+        closeCommitContextMenu();
+      };
       document.addEventListener("click", handler);
       return () => document.removeEventListener("click", handler);
     });
@@ -6071,7 +6322,7 @@ ${component_stack}
         [() => formatDate(get(commit).authorDate)]
       );
       delegated("click", div_5, () => $$props.onSelectCommit(get(commit).hash));
-      delegated("contextmenu", div_5, (e) => onContextMenu(e, get(commit).hash));
+      delegated("contextmenu", div_5, (e) => onContextMenu(e, get(commit)));
       append($$anchor2, div_5);
     });
     reset(div_4);
@@ -6308,7 +6559,7 @@ ${component_stack}
   var root4 = from_html(`<div class="filter-bar svelte-51df0s"><input type="text" placeholder="Branch..." class="filter-input svelte-51df0s"/> <input type="text" placeholder="Author..." class="filter-input svelte-51df0s"/> <input type="date" placeholder="After..." class="filter-input date-input svelte-51df0s"/> <input type="date" placeholder="Before..." class="filter-input date-input svelte-51df0s"/> <input type="text" placeholder="File path..." class="filter-input svelte-51df0s"/> <button class="filter-btn svelte-51df0s">Filter</button> <button class="filter-btn clear svelte-51df0s">Clear</button></div>`);
   var $$css5 = {
     hash: "svelte-51df0s",
-    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:#2b2d30;border:1px solid #393b40;border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid #393b40;flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:#1e1f22;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:#dfe1e5;cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:#2e436e;color:#ffffff;}.filter-popup-item.selected {font-weight:600;color:#e5a50a;}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:#7f858e;text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:#393b40;margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:#7f858e;}.filter-custom-date input {background:#1e1f22;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:#2e436e;color:#ffffff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:#355389;}.branch-context-menu {position:fixed;background:#2b2d30;border:1px solid #393b40;border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;}.bcm-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;color:#dfe1e5;cursor:pointer;white-space:nowrap;margin:1px 0;}.bcm-item:hover {background:#2e436e;color:#ffffff;}.bcm-shortcut {font-size:11px;opacity:0.5;margin-left:28px;}.bcm-divider {height:1px;background:#393b40;margin:4px 0;}"
+    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.ccm-item.disabled {opacity:0.38;cursor:default;pointer-events:none;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff);opacity:0.9;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}"
   };
       function FilterBar($$anchor, $$props) {
     push($$props, true);
@@ -6906,6 +7157,8 @@ ${component_stack}
       function closeBranchContextMenu() {
         const old = document.querySelector(".branch-context-menu");
         if (old) old.remove();
+        const oldCommit = document.querySelectorAll(".commit-context-menu");
+        oldCommit.forEach(m => m.remove());
       }
 
       function showBranchContextMenu(e, branchName) {

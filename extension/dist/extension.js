@@ -297,6 +297,31 @@ var GitService = class {
     if (startPoint) args.push(startPoint);
     await this.exec(args);
   }
+  async cherryPick(hash) {
+    return this.exec(["cherry-pick", hash]);
+  }
+  async revertCommit(hash) {
+    return this.exec(["revert", "--no-edit", hash]);
+  }
+  async reset(hash, mode = "mixed") {
+    return this.exec(["reset", `--${mode}`, hash]);
+  }
+  async createTag(name, hash) {
+    const args = ["tag", name];
+    if (hash) args.push(hash);
+    await this.exec(args);
+  }
+  async createPatch(hash) {
+    return this.exec(["format-patch", "-1", hash, "--stdout"]);
+  }
+  async getRemoteUrl() {
+    try {
+      const out = await this.exec(["remote", "get-url", "origin"]);
+      return out.trim();
+    } catch {
+      return "";
+    }
+  }
   async deleteBranch(name, force = false) {
     await this.exec(["branch", force ? "-D" : "-d", name]);
   }
@@ -1143,6 +1168,208 @@ var GraphViewProvider = class {
       case "rebaseFromHere": {
         const hash = msg.payload;
         await vscode2.commands.executeCommand("intellij-git.interactiveRebase", hash);
+        break;
+      }
+      case "cherryPick": {
+        const { hash } = msg.payload;
+        try {
+          await this.gitService.cherryPick(hash);
+          vscode2.window.showInformationMessage(`Cherry-picked ${hash.slice(0, 8)} successfully`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Cherry-pick failed: ${err.message}`);
+        }
+        break;
+      }
+      case "revertCommit": {
+        const { hash } = msg.payload;
+        try {
+          await this.gitService.revertCommit(hash);
+          vscode2.window.showInformationMessage(`Reverted commit ${hash.slice(0, 8)}`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Revert failed: ${err.message}`);
+        }
+        break;
+      }
+      case "resetToCommit": {
+        const { hash } = msg.payload;
+        const mode = await vscode2.window.showQuickPick([
+          { label: "Soft", description: "Keep all local changes in index (staged)", mode: "soft" },
+          { label: "Mixed", description: "Keep all local changes in working tree (unstaged)", mode: "mixed" },
+          { label: "Hard", description: "Discard all local changes", mode: "hard" }
+        ], { placeHolder: `Reset current branch to ${hash.slice(0, 8)}` });
+        if (mode) {
+          try {
+            await this.gitService.reset(hash, mode.mode);
+            vscode2.window.showInformationMessage(`Reset branch to ${hash.slice(0, 8)} (${mode.label})`);
+            this.loadInitialData();
+          } catch (err) {
+            vscode2.window.showErrorMessage(`Reset failed: ${err.message}`);
+          }
+        }
+        break;
+      }
+      case "undoCommit": {
+        try {
+          await this.gitService.reset("HEAD~1", "soft");
+          vscode2.window.showInformationMessage("Undid last commit (changes kept staged)");
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Undo commit failed: ${err.message}`);
+        }
+        break;
+      }
+      case "createTag": {
+        const { name, hash } = msg.payload;
+        try {
+          await this.gitService.createTag(name, hash);
+          vscode2.window.showInformationMessage(`Created tag ${name} at ${hash.slice(0, 8)}`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Create tag failed: ${err.message}`);
+        }
+        break;
+      }
+      case "createPatch": {
+        const { hash } = msg.payload;
+        try {
+          const patch = await this.gitService.createPatch(hash);
+          const doc = await vscode2.workspace.openTextDocument({
+            content: patch,
+            language: "diff"
+          });
+          await vscode2.window.showTextDocument(doc);
+          vscode2.window.showInformationMessage(`Created patch for ${hash.slice(0, 8)}`);
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Create patch failed: ${err.message}`);
+        }
+        break;
+      }
+      case "compareWithLocal": {
+        const { hash } = msg.payload;
+        try {
+          const files = await this.gitService.getDiffFiles(hash);
+          if (files.length === 0) {
+            vscode2.window.showInformationMessage(`No differences between ${hash.slice(0, 8)} and working tree.`);
+            break;
+          }
+          const items = files.map((f) => ({
+            label: `${f.status} ${f.path}`,
+            description: f.oldPath ? `from ${f.oldPath}` : "",
+            file: f
+          }));
+          const picked = await vscode2.window.showQuickPick(items, {
+            placeHolder: `Select a file changed against ${hash.slice(0, 8)} to view diff`
+          });
+          if (picked) {
+            const filePath = picked.file.path;
+            const leftUri = GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
+            const path6 = require("path");
+            const rightUri = vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
+            const fileName = filePath.split("/").pop() || filePath;
+            await vscode2.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${hash.slice(0, 8)} \u2194 Working Tree)`);
+          }
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Compare with local failed: ${err.message}`);
+        }
+        break;
+      }
+      case "editCommitMessage": {
+        const { hash, subject } = msg.payload;
+        const newMsg = await vscode2.window.showInputBox({
+          prompt: "Edit Commit Message",
+          value: subject || ""
+        });
+        if (newMsg && newMsg.trim()) {
+          try {
+            const headHash = (await this.gitService.getLog({ maxCount: 1 }))[0]?.hash;
+            if (headHash === hash) {
+              await this.gitService.exec(["commit", "--amend", "-m", newMsg.trim()]);
+              vscode2.window.showInformationMessage("Commit message updated");
+              this.loadInitialData();
+            } else {
+              vscode2.window.showWarningMessage("Editing commit message of older commits requires interactive rebase.");
+              await vscode2.commands.executeCommand("intellij-git.interactiveRebase", hash);
+            }
+          } catch (err) {
+            vscode2.window.showErrorMessage(`Edit message failed: ${err.message}`);
+          }
+        }
+        break;
+      }
+      case "dropCommit": {
+        const { hash } = msg.payload;
+        try {
+          const headHash = (await this.gitService.getLog({ maxCount: 1 }))[0]?.hash;
+          if (headHash === hash) {
+            await this.gitService.reset("HEAD~1", "hard");
+            vscode2.window.showInformationMessage(`Dropped commit ${hash.slice(0, 8)}`);
+            this.loadInitialData();
+          } else {
+            vscode2.window.showInformationMessage(`Use Interactive Rebase to drop older commit ${hash.slice(0, 8)}`);
+            await vscode2.commands.executeCommand("intellij-git.interactiveRebase", hash);
+          }
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Drop commit failed: ${err.message}`);
+        }
+        break;
+      }
+      case "pushUpToHere": {
+        const { hash } = msg.payload;
+        try {
+          const currentBranch = await this.gitService.getCurrentBranch();
+          await this.gitService.exec(["push", "origin", `${hash}:refs/heads/${currentBranch}`]);
+          vscode2.window.showInformationMessage(`Pushed up to ${hash.slice(0, 8)} on ${currentBranch}`);
+          this.loadInitialData();
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Push failed: ${err.message}`);
+        }
+        break;
+      }
+      case "showRepoAtRevision": {
+        const { hash } = msg.payload;
+        try {
+          const files = await this.gitService.getCommitFiles(hash);
+          if (files.length === 0) {
+            vscode2.window.showInformationMessage(`No files changed in ${hash.slice(0, 8)}.`);
+            break;
+          }
+          const items = files.map((f) => ({
+            label: `${f.status} ${f.path}`,
+            description: f.oldPath ? `from ${f.oldPath}` : "",
+            path: f.path
+          }));
+          const picked = await vscode2.window.showQuickPick(items, {
+            placeHolder: `Files changed in commit ${hash.slice(0, 8)}`
+          });
+          if (picked) {
+            const uri = GitContentProvider.makeUri(hash, picked.path);
+            await vscode2.commands.executeCommand("vscode.open", uri);
+          }
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Show revision failed: ${err.message}`);
+        }
+        break;
+      }
+      case "openInBrowser": {
+        const { hash } = msg.payload;
+        try {
+          const remoteUrl = await this.gitService.getRemoteUrl();
+          if (!remoteUrl) {
+            vscode2.window.showWarningMessage("No remote URL found for this repository.");
+            break;
+          }
+          let httpUrl = remoteUrl.replace(/^git@([^:]+):/, "https://$1/").replace(/\.git$/, "");
+          if (httpUrl.includes("gitlab.com") || httpUrl.includes("gitlab")) {
+            httpUrl = `${httpUrl}/-/commit/${hash}`;
+          } else {
+            httpUrl = `${httpUrl}/commit/${hash}`;
+          }
+          await vscode2.env.openExternal(vscode2.Uri.parse(httpUrl));
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Open in browser failed: ${err.message}`);
+        }
         break;
       }
     }

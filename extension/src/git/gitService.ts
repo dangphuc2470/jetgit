@@ -108,7 +108,7 @@ export class GitService {
     await execFileAsync('git', ['init'], { cwd: this.cwd });
   }
 
-  private async exec(args: string[], maxBuffer = 10 * 1024 * 1024): Promise<string> {
+  async exec(args: string[], maxBuffer = 10 * 1024 * 1024): Promise<string> {
     const { stdout } = await execFileAsync('git', args, {
       cwd: this.cwd,
       maxBuffer,
@@ -282,6 +282,37 @@ export class GitService {
     const args = ['checkout', '-b', name];
     if (startPoint) args.push(startPoint);
     await this.exec(args);
+  }
+
+  async cherryPick(hash: string): Promise<string> {
+    return this.exec(['cherry-pick', hash]);
+  }
+
+  async revertCommit(hash: string): Promise<string> {
+    return this.exec(['revert', '--no-edit', hash]);
+  }
+
+  async reset(hash: string, mode: 'soft' | 'mixed' | 'hard' = 'mixed'): Promise<string> {
+    return this.exec(['reset', `--${mode}`, hash]);
+  }
+
+  async createTag(name: string, hash?: string): Promise<void> {
+    const args = ['tag', name];
+    if (hash) args.push(hash);
+    await this.exec(args);
+  }
+
+  async createPatch(hash: string): Promise<string> {
+    return this.exec(['format-patch', '-1', hash, '--stdout']);
+  }
+
+  async getRemoteUrl(): Promise<string> {
+    try {
+      const out = await this.exec(['remote', 'get-url', 'origin']);
+      return out.trim();
+    } catch {
+      return '';
+    }
   }
 
   async deleteBranch(name: string, force = false): Promise<void> {

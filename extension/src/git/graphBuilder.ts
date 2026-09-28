@@ -61,7 +61,7 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
           fromRow: row,
           toColumn: p0Col,
           toRow: row + 1,
-          color: colorMap.get(p0) ?? color,
+          color: color,
         });
         lanes[col] = null;
       } else {

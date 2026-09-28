@@ -1992,6 +1992,8 @@ var MergeProvider = class {
     for (const d of this.disposables)
       d.dispose();
   }
+};
+
 // src/views/commitPanel.ts
 var CommitViewProvider = class {
   static viewType = "intellij-git.commitView";

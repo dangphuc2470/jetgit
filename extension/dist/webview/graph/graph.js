@@ -5692,8 +5692,31 @@ ${component_stack}
   }
 
   // webview/graph/CommitGraph.svelte
-  var root_2 = from_svg(`<line stroke-width="2"></line>`);
-  var root_3 = from_svg(`<path fill="none" stroke-width="2"></path>`);
+  function computeAngularPath(x1, y1, x2, y2) {
+    if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return "";
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const absDx = Math.abs(dx);
+
+    if (absDx < 0.5) {
+      return `M ${x1} ${y1} L ${x2} ${y2}`;
+    }
+
+    const maxDiagH = dy > 6 ? dy - 6 : dy;
+    const diagH = Math.min(absDx, maxDiagH);
+    const vH = Math.max(0, (dy - diagH) / 2);
+
+    const bx = x1;
+    const by = y1 + vH;
+    const cx_pt = x2;
+    const cy_pt = y2 - vH;
+
+    return `M ${x1} ${y1} L ${bx} ${by} L ${cx_pt} ${cy_pt} L ${x2} ${y2}`;
+  }
+
+
+  var root_2 = from_svg(`<line stroke-width="1.8" stroke-linecap="round"></line>`);
+  var root_3 = from_svg(`<path fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>`);
   var root_4 = from_svg(`<circle stroke="var(--vscode-editor-background)" stroke-width="1.5"></circle>`);
   var root = from_svg(`<svg class="graph-svg svelte-154okp0"><!><!></svg>`);
   var $$css = {
@@ -5775,20 +5798,13 @@ ${component_stack}
         var alternate = ($$anchor3) => {
           var path = root_3();
           template_effect(
-            ($0, $1, $2, $3, $4, $5, $6, $7) => {
-              set_attribute2(path, "d", `M ${$0 ?? ""} ${$1 ?? ""}
-           C ${$2 ?? ""} ${$3 ?? ""},
-             ${$4 ?? ""} ${$5 ?? ""},
-             ${$6 ?? ""} ${$7 ?? ""}`);
+            ($0, $1, $2, $3) => {
+              set_attribute2(path, "d", computeAngularPath($0, $1, $2, $3));
               set_attribute2(path, "stroke", color());
             },
             [
               () => cx(line().fromColumn),
               () => cy(line().fromRow),
-              () => cx(line().fromColumn),
-              () => cy(line().fromRow) + $$props.rowHeight * 0.5,
-              () => cx(line().toColumn),
-              () => cy(line().toRow) - $$props.rowHeight * 0.5,
               () => cx(line().toColumn),
               () => cy(line().toRow)
             ]

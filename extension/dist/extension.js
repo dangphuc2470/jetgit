@@ -1038,9 +1038,27 @@ var GraphViewProvider = class {
         const ref = msg.payload;
         try {
           await this.gitService.deleteBranch(ref);
+          vscode2.window.showInformationMessage(`Deleted branch '${ref}'`);
           this.loadInitialData();
         } catch (err) {
-          vscode2.window.showErrorMessage(`Delete failed: ${err.message}`);
+          if (err.message && (err.message.includes("not fully merged") || err.message.includes("not merged"))) {
+            const force = await vscode2.window.showWarningMessage(
+              `Branch '${ref}' is not fully merged. Do you want to force delete it?`,
+              { modal: true },
+              "Force Delete"
+            );
+            if (force === "Force Delete") {
+              try {
+                await this.gitService.deleteBranch(ref, true);
+                vscode2.window.showInformationMessage(`Force deleted branch '${ref}'`);
+                this.loadInitialData();
+              } catch (e) {
+                vscode2.window.showErrorMessage(`Delete failed: ${e.message}`);
+              }
+            }
+          } else {
+            vscode2.window.showErrorMessage(`Delete failed: ${err.message}`);
+          }
         }
         break;
       }
@@ -1099,9 +1117,9 @@ var GraphViewProvider = class {
           });
           if (picked) {
             const filePath = picked.file.path;
-            const leftUri = GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
+            const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
             const path6 = require("path");
-            const rightUri = vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
+            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
             const fileName = filePath.split("/").pop() || filePath;
             await vscode2.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${branch} \u2194 Working Tree)`);
           }
@@ -1200,6 +1218,14 @@ var GraphViewProvider = class {
           { label: "Hard", description: "Discard all local changes", mode: "hard" }
         ], { placeHolder: `Reset current branch to ${hash.slice(0, 8)}` });
         if (mode) {
+          if (mode.mode === "hard") {
+            const confirm = await vscode2.window.showWarningMessage(
+              `Are you sure you want to perform a HARD reset to ${hash.slice(0, 8)}? All uncommitted local changes will be lost!`,
+              { modal: true },
+              "Reset"
+            );
+            if (confirm !== "Reset") break;
+          }
           try {
             await this.gitService.reset(hash, mode.mode);
             vscode2.window.showInformationMessage(`Reset branch to ${hash.slice(0, 8)} (${mode.label})`);
@@ -1264,9 +1290,9 @@ var GraphViewProvider = class {
           });
           if (picked) {
             const filePath = picked.file.path;
-            const leftUri = GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
+            const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
             const path6 = require("path");
-            const rightUri = vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
+            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
             const fileName = filePath.split("/").pop() || filePath;
             await vscode2.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${hash.slice(0, 8)} \u2194 Working Tree)`);
           }
@@ -1360,7 +1386,7 @@ var GraphViewProvider = class {
             vscode2.window.showWarningMessage("No remote URL found for this repository.");
             break;
           }
-          let httpUrl = remoteUrl.replace(/^git@([^:]+):/, "https://$1/").replace(/\.git$/, "");
+          let httpUrl = remoteUrl.replace(/^ssh:\/\/git@([^/:]+)(?::\d+)?\//, "https://$1/").replace(/^git@([^:]+):/, "https://$1/").replace(/^https?:\/\/[^@]+@/, "https://").replace(/\.git$/, "");
           if (httpUrl.includes("gitlab.com") || httpUrl.includes("gitlab")) {
             httpUrl = `${httpUrl}/-/commit/${hash}`;
           } else {

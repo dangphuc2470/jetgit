@@ -264,9 +264,27 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         const ref = msg.payload as string;
         try {
           await this.gitService.deleteBranch(ref);
+          vscode.window.showInformationMessage(`Deleted branch '${ref}'`);
           this.loadInitialData();
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Delete failed: ${err.message}`);
+          if (err.message && (err.message.includes('not fully merged') || err.message.includes('not merged'))) {
+            const force = await vscode.window.showWarningMessage(
+              `Branch '${ref}' is not fully merged. Do you want to force delete it?`,
+              { modal: true },
+              'Force Delete',
+            );
+            if (force === 'Force Delete') {
+              try {
+                await this.gitService.deleteBranch(ref, true);
+                vscode.window.showInformationMessage(`Force deleted branch '${ref}'`);
+                this.loadInitialData();
+              } catch (e: any) {
+                vscode.window.showErrorMessage(`Delete failed: ${e.message}`);
+              }
+            }
+          } else {
+            vscode.window.showErrorMessage(`Delete failed: ${err.message}`);
+          }
         }
         break;
       }
@@ -325,9 +343,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           });
           if (picked) {
             const filePath = picked.file.path;
-            const leftUri = GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
+            const leftUri = picked.file.status === 'A'
+              ? GitContentProvider.emptyUri()
+              : GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
             const path = require('path');
-            const rightUri = vscode.Uri.file(path.join(this.gitService.getCwd(), filePath));
+            const rightUri = picked.file.status === 'D'
+              ? GitContentProvider.emptyUri()
+              : vscode.Uri.file(path.join(this.gitService.getCwd(), filePath));
             const fileName = filePath.split('/').pop() || filePath;
             await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${fileName} (${branch} ↔ Working Tree)`);
           }
@@ -426,6 +448,14 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           { label: 'Hard', description: 'Discard all local changes', mode: 'hard' },
         ], { placeHolder: `Reset current branch to ${hash.slice(0, 8)}` });
         if (mode) {
+          if (mode.mode === 'hard') {
+            const confirm = await vscode.window.showWarningMessage(
+              `Are you sure you want to perform a HARD reset to ${hash.slice(0, 8)}? All uncommitted local changes will be lost!`,
+              { modal: true },
+              'Reset',
+            );
+            if (confirm !== 'Reset') break;
+          }
           try {
             await this.gitService.reset(hash, mode.mode as any);
             vscode.window.showInformationMessage(`Reset branch to ${hash.slice(0, 8)} (${mode.label})`);
@@ -490,9 +520,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           });
           if (picked) {
             const filePath = picked.file.path;
-            const leftUri = GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
+            const leftUri = picked.file.status === 'A'
+              ? GitContentProvider.emptyUri()
+              : GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
             const path = require('path');
-            const rightUri = vscode.Uri.file(path.join(this.gitService.getCwd(), filePath));
+            const rightUri = picked.file.status === 'D'
+              ? GitContentProvider.emptyUri()
+              : vscode.Uri.file(path.join(this.gitService.getCwd(), filePath));
             const fileName = filePath.split('/').pop() || filePath;
             await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, `${fileName} (${hash.slice(0, 8)} ↔ Working Tree)`);
           }
@@ -587,7 +621,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
             break;
           }
           let httpUrl = remoteUrl
+            .replace(/^ssh:\/\/git@([^/:]+)(?::\d+)?\//, 'https://$1/')
             .replace(/^git@([^:]+):/, 'https://$1/')
+            .replace(/^https?:\/\/[^@]+@/, 'https://')
             .replace(/\.git$/, '');
           if (httpUrl.includes('gitlab.com') || httpUrl.includes('gitlab')) {
             httpUrl = `${httpUrl}/-/commit/${hash}`;

@@ -1554,6 +1554,8 @@ var CommitViewProvider = class {
   static viewType = "intellij-git.commitView";
   view;
   allFilePaths = [];
+  pollTimer;
+  lastStatusHash = "";
   resolveWebviewView(webviewView, _context, _token) {
     this.view = webviewView;
     webviewView.webview.options = {
@@ -1567,9 +1569,34 @@ var CommitViewProvider = class {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
+        this.startPolling();
+      } else {
+        this.stopPolling();
       }
     });
+    if (webviewView.visible) {
+      this.startPolling();
+    }
     this.refresh();
+  }
+  startPolling() {
+    if (this.pollTimer) return;
+    this.pollTimer = setInterval(async () => {
+      if (!this.view || !this.view.visible) return;
+      try {
+        const quickStatus = await this.gitService.exec(["status", "--porcelain=v1", "-uall"]).catch(() => "");
+        if (quickStatus !== this.lastStatusHash) {
+          await this.refresh();
+        }
+      } catch {
+      }
+    }, 2e3);
+  }
+  stopPolling() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = void 0;
+    }
   }
   async refresh() {
     if (!this.view) return;
@@ -1628,6 +1655,7 @@ var CommitViewProvider = class {
       const changesCount = files.filter((f) => !f.isUntracked).length;
       const unversionedCount = files.filter((f) => f.isUntracked).length;
       this.allFilePaths = files.map((f) => f.path);
+      this.lastStatusHash = files.map((f) => `${f.status}:${f.path}:${f.totalChanges}:${f.staged}`).join("\n");
       this.view.webview.postMessage({
         type: "status",
         payload: {
@@ -2956,7 +2984,7 @@ function activate(context) {
     };
   }
   const gitWatcher = vscode10.workspace.createFileSystemWatcher(
-    new vscode10.RelativePattern(workspaceRoot, ".git/{HEAD,refs/**,index,logs/**}")
+    new vscode10.RelativePattern(workspaceRoot, ".git/**")
   );
   const onGitChange = debounce(() => {
     log.appendLine("Git change detected \u2014 refreshing views...");
@@ -2971,6 +2999,22 @@ function activate(context) {
   gitWatcher.onDidCreate(onGitChange);
   gitWatcher.onDidDelete(onGitChange);
   context.subscriptions.push(gitWatcher);
+  try {
+    const gitExt = vscode10.extensions.getExtension("vscode.git");
+    if (gitExt) {
+      const gitApi = gitExt.exports.getAPI?.(1);
+      if (gitApi) {
+        gitApi.repositories.forEach((repo) => {
+          repo.state.onDidChange(onGitChange);
+        });
+        gitApi.onDidOpenRepository((repo) => {
+          repo.state.onDidChange(onGitChange);
+        });
+      }
+    }
+  } catch (err) {
+    log.appendLine(`Failed to hook into vscode.git: ${err.message}`);
+  }
   context.subscriptions.push(
     vscode10.workspace.onDidSaveTextDocument((doc) => {
       if (doc.uri.scheme === "file") {
@@ -2985,10 +3029,19 @@ function activate(context) {
   const onWorkspaceFsChange = debounce((uri) => {
     if (uri.fsPath.includes("/.git/") || uri.fsPath.includes("/node_modules/")) return;
     commitViewProvider.refresh();
-  }, 400);
+  }, 300);
   workspaceWatcher.onDidCreate(onWorkspaceFsChange);
   workspaceWatcher.onDidDelete(onWorkspaceFsChange);
+  workspaceWatcher.onDidChange(onWorkspaceFsChange);
   context.subscriptions.push(workspaceWatcher);
+  context.subscriptions.push(
+    vscode10.window.onDidChangeWindowState((e) => {
+      if (e.focused) {
+        commitViewProvider.refresh();
+        branchTree.refresh();
+      }
+    })
+  );
   log.appendLine("IntelliJ Git extension activated.");
 }
 function deactivate() {

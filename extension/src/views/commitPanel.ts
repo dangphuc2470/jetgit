@@ -9,6 +9,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
   private view?: vscode.WebviewView;
   private allFilePaths: string[] = [];
+  private pollTimer?: NodeJS.Timeout;
+  private lastStatusHash = '';
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -37,10 +39,39 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
+        this.startPolling();
+      } else {
+        this.stopPolling();
       }
     });
 
+    if (webviewView.visible) {
+      this.startPolling();
+    }
+
     this.refresh();
+  }
+
+  private startPolling(): void {
+    if (this.pollTimer) return;
+    this.pollTimer = setInterval(async () => {
+      if (!this.view || !this.view.visible) return;
+      try {
+        const quickStatus = await this.gitService.exec(['status', '--porcelain=v1', '-uall']).catch(() => '');
+        if (quickStatus !== this.lastStatusHash) {
+          await this.refresh();
+        }
+      } catch {
+        // ignore
+      }
+    }, 2000);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = undefined;
+    }
   }
 
   async refresh(): Promise<void> {
@@ -108,6 +139,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       const unversionedCount = files.filter(f => f.isUntracked).length;
 
       this.allFilePaths = files.map(f => f.path);
+      this.lastStatusHash = files.map(f => `${f.status}:${f.path}:${f.totalChanges}:${f.staged}`).join('\n');
 
       this.view.webview.postMessage({
         type: 'status',

@@ -55,7 +55,7 @@
     return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#90a4ae"><path d="M3 2h7l3 3v9H3V2z" fill="#37474f" stroke="#78909c" stroke-width="1.2"/><path d="M10 2v3h3" fill="none" stroke="#78909c" stroke-width="1.2"/></svg>';
   }
 
-  // Parse diff into hunks with lines
+  // Parse diff into hunks with lines and change blocks
   function parseDiff(rawDiff, filePath) {
     if (!rawDiff || !rawDiff.trim()) return [];
     const lines = rawDiff.split('\n');
@@ -67,16 +67,23 @@
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (line.startsWith('@@')) {
+        let hunkOldStart = 1;
+        let hunkNewStart = 1;
         const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
         if (match) {
           oldLine = parseInt(match[1], 10);
           newLine = parseInt(match[2], 10);
+          hunkOldStart = oldLine;
+          hunkNewStart = newLine;
         }
         currentHunk = {
           header: line,
+          oldStart: hunkOldStart,
+          newStart: hunkNewStart,
           lines: [],
           rawLines: [line],
-          staged: true
+          staged: true,
+          blocks: []
         };
         hunks.push(currentHunk);
       } else if (currentHunk) {
@@ -111,6 +118,35 @@
         }
       }
     }
+
+    // Group contiguous changed lines into change blocks
+    hunks.forEach(hunk => {
+      let currentBlock = null;
+      hunk.lines.forEach((l, idx) => {
+        if (l.type === 'add' || l.type === 'del') {
+          if (!currentBlock) {
+            currentBlock = {
+              id: hunk.blocks.length,
+              startIndex: idx,
+              endIndex: idx,
+              lines: [l],
+              staged: true
+            };
+            hunk.blocks.push(currentBlock);
+          } else {
+            currentBlock.endIndex = idx;
+            currentBlock.lines.push(l);
+          }
+          l.block = currentBlock;
+          l.isBlockStart = (currentBlock.startIndex === idx);
+        } else {
+          currentBlock = null;
+          l.isBlockStart = false;
+          l.block = null;
+        }
+      });
+    });
+
     return hunks;
   }
 
@@ -495,8 +531,19 @@
 
       const hunkChk = hunkHeader.querySelector('.hunk-chk');
       hunkChk.addEventListener('change', () => {
+        const check = hunkChk.checked;
+        hunk.staged = check;
+        if (hunk.blocks) {
+          hunk.blocks.forEach(b => {
+            b.staged = check;
+            b.lines.forEach(bLine => { bLine.staged = check; });
+          });
+          diffContent.querySelectorAll(`.line-chk[data-hunk="${hIdx}"]`).forEach(c => {
+            c.checked = check;
+          });
+        }
         const patchContent = constructHunkPatch(selectedFile, hunk);
-        if (hunkChk.checked) {
+        if (check) {
           vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: false } });
         } else {
           vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: true } });
@@ -511,27 +558,40 @@
         lineRow.className = `diff-line diff-${l.type}`;
 
         const isChanged = l.type === 'add' || l.type === 'del';
+        const isBlockStart = l.isBlockStart;
+        const block = l.block;
+
         lineRow.innerHTML = `
           <div class="gutter">
             <span class="line-num old-num">${l.oldNum !== undefined ? l.oldNum : ''}</span>
             <span class="line-num new-num">${l.newNum !== undefined ? l.newNum : ''}</span>
-            ${isChanged ? `
-              <input type="checkbox" class="line-chk" title="Stage / Unstage line" checked data-hunk="${hIdx}" data-line="${lIdx}"/>
+            ${isBlockStart ? `
+              <input type="checkbox" class="line-chk" title="Stage / Unstage block" ${block && block.staged ? 'checked' : ''} data-hunk="${hIdx}" data-block="${block ? block.id : 0}"/>
             ` : '<span class="gutter-spacer"></span>'}
           </div>
           <div class="line-prefix">${l.type === 'add' ? '+' : l.type === 'del' ? '-' : ' '}</div>
           <div class="line-text">${escapeHtml(l.text)}</div>
         `;
 
-        if (isChanged) {
-          const lineChk = lineRow.querySelector('.line-chk');
-          lineChk.addEventListener('change', () => {
-            // Apply single line or partial hunk
-            const singleLinePatch = constructSingleLinePatch(selectedFile, hunk, l);
-            if (lineChk.checked) {
-              vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: singleLinePatch, reverse: false } });
+        if (isBlockStart && block) {
+          const blockChk = lineRow.querySelector('.line-chk');
+          blockChk.addEventListener('change', () => {
+            const check = blockChk.checked;
+            block.staged = check;
+            block.lines.forEach(bLine => { bLine.staged = check; });
+
+            if (hunk.blocks) {
+              const allBlocksStaged = hunk.blocks.every(b => b.staged);
+              const someBlocksStaged = hunk.blocks.some(b => b.staged);
+              hunkChk.checked = allBlocksStaged;
+              hunkChk.indeterminate = !allBlocksStaged && someBlocksStaged;
+            }
+
+            const patchContent = constructBlockPatch(selectedFile, hunk, block);
+            if (check) {
+              vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: false } });
             } else {
-              vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: singleLinePatch, reverse: true } });
+              vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: true } });
             }
           });
         }
@@ -562,17 +622,34 @@
     return patch;
   }
 
-  // Construct a single line patch
-  function constructSingleLinePatch(filePath, hunk, lineItem) {
+  // Construct a patch for a specific block of changes
+  function constructBlockPatch(filePath, hunk, block) {
+    if (!hunk.blocks || hunk.blocks.length <= 1) {
+      return constructHunkPatch(filePath, hunk);
+    }
     let patch = `--- a/${filePath}\n+++ b/${filePath}\n`;
-    patch += `${hunk.header}\n`;
+    let oldLen = 0;
+    let newLen = 0;
+    const patchBody = [];
+
     hunk.lines.forEach(l => {
-      if (l === lineItem) {
-        patch += `${l.raw}\n`;
+      if (l.block === block) {
+        patchBody.push(l.raw);
+        if (l.type === 'del') oldLen++;
+        if (l.type === 'add') newLen++;
       } else if (l.type === 'ctx') {
-        patch += `${l.raw}\n`;
+        patchBody.push(l.raw);
+        oldLen++;
+        newLen++;
+      } else if (l.type === 'del') {
+        patchBody.push(' ' + l.raw.slice(1));
+        oldLen++;
+        newLen++;
       }
     });
+
+    const header = `@@ -${hunk.oldStart},${oldLen} +${hunk.newStart},${newLen} @@`;
+    patch += header + '\n' + patchBody.join('\n') + '\n';
     return patch;
   }
 

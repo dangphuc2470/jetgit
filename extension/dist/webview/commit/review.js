@@ -1,6 +1,8 @@
 (function() {
   const vscode = acquireVsCodeApi();
 
+  const LINE_HEIGHT = 20; // 20px per line for pixel-perfect math
+
   let state = {
     filePath: '',
     fileName: '',
@@ -8,11 +10,11 @@
     diff: '',
     baseContent: '',
     currentContent: '',
+    baseLines: [],
+    currentLines: [],
     filesList: [],
     currentFileIndex: 0,
-    viewMode: 'side-by-side', // 'side-by-side' | 'unified'
     highlightWords: true,
-    rows: [],
     blocks: [],
     currentDiffIndex: 0
   };
@@ -67,9 +69,44 @@
     };
   }
 
-  // Parse git raw diff into hunks
-  function parseGitHunks(rawDiff) {
-    if (!rawDiff || !rawDiff.trim()) return [];
+  // Parse git raw diff into hunks and build continuous blocks
+  function parseBlocksFromDiff(rawDiff) {
+    state.baseLines = state.baseContent ? state.baseContent.split('\n') : [];
+    state.currentLines = state.currentContent ? state.currentContent.split('\n') : [];
+
+    if (!rawDiff || !rawDiff.trim()) {
+      if (state.baseLines.length === 0 && state.currentLines.length > 0) {
+        // Untracked new file
+        return [{
+          id: 0,
+          type: 'add',
+          leftStart: 1,
+          leftEnd: 1,
+          isLeftEmpty: true,
+          rightStart: 1,
+          rightEnd: state.currentLines.length,
+          isRightEmpty: false,
+          staged: true,
+          patchContent: ''
+        }];
+      } else if (state.currentLines.length === 0 && state.baseLines.length > 0) {
+        // Deleted file
+        return [{
+          id: 0,
+          type: 'del',
+          leftStart: 1,
+          leftEnd: state.baseLines.length,
+          isLeftEmpty: false,
+          rightStart: 1,
+          rightEnd: 1,
+          isRightEmpty: true,
+          staged: true,
+          patchContent: ''
+        }];
+      }
+      return [];
+    }
+
     const lines = rawDiff.split('\n');
     const hunks = [];
     let currentHunk = null;
@@ -97,220 +134,74 @@
         }
       }
     }
-    return hunks;
-  }
 
-  // Build full-file side-by-side aligned rows from baseContent, currentContent and hunks
-  function buildSideBySideModel() {
-    const baseLines = state.baseContent ? state.baseContent.split('\n') : [];
-    const currentLines = state.currentContent ? state.currentContent.split('\n') : [];
-    const hunks = parseGitHunks(state.diff);
-
-    const rows = [];
     const blocks = [];
-    let basePtr = 1;
-    let currentPtr = 1;
-
-    // Helper to add unchanged row
-    function addUnchangedRow(bNum, cNum, text) {
-      rows.push({
-        type: 'none',
-        leftNum: bNum,
-        leftText: escapeHtml(text),
-        rightNum: cNum,
-        rightText: escapeHtml(text),
-        isBlockStart: false,
-        block: null
-      });
-    }
-
-    if (hunks.length === 0) {
-      // Either untracked file, deleted file, or identical file
-      if (baseLines.length === 0 && currentLines.length > 0) {
-        // Purely untracked / new file
-        const block = { id: 0, type: 'add', startIndex: 0, lineCount: currentLines.length, staged: true };
-        blocks.push(block);
-        currentLines.forEach((line, idx) => {
-          rows.push({
-            type: 'add',
-            leftNum: '',
-            leftText: '',
-            rightNum: idx + 1,
-            rightText: escapeHtml(line),
-            isBlockStart: idx === 0,
-            block: block
-          });
-        });
-      } else if (currentLines.length === 0 && baseLines.length > 0) {
-        // Purely deleted file
-        const block = { id: 0, type: 'del', startIndex: 0, lineCount: baseLines.length, staged: true };
-        blocks.push(block);
-        baseLines.forEach((line, idx) => {
-          rows.push({
-            type: 'del',
-            leftNum: idx + 1,
-            leftText: escapeHtml(line),
-            rightNum: '',
-            rightText: '',
-            isBlockStart: idx === 0,
-            block: block
-          });
-        });
-      } else {
-        // Identical file
-        const maxLen = Math.max(baseLines.length, currentLines.length);
-        for (let i = 0; i < maxLen; i++) {
-          const bText = baseLines[i] !== undefined ? baseLines[i] : '';
-          const cText = currentLines[i] !== undefined ? currentLines[i] : '';
-          addUnchangedRow(i + 1, i + 1, bText || cText);
-        }
-      }
-      state.rows = rows;
-      state.blocks = blocks;
-      return;
-    }
-
-    // Process file against hunks
     hunks.forEach((hunk, hIdx) => {
-      // 1. Unchanged rows before this hunk
-      while (basePtr < hunk.oldStart && currentPtr < hunk.newStart && basePtr <= baseLines.length) {
-        const text = baseLines[basePtr - 1] !== undefined ? baseLines[basePtr - 1] : (currentLines[currentPtr - 1] || '');
-        addUnchangedRow(basePtr, currentPtr, text);
-        basePtr++;
-        currentPtr++;
-      }
-
-      // If one pointer fell behind due to start offsets
-      while (basePtr < hunk.oldStart && basePtr <= baseLines.length) {
-        addUnchangedRow(basePtr, '', baseLines[basePtr - 1]);
-        basePtr++;
-      }
-      while (currentPtr < hunk.newStart && currentPtr <= currentLines.length) {
-        addUnchangedRow('', currentPtr, currentLines[currentPtr - 1]);
-        currentPtr++;
-      }
-
-      // 2. Parse inside this hunk into chunks of context and changes
+      let bLine = hunk.oldStart;
+      let cLine = hunk.newStart;
       let dIdx = 0;
+
       while (dIdx < hunk.diffLines.length) {
-        const dLine = hunk.diffLines[dIdx];
-        if (dLine.startsWith(' ')) {
-          const text = dLine.slice(1);
-          addUnchangedRow(basePtr, currentPtr, text);
-          basePtr++;
-          currentPtr++;
+        const d = hunk.diffLines[dIdx];
+        if (d.startsWith(' ')) {
+          bLine++;
+          cLine++;
           dIdx++;
         } else {
-          // Changed block: sequence of '-' and '+'
-          const dels = [];
-          const adds = [];
-          const hunkRawLines = [hunk.header];
+          const startLeft = bLine;
+          const startRight = cLine;
+          let delCount = 0;
+          let addCount = 0;
+          const blockHunkLines = [hunk.header];
 
           while (dIdx < hunk.diffLines.length && (hunk.diffLines[dIdx].startsWith('-') || hunk.diffLines[dIdx].startsWith('+'))) {
             const cur = hunk.diffLines[dIdx];
-            hunkRawLines.push(cur);
+            blockHunkLines.push(cur);
             if (cur.startsWith('-')) {
-              dels.push({ text: cur.slice(1), lineNum: basePtr++ });
+              delCount++;
+              bLine++;
             } else if (cur.startsWith('+')) {
-              adds.push({ text: cur.slice(1), lineNum: currentPtr++ });
+              addCount++;
+              cLine++;
             }
             dIdx++;
           }
 
-          // Determine block type: 'mod' (blue), 'add' (green), 'del' (red)
           let blockType = 'mod';
-          if (dels.length > 0 && adds.length === 0) blockType = 'del';
-          else if (adds.length > 0 && dels.length === 0) blockType = 'add';
-          else blockType = 'mod'; // Modified: words/spaces/numbers changed
+          if (delCount > 0 && addCount === 0) blockType = 'del';
+          else if (addCount > 0 && delCount === 0) blockType = 'add';
+          else blockType = 'mod';
 
-          const block = {
+          // Unified patch for this hunk/block
+          let patch = `--- a/${state.filePath}\n+++ b/${state.filePath}\n${hunk.header}\n`;
+          hunk.rawLines.slice(1).forEach(l => { patch += l + '\n'; });
+
+          blocks.push({
             id: blocks.length,
             type: blockType,
-            startIndex: rows.length,
-            lineCount: Math.max(dels.length, adds.length),
+            leftStart: delCount > 0 ? startLeft : Math.max(1, startLeft - 1),
+            leftEnd: delCount > 0 ? (startLeft + delCount - 1) : Math.max(1, startLeft - 1),
+            isLeftEmpty: delCount === 0,
+            rightStart: addCount > 0 ? startRight : Math.max(1, startRight - 1),
+            rightEnd: addCount > 0 ? (startRight + addCount - 1) : Math.max(1, startRight - 1),
+            isRightEmpty: addCount === 0,
+            delCount,
+            addCount,
             staged: true,
-            hunkIndex: hIdx,
-            hunk: hunk,
-            patchContent: constructHunkPatch(state.filePath, hunk)
-          };
-          blocks.push(block);
-
-          const maxLines = Math.max(dels.length, adds.length);
-          for (let m = 0; m < maxLines; m++) {
-            const hasLeft = m < dels.length;
-            const hasRight = m < adds.length;
-            const isFirst = (m === 0);
-
-            if (hasLeft && hasRight) {
-              // Line modified: compute word diff (blue highlight)
-              const wDiff = computeWordDiff(dels[m].text, adds[m].text);
-              rows.push({
-                type: 'mod',
-                leftNum: dels[m].lineNum,
-                leftHtml: wDiff.leftHtml,
-                rightNum: adds[m].lineNum,
-                rightHtml: wDiff.rightHtml,
-                isBlockStart: isFirst,
-                block: block
-              });
-            } else if (hasLeft && !hasRight) {
-              // Deleted line (red highlight)
-              rows.push({
-                type: 'del',
-                leftNum: dels[m].lineNum,
-                leftHtml: `<span class="diff-word-del">${escapeHtml(dels[m].text)}</span>`,
-                rightNum: '',
-                rightHtml: '',
-                isBlockStart: isFirst,
-                block: block
-              });
-            } else if (!hasLeft && hasRight) {
-              // Added line (green highlight)
-              rows.push({
-                type: 'add',
-                leftNum: '',
-                leftHtml: '',
-                rightNum: adds[m].lineNum,
-                rightHtml: `<span class="diff-word-add">${escapeHtml(adds[m].text)}</span>`,
-                isBlockStart: isFirst,
-                block: block
-              });
-            }
-          }
+            patchContent: patch
+          });
         }
       }
     });
 
-    // 3. Trailing unchanged rows after all hunks
-    const maxRemaining = Math.max(baseLines.length - basePtr + 1, currentLines.length - currentPtr + 1);
-    for (let r = 0; r < maxRemaining; r++) {
-      const bNum = basePtr <= baseLines.length ? basePtr : '';
-      const cNum = currentPtr <= currentLines.length ? currentPtr : '';
-      const text = (bNum && baseLines[basePtr - 1] !== undefined) ? baseLines[basePtr - 1] : (currentLines[currentPtr - 1] || '');
-      addUnchangedRow(bNum, cNum, text);
-      if (bNum) basePtr++;
-      if (cNum) currentPtr++;
-    }
-
-    state.rows = rows;
-    state.blocks = blocks;
-  }
-
-  // Construct a standard unified patch for a hunk
-  function constructHunkPatch(filePath, hunk) {
-    let patch = `--- a/${filePath}\n+++ b/${filePath}\n`;
-    patch += hunk.header + '\n';
-    hunk.rawLines.slice(1).forEach(l => {
-      patch += l + '\n';
-    });
-    return patch;
+    return blocks;
   }
 
   // Render the whole review interface
   function render() {
     app.innerHTML = '';
 
-    buildSideBySideModel();
+    state.blocks = parseBlocksFromDiff(state.diff);
 
     const root = document.createElement('div');
     root.className = 'studio-diff-container';
@@ -326,7 +217,8 @@
     toolbar.innerHTML = `
       <div class="toolbar-left-group">
         <div class="dropdown-pill">
-          <span class="pill-text">${state.viewMode === 'side-by-side' ? 'Side-by-side viewer' : 'Unified viewer'}</span>
+          <span class="pill-icon">≡</span>
+          <span class="pill-text">Side-by-side viewer</span>
           <span class="pill-arrow">▾</span>
         </div>
         <div class="dropdown-pill" id="pill-highlight-words">
@@ -346,7 +238,7 @@
           <button class="arrow-btn" id="btn-next-diff" title="Next Difference (Shift+F7)">▼</button>
         </div>
         <div class="toolbar-divider"></div>
-        <label class="current-version-label" title="Stage all changes in this file">
+        <label class="current-version-label" title="Stage / Unstage entire file">
           <input type="checkbox" id="chk-master-version" checked/>
           <span>Current version</span>
         </label>
@@ -373,92 +265,188 @@
     `;
     root.appendChild(colHeader);
 
-    // 3. Diff Viewport (Side-by-side synchronized editor)
+    // 3. Diff Viewport (Left editor, Middle gutter with SVG ribbons, Right editor)
     const viewportWrapper = document.createElement('div');
     viewportWrapper.className = 'studio-diff-viewport-wrapper';
 
-    const scrollPane = document.createElement('div');
-    scrollPane.className = 'studio-diff-scroll';
+    // Left Editor Scroll Container
+    const leftPane = document.createElement('div');
+    leftPane.className = 'editor-pane left-pane';
 
-    // Editor Table with Left text, Middle gutter, Right text
-    const table = document.createElement('div');
-    table.className = 'studio-diff-table';
+    // Right Editor Scroll Container
+    const rightPane = document.createElement('div');
+    rightPane.className = 'editor-pane right-pane';
 
-    state.rows.forEach((row, rIdx) => {
-      const rowEl = document.createElement('div');
-      const rowType = row.type; // 'none', 'mod', 'add', 'del'
-      rowEl.className = `studio-diff-row row-${rowType}`;
-      rowEl.setAttribute('data-row-idx', rIdx);
-
-      const block = row.block;
-      const isStart = row.isBlockStart;
-
-      // Left pane cell
-      const leftCell = document.createElement('div');
-      leftCell.className = `diff-cell left-cell cell-${rowType}`;
-      if (rowType === 'add') {
-        leftCell.classList.add('cell-filler');
-      } else {
-        leftCell.innerHTML = `<span class="code-line">${row.leftHtml !== undefined ? row.leftHtml : (row.leftText || '&nbsp;')}</span>`;
+    // Build line maps for quick lookup of which block each line belongs to
+    const leftLineMap = {};
+    const rightLineMap = {};
+    state.blocks.forEach(b => {
+      if (!b.isLeftEmpty) {
+        for (let l = b.leftStart; l <= b.leftEnd; l++) {
+          leftLineMap[l] = b;
+        }
       }
-
-      // Middle gutter cell (line numbers + checkbox + connector)
-      const gutterCell = document.createElement('div');
-      gutterCell.className = 'diff-gutter-cell';
-
-      const leftNumSpan = `<span class="gutter-num left-num">${row.leftNum || ''}</span>`;
-      const rightNumSpan = `<span class="gutter-num right-num">${row.rightNum || ''}</span>`;
-
-      let actionHtml = '<span class="gutter-spacer"></span>';
-      if (isStart && block) {
-        actionHtml = `
-          <div class="gutter-action-box">
-            <input type="checkbox" class="block-chk" data-block-id="${block.id}" title="Stage / Unstage change block" ${block.staged ? 'checked' : ''}/>
-            <button class="gutter-revert-btn" data-block-id="${block.id}" title="Revert block">↶</button>
-          </div>
-        `;
+      if (!b.isRightEmpty) {
+        for (let r = b.rightStart; r <= b.rightEnd; r++) {
+          rightLineMap[r] = b;
+        }
       }
-
-      gutterCell.innerHTML = `
-        ${leftNumSpan}
-        <div class="gutter-center-col">${actionHtml}</div>
-        ${rightNumSpan}
-      `;
-
-      // Right pane cell
-      const rightCell = document.createElement('div');
-      rightCell.className = `diff-cell right-cell cell-${rowType}`;
-      if (rowType === 'del') {
-        rightCell.classList.add('cell-filler');
-      } else {
-        rightCell.innerHTML = `<span class="code-line">${row.rightHtml !== undefined ? row.rightHtml : (row.rightText || '&nbsp;')}</span>`;
-      }
-
-      rowEl.appendChild(leftCell);
-      rowEl.appendChild(gutterCell);
-      rowEl.appendChild(rightCell);
-      table.appendChild(rowEl);
     });
 
-    scrollPane.appendChild(table);
-    viewportWrapper.appendChild(scrollPane);
+    // Render Left Lines (Pure original code, NO dummy filler rows!)
+    let leftHtml = '';
+    state.baseLines.forEach((line, idx) => {
+      const lineNum = idx + 1;
+      const b = leftLineMap[lineNum];
+      let rowClass = 'editor-line';
+      let contentHtml = escapeHtml(line);
+
+      if (b) {
+        if (b.type === 'del') {
+          rowClass += ' line-del';
+          contentHtml = `<span class="diff-word-del">${contentHtml}</span>`;
+        } else if (b.type === 'mod') {
+          rowClass += ' line-mod';
+          // Compute word diff against matching line in right block
+          const rOffset = lineNum - b.leftStart;
+          const matchingRightLineNum = b.rightStart + rOffset;
+          const rightText = (matchingRightLineNum <= b.rightEnd && state.currentLines[matchingRightLineNum - 1] !== undefined)
+            ? state.currentLines[matchingRightLineNum - 1]
+            : '';
+          const wDiff = computeWordDiff(line, rightText);
+          contentHtml = wDiff.leftHtml;
+        }
+      }
+
+      leftHtml += `
+        <div class="${rowClass}" data-line="${lineNum}">
+          <span class="gutter-num">${lineNum}</span>
+          <span class="line-content">${contentHtml || '&nbsp;'}</span>
+        </div>
+      `;
+    });
+    leftPane.innerHTML = `<div class="editor-lines-container">${leftHtml}</div>`;
+
+    // Render Right Lines (Pure modified code, NO dummy filler rows!)
+    let rightHtml = '';
+    state.currentLines.forEach((line, idx) => {
+      const lineNum = idx + 1;
+      const b = rightLineMap[lineNum];
+      let rowClass = 'editor-line';
+      let contentHtml = escapeHtml(line);
+
+      if (b) {
+        if (b.type === 'add') {
+          rowClass += ' line-add';
+          contentHtml = `<span class="diff-word-add">${contentHtml}</span>`;
+        } else if (b.type === 'mod') {
+          rowClass += ' line-mod';
+          // Compute word diff against matching line in left block
+          const lOffset = lineNum - b.rightStart;
+          const matchingLeftLineNum = b.leftStart + lOffset;
+          const leftText = (matchingLeftLineNum <= b.leftEnd && state.baseLines[matchingLeftLineNum - 1] !== undefined)
+            ? state.baseLines[matchingLeftLineNum - 1]
+            : '';
+          const wDiff = computeWordDiff(leftText, line);
+          contentHtml = wDiff.rightHtml;
+        }
+      }
+
+      rightHtml += `
+        <div class="${rowClass}" data-line="${lineNum}">
+          <span class="gutter-num">${lineNum}</span>
+          <span class="line-content">${contentHtml || '&nbsp;'}</span>
+        </div>
+      `;
+    });
+    rightPane.innerHTML = `<div class="editor-lines-container">${rightHtml}</div>`;
+
+    // Middle Gutter with SVG curved connectors
+    const middleGutter = document.createElement('div');
+    middleGutter.className = 'middle-gutter';
+
+    const maxLines = Math.max(state.baseLines.length, state.currentLines.length, 1);
+    const gutterTotalHeight = maxLines * LINE_HEIGHT;
+
+    // SVG ribbon layer
+    const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgEl.setAttribute('class', 'gutter-ribbon-svg');
+    svgEl.setAttribute('width', '54');
+    svgEl.setAttribute('height', `${gutterTotalHeight}`);
+    svgEl.style.height = `${gutterTotalHeight}px`;
+
+    const W = 54;
+    let pathsHtml = '';
+    let controlsHtml = '';
+
+    state.blocks.forEach(b => {
+      let y1, y2, y3, y4;
+
+      if (b.isLeftEmpty) {
+        // Pure addition: starts as a point on the left
+        y1 = (b.leftStart - 1) * LINE_HEIGHT + (LINE_HEIGHT / 2);
+        y2 = y1;
+      } else {
+        y1 = (b.leftStart - 1) * LINE_HEIGHT;
+        y2 = b.leftEnd * LINE_HEIGHT;
+      }
+
+      if (b.isRightEmpty) {
+        // Pure deletion: ends as a point on the right
+        y3 = (b.rightStart - 1) * LINE_HEIGHT + (LINE_HEIGHT / 2);
+        y4 = y3;
+      } else {
+        y3 = (b.rightStart - 1) * LINE_HEIGHT;
+        y4 = b.rightEnd * LINE_HEIGHT;
+      }
+
+      // Smooth cubic bezier curved ribbon
+      const d = `M 0,${y1} C ${W * 0.45},${y1} ${W * 0.55},${y3} ${W},${y3} L ${W},${y4} C ${W * 0.55},${y4} ${W * 0.45},${y2} 0,${y2} Z`;
+      const fillClass = `ribbon-${b.type}`;
+
+      pathsHtml += `<path d="${d}" class="diff-ribbon ${fillClass}" data-block-id="${b.id}"/>`;
+
+      // Checkbox placed at the middle of the ribbon
+      const checkY = Math.min(y1, y3) + 2;
+      controlsHtml += `
+        <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">
+          <input type="checkbox" class="block-chk" title="Stage / Unstage block" ${b.staged ? 'checked' : ''} data-block-id="${b.id}"/>
+        </div>
+      `;
+    });
+
+    svgEl.innerHTML = pathsHtml;
+    middleGutter.appendChild(svgEl);
+
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'gutter-controls-layer';
+    controlsContainer.style.height = `${gutterTotalHeight}px`;
+    controlsContainer.innerHTML = controlsHtml;
+    middleGutter.appendChild(controlsContainer);
+
+    viewportWrapper.appendChild(leftPane);
+    viewportWrapper.appendChild(middleGutter);
+    viewportWrapper.appendChild(rightPane);
 
     // 4. Far Right Overview Ruler (Diff Minimap)
     const overviewRuler = document.createElement('div');
     overviewRuler.className = 'studio-overview-ruler';
-    const totalRowCount = Math.max(state.rows.length, 1);
+    const totalLines = Math.max(state.currentLines.length, state.baseLines.length, 1);
 
     state.blocks.forEach(b => {
-      const topPct = (b.startIndex / totalRowCount) * 100;
-      const heightPct = Math.max((b.lineCount / totalRowCount) * 100, 1.2);
+      const lineStart = b.isRightEmpty ? b.leftStart : b.rightStart;
+      const lineCount = b.isRightEmpty ? (b.leftEnd - b.leftStart + 1) : (b.rightEnd - b.rightStart + 1);
+      const topPct = (lineStart / totalLines) * 100;
+      const heightPct = Math.max((lineCount / totalLines) * 100, 1.2);
+
       const stripe = document.createElement('div');
       stripe.className = `ruler-stripe stripe-${b.type}`;
       stripe.style.top = `${topPct}%`;
       stripe.style.height = `${heightPct}%`;
-      stripe.setAttribute('title', `${b.type.toUpperCase()}: Line ${b.startIndex + 1}`);
+      stripe.setAttribute('title', `${b.type.toUpperCase()}: Line ${lineStart}`);
 
       stripe.addEventListener('click', () => {
-        scrollToRow(b.startIndex);
+        scrollToLine(lineStart);
       });
       overviewRuler.appendChild(stripe);
     });
@@ -468,22 +456,51 @@
 
     app.appendChild(root);
 
-    // Attach all event listeners
+    // Synchronize scrolling between leftPane, middleGutter, and rightPane
+    setupSynchronizedScrolling(leftPane, rightPane, middleGutter);
+
+    // Attach toolbar & block events
     attachToolbarEvents(toolbar);
-    attachGutterEvents(table);
+    attachBlockEvents(controlsContainer);
   }
 
-  // Scroll to a specific row index smoothly
-  function scrollToRow(rowIdx) {
-    const scrollPane = document.querySelector('.studio-diff-scroll');
-    const targetRow = document.querySelector(`.studio-diff-row[data-row-idx="${rowIdx}"]`);
-    if (scrollPane && targetRow) {
-      const top = targetRow.offsetTop - 60;
-      scrollPane.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  // Smooth synchronized scrolling across Left Pane, Middle Gutter, and Right Pane
+  function setupSynchronizedScrolling(leftPane, rightPane, middleGutter) {
+    let activeScroll = null;
+
+    function onScroll(source, targets) {
+      if (activeScroll && activeScroll !== source) return;
+      activeScroll = source;
+
+      const top = source.scrollTop;
+      targets.forEach(t => {
+        t.scrollTop = top;
+      });
+
+      requestAnimationFrame(() => {
+        activeScroll = null;
+      });
+    }
+
+    leftPane.addEventListener('scroll', () => onScroll(leftPane, [rightPane, middleGutter]), { passive: true });
+    rightPane.addEventListener('scroll', () => onScroll(rightPane, [leftPane, middleGutter]), { passive: true });
+  }
+
+  // Scroll to a specific line in both panes
+  function scrollToLine(lineNum) {
+    const leftPane = document.querySelector('.editor-pane.left-pane');
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    const middleGutter = document.querySelector('.middle-gutter');
+    const targetTop = Math.max(0, (lineNum - 1) * LINE_HEIGHT - 60);
+
+    if (leftPane && rightPane && middleGutter) {
+      leftPane.scrollTo({ top: targetTop, behavior: 'smooth' });
+      rightPane.scrollTo({ top: targetTop, behavior: 'smooth' });
+      middleGutter.scrollTo({ top: targetTop, behavior: 'smooth' });
     }
   }
 
-  // Jump between difference blocks
+  // Jump to diff block
   function jumpDiff(direction) {
     if (state.blocks.length === 0) return;
     state.currentDiffIndex += direction;
@@ -492,9 +509,10 @@
     } else if (state.currentDiffIndex >= state.blocks.length) {
       state.currentDiffIndex = 0;
     }
-    const targetBlock = state.blocks[state.currentDiffIndex];
-    if (targetBlock) {
-      scrollToRow(targetBlock.startIndex);
+    const b = state.blocks[state.currentDiffIndex];
+    if (b) {
+      const targetLine = b.isRightEmpty ? b.leftStart : b.rightStart;
+      scrollToLine(targetLine);
     }
   }
 
@@ -559,9 +577,9 @@
     }
   }
 
-  // Attach gutter block actions (stage hunk, rollback hunk)
-  function attachGutterEvents(table) {
-    table.querySelectorAll('.block-chk').forEach(chk => {
+  // Attach gutter block checkboxes
+  function attachBlockEvents(controlsContainer) {
+    controlsContainer.querySelectorAll('.block-chk').forEach(chk => {
       chk.addEventListener('change', (e) => {
         e.stopPropagation();
         const blockId = parseInt(chk.getAttribute('data-block-id'), 10);
@@ -570,25 +588,10 @@
         const check = chk.checked;
         block.staged = check;
 
-        // Apply hunk patch selectively
         if (block.patchContent) {
           vscode.postMessage({
             type: 'applyHunkPatch',
             payload: { patch: block.patchContent, reverse: !check }
-          });
-        }
-      });
-    });
-
-    table.querySelectorAll('.gutter-revert-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const blockId = parseInt(btn.getAttribute('data-block-id'), 10);
-        const block = state.blocks.find(b => b.id === blockId);
-        if (block && block.patchContent) {
-          vscode.postMessage({
-            type: 'rollbackHunk',
-            payload: { patch: block.patchContent }
           });
         }
       });

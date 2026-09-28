@@ -1007,9 +1007,9 @@ body, html {
 }
 
 .col-header-gutter {
-  width: 76px;
-  min-width: 76px;
-  max-width: 76px;
+  width: 54px;
+  min-width: 54px;
+  max-width: 54px;
   background: #1e1f22;
   border-left: 1px solid #2b2d30;
   border-right: 1px solid #2b2d30;
@@ -1020,84 +1020,109 @@ body, html {
   display: flex;
   position: relative;
   overflow: hidden;
-}
-
-.studio-diff-scroll {
-  flex: 1;
-  overflow: auto;
-  font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Menlo, Consolas, monospace;
-  font-size: 12px;
-  line-height: 20px;
   background: #1e1f22;
 }
 
-.studio-diff-table {
+/* Continuous Side-by-side Editor Panes */
+.editor-pane {
+  flex: 1;
+  overflow: auto;
+  background: #1e1f22;
+}
+
+.editor-lines-container {
   display: flex;
   flex-direction: column;
   min-width: 100%;
 }
 
-.studio-diff-row {
-  display: flex;
-  min-height: 20px;
+.editor-line {
   height: 20px;
+  min-height: 20px;
+  line-height: 20px;
+  display: flex;
+  align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #bcbec4;
+  white-space: pre;
 }
 
-.diff-cell {
+.editor-line .gutter-num {
+  width: 44px;
+  min-width: 44px;
+  text-align: right;
+  padding-right: 12px;
+  color: #5a5d63;
+  user-select: none;
+  font-size: 11px;
+}
+
+.editor-line .line-content {
   flex: 1;
-  padding: 0 12px;
+  padding-left: 6px;
   white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
+}
+
+/* Middle Gutter with Curved SVG Ribbons */
+.middle-gutter {
+  width: 54px;
+  min-width: 54px;
+  max-width: 54px;
+  overflow: hidden;
+  position: relative;
   background: #1e1f22;
-}
-
-.code-line {
-  white-space: pre;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Filler row for empty lines when opposite side is added/deleted */
-.cell-filler {
-  background: #17181a repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255, 255, 255, 0.015) 5px, rgba(255, 255, 255, 0.015) 10px) !important;
-}
-
-/* Middle gutter with line numbers and stage checkbox */
-.diff-gutter-cell {
-  width: 76px;
-  min-width: 76px;
-  max-width: 76px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #191a1c;
   border-left: 1px solid #2b2d30;
   border-right: 1px solid #2b2d30;
   user-select: none;
-  padding: 0 4px;
 }
 
-.gutter-num {
-  font-size: 11px;
-  color: #5e626a;
-  min-width: 24px;
-  text-align: right;
+.gutter-ribbon-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
 }
 
-.gutter-center-col {
-  flex: 1;
+.diff-ribbon {
+  stroke-width: 1px;
+  transition: opacity 0.1s;
+}
+
+.ribbon-mod {
+  fill: rgba(28, 85, 115, 0.35);
+  stroke: #266e8c;
+}
+
+.ribbon-add {
+  fill: rgba(35, 95, 55, 0.35);
+  stroke: #3a8c54;
+}
+
+.ribbon-del {
+  fill: rgba(110, 40, 50, 0.35);
+  stroke: #9c3842;
+}
+
+.gutter-controls-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.gutter-block-control {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.gutter-action-box {
-  display: flex;
-  align-items: center;
-  gap: 3px;
 }
 
 .block-chk {
@@ -1107,35 +1132,16 @@ body, html {
   accent-color: #3574f0;
 }
 
-.gutter-revert-btn {
-  background: none;
-  border: none;
-  color: #7f848e;
-  cursor: pointer;
-  font-size: 11px;
-  padding: 0;
-  line-height: 1;
-}
-
-.gutter-revert-btn:hover {
-  color: #3574f0;
-}
-
 /* ==========================================================================
-   Android Studio JetBrains Exact Diff Colors:
-   - Modified (Blue / Cyan / Teal): #16323f line, #246580 word
-   - Added (Green): #1b3827 line, #2f7847 word
-   - Deleted (Red): #3d2024 line, #6e2830 word
+   Android Studio Exact Color Palette:
+   - Modified (Blue / Cyan / Teal): #173542 line, #245e75 word
+   - Added (Green): #1d3c2a line, #2c6e43 word
+   - Deleted (Red): #3e2226 line, #6e2830 word
    ========================================================================== */
 
 /* 1. MODIFIED LINES (Xanh dương / Cyan / Teal) */
-.row-mod .diff-cell.cell-mod {
+.line-mod {
   background: #173542 !important;
-}
-
-.row-mod .diff-gutter-cell {
-  background: #1b323d !important;
-  border-color: #244957 !important;
 }
 
 .diff-word-mod-left {
@@ -1153,13 +1159,8 @@ body, html {
 }
 
 /* 2. ADDED LINES (Xanh lá / Green) */
-.row-add .diff-cell.right-cell.cell-add {
+.line-add {
   background: #1d3c2a !important;
-}
-
-.row-add .diff-gutter-cell {
-  background: #182e21 !important;
-  border-color: #244b33 !important;
 }
 
 .diff-word-add {
@@ -1170,13 +1171,8 @@ body, html {
 }
 
 /* 3. DELETED LINES (Đỏ / Red) */
-.row-del .diff-cell.left-cell.cell-del {
+.line-del {
   background: #3e2226 !important;
-}
-
-.row-del .diff-gutter-cell {
-  background: #2f1c1f !important;
-  border-color: #4b282d !important;
 }
 
 .diff-word-del {

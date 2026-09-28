@@ -619,6 +619,14 @@
 
     diffContainer.appendChild(diffContent);
 
+    // Auto-scroll to first diff line
+    requestAnimationFrame(() => {
+      const firstDiff = diffContent.querySelector('.diff-line.diff-add, .diff-line.diff-del');
+      if (firstDiff) {
+        firstDiff.scrollIntoView({ block: 'center' });
+      }
+    });
+
     // Header actions
     const btnOpenCenter = diffHeader.querySelector('#btn-open-center');
     if (btnOpenCenter) {

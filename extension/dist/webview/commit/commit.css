@@ -1115,7 +1115,11 @@ body, html {
 .diff-ribbon {
   stroke-width: 0 !important;
   stroke: none !important;
-  transition: opacity 0.1s;
+  transition: opacity 0.1s, filter 0.2s;
+}
+
+.diff-ribbon-active {
+  filter: brightness(1.5) drop-shadow(0 0 6px rgba(53, 116, 240, 0.8));
 }
 
 .ribbon-mod {

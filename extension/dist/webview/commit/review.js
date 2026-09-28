@@ -803,38 +803,93 @@
       isSyncing = false;
     }, { passive: true });
 
-    // Initial draw
-    requestAnimationFrame(updateRibbons);
+    // Initial draw and auto jump to first change
+    requestAnimationFrame(() => {
+      updateRibbons();
+      if (state.blocks && state.blocks.length > 0) {
+        jumpToBlock(0);
+      }
+    });
 
     // Attach toolbar events
     attachToolbarEvents(toolbar);
   }
 
-  // Scroll to a specific line in both panes
-  function scrollToLine(lineNum) {
-    const leftPane = document.querySelector('.editor-pane.left-pane');
-    const rightPane = document.querySelector('.editor-pane.right-pane');
-    const targetRight = Math.max(0, (lineNum - 1) * LINE_HEIGHT - 60);
-
-    if (leftPane && rightPane) {
-      rightPane.scrollTo({ top: targetRight, behavior: 'smooth' });
-      leftPane.scrollTo({ top: mapRightToLeft(targetRight), behavior: 'smooth' });
+  function highlightActiveBlock(blockId) {
+    const svgEl = document.querySelector('#diff-svg');
+    if (!svgEl) return;
+    const ribbon = svgEl.querySelector(`[data-block-id="${blockId}"]`);
+    if (ribbon) {
+      ribbon.classList.add('diff-ribbon-active');
+      setTimeout(() => {
+        ribbon.classList.remove('diff-ribbon-active');
+      }, 700);
     }
   }
 
-  // Jump to diff block
-  function jumpDiff(direction) {
-    if (state.blocks.length === 0) return;
-    state.currentDiffIndex += direction;
-    if (state.currentDiffIndex < 0) {
-      state.currentDiffIndex = state.blocks.length - 1;
-    } else if (state.currentDiffIndex >= state.blocks.length) {
-      state.currentDiffIndex = 0;
+  // Jump to a specific diff block instantly
+  function jumpToBlock(index) {
+    if (!state.blocks || state.blocks.length === 0) return;
+    if (index < 0) index = state.blocks.length - 1;
+    if (index >= state.blocks.length) index = 0;
+    state.currentDiffIndex = index;
+
+    const b = state.blocks[index];
+    if (!b) return;
+
+    const leftPane = document.querySelector('.editor-pane.left-pane');
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    if (!leftPane || !rightPane) return;
+
+    let targetLeft = 0;
+    let targetRight = 0;
+
+    if (b.isRightEmpty) {
+      targetLeft = Math.max(0, (b.leftStart - 1) * LINE_HEIGHT - 60);
+      targetRight = mapLeftToRight(targetLeft);
+    } else {
+      targetRight = Math.max(0, (b.rightStart - 1) * LINE_HEIGHT - 60);
+      targetLeft = mapRightToLeft(targetRight);
     }
-    const b = state.blocks[state.currentDiffIndex];
-    if (b) {
-      const targetLine = b.isRightEmpty ? b.leftStart : b.rightStart;
-      scrollToLine(targetLine);
+
+    isSyncing = true;
+    rightPane.scrollTop = targetRight;
+    leftPane.scrollTop = targetLeft;
+    updateRibbons();
+    isSyncing = false;
+
+    highlightActiveBlock(b.id);
+  }
+
+  // Jump to diff block relative to current scroll position (F7 / Shift+F7)
+  function jumpDiff(direction) {
+    if (!state.blocks || state.blocks.length === 0) return;
+
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    const currentScroll = rightPane ? rightPane.scrollTop : 0;
+
+    const getBlockY = (b) => {
+      return b.isRightEmpty ? mapLeftToRight((b.leftStart - 1) * LINE_HEIGHT) : (b.rightStart - 1) * LINE_HEIGHT;
+    };
+
+    if (direction > 0) {
+      let targetIdx = state.blocks.findIndex(b => getBlockY(b) > currentScroll + 70);
+      if (targetIdx === -1) {
+        targetIdx = 0;
+      }
+      jumpToBlock(targetIdx);
+    } else {
+      let targetIdx = -1;
+      for (let i = state.blocks.length - 1; i >= 0; i--) {
+        if (getBlockY(state.blocks[i]) < currentScroll + 50) {
+          targetIdx = i;
+          break;
+        }
+      }
+      if (targetIdx === -1) {
+        targetIdx = state.blocks.length - 1;
+      }
+      jumpToBlock(targetIdx);
     }
   }
 

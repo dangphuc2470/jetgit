@@ -869,6 +869,31 @@
         render();
         break;
       }
+      case 'themeTokens': {
+        const tokens = msg.payload;
+        if (!tokens) break;
+        let styleEl = document.getElementById('dynamic-syntax-tokens');
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          styleEl.id = 'dynamic-syntax-tokens';
+          document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = `
+          :root {
+            --syn-kwd: ${tokens.kwd} !important;
+            --syn-type: ${tokens.type} !important;
+            --syn-fn: ${tokens.fn} !important;
+            --syn-str: ${tokens.str} !important;
+            --syn-num: ${tokens.num} !important;
+            --syn-const: ${tokens.constVal} !important;
+            --syn-var: ${tokens.varVal} !important;
+            --syn-comment: ${tokens.comment} !important;
+            --syn-anno: ${tokens.anno || tokens.type} !important;
+            --syn-punct: ${tokens.punct || '#948a8b'} !important;
+          }
+        `;
+        break;
+      }
     }
   });
 

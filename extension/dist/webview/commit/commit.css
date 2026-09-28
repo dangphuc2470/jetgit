@@ -1229,47 +1229,47 @@ body, html {
 }
 
 /* ==========================================================================
-   Code Syntax Highlighting (Monokai Pro - Filter Ristretto Theme Colors)
+   Code Syntax Highlighting (Dynamic Theme Colors via CSS Variables)
    ========================================================================== */
 .syn-kwd {
-  color: #fd6883 !important; /* Keywords (static, void, return, try, final...): coral red/pink */
+  color: var(--syn-kwd, #fd6883) !important;
 }
 
 .syn-type {
-  color: #85dacc !important; /* Types & Classes (String, GlobalConnection, Widget...): mint/cyan */
+  color: var(--syn-type, #85dacc) !important;
 }
 
 .syn-fn {
-  color: #adda78 !important; /* Methods & Functions: soft lime green */
+  color: var(--syn-fn, #adda78) !important;
 }
 
 .syn-str {
-  color: #f9cc6c !important; /* Strings: warm yellow */
+  color: var(--syn-str, #f9cc6c) !important;
 }
 
 .syn-num {
-  color: #a8a9eb !important; /* Numbers: lavender/purple */
+  color: var(--syn-num, #a8a9eb) !important;
 }
 
 .syn-const {
-  color: #a8a9eb !important; /* Booleans & null (true, false, null): lavender/purple */
+  color: var(--syn-const, #a8a9eb) !important;
 }
 
 .syn-var {
-  color: #fff1f3 !important; /* Variables & identifiers: warm white */
+  color: var(--syn-var, #fff1f3) !important;
 }
 
 .syn-comment {
-  color: #72696a !important; /* Comments (//, /*): muted brownish gray */
+  color: var(--syn-comment, #72696a) !important;
   font-style: italic;
 }
 
 .syn-anno {
-  color: #85dacc !important; /* Annotations (@override): mint/cyan */
+  color: var(--syn-anno, #85dacc) !important;
 }
 
 .syn-punct {
-  color: #948a8b !important; /* Operators & punctuation: slate gray */
+  color: var(--syn-punct, #948a8b) !important;
 }
 
 /* Far Right Overview Ruler (Diff Minimap) */

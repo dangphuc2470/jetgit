@@ -122,6 +122,71 @@
   }
 
   // Parse git raw diff into hunks, blocks and anchored scroll segments
+  function isBlockStaged(block, stagedDiff, baseLines, currentLines) {
+    if (!stagedDiff || !stagedDiff.trim()) return false;
+    if (block.type === 'add' || block.type === 'mod') {
+      for (let i = 0; i < (block.addCount || 0); i++) {
+        const line = currentLines[(block.rightStart - 1) + i];
+        if (line !== undefined && stagedDiff.includes('+' + line)) {
+          return true;
+        }
+      }
+    }
+    if (block.type === 'del' || block.type === 'mod') {
+      for (let i = 0; i < (block.delCount || 0); i++) {
+        const line = baseLines[(block.leftStart - 1) + i];
+        if (line !== undefined && stagedDiff.includes('-' + line)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function buildStagedContent(baseContent, currentContent, blocks) {
+    const baseLines = (baseContent || '').split('\n');
+    const currentLines = (currentContent || '').split('\n');
+    const result = [];
+    let curBaseLine = 1;
+
+    const sorted = [...blocks].sort((a, b) => a.leftStart - b.leftStart);
+
+    for (const b of sorted) {
+      while (curBaseLine < b.leftStart && curBaseLine <= baseLines.length) {
+        result.push(baseLines[curBaseLine - 1]);
+        curBaseLine++;
+      }
+
+      if (b.staged) {
+        if (b.addCount > 0) {
+          for (let i = 0; i < b.addCount; i++) {
+            const cIdx = (b.rightStart - 1) + i;
+            if (cIdx >= 0 && cIdx < currentLines.length) {
+              result.push(currentLines[cIdx]);
+            }
+          }
+        }
+        curBaseLine += (b.delCount || 0);
+      } else {
+        if (b.delCount > 0) {
+          for (let i = 0; i < b.delCount; i++) {
+            if (curBaseLine <= baseLines.length) {
+              result.push(baseLines[curBaseLine - 1]);
+              curBaseLine++;
+            }
+          }
+        }
+      }
+    }
+
+    while (curBaseLine <= baseLines.length) {
+      result.push(baseLines[curBaseLine - 1]);
+      curBaseLine++;
+    }
+
+    return result.join('\n');
+  }
+
   function parseDiffData(rawDiff) {
     state.baseLines = state.baseContent ? state.baseContent.split('\n') : [];
     state.currentLines = state.currentContent ? state.currentContent.split('\n') : [];
@@ -140,7 +205,7 @@
           rightStart: 1,
           rightEnd: R_total,
           isRightEmpty: false,
-          staged: true,
+          staged: false,
           patchContent: ''
         }];
         state.segments = [{
@@ -160,7 +225,7 @@
           rightStart: 1,
           rightEnd: 1,
           isRightEmpty: true,
-          staged: true,
+          staged: false,
           patchContent: ''
         }];
         state.segments = [{
@@ -249,7 +314,7 @@
           let patch = `--- a/${state.filePath}\n+++ b/${state.filePath}\n${hunk.header}\n`;
           hunk.rawLines.slice(1).forEach(l => { patch += l + '\n'; });
 
-          blocks.push({
+          const bObj = {
             id: blocks.length,
             type: blockType,
             leftStart: startLeft,
@@ -260,9 +325,11 @@
             isRightEmpty: addCount === 0,
             delCount,
             addCount,
-            staged: true,
+            staged: false,
             patchContent: patch
-          });
+          };
+          bObj.staged = isBlockStaged(bObj, state.stagedDiff, state.baseLines, state.currentLines);
+          blocks.push(bObj);
         }
       }
     });
@@ -694,12 +761,25 @@
           const check = chk.checked;
           block.staged = check;
 
-          if (block.patchContent) {
-            vscode.postMessage({
-              type: 'applyHunkPatch',
-              payload: { patch: block.patchContent, reverse: !check }
-            });
+          const stagedCount = state.blocks.filter(b => b.staged).length;
+          const totalCount = state.blocks.length;
+          const stagedContent = buildStagedContent(state.baseContent, state.currentContent, state.blocks);
+
+          const masterChk = document.querySelector('#chk-master-version');
+          if (masterChk) {
+            masterChk.checked = stagedCount === totalCount && totalCount > 0;
+            masterChk.indeterminate = stagedCount > 0 && stagedCount < totalCount;
           }
+
+          vscode.postMessage({
+            type: 'updateBlockStage',
+            payload: {
+              filePath: state.filePath,
+              stagedContent,
+              stagedCount,
+              totalCount
+            }
+          });
         });
       });
     }
@@ -796,15 +876,26 @@
     // Master version checkbox (stages or unstages entire file)
     const masterChk = toolbar.querySelector('#chk-master-version');
     if (masterChk) {
+      const stagedCount = state.blocks.filter(b => b.staged).length;
+      const totalCount = state.blocks.length;
+      masterChk.checked = stagedCount === totalCount && totalCount > 0;
+      masterChk.indeterminate = stagedCount > 0 && stagedCount < totalCount;
+
       masterChk.addEventListener('change', () => {
         const check = masterChk.checked;
         state.blocks.forEach(b => { b.staged = check; });
         document.querySelectorAll('.block-chk').forEach(c => { c.checked = check; });
-        if (check) {
-          vscode.postMessage({ type: 'stageFile', payload: state.filePath });
-        } else {
-          vscode.postMessage({ type: 'unstageFile', payload: state.filePath });
-        }
+        const newStagedCount = check ? state.blocks.length : 0;
+        const stagedContent = check ? state.currentContent : state.baseContent;
+        vscode.postMessage({
+          type: 'updateBlockStage',
+          payload: {
+            filePath: state.filePath,
+            stagedContent,
+            stagedCount: newStagedCount,
+            totalCount: state.blocks.length
+          }
+        });
       });
     }
 
@@ -861,6 +952,7 @@
         state.fileName = data.fileName || state.filePath.split('/').pop() || '';
         state.fileDir = data.fileDir || state.filePath.split('/').slice(0, -1).join('/');
         state.diff = data.diff || '';
+        state.stagedDiff = data.stagedDiff || '';
         state.baseContent = data.baseContent !== undefined ? data.baseContent : '';
         state.currentContent = data.currentContent !== undefined ? data.currentContent : '';
         state.filesList = data.filesList || [];

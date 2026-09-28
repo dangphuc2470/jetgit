@@ -368,6 +368,20 @@ export class GitService {
     await this.exec(['add', '--', ...paths]);
   }
 
+  async stageFileContent(filePath: string, content: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const proc = execFile('git', ['hash-object', '-w', '--stdin'], { cwd: this.cwd }, (err, stdout, stderr) => {
+        if (err) return reject(new Error(stderr || err.message));
+        const sha = stdout.trim();
+        this.exec(['update-index', '--cacheinfo', `100644,${sha},${filePath}`])
+          .then(() => resolve())
+          .catch(reject);
+      });
+      proc.stdin?.write(content);
+      proc.stdin?.end();
+    });
+  }
+
   async unstageFile(path: string): Promise<void> {
     await this.exec(['reset', 'HEAD', '--', path]);
   }

@@ -389,6 +389,19 @@ var GitService = class {
   async stageFiles(paths) {
     await this.exec(["add", "--", ...paths]);
   }
+  async stageFileContent(filePath, content) {
+    return new Promise((resolve, reject) => {
+      const proc = (0, import_child_process.execFile)("git", ["hash-object", "-w", "--stdin"], { cwd: this.cwd }, (err, stdout, stderr) => {
+        if (err) return reject(new Error(stderr || err.message));
+        const sha = stdout.trim();
+        this.exec(["update-index", "--cacheinfo", `100644,${sha},${filePath}`])
+          .then(() => resolve())
+          .catch(reject);
+      });
+      proc.stdin?.write(content);
+      proc.stdin?.end();
+    });
+  }
   async commit(message) {
     await this.exec(["commit", "-m", message]);
   }
@@ -2023,6 +2036,9 @@ var CommitReviewPanel = class {
   static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange) {
     const fileName = import_path.basename(filePath);
     if (CommitReviewPanel.currentPanel) {
+      if (onStageChange) {
+        CommitReviewPanel.currentPanel.onStageChange = onStageChange;
+      }
       CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
       CommitReviewPanel.currentPanel.panel.reveal(vscode8.ViewColumn.Active, true);
       CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
@@ -2071,6 +2087,12 @@ var CommitReviewPanel = class {
       } catch {
         currentContent = "";
       }
+      let stagedDiff = "";
+      try {
+        stagedDiff = await this.gitService.exec(["diff", "--cached", "--", filePath]);
+      } catch {
+        stagedDiff = "";
+      }
       const currentFileIndex = this.filesList.indexOf(filePath);
       this.panel.webview.postMessage({
         type: "fileDiff",
@@ -2079,6 +2101,7 @@ var CommitReviewPanel = class {
           fileName,
           fileDir: import_path.dirname(filePath) === "." ? "" : import_path.dirname(filePath),
           diff,
+          stagedDiff,
           baseContent,
           currentContent,
           filesList: this.filesList,
@@ -2110,6 +2133,22 @@ var CommitReviewPanel = class {
         if (newIndex >= 0 && newIndex < this.filesList.length) {
           const newPath = this.filesList[newIndex];
           this.loadFile(newPath, this.filesList);
+        }
+        break;
+      }
+      case "updateBlockStage": {
+        const { filePath, stagedContent, stagedCount, totalCount } = msg.payload;
+        try {
+          if (stagedCount === 0) {
+            await this.gitService.unstageFile(filePath);
+          } else if (stagedCount === totalCount) {
+            await this.gitService.stageFile(filePath);
+          } else {
+            await this.gitService.stageFileContent(filePath, stagedContent);
+          }
+          if (this.onStageChange) this.onStageChange();
+        } catch (err) {
+          vscode8.window.showErrorMessage(`Update stage failed: ${err.message}`);
         }
         break;
       }
@@ -2315,25 +2354,35 @@ var CommitViewProvider = class {
       return;
     }
     try {
-      const [statusEntries, mergeMsg, recentMessages, stashes] = await Promise.all([
+      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
         this.gitService.getRecentCommitMessages(10),
-        this.gitService.getStashes()
+        this.gitService.getStashes(),
+        this.gitService.exec(["diff", "HEAD"]).catch(() => ""),
+        this.gitService.exec(["diff", "--cached"]).catch(() => "")
       ]);
+      const totalChangesMap = this.parseChangesPerFile(totalDiff);
+      const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
       const files = statusEntries.map((entry) => {
         const filePath = entry.path;
         const fileName = import_path.basename(filePath);
         const fileDir = import_path.dirname(filePath);
         const isUntracked = entry.x === "?" && entry.y === "?";
         const isStaged = entry.x !== " " && entry.x !== "?";
+        const totalChanges = totalChangesMap.get(filePath) || 0;
+        const stagedChanges = stagedChangesMap.get(filePath) || 0;
+        const isPartiallyStaged = totalChanges > 0 && stagedChanges > 0 && stagedChanges < totalChanges;
         return {
           path: filePath,
           name: fileName,
           dir: fileDir === "." ? "" : fileDir,
           status: entry.y !== " " ? entry.y : entry.x,
           staged: isStaged,
-          isUntracked
+          isUntracked,
+          totalChanges,
+          stagedChanges,
+          partiallyStaged: isPartiallyStaged
         };
       });
       files.sort((a, b) => {
@@ -2359,6 +2408,39 @@ var CommitViewProvider = class {
     } catch (err) {
       this.log.appendLine(`Commit panel status fetch failed: ${err.message}`);
     }
+  }
+  parseChangesPerFile(diffText) {
+    const map = new Map();
+    if (!diffText || !diffText.trim()) return map;
+    const fileSections = diffText.split(/^diff --git /m);
+    for (const section of fileSections) {
+      if (!section.trim()) continue;
+      const match = section.match(/^a\/(.*?)\s+b\/(.*?)(?:\n|$)/);
+      if (!match) continue;
+      const filePath = match[2];
+      const lines = section.split("\n");
+      let count = 0;
+      let inHunk = false;
+      let inDiffBlock = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith("@@")) {
+          inHunk = true;
+          inDiffBlock = false;
+        } else if (inHunk) {
+          if (line.startsWith("+") || line.startsWith("-")) {
+            if (!inDiffBlock) {
+              count++;
+              inDiffBlock = true;
+            }
+          } else if (line.startsWith(" ")) {
+            inDiffBlock = false;
+          }
+        }
+      }
+      map.set(filePath, count);
+    }
+    return map;
   }
   async handleMessage(msg) {
     switch (msg.type) {

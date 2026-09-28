@@ -268,12 +268,12 @@ body, html {
   transform: rotate(45deg);
 }
 
-.group-chk:indeterminate {
+.group-chk:indeterminate, .file-chk:indeterminate {
   background: #3574f0;
   border-color: #3574f0;
 }
 
-.group-chk:indeterminate::after {
+.group-chk:indeterminate::after, .file-chk:indeterminate::after {
   content: '';
   position: absolute;
   top: 4px;
@@ -281,6 +281,14 @@ body, html {
   width: 7px;
   height: 2px;
   background: #ffffff;
+}
+
+.file-changes-badge {
+  color: #8c8c8c;
+  font-style: italic;
+  font-size: 11px;
+  margin-left: 6px;
+  white-space: nowrap;
 }
 
 .file-icon {

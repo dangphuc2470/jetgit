@@ -42,6 +42,9 @@ export class CommitReviewPanel {
   ): CommitReviewPanel {
     const fileName = path.basename(filePath);
     if (CommitReviewPanel.currentPanel) {
+      if (onStageChange) {
+        CommitReviewPanel.currentPanel.onStageChange = onStageChange;
+      }
       CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
       CommitReviewPanel.currentPanel.panel.reveal(vscode.ViewColumn.Active, true);
       CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
@@ -94,6 +97,12 @@ export class CommitReviewPanel {
       } catch {
         currentContent = '';
       }
+      let stagedDiff = '';
+      try {
+        stagedDiff = await this.gitService.exec(['diff', '--cached', '--', filePath]);
+      } catch {
+        stagedDiff = '';
+      }
       const currentFileIndex = this.filesList.indexOf(filePath);
       this.panel.webview.postMessage({
         type: 'fileDiff',
@@ -102,6 +111,7 @@ export class CommitReviewPanel {
           fileName,
           fileDir: path.dirname(filePath) === '.' ? '' : path.dirname(filePath),
           diff,
+          stagedDiff,
           baseContent,
           currentContent,
           filesList: this.filesList,
@@ -132,6 +142,22 @@ export class CommitReviewPanel {
         if (newIndex >= 0 && newIndex < this.filesList.length) {
           const newPath = this.filesList[newIndex];
           this.loadFile(newPath, this.filesList);
+        }
+        break;
+      }
+      case 'updateBlockStage': {
+        const { filePath, stagedContent, stagedCount, totalCount } = msg.payload;
+        try {
+          if (stagedCount === 0) {
+            await this.gitService.unstageFile(filePath);
+          } else if (stagedCount === totalCount) {
+            await this.gitService.stageFile(filePath);
+          } else {
+            await this.gitService.stageFileContent(filePath, stagedContent);
+          }
+          if (this.onStageChange) this.onStageChange();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Update stage failed: ${err.message}`);
         }
         break;
       }

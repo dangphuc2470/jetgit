@@ -373,8 +373,9 @@
     const groupEl = document.createElement('div');
     groupEl.className = 'tree-group';
 
-    const allChecked = files.length > 0 && files.every(f => state.checkedFiles.has(f.path));
-    const someChecked = !allChecked && files.some(f => state.checkedFiles.has(f.path));
+    const anyPartiallyStaged = files.some(f => f.partiallyStaged || (f.totalChanges > 0 && f.stagedChanges > 0 && f.stagedChanges < f.totalChanges));
+    const allChecked = files.length > 0 && files.every(f => (state.checkedFiles.has(f.path) || (f.staged && !f.partiallyStaged)));
+    const someChecked = anyPartiallyStaged || (!allChecked && files.some(f => state.checkedFiles.has(f.path) || f.staged || f.stagedChanges > 0));
 
     const header = document.createElement('div');
     header.className = 'group-header';
@@ -382,11 +383,11 @@
       <span class="group-arrow ${expanded ? 'expanded' : ''}">▶</span>
       <input type="checkbox" class="group-chk" ${allChecked ? 'checked' : ''}/>
       <span class="group-title">${title}</span>
-      <span class="group-count">${files.length} files</span>
+      <span class="group-count">${files.length} ${files.length === 1 ? 'file' : 'files'}</span>
     `;
 
     const chk = header.querySelector('.group-chk');
-    chk.indeterminate = someChecked;
+    chk.indeterminate = someChecked && !allChecked;
 
     chk.addEventListener('change', (e) => {
       e.stopPropagation();
@@ -422,20 +423,30 @@
       files.forEach(file => {
         const itemEl = document.createElement('div');
         const isSelected = state.selectedFile === file.path;
-        const isChecked = state.checkedFiles.has(file.path);
+        const isPartiallyStaged = file.partiallyStaged || (file.totalChanges > 0 && file.stagedChanges > 0 && file.stagedChanges < file.totalChanges);
+        const isChecked = !isPartiallyStaged && (state.checkedFiles.has(file.path) || (file.staged && !isPartiallyStaged));
         itemEl.className = `file-item ${isSelected ? 'selected' : ''}`;
 
         const isUnversioned = file.isUntracked;
         const nameColorClass = isUnversioned ? 'name-unversioned' : 'name-modified';
+
+        let badgeHtml = '';
+        if (isPartiallyStaged) {
+          badgeHtml = `<span class="file-changes-badge">${file.stagedChanges} of ${file.totalChanges} changes</span>`;
+        }
 
         itemEl.innerHTML = `
           <input type="checkbox" class="file-chk" ${isChecked ? 'checked' : ''}/>
           <span class="file-icon">${getFileIcon(file.name)}</span>
           <span class="file-name ${nameColorClass}">${escapeHtml(file.name)}</span>
           ${state.showPaths && file.dir ? `<span class="file-dir">${escapeHtml(file.dir)}</span>` : ''}
+          ${badgeHtml}
         `;
 
         const fileChk = itemEl.querySelector('.file-chk');
+        if (isPartiallyStaged) {
+          fileChk.indeterminate = true;
+        }
         fileChk.addEventListener('change', (e) => {
           e.stopPropagation();
           if (fileChk.checked) {

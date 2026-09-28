@@ -56,12 +56,17 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const [statusEntries, mergeMsg, recentMessages, stashes] = await Promise.all([
+      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
         this.gitService.getRecentCommitMessages(10),
         this.gitService.getStashes(),
+        this.gitService.exec(['diff', 'HEAD']).catch(() => ''),
+        this.gitService.exec(['diff', '--cached']).catch(() => ''),
       ]);
+
+      const totalChangesMap = this.parseChangesPerFile(totalDiff);
+      const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
 
       const files = statusEntries.map(entry => {
         const filePath = entry.path;
@@ -69,6 +74,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const fileDir = path.dirname(filePath);
         const isUntracked = entry.x === '?' && entry.y === '?';
         const isStaged = entry.x !== ' ' && entry.x !== '?';
+        const totalChanges = totalChangesMap.get(filePath) || 0;
+        const stagedChanges = stagedChangesMap.get(filePath) || 0;
+        const isPartiallyStaged = totalChanges > 0 && stagedChanges > 0 && stagedChanges < totalChanges;
 
         return {
           path: filePath,
@@ -77,6 +85,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           status: entry.y !== ' ' ? entry.y : entry.x,
           staged: isStaged,
           isUntracked,
+          totalChanges,
+          stagedChanges,
+          partiallyStaged: isPartiallyStaged,
         };
       });
 
@@ -106,6 +117,43 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     } catch (err: any) {
       this.log.appendLine(`Commit panel status fetch failed: ${err.message}`);
     }
+  }
+
+  private parseChangesPerFile(diffText: string): Map<string, number> {
+    const map = new Map<string, number>();
+    if (!diffText || !diffText.trim()) return map;
+
+    const fileSections = diffText.split(/^diff --git /m);
+    for (const section of fileSections) {
+      if (!section.trim()) continue;
+      const match = section.match(/^a\/(.*?)\s+b\/(.*?)(?:\n|$)/);
+      if (!match) continue;
+      const filePath = match[2];
+
+      const lines = section.split('\n');
+      let count = 0;
+      let inHunk = false;
+      let inDiffBlock = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('@@')) {
+          inHunk = true;
+          inDiffBlock = false;
+        } else if (inHunk) {
+          if (line.startsWith('+') || line.startsWith('-')) {
+            if (!inDiffBlock) {
+              count++;
+              inDiffBlock = true;
+            }
+          } else if (line.startsWith(' ')) {
+            inDiffBlock = false;
+          }
+        }
+      }
+      map.set(filePath, count);
+    }
+    return map;
   }
 
   private async handleMessage(msg: { type: string; payload?: any }): Promise<void> {

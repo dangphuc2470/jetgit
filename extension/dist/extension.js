@@ -1683,13 +1683,7 @@ var CommitViewProvider = class {
         await this.refresh();
         break;
       }
-      case "selectFile": {
-        const filePath = msg.payload;
-        if (CommitReviewPanel.currentPanel) {
-          CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
-        }
-        break;
-      }
+      case "selectFile":
       case "openReviewInCenter": {
         const filePath = msg.payload;
         if (filePath) {

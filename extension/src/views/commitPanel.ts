@@ -169,13 +169,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         await this.refresh();
         break;
       }
-      case 'selectFile': {
-        const filePath = msg.payload as string;
-        if (CommitReviewPanel.currentPanel) {
-          CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
-        }
-        break;
-      }
+      case 'selectFile':
       case 'openReviewInCenter': {
         const filePath = msg.payload as string;
         if (filePath) {

@@ -462,8 +462,7 @@
         itemEl.addEventListener('click', (e) => {
           if (e.target === fileChk) return;
           state.selectedFile = file.path;
-          vscode.postMessage({ type: 'getFileDiff', payload: file.path });
-          vscode.postMessage({ type: 'selectFile', payload: file.path });
+          vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
           render();
         });
 

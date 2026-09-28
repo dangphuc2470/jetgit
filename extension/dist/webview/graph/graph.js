@@ -5713,7 +5713,7 @@ ${component_stack}
     const DOT_RADIUS = 4;
     const PADDING = 10;
     function svgWidth() {
-      return $$props.graphWidth * COL_WIDTH + PADDING * 2;
+      return Math.max(4, $$props.graphWidth || 1) * COL_WIDTH + PADDING * 2;
     }
     function svgHeight() {
       return $$props.visibleCount * $$props.rowHeight;
@@ -6037,7 +6037,17 @@ ${component_stack}
         ($0) => {
           const isMerge = (get(commit).parents && get(commit).parents.length > 1) || (get(commit).subject && get(commit).subject.startsWith("Merge "));
           classes = set_class(div_5, 1, "commit-row svelte-1rusxbg" + (isMerge ? " is-merge" : ""), null, classes, { selected: get(commit).hash === $$props.selectedHash });
-          const gw = ($$props.graphWidth || 1) * 16 + 20;
+          const g = get(commit).graph;
+          let maxCol = g ? g.column : 0;
+          if (g && g.lines) {
+            for (let li = 0; li < g.lines.length; li++) {
+              const l = g.lines[li];
+              if (l.fromColumn > maxCol) maxCol = l.fromColumn;
+              if (l.toColumn > maxCol) maxCol = l.toColumn;
+            }
+          }
+          const rowBranches = Math.max(4, maxCol + 1);
+          const gw = rowBranches * 16 + 20;
           set_style(span, `width: ${gw}px; min-width: ${gw}px;`);
           set_text(text2, "");
           set_attribute2(span_1, "title", get(commit).subject);

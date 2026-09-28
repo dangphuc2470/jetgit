@@ -16,6 +16,7 @@
     currentFileIndex: 0,
     highlightWords: true,
     blocks: [],
+    segments: [],
     currentDiffIndex: 0
   };
 
@@ -69,33 +70,41 @@
     };
   }
 
-  // Parse git raw diff into hunks and build continuous blocks
-  function parseBlocksFromDiff(rawDiff) {
+  // Parse git raw diff into hunks, blocks and anchored scroll segments
+  function parseDiffData(rawDiff) {
     state.baseLines = state.baseContent ? state.baseContent.split('\n') : [];
     state.currentLines = state.currentContent ? state.currentContent.split('\n') : [];
 
+    const L_total = state.baseLines.length;
+    const R_total = state.currentLines.length;
+
     if (!rawDiff || !rawDiff.trim()) {
-      if (state.baseLines.length === 0 && state.currentLines.length > 0) {
-        // Untracked new file
-        return [{
+      if (L_total === 0 && R_total > 0) {
+        state.blocks = [{
           id: 0,
           type: 'add',
           leftStart: 1,
           leftEnd: 1,
           isLeftEmpty: true,
           rightStart: 1,
-          rightEnd: state.currentLines.length,
+          rightEnd: R_total,
           isRightEmpty: false,
           staged: true,
           patchContent: ''
         }];
-      } else if (state.currentLines.length === 0 && state.baseLines.length > 0) {
-        // Deleted file
-        return [{
+        state.segments = [{
+          leftY: 0,
+          rightY: 0,
+          hLeft: 0,
+          hRight: R_total * LINE_HEIGHT,
+          isDiff: true
+        }];
+      } else if (R_total === 0 && L_total > 0) {
+        state.blocks = [{
           id: 0,
           type: 'del',
           leftStart: 1,
-          leftEnd: state.baseLines.length,
+          leftEnd: L_total,
           isLeftEmpty: false,
           rightStart: 1,
           rightEnd: 1,
@@ -103,8 +112,24 @@
           staged: true,
           patchContent: ''
         }];
+        state.segments = [{
+          leftY: 0,
+          rightY: 0,
+          hLeft: L_total * LINE_HEIGHT,
+          hRight: 0,
+          isDiff: true
+        }];
+      } else {
+        state.blocks = [];
+        state.segments = [{
+          leftY: 0,
+          rightY: 0,
+          hLeft: L_total * LINE_HEIGHT,
+          hRight: R_total * LINE_HEIGHT,
+          isDiff: false
+        }];
       }
-      return [];
+      return;
     }
 
     const lines = rawDiff.split('\n');
@@ -136,7 +161,7 @@
     }
 
     const blocks = [];
-    hunks.forEach((hunk, hIdx) => {
+    hunks.forEach((hunk) => {
       let bLine = hunk.oldStart;
       let cLine = hunk.newStart;
       let dIdx = 0;
@@ -152,11 +177,9 @@
           const startRight = cLine;
           let delCount = 0;
           let addCount = 0;
-          const blockHunkLines = [hunk.header];
 
           while (dIdx < hunk.diffLines.length && (hunk.diffLines[dIdx].startsWith('-') || hunk.diffLines[dIdx].startsWith('+'))) {
             const cur = hunk.diffLines[dIdx];
-            blockHunkLines.push(cur);
             if (cur.startsWith('-')) {
               delCount++;
               bLine++;
@@ -172,7 +195,6 @@
           else if (addCount > 0 && delCount === 0) blockType = 'add';
           else blockType = 'mod';
 
-          // Unified patch for this hunk/block
           let patch = `--- a/${state.filePath}\n+++ b/${state.filePath}\n${hunk.header}\n`;
           hunk.rawLines.slice(1).forEach(l => { patch += l + '\n'; });
 
@@ -194,14 +216,161 @@
       }
     });
 
-    return blocks;
+    state.blocks = blocks;
+    state.segments = buildSegments(hunks, L_total, R_total);
+  }
+
+  // Build anchored scroll segments connecting common code and diff blocks
+  function buildSegments(hunks, L_total, R_total) {
+    const segments = [];
+    let curL = 1;
+    let curR = 1;
+
+    hunks.forEach((hunk) => {
+      // 1. Common unchanged code before hunk
+      const commonCount = Math.min(
+        Math.max(0, hunk.oldStart - curL),
+        Math.max(0, hunk.newStart - curR)
+      );
+      if (commonCount > 0) {
+        segments.push({
+          leftY: (curL - 1) * LINE_HEIGHT,
+          rightY: (curR - 1) * LINE_HEIGHT,
+          hLeft: commonCount * LINE_HEIGHT,
+          hRight: commonCount * LINE_HEIGHT,
+          isDiff: false
+        });
+        curL += commonCount;
+        curR += commonCount;
+      }
+
+      if (curL < hunk.oldStart) {
+        const diffL = hunk.oldStart - curL;
+        segments.push({
+          leftY: (curL - 1) * LINE_HEIGHT,
+          rightY: (curR - 1) * LINE_HEIGHT,
+          hLeft: diffL * LINE_HEIGHT,
+          hRight: 0,
+          isDiff: true
+        });
+        curL += diffL;
+      }
+      if (curR < hunk.newStart) {
+        const diffR = hunk.newStart - curR;
+        segments.push({
+          leftY: (curL - 1) * LINE_HEIGHT,
+          rightY: (curR - 1) * LINE_HEIGHT,
+          hLeft: 0,
+          hRight: diffR * LINE_HEIGHT,
+          isDiff: true
+        });
+        curR += diffR;
+      }
+
+      // 2. Inside hunk: walk diff lines
+      let dIdx = 0;
+      while (dIdx < hunk.diffLines.length) {
+        const d = hunk.diffLines[dIdx];
+        if (d.startsWith(' ')) {
+          let ctxCount = 0;
+          while (dIdx < hunk.diffLines.length && hunk.diffLines[dIdx].startsWith(' ')) {
+            ctxCount++;
+            dIdx++;
+          }
+          segments.push({
+            leftY: (curL - 1) * LINE_HEIGHT,
+            rightY: (curR - 1) * LINE_HEIGHT,
+            hLeft: ctxCount * LINE_HEIGHT,
+            hRight: ctxCount * LINE_HEIGHT,
+            isDiff: false
+          });
+          curL += ctxCount;
+          curR += ctxCount;
+        } else {
+          let delCount = 0;
+          let addCount = 0;
+          while (dIdx < hunk.diffLines.length && (hunk.diffLines[dIdx].startsWith('-') || hunk.diffLines[dIdx].startsWith('+'))) {
+            if (hunk.diffLines[dIdx].startsWith('-')) delCount++;
+            else if (hunk.diffLines[dIdx].startsWith('+')) addCount++;
+            dIdx++;
+          }
+          segments.push({
+            leftY: (curL - 1) * LINE_HEIGHT,
+            rightY: (curR - 1) * LINE_HEIGHT,
+            hLeft: delCount * LINE_HEIGHT,
+            hRight: addCount * LINE_HEIGHT,
+            isDiff: true
+          });
+          curL += delCount;
+          curR += addCount;
+        }
+      }
+    });
+
+    // 3. Trailing common lines after last hunk
+    const remL = Math.max(0, L_total - curL + 1);
+    const remR = Math.max(0, R_total - curR + 1);
+    const trailingCommon = Math.max(remL, remR);
+    if (trailingCommon > 0) {
+      segments.push({
+        leftY: (curL - 1) * LINE_HEIGHT,
+        rightY: (curR - 1) * LINE_HEIGHT,
+        hLeft: remL * LINE_HEIGHT,
+        hRight: remR * LINE_HEIGHT,
+        isDiff: false
+      });
+    }
+
+    return segments;
+  }
+
+  // Map Left scroll position to Right scroll position (Anchored Scroll)
+  function mapLeftToRight(sLeft) {
+    if (sLeft <= 0 || state.segments.length === 0) return 0;
+    for (let i = 0; i < state.segments.length; i++) {
+      const seg = state.segments[i];
+      if (sLeft >= seg.leftY && sLeft <= seg.leftY + seg.hLeft) {
+        if (!seg.isDiff) {
+          return seg.rightY + (sLeft - seg.leftY);
+        } else {
+          if (seg.hLeft === 0 || seg.hRight === 0) {
+            return seg.rightY; // Wait until this side reaches common code!
+          }
+          const ratio = (sLeft - seg.leftY) / seg.hLeft;
+          return seg.rightY + ratio * seg.hRight;
+        }
+      }
+    }
+    const last = state.segments[state.segments.length - 1];
+    return last ? (last.rightY + last.hRight) : sLeft;
+  }
+
+  // Map Right scroll position to Left scroll position (Anchored Scroll)
+  function mapRightToLeft(sRight) {
+    if (sRight <= 0 || state.segments.length === 0) return 0;
+    for (let i = 0; i < state.segments.length; i++) {
+      const seg = state.segments[i];
+      if (sRight >= seg.rightY && sRight <= seg.rightY + seg.hRight) {
+        if (!seg.isDiff) {
+          return seg.leftY + (sRight - seg.rightY);
+        } else {
+          if (seg.hRight === 0 || seg.hLeft === 0) {
+            return seg.leftY; // Wait until this side reaches common code!
+          }
+          const ratio = (sRight - seg.rightY) / seg.hRight;
+          return seg.leftY + ratio * seg.hLeft;
+        }
+      }
+    }
+    const last = state.segments[state.segments.length - 1];
+    return last ? (last.leftY + last.hLeft) : sRight;
   }
 
   // Render the whole review interface
   function render() {
     app.innerHTML = '';
 
-    state.blocks = parseBlocksFromDiff(state.diff);
+    parseDiffData(state.diff);
 
     const root = document.createElement('div');
     root.className = 'studio-diff-container';
@@ -265,7 +434,7 @@
     `;
     root.appendChild(colHeader);
 
-    // 3. Diff Viewport (Left editor, Middle gutter with SVG ribbons, Right editor)
+    // 3. Diff Viewport (Left editor, Middle gutter, Right editor)
     const viewportWrapper = document.createElement('div');
     viewportWrapper.className = 'studio-diff-viewport-wrapper';
 
@@ -293,7 +462,7 @@
       }
     });
 
-    // Render Left Lines (Pure original code, NO dummy filler rows!)
+    // Render Left Lines (Pure code, NO fake dummy filler rows!)
     let leftHtml = '';
     state.baseLines.forEach((line, idx) => {
       const lineNum = idx + 1;
@@ -307,7 +476,6 @@
           contentHtml = `<span class="diff-word-del">${contentHtml}</span>`;
         } else if (b.type === 'mod') {
           rowClass += ' line-mod';
-          // Compute word diff against matching line in right block
           const rOffset = lineNum - b.leftStart;
           const matchingRightLineNum = b.rightStart + rOffset;
           const rightText = (matchingRightLineNum <= b.rightEnd && state.currentLines[matchingRightLineNum - 1] !== undefined)
@@ -327,7 +495,7 @@
     });
     leftPane.innerHTML = `<div class="editor-lines-container">${leftHtml}</div>`;
 
-    // Render Right Lines (Pure modified code, NO dummy filler rows!)
+    // Render Right Lines (Pure code, NO fake dummy filler rows!)
     let rightHtml = '';
     state.currentLines.forEach((line, idx) => {
       const lineNum = idx + 1;
@@ -341,7 +509,6 @@
           contentHtml = `<span class="diff-word-add">${contentHtml}</span>`;
         } else if (b.type === 'mod') {
           rowClass += ' line-mod';
-          // Compute word diff against matching line in left block
           const lOffset = lineNum - b.rightStart;
           const matchingLeftLineNum = b.leftStart + lOffset;
           const leftText = (matchingLeftLineNum <= b.leftEnd && state.baseLines[matchingLeftLineNum - 1] !== undefined)
@@ -361,67 +528,18 @@
     });
     rightPane.innerHTML = `<div class="editor-lines-container">${rightHtml}</div>`;
 
-    // Middle Gutter with SVG curved connectors
+    // Middle Gutter with Viewport SVG curved ribbons
     const middleGutter = document.createElement('div');
     middleGutter.className = 'middle-gutter';
 
-    const maxLines = Math.max(state.baseLines.length, state.currentLines.length, 1);
-    const gutterTotalHeight = maxLines * LINE_HEIGHT;
-
-    // SVG ribbon layer
     const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgEl.setAttribute('class', 'gutter-ribbon-svg');
     svgEl.setAttribute('width', '54');
-    svgEl.setAttribute('height', `${gutterTotalHeight}`);
-    svgEl.style.height = `${gutterTotalHeight}px`;
-
-    const W = 54;
-    let pathsHtml = '';
-    let controlsHtml = '';
-
-    state.blocks.forEach(b => {
-      let y1, y2, y3, y4;
-
-      if (b.isLeftEmpty) {
-        // Pure addition: starts as a point on the left
-        y1 = (b.leftStart - 1) * LINE_HEIGHT + (LINE_HEIGHT / 2);
-        y2 = y1;
-      } else {
-        y1 = (b.leftStart - 1) * LINE_HEIGHT;
-        y2 = b.leftEnd * LINE_HEIGHT;
-      }
-
-      if (b.isRightEmpty) {
-        // Pure deletion: ends as a point on the right
-        y3 = (b.rightStart - 1) * LINE_HEIGHT + (LINE_HEIGHT / 2);
-        y4 = y3;
-      } else {
-        y3 = (b.rightStart - 1) * LINE_HEIGHT;
-        y4 = b.rightEnd * LINE_HEIGHT;
-      }
-
-      // Smooth cubic bezier curved ribbon
-      const d = `M 0,${y1} C ${W * 0.45},${y1} ${W * 0.55},${y3} ${W},${y3} L ${W},${y4} C ${W * 0.55},${y4} ${W * 0.45},${y2} 0,${y2} Z`;
-      const fillClass = `ribbon-${b.type}`;
-
-      pathsHtml += `<path d="${d}" class="diff-ribbon ${fillClass}" data-block-id="${b.id}"/>`;
-
-      // Checkbox placed at the middle of the ribbon
-      const checkY = Math.min(y1, y3) + 2;
-      controlsHtml += `
-        <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">
-          <input type="checkbox" class="block-chk" title="Stage / Unstage block" ${b.staged ? 'checked' : ''} data-block-id="${b.id}"/>
-        </div>
-      `;
-    });
-
-    svgEl.innerHTML = pathsHtml;
+    svgEl.setAttribute('height', '100%');
     middleGutter.appendChild(svgEl);
 
     const controlsContainer = document.createElement('div');
     controlsContainer.className = 'gutter-controls-layer';
-    controlsContainer.style.height = `${gutterTotalHeight}px`;
-    controlsContainer.innerHTML = controlsHtml;
     middleGutter.appendChild(controlsContainer);
 
     viewportWrapper.appendChild(leftPane);
@@ -456,47 +574,102 @@
 
     app.appendChild(root);
 
-    // Synchronize scrolling between leftPane, middleGutter, and rightPane
-    setupSynchronizedScrolling(leftPane, rightPane, middleGutter);
+    // Dynamic viewport-based ribbon updater
+    function updateRibbons() {
+      const sLeft = leftPane.scrollTop;
+      const sRight = rightPane.scrollTop;
+      const viewH = middleGutter.clientHeight || 800;
+      const W = 54;
 
-    // Attach toolbar & block events
-    attachToolbarEvents(toolbar);
-    attachBlockEvents(controlsContainer);
-  }
+      let svgHtml = '';
+      let ctrlHtml = '';
 
-  // Smooth synchronized scrolling across Left Pane, Middle Gutter, and Right Pane
-  function setupSynchronizedScrolling(leftPane, rightPane, middleGutter) {
-    let activeScroll = null;
+      state.blocks.forEach(b => {
+        let y1 = (b.leftStart - 1) * LINE_HEIGHT - sLeft;
+        let y2 = b.isLeftEmpty ? y1 : (b.leftEnd * LINE_HEIGHT - sLeft);
 
-    function onScroll(source, targets) {
-      if (activeScroll && activeScroll !== source) return;
-      activeScroll = source;
+        let y3 = (b.rightStart - 1) * LINE_HEIGHT - sRight;
+        let y4 = b.isRightEmpty ? y3 : (b.rightEnd * LINE_HEIGHT - sRight);
 
-      const top = source.scrollTop;
-      targets.forEach(t => {
-        t.scrollTop = top;
+        // Skip if block is offscreen
+        if (Math.max(y2, y4) < -20 || Math.min(y1, y3) > viewH + 20) {
+          return;
+        }
+
+        const d = `M 0,${y1} C ${W * 0.45},${y1} ${W * 0.55},${y3} ${W},${y3} L ${W},${y4} C ${W * 0.55},${y4} ${W * 0.45},${y2} 0,${y2} Z`;
+        const fillClass = `ribbon-${b.type}`;
+
+        svgHtml += `<path d="${d}" class="diff-ribbon ${fillClass}" data-block-id="${b.id}"/>`;
+
+        // Checkbox positioned at the vertical center of the right block (or left block)
+        const checkY = (y3 + y4) / 2 - 7;
+        if (checkY >= -15 && checkY <= viewH + 15) {
+          ctrlHtml += `
+            <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">
+              <input type="checkbox" class="block-chk" title="Stage / Unstage block" ${b.staged ? 'checked' : ''} data-block-id="${b.id}"/>
+            </div>
+          `;
+        }
       });
 
-      requestAnimationFrame(() => {
-        activeScroll = null;
+      svgEl.innerHTML = svgHtml;
+      controlsContainer.innerHTML = ctrlHtml;
+
+      // Re-attach checkbox event listener for visible controls
+      controlsContainer.querySelectorAll('.block-chk').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const blockId = parseInt(chk.getAttribute('data-block-id'), 10);
+          const block = state.blocks.find(b => b.id === blockId);
+          if (!block) return;
+          const check = chk.checked;
+          block.staged = check;
+
+          if (block.patchContent) {
+            vscode.postMessage({
+              type: 'applyHunkPatch',
+              payload: { patch: block.patchContent, reverse: !check }
+            });
+          }
+        });
       });
     }
 
-    leftPane.addEventListener('scroll', () => onScroll(leftPane, [rightPane, middleGutter]), { passive: true });
-    rightPane.addEventListener('scroll', () => onScroll(rightPane, [leftPane, middleGutter]), { passive: true });
+    // Anchored Dual Scroll Synchronization
+    let isSyncing = false;
+
+    leftPane.addEventListener('scroll', () => {
+      if (isSyncing) return;
+      isSyncing = true;
+      rightPane.scrollTop = mapLeftToRight(leftPane.scrollTop);
+      updateRibbons();
+      isSyncing = false;
+    }, { passive: true });
+
+    rightPane.addEventListener('scroll', () => {
+      if (isSyncing) return;
+      isSyncing = true;
+      leftPane.scrollTop = mapRightToLeft(rightPane.scrollTop);
+      updateRibbons();
+      isSyncing = false;
+    }, { passive: true });
+
+    // Initial draw
+    requestAnimationFrame(updateRibbons);
+
+    // Attach toolbar events
+    attachToolbarEvents(toolbar);
   }
 
   // Scroll to a specific line in both panes
   function scrollToLine(lineNum) {
     const leftPane = document.querySelector('.editor-pane.left-pane');
     const rightPane = document.querySelector('.editor-pane.right-pane');
-    const middleGutter = document.querySelector('.middle-gutter');
-    const targetTop = Math.max(0, (lineNum - 1) * LINE_HEIGHT - 60);
+    const targetRight = Math.max(0, (lineNum - 1) * LINE_HEIGHT - 60);
 
-    if (leftPane && rightPane && middleGutter) {
-      leftPane.scrollTo({ top: targetTop, behavior: 'smooth' });
-      rightPane.scrollTo({ top: targetTop, behavior: 'smooth' });
-      middleGutter.scrollTo({ top: targetTop, behavior: 'smooth' });
+    if (leftPane && rightPane) {
+      rightPane.scrollTo({ top: targetRight, behavior: 'smooth' });
+      leftPane.scrollTo({ top: mapRightToLeft(targetRight), behavior: 'smooth' });
     }
   }
 
@@ -575,27 +748,6 @@
         }
       });
     }
-  }
-
-  // Attach gutter block checkboxes
-  function attachBlockEvents(controlsContainer) {
-    controlsContainer.querySelectorAll('.block-chk').forEach(chk => {
-      chk.addEventListener('change', (e) => {
-        e.stopPropagation();
-        const blockId = parseInt(chk.getAttribute('data-block-id'), 10);
-        const block = state.blocks.find(b => b.id === blockId);
-        if (!block) return;
-        const check = chk.checked;
-        block.staged = check;
-
-        if (block.patchContent) {
-          vscode.postMessage({
-            type: 'applyHunkPatch',
-            payload: { patch: block.patchContent, reverse: !check }
-          });
-        }
-      });
-    });
   }
 
   function escapeHtml(str) {

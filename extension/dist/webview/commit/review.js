@@ -1287,7 +1287,7 @@
           vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex + 1 });
         } else {
           pendingNextFile = true;
-          showDiffNavigationHint('F7', 'Nhấn F7 lần nữa để qua file tiếp theo');
+          showDiffNavigationHint('F7', 'Press F7 again to go to the next file');
         }
       }
       return;
@@ -1313,10 +1313,10 @@
             vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex + 1 });
           } else {
             pendingNextFile = true;
-            showDiffNavigationHint('F7', 'Nhấn F7 lần nữa để qua file tiếp theo');
+            showDiffNavigationHint('F7', 'Press F7 again to go to the next file');
           }
         } else {
-          showDiffNavigationHint('F7', 'Đã ở thay đổi cuối cùng của file cuối cùng');
+          showDiffNavigationHint('F7', 'You are at the last change of the last file');
         }
       }
     } else {
@@ -1338,10 +1338,10 @@
             vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex - 1 });
           } else {
             pendingPrevFile = true;
-            showDiffNavigationHint('Shift+F7', 'Nhấn Shift+F7 lần nữa để về file trước đó');
+            showDiffNavigationHint('Shift+F7', 'Press Shift+F7 again to go to the previous file');
           }
         } else {
-          showDiffNavigationHint('Shift+F7', 'Đã ở thay đổi đầu tiên của file đầu tiên');
+          showDiffNavigationHint('Shift+F7', 'You are at the first change of the first file');
         }
       }
     }

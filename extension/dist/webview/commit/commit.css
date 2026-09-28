@@ -1105,23 +1105,24 @@ body, html {
 }
 
 .diff-ribbon {
-  stroke-width: 1px;
+  stroke-width: 0 !important;
+  stroke: none !important;
   transition: opacity 0.1s;
 }
 
 .ribbon-mod {
-  fill: rgba(28, 85, 115, 0.4);
-  stroke: #266e8c;
+  fill: rgba(28, 85, 115, 0.45);
+  stroke: none !important;
 }
 
 .ribbon-add {
-  fill: rgba(35, 95, 55, 0.4);
-  stroke: #3a8c54;
+  fill: rgba(35, 95, 55, 0.45);
+  stroke: none !important;
 }
 
 .ribbon-del {
-  fill: rgba(90, 95, 105, 0.35);
-  stroke: #6a707d;
+  fill: rgba(90, 95, 105, 0.4);
+  stroke: none !important;
 }
 
 /* Opposing insertion and deletion indicator lines */
@@ -1155,8 +1156,9 @@ body, html {
 
 .gutter-block-control {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 8px;
+  width: 14px;
+  height: 14px;
   pointer-events: auto;
   z-index: 5;
   display: flex;
@@ -1165,8 +1167,10 @@ body, html {
 }
 
 .block-chk {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
   cursor: pointer;
   accent-color: #3574f0;
 }
@@ -1225,47 +1229,47 @@ body, html {
 }
 
 /* ==========================================================================
-   Code Syntax Highlighting (Editor Standard Colors - "màu bình thường như lúc code bên ngoài")
+   Code Syntax Highlighting (Monokai Pro - Filter Ristretto Theme Colors)
    ========================================================================== */
 .syn-kwd {
-  color: #c586c0; /* Keywords (static, void, return, try, final...): purple */
+  color: #fd6883 !important; /* Keywords (static, void, return, try, final...): coral red/pink */
 }
 
 .syn-type {
-  color: #4ec9b0; /* Types & Classes (String, GlobalConnection, Widget...): teal */
+  color: #85dacc !important; /* Types & Classes (String, GlobalConnection, Widget...): mint/cyan */
 }
 
 .syn-fn {
-  color: #dcdcaa; /* Methods & Functions: yellow */
+  color: #adda78 !important; /* Methods & Functions: soft lime green */
 }
 
 .syn-str {
-  color: #ce9178; /* Strings: warm terracotta orange */
+  color: #f9cc6c !important; /* Strings: warm yellow */
 }
 
 .syn-num {
-  color: #b5cea8; /* Numbers: sage green */
+  color: #a8a9eb !important; /* Numbers: lavender/purple */
 }
 
 .syn-const {
-  color: #569cd6; /* Booleans & null (true, false, null): blue */
+  color: #a8a9eb !important; /* Booleans & null (true, false, null): lavender/purple */
 }
 
 .syn-var {
-  color: #9cdcfe; /* Variables & identifiers: light sky blue */
+  color: #fff1f3 !important; /* Variables & identifiers: warm white */
 }
 
 .syn-comment {
-  color: #6a9955; /* Comments (//, /*): comment green */
+  color: #72696a !important; /* Comments (//, /*): muted brownish gray */
   font-style: italic;
 }
 
 .syn-anno {
-  color: #dcdcaa; /* Annotations (@override): gold */
+  color: #85dacc !important; /* Annotations (@override): mint/cyan */
 }
 
 .syn-punct {
-  color: #d4d4d4; /* Operators & punctuation */
+  color: #948a8b !important; /* Operators & punctuation: slate gray */
 }
 
 /* Far Right Overview Ruler (Diff Minimap) */

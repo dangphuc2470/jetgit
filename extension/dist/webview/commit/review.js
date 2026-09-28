@@ -670,10 +670,8 @@
 
         svgHtml += `<path d="${d}" class="diff-ribbon ${fillClass}" data-block-id="${b.id}"/>`;
 
-        // Checkbox positioned at the vertical visual center of the ribbon
-        const midLeft = (y1 + y2) / 2;
-        const midRight = (y3 + y4) / 2;
-        const checkY = (midLeft + midRight) / 2 - 7;
+        // Checkbox positioned neatly in a straight vertical column aligned with Android Studio
+        const checkY = b.isRightEmpty ? (y3 - 7) : (y3 + 3);
         if (checkY >= -15 && checkY <= viewH + 15) {
           ctrlHtml += `
             <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">

@@ -13,6 +13,16 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
   private lastBranches: BranchInfo[] = [];
   private lastTags: TagInfo[] = [];
+  private hasInitializedFilter = false;
+  private currentFilter: {
+    branch?: string;
+    author?: string;
+    after?: string;
+    before?: string;
+    path?: string;
+    query?: string;
+    all?: boolean;
+  } = {};
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -40,7 +50,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
-        this.loadInitialData();
+        this.refresh();
       }
     });
 
@@ -68,8 +78,20 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       this.hasReachedEnd = false;
       this.isLoadingMore = false;
       this.log.appendLine('Loading git log...');
+
+      let currentBranch = '';
+      try {
+        currentBranch = await this.gitService.getCurrentBranch();
+      } catch { /* ignore */ }
+
+      // Align with Android Studio: Default to filtering by active branch ONLY ONCE on initial startup
+      if (!this.hasInitializedFilter) {
+        this.hasInitializedFilter = true;
+        this.currentFilter = currentBranch ? { branch: currentBranch, all: false } : { all: true };
+      }
+
       const [commits, branches, tags] = await Promise.all([
-        this.gitService.getLog({ maxCount: 300, all: true }),
+        this.gitService.getLog({ maxCount: 300, ...this.currentFilter }),
         this.gitService.getBranches(),
         this.gitService.getTags(),
       ]);
@@ -84,7 +106,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       this.log.appendLine(`Loaded ${this.allCommits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
       this.sendCommits();
-      this.sendBranches(branches, tags);
+      this.sendBranches(branches, tags, currentBranch);
     } catch (err: any) {
       this.log.appendLine(`Git log failed: ${err.message}`);
       this.view?.webview.postMessage({
@@ -114,15 +136,23 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async sendBranches(branches: BranchInfo[], tags: TagInfo[]): Promise<void> {
-    let currentBranch = '';
-    try {
-      currentBranch = await this.gitService.getCurrentBranch();
-    } catch { /* ignore */ }
+  private async sendBranches(branches: BranchInfo[], tags: TagInfo[], currentBranch?: string): Promise<void> {
+    if (currentBranch === undefined) {
+      try {
+        currentBranch = await this.gitService.getCurrentBranch();
+      } catch {
+        currentBranch = '';
+      }
+    }
 
     this.view?.webview.postMessage({
       type: 'branches',
-      payload: { branches, tags, currentBranch },
+      payload: {
+        branches,
+        tags,
+        currentBranch,
+        activeBranch: this.currentFilter.branch || '',
+      },
     });
   }
 
@@ -137,6 +167,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         const repoPath = msg.payload as string;
         this.log.appendLine(`Switching git repository to: ${repoPath}`);
         this.gitService.setCwd(repoPath);
+        this.hasInitializedFilter = false;
         await this.loadInitialData();
         break;
       }
@@ -145,6 +176,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         try {
           await this.gitService.initRepo();
           vscode.window.showInformationMessage('Initialized Git repository successfully.');
+          this.hasInitializedFilter = false;
           await this.loadInitialData();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Failed to init git repository: ${err.message}`);
@@ -192,7 +224,11 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         this.isLoadingMore = true;
         const skip = this.allCommits.length;
         try {
-          const more = await this.gitService.getLog({ maxCount: 100, skip, all: true });
+          const more = await this.gitService.getLog({
+            maxCount: 100,
+            skip,
+            ...this.currentFilter,
+          });
           const existingHashes = new Set(this.allCommits.map(c => c.hash));
           const uniqueMore = more.filter(c => !existingHashes.has(c.hash));
           if (uniqueMore.length > 0) {
@@ -212,18 +248,22 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'filter': {
-        const { branch, author, after, before, path: filePath } = msg.payload;
+        const { branch, author, after, before, path: filePath, query } = msg.payload || {};
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
+        this.currentFilter = {
+          branch: branch || undefined,
+          author: author || undefined,
+          after: after || undefined,
+          before: before || undefined,
+          path: filePath || undefined,
+          query: query || undefined,
+          all: !branch,
+        };
         try {
           const commits = await this.gitService.getLog({
             maxCount: 300,
-            all: !branch,
-            branch: branch || undefined,
-            author: author || undefined,
-            after: after || undefined,
-            before: before || undefined,
-            path: filePath || undefined,
+            ...this.currentFilter,
           });
           const seen = new Set<string>();
           this.allCommits = commits.filter(c => {
@@ -235,6 +275,34 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           this.sendCommits();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Filter failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'refresh': {
+        this.hasReachedEnd = false;
+        this.isLoadingMore = false;
+        try {
+          const [commits, branches, tags] = await Promise.all([
+            this.gitService.getLog({
+              maxCount: 300,
+              ...this.currentFilter,
+            }),
+            this.gitService.getBranches(),
+            this.gitService.getTags(),
+          ]);
+          const seen = new Set<string>();
+          this.allCommits = commits.filter(c => {
+            if (seen.has(c.hash)) return false;
+            seen.add(c.hash);
+            return true;
+          });
+          this.lastBranches = branches;
+          this.lastTags = tags;
+          this.graphNodes = buildGraph(this.allCommits);
+          this.sendCommits();
+          this.sendBranches(branches, tags);
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }
         break;
       }
@@ -646,8 +714,31 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  refresh(): void {
-    this.loadInitialData();
+  async refresh(): Promise<void> {
+    if (!this.view || !this.view.visible) return;
+    this.hasReachedEnd = false;
+    this.isLoadingMore = false;
+    try {
+      const [commits, branches, tags] = await Promise.all([
+        this.gitService.getLog({
+          maxCount: 300,
+          ...this.currentFilter,
+        }),
+        this.gitService.getBranches(),
+        this.gitService.getTags(),
+      ]);
+      const seen = new Set<string>();
+      this.allCommits = commits.filter(c => {
+        if (seen.has(c.hash)) return false;
+        seen.add(c.hash);
+        return true;
+      });
+      this.lastBranches = branches;
+      this.lastTags = tags;
+      this.graphNodes = buildGraph(this.allCommits);
+      this.sendCommits();
+      this.sendBranches(branches, tags);
+    } catch { /* ignore */ }
   }
 
   show(): void {

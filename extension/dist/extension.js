@@ -156,7 +156,7 @@ var GitService = class {
   }
   async getLog(options = {}) {
     const args = ["log", `--format=${LOG_FORMAT}`];
-    if (options.all !== false) {
+    if (options.all === true || !options.branch && options.all !== false) {
       args.push("--all");
     }
     args.push("--decorate=full");
@@ -165,6 +165,10 @@ var GitService = class {
     if (options.author) args.push(`--author=${options.author}`);
     if (options.after) args.push(`--after=${options.after}`);
     if (options.before) args.push(`--before=${options.before}`);
+    if (options.query) {
+      args.push(`--grep=${options.query}`);
+      args.push("-i");
+    }
     if (options.branch) args.push(options.branch);
     if (options.path) {
       args.push("--");
@@ -817,6 +821,8 @@ var GraphViewProvider = class {
   hasReachedEnd = false;
   lastBranches = [];
   lastTags = [];
+  hasInitializedFilter = false;
+  currentFilter = {};
   resolveWebviewView(webviewView, _context, _token) {
     this.view = webviewView;
     webviewView.webview.options = {
@@ -829,7 +835,7 @@ var GraphViewProvider = class {
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
-        this.loadInitialData();
+        this.refresh();
       }
     });
     this.loadInitialData();
@@ -853,8 +859,17 @@ var GraphViewProvider = class {
       this.hasReachedEnd = false;
       this.isLoadingMore = false;
       this.log.appendLine("Loading git log...");
+      let currentBranch = "";
+      try {
+        currentBranch = await this.gitService.getCurrentBranch();
+      } catch {
+      }
+      if (!this.hasInitializedFilter) {
+        this.hasInitializedFilter = true;
+        this.currentFilter = currentBranch ? { branch: currentBranch, all: false } : { all: true };
+      }
       const [commits, branches, tags] = await Promise.all([
-        this.gitService.getLog({ maxCount: 300, all: true }),
+        this.gitService.getLog({ maxCount: 300, ...this.currentFilter }),
         this.gitService.getBranches(),
         this.gitService.getTags()
       ]);
@@ -869,7 +884,7 @@ var GraphViewProvider = class {
       this.log.appendLine(`Loaded ${this.allCommits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
       this.sendCommits();
-      this.sendBranches(branches, tags);
+      this.sendBranches(branches, tags, currentBranch);
     } catch (err) {
       this.log.appendLine(`Git log failed: ${err.message}`);
       this.view?.webview.postMessage({
@@ -897,15 +912,22 @@ var GraphViewProvider = class {
       }
     });
   }
-  async sendBranches(branches, tags) {
-    let currentBranch = "";
-    try {
-      currentBranch = await this.gitService.getCurrentBranch();
-    } catch {
+  async sendBranches(branches, tags, currentBranch) {
+    if (currentBranch === void 0) {
+      try {
+        currentBranch = await this.gitService.getCurrentBranch();
+      } catch {
+        currentBranch = "";
+      }
     }
     this.view?.webview.postMessage({
       type: "branches",
-      payload: { branches, tags, currentBranch }
+      payload: {
+        branches,
+        tags,
+        currentBranch,
+        activeBranch: this.currentFilter.branch || ""
+      }
     });
   }
   async handleMessage(msg) {
@@ -919,6 +941,7 @@ var GraphViewProvider = class {
         const repoPath = msg.payload;
         this.log.appendLine(`Switching git repository to: ${repoPath}`);
         this.gitService.setCwd(repoPath);
+        this.hasInitializedFilter = false;
         await this.loadInitialData();
         break;
       }
@@ -927,6 +950,7 @@ var GraphViewProvider = class {
         try {
           await this.gitService.initRepo();
           vscode2.window.showInformationMessage("Initialized Git repository successfully.");
+          this.hasInitializedFilter = false;
           await this.loadInitialData();
         } catch (err) {
           vscode2.window.showErrorMessage(`Failed to init git repository: ${err.message}`);
@@ -966,7 +990,11 @@ var GraphViewProvider = class {
         this.isLoadingMore = true;
         const skip = this.allCommits.length;
         try {
-          const more = await this.gitService.getLog({ maxCount: 100, skip, all: true });
+          const more = await this.gitService.getLog({
+            maxCount: 100,
+            skip,
+            ...this.currentFilter
+          });
           const existingHashes = new Set(this.allCommits.map((c) => c.hash));
           const uniqueMore = more.filter((c) => !existingHashes.has(c.hash));
           if (uniqueMore.length > 0) {
@@ -986,18 +1014,22 @@ var GraphViewProvider = class {
         break;
       }
       case "filter": {
-        const { branch, author, after, before, path: filePath } = msg.payload;
+        const { branch, author, after, before, path: filePath, query } = msg.payload || {};
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
+        this.currentFilter = {
+          branch: branch || void 0,
+          author: author || void 0,
+          after: after || void 0,
+          before: before || void 0,
+          path: filePath || void 0,
+          query: query || void 0,
+          all: !branch
+        };
         try {
           const commits = await this.gitService.getLog({
             maxCount: 300,
-            all: !branch,
-            branch: branch || void 0,
-            author: author || void 0,
-            after: after || void 0,
-            before: before || void 0,
-            path: filePath || void 0
+            ...this.currentFilter
           });
           const seen = /* @__PURE__ */ new Set();
           this.allCommits = commits.filter((c) => {
@@ -1009,6 +1041,34 @@ var GraphViewProvider = class {
           this.sendCommits();
         } catch (err) {
           vscode2.window.showErrorMessage(`Filter failed: ${err.message}`);
+        }
+        break;
+      }
+      case "refresh": {
+        this.hasReachedEnd = false;
+        this.isLoadingMore = false;
+        try {
+          const [commits, branches, tags] = await Promise.all([
+            this.gitService.getLog({
+              maxCount: 300,
+              ...this.currentFilter
+            }),
+            this.gitService.getBranches(),
+            this.gitService.getTags()
+          ]);
+          const seen = /* @__PURE__ */ new Set();
+          this.allCommits = commits.filter((c) => {
+            if (seen.has(c.hash)) return false;
+            seen.add(c.hash);
+            return true;
+          });
+          this.lastBranches = branches;
+          this.lastTags = tags;
+          this.graphNodes = buildGraph(this.allCommits);
+          this.sendCommits();
+          this.sendBranches(branches, tags);
+        } catch (err) {
+          vscode2.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }
         break;
       }
@@ -1406,8 +1466,32 @@ var GraphViewProvider = class {
       payload: hash
     });
   }
-  refresh() {
-    this.loadInitialData();
+  async refresh() {
+    if (!this.view || !this.view.visible) return;
+    this.hasReachedEnd = false;
+    this.isLoadingMore = false;
+    try {
+      const [commits, branches, tags] = await Promise.all([
+        this.gitService.getLog({
+          maxCount: 300,
+          ...this.currentFilter
+        }),
+        this.gitService.getBranches(),
+        this.gitService.getTags()
+      ]);
+      const seen = /* @__PURE__ */ new Set();
+      this.allCommits = commits.filter((c) => {
+        if (seen.has(c.hash)) return false;
+        seen.add(c.hash);
+        return true;
+      });
+      this.lastBranches = branches;
+      this.lastTags = tags;
+      this.graphNodes = buildGraph(this.allCommits);
+      this.sendCommits();
+      this.sendBranches(branches, tags);
+    } catch {
+    }
   }
   show() {
     if (this.view) {

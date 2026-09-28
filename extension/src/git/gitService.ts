@@ -130,10 +130,11 @@ export class GitService {
     before?: string;
     path?: string;
     all?: boolean;
+    query?: string;
   } = {}): Promise<Commit[]> {
     const args = ['log', `--format=${LOG_FORMAT}`];
 
-    if (options.all !== false) {
+    if (options.all === true || (!options.branch && options.all !== false)) {
       args.push('--all');
     }
     args.push('--decorate=full');
@@ -143,6 +144,10 @@ export class GitService {
     if (options.author) args.push(`--author=${options.author}`);
     if (options.after) args.push(`--after=${options.after}`);
     if (options.before) args.push(`--before=${options.before}`);
+    if (options.query) {
+      args.push(`--grep=${options.query}`);
+      args.push('-i');
+    }
     if (options.branch) args.push(options.branch);
     if (options.path) {
       args.push('--');

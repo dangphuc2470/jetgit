@@ -1,9 +1,18 @@
 window.onerror = function(msg, url, line, col, error) {
+  if (typeof msg === 'string' && msg.includes('ResizeObserver loop')) {
+    return true;
+  }
   var d = document.createElement('div');
   d.style.cssText = 'color:#ff6b6b;background:#1e1e1e;padding:20px;font-family:monospace;white-space:pre-wrap;font-size:13px;position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;overflow:auto;border:2px solid #e51400;';
   d.innerHTML = '<h3 style="color:#f48771;margin-top:0;">Git Log Webview Error</h3><p><b>' + msg + '</b></p><p>Line ' + line + ':' + col + '</p><pre style="background:#252526;padding:10px;border-radius:4px;">' + (error ? error.stack : '') + '</pre>';
   document.body.appendChild(d);
 };
+window.addEventListener('error', function(e) {
+  if (e.message && e.message.includes('ResizeObserver loop')) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }
+});
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -5920,7 +5929,14 @@ ${component_stack}
       if (!get(containerEl))
         return;
       const obs = new ResizeObserver((entries) => {
-        set(containerHeight, entries[0].contentRect.height, true);
+        if (!entries || !entries.length) return;
+        window.requestAnimationFrame(() => {
+          if (!entries[0]) return;
+          const h = entries[0].contentRect.height;
+          if (h && Math.abs(h - get(containerHeight)) > 1) {
+            set(containerHeight, h, true);
+          }
+        });
       });
       obs.observe(get(containerEl));
       return () => obs.disconnect();
@@ -6638,7 +6654,7 @@ ${component_stack}
     bar.className = "filter-bar svelte-51df0s";
 
     let curQuery = "";
-    let curBranch = "";
+    let curBranch = $$props.activeBranch || "";
     let curUser = "";
     let curDate = "";
     let curAfter = "";
@@ -7137,12 +7153,14 @@ ${component_stack}
     let activeBranch = state("");
     let branchSearch = state("");
     let noGitData = state(null);
+    let hasInitializedActiveBranch = false;
 
     onMount(() => {
       postMessage("ready");
       unsubscribe = onMessage((msg) => {
         switch (msg.type) {
           case "noGitRepo": {
+            hasInitializedActiveBranch = false;
             set(loading, false);
             set(noGitData, msg.payload, true);
             break;
@@ -7175,6 +7193,12 @@ ${component_stack}
           }
           case "branches": {
             set(branchData, msg.payload, true);
+            if (!hasInitializedActiveBranch) {
+              hasInitializedActiveBranch = true;
+              if (msg.payload && msg.payload.activeBranch) {
+                set(activeBranch, msg.payload.activeBranch, true);
+              }
+            }
             break;
           }
           case "commitFiles": {

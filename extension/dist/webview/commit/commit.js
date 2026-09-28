@@ -274,9 +274,13 @@
     treeContainer.className = 'file-tree-container';
     treeContainer.style.flex = `${state.splitRatio}`;
 
-    // Render Changes group
-    const changesFiles = state.files.filter(f => !f.isUntracked);
-    const unversionedFiles = state.files.filter(f => f.isUntracked);
+    // Render Changes group (sorted A-Z)
+    const changesFiles = state.files
+      .filter(f => !f.isUntracked)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
+    const unversionedFiles = state.files
+      .filter(f => f.isUntracked)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
 
     const changesGroup = renderFileGroup(
       'Changes',
@@ -390,8 +394,10 @@
       files.forEach(f => {
         if (check) {
           state.checkedFiles.add(f.path);
+          vscode.postMessage({ type: 'stageFile', payload: f.path });
         } else {
           state.checkedFiles.delete(f.path);
+          vscode.postMessage({ type: 'unstageFile', payload: f.path });
         }
       });
       render();
@@ -942,13 +948,14 @@
         state.recentMessages = data.recentMessages || [];
         state.stashes = data.stashes || [];
 
-        // Pre-check files that are staged or modified
-        if (!state.checkedFiles || state.checkedFiles.size === 0) {
-          state.files.forEach(f => {
-            if (!f.isUntracked) {
-              state.checkedFiles.add(f.path);
+        // Default is unchecked; only prune paths that are no longer in status
+        if (state.checkedFiles && state.checkedFiles.size > 0) {
+          const validPaths = new Set(state.files.map(f => f.path));
+          for (const p of Array.from(state.checkedFiles)) {
+            if (!validPaths.has(p)) {
+              state.checkedFiles.delete(p);
             }
-          });
+          }
         }
 
         // Set default commit message if empty

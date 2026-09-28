@@ -2336,6 +2336,12 @@ var CommitViewProvider = class {
           isUntracked
         };
       });
+      files.sort((a, b) => {
+        const nameA = a.name.toLowerCase();
+        const nameB = b.name.toLowerCase();
+        if (nameA !== nameB) return nameA.localeCompare(nameB);
+        return a.path.localeCompare(b.path);
+      });
       const changesCount = files.filter((f) => !f.isUntracked).length;
       const unversionedCount = files.filter((f) => f.isUntracked).length;
       this.allFilePaths = files.map((f) => f.path);

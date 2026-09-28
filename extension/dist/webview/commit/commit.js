@@ -446,15 +446,14 @@
           if (e.target === fileChk) return;
           state.selectedFile = file.path;
           vscode.postMessage({ type: 'getFileDiff', payload: file.path });
+          vscode.postMessage({ type: 'selectFile', payload: file.path });
           render();
         });
 
         itemEl.addEventListener('dblclick', (e) => {
           if (e.target === fileChk) return;
           state.selectedFile = file.path;
-          state.showDiff = true;
-          vscode.postMessage({ type: 'getFileDiff', payload: file.path });
-          render();
+          vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
         });
 
         itemsContainer.appendChild(itemEl);
@@ -487,6 +486,7 @@
         <button class="diff-tool-btn" id="btn-revert-hunk" title="Revert Hunk">↶</button>
         <button class="diff-tool-btn" id="btn-prev-diff" title="Previous Difference (Cmd+Shift+Up)">▲</button>
         <button class="diff-tool-btn" id="btn-next-diff" title="Next Difference (Cmd+Shift+Down)">▼</button>
+        <button class="diff-tool-btn" id="btn-open-center" title="Open in Center Editor Tab (Android Studio)">⤢</button>
         <button class="diff-tool-btn" id="btn-open-editor" title="Open in VS Code Diff Editor">↗</button>
         <button class="diff-tool-btn" id="btn-close-diff" title="Close Diff (Esc)">✕</button>
       </div>
@@ -603,6 +603,13 @@
     diffContainer.appendChild(diffContent);
 
     // Header actions
+    const btnOpenCenter = diffHeader.querySelector('#btn-open-center');
+    if (btnOpenCenter) {
+      btnOpenCenter.addEventListener('click', () => {
+        vscode.postMessage({ type: 'openReviewInCenter', payload: selectedFile });
+      });
+    }
+
     diffHeader.querySelector('#btn-close-diff').addEventListener('click', () => {
       state.showDiff = false;
       render();
@@ -729,12 +736,13 @@
     });
 
     toolbar.querySelector('#btn-show-diff').addEventListener('click', () => {
-      state.showDiff = !state.showDiff;
-      if (state.showDiff && !state.diffData && (state.selectedFile || state.files[0])) {
-        const path = state.selectedFile || state.files[0].path;
-        vscode.postMessage({ type: 'getFileDiff', payload: path });
+      const selected = state.selectedFile || (state.files[0] ? state.files[0].path : '');
+      if (selected) {
+        vscode.postMessage({ type: 'openReviewInCenter', payload: selected });
+      } else {
+        state.showDiff = !state.showDiff;
+        render();
       }
-      render();
     });
 
     toolbar.querySelector('#btn-view-options').addEventListener('click', () => {

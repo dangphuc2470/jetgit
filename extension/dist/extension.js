@@ -1994,10 +1994,168 @@ var MergeProvider = class {
   }
 };
 
+// src/views/commitReviewPanel.ts
+var CommitReviewPanel = class {
+  static currentPanel;
+  static viewType = "intellij-git.commitReview";
+  panel;
+  disposables = [];
+  currentFilePath = "";
+  filesList = [];
+  constructor(panel, extensionUri, gitService, onStageChange) {
+    this.panel = panel;
+    this.extensionUri = extensionUri;
+    this.gitService = gitService;
+    this.onStageChange = onStageChange;
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    this.panel.webview.html = this.getHtml();
+    this.panel.webview.onDidReceiveMessage(
+      (msg) => this.handleMessage(msg),
+      null,
+      this.disposables
+    );
+  }
+  static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange) {
+    const fileName = import_path.basename(filePath);
+    if (CommitReviewPanel.currentPanel) {
+      CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
+      CommitReviewPanel.currentPanel.panel.reveal(vscode8.ViewColumn.Active, true);
+      CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
+      return CommitReviewPanel.currentPanel;
+    }
+    const panel = vscode8.window.createWebviewPanel(
+      CommitReviewPanel.viewType,
+      `Diff: ${fileName}`,
+      vscode8.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode8.Uri.joinPath(extensionUri, "dist", "webview")
+        ]
+      }
+    );
+    CommitReviewPanel.currentPanel = new CommitReviewPanel(
+      panel,
+      extensionUri,
+      gitService,
+      onStageChange
+    );
+    CommitReviewPanel.currentPanel.loadFile(filePath, filesList);
+    return CommitReviewPanel.currentPanel;
+  }
+  async loadFile(filePath, filesList) {
+    this.currentFilePath = filePath;
+    if (filesList) this.filesList = filesList;
+    const fileName = import_path.basename(filePath);
+    this.panel.title = `Diff: ${fileName}`;
+    try {
+      const diff = await this.gitService.getFileDiff(filePath);
+      const currentFileIndex = this.filesList.indexOf(filePath);
+      this.panel.webview.postMessage({
+        type: "fileDiff",
+        payload: {
+          path: filePath,
+          diff,
+          filesList: this.filesList,
+          currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0
+        }
+      });
+    } catch (err) {
+      vscode8.window.showErrorMessage(`Failed to load diff: ${err.message}`);
+    }
+  }
+  async handleMessage(msg) {
+    switch (msg.type) {
+      case "ready": {
+        if (this.currentFilePath) {
+          this.loadFile(this.currentFilePath, this.filesList);
+        }
+        break;
+      }
+      case "refreshDiff": {
+        const filePath = msg.payload || this.currentFilePath;
+        if (filePath) {
+          this.loadFile(filePath, this.filesList);
+        }
+        break;
+      }
+      case "navigateFile": {
+        const newIndex = msg.payload;
+        if (newIndex >= 0 && newIndex < this.filesList.length) {
+          const newPath = this.filesList[newIndex];
+          this.loadFile(newPath, this.filesList);
+        }
+        break;
+      }
+      case "applyHunkPatch": {
+        const { patch, reverse } = msg.payload;
+        try {
+          await this.gitService.applyHunkPatch(patch, reverse);
+          if (this.onStageChange) this.onStageChange();
+          await this.loadFile(this.currentFilePath, this.filesList);
+        } catch (err) {
+          vscode8.window.showErrorMessage(`Apply patch failed: ${err.message}`);
+        }
+        break;
+      }
+      case "rollbackHunk": {
+        const { patch } = msg.payload;
+        try {
+          await this.gitService.applyHunkPatch(patch, true);
+          if (this.onStageChange) this.onStageChange();
+          await this.loadFile(this.currentFilePath, this.filesList);
+          vscode8.window.showInformationMessage("Hunk reverted successfully.");
+        } catch (err) {
+          vscode8.window.showErrorMessage(`Rollback hunk failed: ${err.message}`);
+        }
+        break;
+      }
+    }
+  }
+  getHtml() {
+    const scriptUri = this.panel.webview.asWebviewUri(
+      vscode8.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "review.js")
+    );
+    const styleUri = this.panel.webview.asWebviewUri(
+      vscode8.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
+    );
+    const nonce = getNonceReview();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' \${this.panel.webview.cspSource}; script-src 'nonce-\${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="\${styleUri}">
+  <title>Code Review</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script nonce="\${nonce}" src="\${scriptUri}"></script>
+</body>
+</html>`;
+  }
+  dispose() {
+    CommitReviewPanel.currentPanel = void 0;
+    for (const d of this.disposables) d.dispose();
+  }
+};
+function getNonceReview() {
+  let text = "";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return text;
+}
+
 // src/views/commitPanel.ts
 var CommitViewProvider = class {
   static viewType = "intellij-git.commitView";
   view;
+  allFilePaths = [];
   constructor(extensionUri, gitService, log2) {
     this.extensionUri = extensionUri;
     this.gitService = gitService;
@@ -2056,6 +2214,7 @@ var CommitViewProvider = class {
       });
       const changesCount = files.filter((f) => !f.isUntracked).length;
       const unversionedCount = files.filter((f) => f.isUntracked).length;
+      this.allFilePaths = files.map((f) => f.path);
       this.view.webview.postMessage({
         type: "status",
         payload: {
@@ -2076,6 +2235,26 @@ var CommitViewProvider = class {
       case "ready":
       case "refresh": {
         await this.refresh();
+        break;
+      }
+      case "selectFile": {
+        const filePath = msg.payload;
+        if (CommitReviewPanel.currentPanel) {
+          CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+        }
+        break;
+      }
+      case "openReviewInCenter": {
+        const filePath = msg.payload;
+        if (filePath) {
+          CommitReviewPanel.createOrShow(
+            this.extensionUri,
+            this.gitService,
+            filePath,
+            this.allFilePaths,
+            () => this.refresh()
+          );
+        }
         break;
       }
       case "stageFile": {
@@ -2337,6 +2516,20 @@ function activate(context) {
   context.subscriptions.push(
     vscode8.commands.registerCommand("intellij-git.openCommit", () => {
       vscode8.commands.executeCommand("intellij-git.commitView.focus");
+    })
+  );
+  context.subscriptions.push(
+    vscode8.commands.registerCommand("intellij-git.openCommitReview", (filePath) => {
+      const target = filePath || (commitViewProvider.allFilePaths.length > 0 ? commitViewProvider.allFilePaths[0] : "");
+      if (target) {
+        CommitReviewPanel.createOrShow(
+          context.extensionUri,
+          gitService,
+          target,
+          commitViewProvider.allFilePaths,
+          () => commitViewProvider.refresh()
+        );
+      }
     })
   );
   context.subscriptions.push(

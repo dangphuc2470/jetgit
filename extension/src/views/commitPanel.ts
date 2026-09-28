@@ -3,10 +3,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { GitService, type StatusEntry } from '../git/gitService';
 import { GitContentProvider } from '../providers/gitContentProvider';
+import { CommitReviewPanel } from './commitReviewPanel';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
   private view?: vscode.WebviewView;
+  private allFilePaths: string[] = [];
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -81,6 +83,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       const changesCount = files.filter(f => !f.isUntracked).length;
       const unversionedCount = files.filter(f => f.isUntracked).length;
 
+      this.allFilePaths = files.map(f => f.path);
+
       this.view.webview.postMessage({
         type: 'status',
         payload: {
@@ -102,6 +106,26 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'ready':
       case 'refresh': {
         await this.refresh();
+        break;
+      }
+      case 'selectFile': {
+        const filePath = msg.payload as string;
+        if (CommitReviewPanel.currentPanel) {
+          CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+        }
+        break;
+      }
+      case 'openReviewInCenter': {
+        const filePath = msg.payload as string;
+        if (filePath) {
+          CommitReviewPanel.createOrShow(
+            this.extensionUri,
+            this.gitService,
+            filePath,
+            this.allFilePaths,
+            () => this.refresh(),
+          );
+        }
         break;
       }
       case 'stageFile': {

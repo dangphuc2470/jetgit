@@ -7563,6 +7563,37 @@ ${component_stack}
         }
 
         function renderTreeLevel(lvlContainer, node) {
+          const curBranchObj = node.branches.find((b) => b.name === currentBranch);
+          const otherBranches = node.branches
+            .filter((b) => b.name !== currentBranch)
+            .sort((a, b) => a.leafName.localeCompare(b.leafName));
+
+          function renderBranchItem(b) {
+            const item = document.createElement("div");
+            item.className = "tree-item" + (currentActive === b.name ? " active" : "") + (b.name === currentBranch ? " current-head" : "");
+
+            const isCur = (b.name === currentBranch);
+            const isStar = b.leafName === "develop" || b.leafName === "main" || b.leafName === "master";
+
+            let icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
+            if (isCur) icon = '<span class="tree-item-icon">' + svgTagIcon + '</span>';
+            else if (isStar) icon = '<span class="tree-item-icon"><span style="color:#e5a50a;font-size:13px;line-height:1;">★</span></span>';
+
+            const trackHtml = getTrackingHtml(b);
+            const spacer = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span>';
+            item.innerHTML = spacer + icon + '<span class="branch-name" style="' + (isCur ? 'font-weight:600;' : '') + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
+            item.title = b.name;
+            item.addEventListener("click", () => handleBranchClick(b.name));
+            item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
+            lvlContainer.appendChild(item);
+          }
+
+          // 1. Nhánh hiện tại trước
+          if (curBranchObj) {
+            renderBranchItem(curBranchObj);
+          }
+
+          // 2. Đến folder từ A đến Z
           const folderKeys = Object.keys(node.folders).sort((a, b) => a.localeCompare(b));
           for (const fk of folderKeys) {
             const subNode = node.folders[fk];
@@ -7599,30 +7630,9 @@ ${component_stack}
             lvlContainer.appendChild(fDiv);
           }
 
-          const sortedBranches = node.branches.slice().sort((a, b) => {
-            if (a.name === currentBranch) return -1;
-            if (b.name === currentBranch) return 1;
-            return a.leafName.localeCompare(b.leafName);
-          });
-
-          for (const b of sortedBranches) {
-            const item = document.createElement("div");
-            item.className = "tree-item" + (currentActive === b.name ? " active" : "");
-
-            const isCur = (b.name === currentBranch);
-            const isStar = b.leafName === "develop" || b.leafName === "main" || b.leafName === "master";
-
-            let icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
-            if (isCur) icon = '<span class="tree-item-icon">' + svgTagIcon + '</span>';
-            else if (isStar) icon = '<span class="tree-item-icon"><span style="color:#e5a50a;font-size:13px;line-height:1;">★</span></span>';
-
-            const trackHtml = getTrackingHtml(b);
-            const spacer = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span>';
-            item.innerHTML = spacer + icon + '<span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
-            item.title = b.name;
-            item.addEventListener("click", () => handleBranchClick(b.name));
-            item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
-            lvlContainer.appendChild(item);
+          // 3. Mới tới các nhánh còn lại từ A đến Z
+          for (const b of otherBranches) {
+            renderBranchItem(b);
           }
         }
 

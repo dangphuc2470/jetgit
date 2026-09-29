@@ -879,6 +879,8 @@ var GraphViewProvider = class {
         currentBranch = await this.gitService.getCurrentBranch();
       } catch {
       }
+      this.hasReachedEnd = false;
+      this.isLoadingMore = false;
       if (!this.hasInitializedFilter) {
         this.hasInitializedFilter = true;
         this.currentFilter = currentBranch ? { branch: currentBranch, all: false } : { all: true };
@@ -1006,7 +1008,7 @@ var GraphViewProvider = class {
         const skip = this.allCommits.length;
         try {
           const more = await this.gitService.getLog({
-            maxCount: 100,
+            maxCount: 300,
             skip,
             ...this.currentFilter
           });

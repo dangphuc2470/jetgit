@@ -5932,11 +5932,18 @@ ${component_stack}
     });
     let isLoadingMore = false;
     let hasReachedEnd = false;
+    let prevCommitCount = 0;
     function onScroll(e) {
       const el = e.target;
       set(scrollTop, el.scrollTop, true);
-      const totalHeight = $$props.commits.length * ROW_HEIGHT;
-      if (!isLoadingMore && !hasReachedEnd && $$props.commits.length >= 100 && el.scrollTop + get(containerHeight) > totalHeight - 150) {
+      const curCount = ($$props.commits ? $$props.commits.length : 0);
+      if (curCount !== prevCommitCount) {
+        isLoadingMore = false;
+        hasReachedEnd = false;
+        prevCommitCount = curCount;
+      }
+      const totalHeight = curCount * ROW_HEIGHT;
+      if (!isLoadingMore && !hasReachedEnd && curCount >= 50 && el.scrollTop + get(containerHeight) > totalHeight - 350) {
         isLoadingMore = true;
         $$props.onLoadMore();
       }
@@ -7231,9 +7238,7 @@ ${component_stack}
       if (!container) return;
       const data = get(branchData);
       const currentActive = get(activeBranch);
-      const searchQuery = get(branchSearch);
       const { branches = [], tags = [], currentBranch = "" } = data;
-      container.innerHTML = "";
 
       // Close any open context menu
       function closeBranchContextMenu() {
@@ -7396,309 +7401,326 @@ ${component_stack}
         });
       }
 
-      // Vertical Strip on the left
-      const strip = document.createElement("div");
-      strip.className = "sidebar-strip";
+      let strip = container.querySelector(".sidebar-strip");
+      let mainArea = container.querySelector(".sidebar-main");
+      let sInput = container.querySelector(".branch-search-input");
+      let treeContent = container.querySelector(".branch-tree-content");
 
-      function addStripBtn(iconSvg, title, onClick, extraClass = "", shortcut = "") {
-        const btn = document.createElement("button");
-        btn.className = "sidebar-strip-btn " + extraClass;
-        btn.innerHTML = iconSvg;
-        attachTooltip(btn, title, shortcut);
-        btn.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          onClick(btn);
-        });
-        strip.appendChild(btn);
-        return btn;
-      }
+      function populateTree(searchQuery) {
+        if (!treeContent) return;
+        treeContent.innerHTML = "";
+        const favOnly = container.dataset.favOnly === "true";
+        const query = (searchQuery !== undefined ? searchQuery : (sInput ? sInput.value : "")).toLowerCase();
+        const isFavoriteBranch = (name) => name === currentBranch || name === "develop" || name === "main" || name === "master" || name.endsWith("/develop") || name.endsWith("/main");
+        const filterFn = (name) => {
+          if (query && !name.toLowerCase().includes(query)) return false;
+          if (favOnly && !isFavoriteBranch(name)) return false;
+          return true;
+        };
 
-      const collapseSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-      const expandSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-      const isCollapsed = container.classList.contains("collapsed");
-      const collapseBtn = addStripBtn(isCollapsed ? expandSvg : collapseSvg, isCollapsed ? "Expand Branches" : "Collapse Branches", (btn) => {
-        container.classList.toggle("collapsed");
-        const coll = container.classList.contains("collapsed");
-        btn.innerHTML = coll ? expandSvg : collapseSvg;
-        updateTooltip(btn, coll ? "Expand Branches" : "Collapse Branches");
-      });
-
-      // New branch (+)
-      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch...", () => {
-        const base = get(activeBranch) || currentBranch || "HEAD";
-        const name = prompt("New branch name (from '" + base + "'):");
-        if (name && name.trim()) postMessage("createBranch", { name: name.trim(), startPoint: base });
-      }, "", "+");
-
-      // Fetch / Update Selected Branch (↙)
-      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch", () => {
-        const target = get(activeBranch) || currentBranch;
-        if (target) {
-          postMessage("pull", target);
+        function createSec(title, isOpenDefault = true) {
+          const sec = document.createElement("div");
+          sec.className = "tree-section";
+          const hdr = document.createElement("div");
+          hdr.className = "tree-section-header";
+          hdr.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> <span>' + title + '</span>';
+          const bdy = document.createElement("div");
+          bdy.className = "tree-section-body";
+          bdy.style.display = isOpenDefault ? "block" : "none";
+          hdr.addEventListener("click", () => {
+            const open = bdy.style.display !== "none";
+            bdy.style.display = open ? "none" : "block";
+            hdr.querySelector(".arrow").textContent = open ? "▸" : "▾";
+          });
+          sec.appendChild(hdr);
+          sec.appendChild(bdy);
+          return { sec, bdy };
         }
-      }, "", "Fetch/Pull");
 
-      // Delete Selected Branch (🗑)
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch", () => {
-        const target = get(activeBranch);
-        if (!target) {
-          alert("Please select a branch to delete");
-        } else if (target === currentBranch) {
-          alert("Cannot delete the currently checked out branch '" + target + "'");
-        } else if (confirm("Delete branch '" + target + "'?")) {
-          postMessage("deleteBranch", target);
-        }
-      }, "", "Delete");
-
-      // Fetch All (⇄)
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="17" x2="4" y2="17"></line><polyline points="10 11 4 17 10 23"></polyline><line x1="4" y1="7" x2="20" y2="7"></line><polyline points="14 1 20 7 14 13"></polyline></svg>', "Fetch All Remotes", () => {
-        postMessage("fetchAll");
-      }, "", "git fetch --all");
-
-      // Search (Q)
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', "Search Branches", () => {
-        if (container.classList.contains("collapsed")) {
-          container.classList.remove("collapsed");
-          collapseBtn.innerHTML = collapseSvg;
-          updateTooltip(collapseBtn, "Collapse Branches");
-        }
-        sInput.focus();
-        sInput.select();
-      }, "", "Search");
-
-      // Expand / Collapse all
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>', "Expand / Collapse All Folders", () => {
-        const bodies = treeContent.querySelectorAll(".tree-section-body, .tree-folder-body");
-        let anyOpen = false;
-        bodies.forEach(b => { if (b.style.display !== "none") anyOpen = true; });
-        bodies.forEach(b => { b.style.display = anyOpen ? "none" : "block"; });
-        treeContent.querySelectorAll(".arrow").forEach(a => { a.textContent = anyOpen ? "▸" : "▾"; });
-      });
-
-      // Star / Favorites Filter
-      let favOnly = container.dataset.favOnly === "true";
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="' + (favOnly ? "#e5a50a" : "none") + '" stroke="' + (favOnly ? "#e5a50a" : "currentColor") + '" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>', favOnly ? "Show All Branches" : "Filter Favorite Branches (★)", () => {
-        favOnly = !favOnly;
-        container.dataset.favOnly = favOnly ? "true" : "false";
-        renderSidebarContent(container);
-      }, favOnly ? "active" : "");
-
-      // Locate Current Branch (HEAD)
-      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>', "Locate Current Branch (HEAD)", () => {
-        if (currentBranch) {
-          handleBranchClick(currentBranch);
-        }
-      });
-
-      container.appendChild(strip);
-
-      // 2. Main Area (Search + Tree)
-      const mainArea = document.createElement("div");
-      mainArea.className = "sidebar-main";
-
-      const searchBox = document.createElement("div");
-      searchBox.className = "branch-search-box";
-      const sInput = document.createElement("input");
-      sInput.type = "text";
-      sInput.className = "branch-search-input";
-      sInput.placeholder = "Search branches...";
-      sInput.value = searchQuery || "";
-      sInput.addEventListener("input", (e) => set(branchSearch, e.target.value.toLowerCase(), true));
-      searchBox.appendChild(sInput);
-      mainArea.appendChild(searchBox);
-
-      const treeContent = document.createElement("div");
-      treeContent.className = "branch-tree-content";
-
-      const query = (searchQuery || "").toLowerCase();
-      const isFavoriteBranch = (name) => name === currentBranch || name === "develop" || name === "main" || name === "master" || name.endsWith("/develop") || name.endsWith("/main");
-      const filterFn = (name) => {
-        if (query && !name.toLowerCase().includes(query)) return false;
-        if (favOnly && !isFavoriteBranch(name)) return false;
-        return true;
-      };
-
-      function createSec(title, isOpenDefault = true) {
-        const sec = document.createElement("div");
-        sec.className = "tree-section";
-        const hdr = document.createElement("div");
-        hdr.className = "tree-section-header";
-        hdr.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> <span>' + title + '</span>';
-        const bdy = document.createElement("div");
-        bdy.className = "tree-section-body";
-        bdy.style.display = isOpenDefault ? "block" : "none";
-        hdr.addEventListener("click", () => {
-          const open = bdy.style.display !== "none";
-          bdy.style.display = open ? "none" : "block";
-          hdr.querySelector(".arrow").textContent = open ? "▸" : "▾";
-        });
-        sec.appendChild(hdr);
-        sec.appendChild(bdy);
-        return { sec, bdy };
-      }
-
-      function handleBranchClick(name) {
-        if (get(activeBranch) === name) {
-          set(activeBranch, "", true);
-          onFilter({});
-        } else {
-          set(activeBranch, name, true);
-          onFilter({ branch: name });
-        }
-      }
-
-      function getTrackingHtml(b) {
-        if (!b) return "";
-        let trackHtml = "";
-        if (b.behind || b.ahead) {
-          trackHtml = '<span class="branch-track" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:11px;font-family:var(--vscode-editor-font-family, monospace);">';
-          if (b.behind) {
-            const behindTxt = "Behind remote by " + b.behind + " commit" + (b.behind > 1 ? "s" : "");
-            trackHtml += '<span class="track-badge behind" style="color:#58a6ff;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + behindTxt + '" title="' + behindTxt + '">↙ ' + b.behind + '</span>';
+        function handleBranchClick(name) {
+          if (get(activeBranch) === name) {
+            set(activeBranch, "", true);
+            onFilter({});
+          } else {
+            set(activeBranch, name, true);
+            onFilter({ branch: name });
           }
-          if (b.ahead) {
-            const aheadTxt = "Ahead of remote by " + b.ahead + " commit" + (b.ahead > 1 ? "s" : "");
-            trackHtml += '<span class="track-badge ahead" style="color:#3fb950;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + aheadTxt + '" title="' + aheadTxt + '">↗ ' + b.ahead + '</span>';
-          }
-          trackHtml += '</span>';
         }
-        return trackHtml;
-      }
 
-      const svgTagIcon = '<svg width="13" height="13" viewBox="0 0 16 16" fill="#e5a50a" style="display:block;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>';
-      const svgBranchWhite = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="display:block;color:#dfe1e5;"><path d="M11.75 2.5a1.75 1.75 0 1 0-2.45 1.6 4.75 4.75 0 0 0-4.05 4.65v.5a2.5 2.5 0 1 0 1.5 0v-.5c0-1.8 1.45-3.25 3.25-3.25h.25a1.75 1.75 0 0 0 1.5-3zM4 12.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm7-9a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>';
-
-      if (currentBranch && filterFn(currentBranch)) {
-        const headSec = createSec("HEAD (Current Branch)", true);
-        const item = document.createElement("div");
-        item.className = "tree-item current-head" + (currentActive === currentBranch ? " active" : "");
-        const curInfo = branches.find((b) => b.name === currentBranch);
-        const trackHtml = getTrackingHtml(curInfo);
-        item.innerHTML = '<span class="tree-item-icon">' + svgTagIcon + '</span> <span class="branch-name" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + currentBranch + '</span>' + trackHtml;
-        item.addEventListener("click", () => handleBranchClick(currentBranch));
-        item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, currentBranch));
-        headSec.bdy.appendChild(item);
-        treeContent.appendChild(headSec.sec);
-      }
-
-      function createTreeNode(name = "", fullPath = "") {
-        return { name, fullPath, folders: {}, branches: [] };
-      }
-
-      function insertBranchIntoTree(root, parts, branchObj) {
-        let current = root;
-        for (let i = 0; i < parts.length - 1; i++) {
-          const part = parts[i];
-          if (!current.folders[part]) {
-            const nextPath = current.fullPath ? current.fullPath + "/" + part : part;
-            current.folders[part] = createTreeNode(part, nextPath);
+        function getTrackingHtml(b) {
+          if (!b) return "";
+          let trackHtml = "";
+          if (b.behind || b.ahead) {
+            trackHtml = '<span class="branch-track" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:11px;font-family:var(--vscode-editor-font-family, monospace);">';
+            if (b.behind) {
+              const behindTxt = "Behind remote by " + b.behind + " commit" + (b.behind > 1 ? "s" : "");
+              trackHtml += '<span class="track-badge behind" style="color:#58a6ff;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + behindTxt + '" title="' + behindTxt + '">↙ ' + b.behind + '</span>';
+            }
+            if (b.ahead) {
+              const aheadTxt = "Ahead of remote by " + b.ahead + " commit" + (b.ahead > 1 ? "s" : "");
+              trackHtml += '<span class="track-badge ahead" style="color:#3fb950;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + aheadTxt + '" title="' + aheadTxt + '">↗ ' + b.ahead + '</span>';
+            }
+            trackHtml += '</span>';
           }
-          current = current.folders[part];
+          return trackHtml;
         }
-        const leafName = parts[parts.length - 1];
-        current.branches.push({ ...branchObj, leafName });
-      }
 
-      function renderTreeLevel(container, node, isOpenDefault = true) {
-        // 1. Subfolders sorted alphabetically
-        const folderKeys = Object.keys(node.folders).sort((a, b) => a.localeCompare(b));
-        for (const fk of folderKeys) {
-          const subNode = node.folders[fk];
-          const fDiv = document.createElement("div");
-          fDiv.className = "tree-folder";
+        const svgTagIcon = '<svg width="13" height="13" viewBox="0 0 16 16" fill="#e5a50a" style="display:block;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>';
+        const svgBranchWhite = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="display:block;color:#dfe1e5;"><path d="M11.75 2.5a1.75 1.75 0 1 0-2.45 1.6 4.75 4.75 0 0 0-4.05 4.65v.5a2.5 2.5 0 1 0 1.5 0v-.5c0-1.8 1.45-3.25 3.25-3.25h.25a1.75 1.75 0 0 0 1.5-3zM4 12.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm7-9a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>';
 
-          const fHdr = document.createElement("div");
-          fHdr.className = "tree-folder-header";
-          const folderIconSvg = '<span class="tree-item-icon" style="color:#8c8c8c;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M1.5 3.5C1.5 2.67 2.17 2 3 2H6.2C6.6 2 6.98 2.16 7.26 2.44L8.56 3.74C8.84 4.02 9.22 4.18 9.62 4.18H13C13.83 4.18 14.5 4.85 14.5 5.68V12.5C14.5 13.33 13.83 14 13 14H3C2.17 14 1.5 13.33 1.5 12.5V3.5Z"/></svg></span>';
-          fHdr.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> ' + folderIconSvg + ' <span>' + fk + '</span>';
+        if (currentBranch && filterFn(currentBranch)) {
+          const headSec = createSec("HEAD (Current Branch)", true);
+          const item = document.createElement("div");
+          item.className = "tree-item current-head" + (currentActive === currentBranch ? " active" : "");
+          const curInfo = branches.find((b) => b.name === currentBranch);
+          const trackHtml = getTrackingHtml(curInfo);
+          item.innerHTML = '<span class="tree-item-icon">' + svgTagIcon + '</span> <span class="branch-name" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + currentBranch + '</span>' + trackHtml;
+          item.addEventListener("click", () => handleBranchClick(currentBranch));
+          item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, currentBranch));
+          headSec.bdy.appendChild(item);
+          treeContent.appendChild(headSec.sec);
+        }
 
-          const fBdy = document.createElement("div");
-          fBdy.className = "tree-folder-body";
-          fBdy.style.paddingLeft = "14px";
-          fBdy.style.display = isOpenDefault ? "block" : "none";
+        function createTreeNode(name = "", fullPath = "") {
+          return { name, fullPath, folders: {}, branches: [] };
+        }
 
-          fHdr.addEventListener("click", () => {
-            const open = fBdy.style.display !== "none";
-            fBdy.style.display = open ? "none" : "block";
-            fHdr.querySelector(".arrow").textContent = open ? "▸" : "▾";
+        function insertBranchIntoTree(root, parts, branchObj) {
+          let current = root;
+          for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (!current.folders[part]) {
+              const nextPath = current.fullPath ? current.fullPath + "/" + part : part;
+              current.folders[part] = createTreeNode(part, nextPath);
+            }
+            current = current.folders[part];
+          }
+          const leafName = parts[parts.length - 1];
+          current.branches.push({ ...branchObj, leafName });
+        }
+
+        function renderTreeLevel(lvlContainer, node, isOpenDefault = true) {
+          const folderKeys = Object.keys(node.folders).sort((a, b) => a.localeCompare(b));
+          for (const fk of folderKeys) {
+            const subNode = node.folders[fk];
+            const fDiv = document.createElement("div");
+            fDiv.className = "tree-folder";
+
+            const fHdr = document.createElement("div");
+            fHdr.className = "tree-folder-header";
+            const folderIconSvg = '<span class="tree-item-icon" style="color:#8c8c8c;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M1.5 3.5C1.5 2.67 2.17 2 3 2H6.2C6.6 2 6.98 2.16 7.26 2.44L8.56 3.74C8.84 4.02 9.22 4.18 9.62 4.18H13C13.83 4.18 14.5 4.85 14.5 5.68V12.5C14.5 13.33 13.83 14 13 14H3C2.17 14 1.5 13.33 1.5 12.5V3.5Z"/></svg></span>';
+            fHdr.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> ' + folderIconSvg + ' <span>' + fk + '</span>';
+
+            const fBdy = document.createElement("div");
+            fBdy.className = "tree-folder-body";
+            fBdy.style.paddingLeft = "14px";
+            fBdy.style.display = isOpenDefault ? "block" : "none";
+
+            fHdr.addEventListener("click", () => {
+              const open = fBdy.style.display !== "none";
+              fBdy.style.display = open ? "none" : "block";
+              fHdr.querySelector(".arrow").textContent = open ? "▸" : "▾";
+            });
+
+            fDiv.appendChild(fHdr);
+            renderTreeLevel(fBdy, subNode, isOpenDefault);
+            fDiv.appendChild(fBdy);
+            lvlContainer.appendChild(fDiv);
+          }
+
+          const sortedBranches = node.branches.slice().sort((a, b) => {
+            if (a.name === currentBranch) return -1;
+            if (b.name === currentBranch) return 1;
+            return a.leafName.localeCompare(b.leafName);
           });
 
-          fDiv.appendChild(fHdr);
-          renderTreeLevel(fBdy, subNode, isOpenDefault);
-          fDiv.appendChild(fBdy);
-          container.appendChild(fDiv);
+          for (const b of sortedBranches) {
+            const item = document.createElement("div");
+            item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+
+            const isCur = (b.name === currentBranch);
+            const isStar = b.leafName === "develop" || b.leafName === "main" || b.leafName === "master";
+
+            let icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
+            if (isCur) icon = '<span class="tree-item-icon">' + svgTagIcon + '</span>';
+            else if (isStar) icon = '<span class="tree-item-icon"><span style="color:#e5a50a;font-size:13px;line-height:1;">★</span></span>';
+
+            const trackHtml = getTrackingHtml(b);
+            item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
+            item.title = b.name;
+            item.addEventListener("click", () => handleBranchClick(b.name));
+            item.addEventListener("dblclick", () => postMessage("checkout", b.name));
+            item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
+            lvlContainer.appendChild(item);
+          }
         }
 
-        // 2. Branch leaf items (sorted alphabetically, current branch at top if present)
-        const sortedBranches = node.branches.slice().sort((a, b) => {
-          if (a.name === currentBranch) return -1;
-          if (b.name === currentBranch) return 1;
-          return a.leafName.localeCompare(b.leafName);
+        const localList = branches.filter((b) => !b.remote && !b.name.startsWith("origin/") && filterFn(b.name));
+        if (localList.length > 0) {
+          const localSec = createSec("Local", true);
+          const localTree = createTreeNode();
+          for (const b of localList) {
+            const parts = b.name.split("/");
+            insertBranchIntoTree(localTree, parts, b);
+          }
+          renderTreeLevel(localSec.bdy, localTree, true);
+          treeContent.appendChild(localSec.sec);
+        }
+
+        const remoteList = branches.filter((b) => b.remote || b.name.startsWith("origin/")).filter((b) => filterFn(b.name));
+        if (remoteList.length > 0) {
+          const remoteSec = createSec("Remote", true);
+          const remoteTree = createTreeNode();
+          for (const b of remoteList) {
+            const parts = b.name.split("/");
+            insertBranchIntoTree(remoteTree, parts, { ...b, remote: true });
+          }
+          renderTreeLevel(remoteSec.bdy, remoteTree, true);
+          treeContent.appendChild(remoteSec.sec);
+        }
+
+        if (tags.length > 0) {
+          const tagSec = createSec("Tags", false);
+          for (const t of tags.filter((t) => filterFn(t.name))) {
+            const item = document.createElement("div");
+            item.className = "tree-item";
+            item.innerHTML = '<span class="tree-item-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="#d29922" style="display:block;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + t.name + '</span>';
+            item.addEventListener("click", () => handleBranchClick(t.name));
+            tagSec.bdy.appendChild(item);
+          }
+          treeContent.appendChild(tagSec.sec);
+        }
+
+        treeContent.querySelectorAll(".track-badge").forEach((badge) => {
+          attachTooltip(badge, badge.dataset.tooltip || badge.title || "", "", "bottom");
+        });
+      }
+
+      if (!strip || !mainArea || !sInput || !treeContent) {
+        container.innerHTML = "";
+
+        strip = document.createElement("div");
+        strip.className = "sidebar-strip";
+
+        function addStripBtn(iconSvg, title, onClick, extraClass = "", shortcut = "") {
+          const btn = document.createElement("button");
+          btn.className = "sidebar-strip-btn " + extraClass;
+          btn.innerHTML = iconSvg;
+          attachTooltip(btn, title, shortcut);
+          btn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            onClick(btn);
+          });
+          strip.appendChild(btn);
+          return btn;
+        }
+
+        const collapseSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+        const expandSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        const isCollapsed = container.classList.contains("collapsed");
+        const collapseBtn = addStripBtn(isCollapsed ? expandSvg : collapseSvg, isCollapsed ? "Expand Branches" : "Collapse Branches", (btn) => {
+          container.classList.toggle("collapsed");
+          const coll = container.classList.contains("collapsed");
+          btn.innerHTML = coll ? expandSvg : collapseSvg;
+          updateTooltip(btn, coll ? "Expand Branches" : "Collapse Branches");
         });
 
-        for (const b of sortedBranches) {
-          const item = document.createElement("div");
-          item.className = "tree-item" + (currentActive === b.name ? " active" : "");
+        // New branch (+)
+        addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch...", () => {
+          const base = get(activeBranch) || currentBranch || "HEAD";
+          const name = prompt("New branch name (from '" + base + "'):");
+          if (name && name.trim()) postMessage("createBranch", { name: name.trim(), startPoint: base });
+        }, "", "+");
 
-          const isCur = (b.name === currentBranch);
-          const isStar = b.leafName === "develop" || b.leafName === "main" || b.leafName === "master";
+        // Fetch / Update Selected Branch (↙)
+        addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch", () => {
+          const target = get(activeBranch) || currentBranch;
+          if (target) {
+            postMessage("pull", target);
+          }
+        }, "", "Fetch/Pull");
 
-          let icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
-          if (isCur) icon = '<span class="tree-item-icon">' + svgTagIcon + '</span>';
-          else if (isStar) icon = '<span class="tree-item-icon"><span style="color:#e5a50a;font-size:13px;line-height:1;">★</span></span>';
+        // Delete Selected Branch (🗑)
+        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch", () => {
+          const target = get(activeBranch);
+          if (!target) {
+            alert("Please select a branch to delete");
+          } else if (target === currentBranch) {
+            alert("Cannot delete the currently checked out branch '" + target + "'");
+          } else if (confirm("Delete branch '" + target + "'?")) {
+            postMessage("deleteBranch", target);
+          }
+        }, "", "Delete");
 
-          const trackHtml = getTrackingHtml(b);
-          item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
-          item.title = b.name;
-          item.addEventListener("click", () => handleBranchClick(b.name));
-          item.addEventListener("dblclick", () => postMessage("checkout", b.name));
-          item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
-          container.appendChild(item);
-        }
+        // Fetch All (⇄)
+        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="17" x2="4" y2="17"></line><polyline points="10 11 4 17 10 23"></polyline><line x1="4" y1="7" x2="20" y2="7"></line><polyline points="14 1 20 7 14 13"></polyline></svg>', "Fetch All Remotes", () => {
+          postMessage("fetchAll");
+        }, "", "git fetch --all");
+
+        // Search (Q)
+        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', "Search Branches", () => {
+          if (container.classList.contains("collapsed")) {
+            container.classList.remove("collapsed");
+            collapseBtn.innerHTML = collapseSvg;
+            updateTooltip(collapseBtn, "Collapse Branches");
+          }
+          if (sInput) {
+            sInput.focus();
+            sInput.select();
+          }
+        }, "", "Search");
+
+        // Expand / Collapse all
+        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>', "Expand / Collapse All Folders", () => {
+          const bodies = treeContent.querySelectorAll(".tree-section-body, .tree-folder-body");
+          let anyOpen = false;
+          bodies.forEach(b => { if (b.style.display !== "none") anyOpen = true; });
+          bodies.forEach(b => { b.style.display = anyOpen ? "none" : "block"; });
+          treeContent.querySelectorAll(".arrow").forEach(a => { a.textContent = anyOpen ? "▸" : "▾"; });
+        });
+
+        // Star / Favorites Filter
+        const favOnly = container.dataset.favOnly === "true";
+        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="' + (favOnly ? "#e5a50a" : "none") + '" stroke="' + (favOnly ? "#e5a50a" : "currentColor") + '" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>', favOnly ? "Show All Branches" : "Filter Favorite Branches (★)", (btn) => {
+          const nowFav = container.dataset.favOnly !== "true";
+          container.dataset.favOnly = nowFav ? "true" : "false";
+          btn.classList.toggle("active", nowFav);
+          btn.querySelector("svg").setAttribute("fill", nowFav ? "#e5a50a" : "none");
+          btn.querySelector("svg").setAttribute("stroke", nowFav ? "#e5a50a" : "currentColor");
+          populateTree();
+        }, favOnly ? "active" : "");
+
+        // Locate Current Branch (HEAD)
+        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>', "Locate Current Branch (HEAD)", () => {
+          if (currentBranch) {
+            handleBranchClick(currentBranch);
+          }
+        });
+
+        container.appendChild(strip);
+
+        mainArea = document.createElement("div");
+        mainArea.className = "sidebar-main";
+
+        const searchBox = document.createElement("div");
+        searchBox.className = "branch-search-box";
+        sInput = document.createElement("input");
+        sInput.type = "text";
+        sInput.className = "branch-search-input";
+        sInput.placeholder = "Search branches...";
+        sInput.addEventListener("input", (e) => {
+          populateTree(e.target.value);
+        });
+        searchBox.appendChild(sInput);
+        mainArea.appendChild(searchBox);
+
+        treeContent = document.createElement("div");
+        treeContent.className = "branch-tree-content";
+        mainArea.appendChild(treeContent);
+        container.appendChild(mainArea);
       }
 
-      const localList = branches.filter((b) => !b.remote && !b.name.startsWith("origin/") && filterFn(b.name));
-      if (localList.length > 0) {
-        const localSec = createSec("Local", true);
-        const localTree = createTreeNode();
-        for (const b of localList) {
-          const parts = b.name.split("/");
-          insertBranchIntoTree(localTree, parts, b);
-        }
-        renderTreeLevel(localSec.bdy, localTree, true);
-        treeContent.appendChild(localSec.sec);
-      }
-
-      const remoteList = branches.filter((b) => b.remote || b.name.startsWith("origin/")).filter((b) => filterFn(b.name));
-      if (remoteList.length > 0) {
-        const remoteSec = createSec("Remote", true);
-        const remoteTree = createTreeNode();
-        for (const b of remoteList) {
-          const parts = b.name.split("/");
-          insertBranchIntoTree(remoteTree, parts, { ...b, remote: true });
-        }
-        renderTreeLevel(remoteSec.bdy, remoteTree, true);
-        treeContent.appendChild(remoteSec.sec);
-      }
-
-      if (tags.length > 0) {
-        const tagSec = createSec("Tags", false);
-        for (const t of tags.filter((t) => filterFn(t.name))) {
-          const item = document.createElement("div");
-          item.className = "tree-item";
-          item.innerHTML = '<span class="tree-item-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="#d29922" style="display:block;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + t.name + '</span>';
-          item.addEventListener("click", () => handleBranchClick(t.name));
-          tagSec.bdy.appendChild(item);
-        }
-        treeContent.appendChild(tagSec.sec);
-      }
-
-      mainArea.appendChild(treeContent);
-      container.appendChild(mainArea);
-
-      treeContent.querySelectorAll(".track-badge").forEach((badge) => {
-        attachTooltip(badge, badge.dataset.tooltip || badge.title || "", "", "bottom");
-      });
+      populateTree();
     }
 
     var div = root5();

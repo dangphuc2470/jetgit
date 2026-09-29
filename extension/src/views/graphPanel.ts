@@ -87,6 +87,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       } catch { /* ignore */ }
 
       // Align with Android Studio: Default to filtering by active branch ONLY ONCE on initial startup
+      this.hasReachedEnd = false;
+      this.isLoadingMore = false;
       if (!this.hasInitializedFilter) {
         this.hasInitializedFilter = true;
         this.currentFilter = currentBranch ? { branch: currentBranch, all: false } : { all: true };
@@ -227,7 +229,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         const skip = this.allCommits.length;
         try {
           const more = await this.gitService.getLog({
-            maxCount: 100,
+            maxCount: 300,
             skip,
             ...this.currentFilter,
           });

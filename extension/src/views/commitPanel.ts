@@ -211,12 +211,46 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'stageFiles': {
+        const filePaths = msg.payload as string[];
+        if (!filePaths || filePaths.length === 0) return;
+        try {
+          await this.gitService.stageFiles(filePaths);
+          if (CommitReviewPanel.currentPanel) {
+            const current = CommitReviewPanel.currentPanel.getCurrentFilePath();
+            if (current && filePaths.includes(current)) {
+              await CommitReviewPanel.currentPanel.loadFile(current, this.allFilePaths);
+            }
+          }
+          await this.refresh();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Stage failed: ${err.message}`);
+        }
+        break;
+      }
       case 'unstageFile': {
         const filePath = msg.payload as string;
         try {
           await this.gitService.unstageFile(filePath);
           if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
             await CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+          }
+          await this.refresh();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Unstage failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'unstageFiles': {
+        const filePaths = msg.payload as string[];
+        if (!filePaths || filePaths.length === 0) return;
+        try {
+          await this.gitService.unstageFiles(filePaths);
+          if (CommitReviewPanel.currentPanel) {
+            const current = CommitReviewPanel.currentPanel.getCurrentFilePath();
+            if (current && filePaths.includes(current)) {
+              await CommitReviewPanel.currentPanel.loadFile(current, this.allFilePaths);
+            }
           }
           await this.refresh();
         } catch (err: any) {

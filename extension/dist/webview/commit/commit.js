@@ -392,15 +392,14 @@
     chk.addEventListener('change', (e) => {
       e.stopPropagation();
       const check = chk.checked;
-      files.forEach(f => {
-        if (check) {
-          state.checkedFiles.add(f.path);
-          vscode.postMessage({ type: 'stageFile', payload: f.path });
-        } else {
-          state.checkedFiles.delete(f.path);
-          vscode.postMessage({ type: 'unstageFile', payload: f.path });
-        }
-      });
+      const paths = files.map(f => f.path);
+      if (check) {
+        paths.forEach(p => state.checkedFiles.add(p));
+        vscode.postMessage({ type: 'stageFiles', payload: paths });
+      } else {
+        paths.forEach(p => state.checkedFiles.delete(p));
+        vscode.postMessage({ type: 'unstageFiles', payload: paths });
+      }
       render();
     });
 

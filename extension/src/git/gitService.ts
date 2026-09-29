@@ -361,9 +361,37 @@ export class GitService {
   }
 
   async pull(branch?: string): Promise<string> {
-    const args = ['pull'];
-    if (branch) args.push('origin', branch);
-    return this.exec(args);
+    const currentBranch = await this.getCurrentBranch();
+    if (!branch || branch === currentBranch) {
+      return this.exec(['pull']);
+    }
+
+    // Updating a different local branch without checking it out:
+    // Safely update branch ref using git fetch <remote> <branch>:<branch>
+    try {
+      const remotesOutput = await this.exec(['remote']);
+      const remotes = remotesOutput.split('\n').map(s => s.trim()).filter(Boolean);
+      const remote = remotes[0] || 'origin';
+
+      let targetBranch = branch;
+      if (branch.startsWith(remote + '/')) {
+        targetBranch = branch.slice(remote.length + 1);
+      }
+
+      const branchCheck = await this.exec(['branch', '--list', targetBranch]);
+      if (branchCheck.trim()) {
+        const out = await this.exec(['fetch', remote, `${targetBranch}:${targetBranch}`]);
+        return out || `Updated branch '${targetBranch}' successfully.`;
+      } else {
+        const out = await this.exec(['fetch', remote, targetBranch]);
+        return out || `Fetched '${targetBranch}' successfully.`;
+      }
+    } catch (err: any) {
+      if (err.message && (err.message.includes('non-fast-forward') || err.message.includes('rejected'))) {
+        throw new Error(`Cannot fast-forward branch '${branch}' because local commits diverged. Please checkout '${branch}' to merge or rebase.`);
+      }
+      throw err;
+    }
   }
 
   async push(branch?: string): Promise<string> {

@@ -434,10 +434,10 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         const branch = msg.payload as string;
         try {
           const out = await this.gitService.pull(branch);
-          vscode.window.showInformationMessage(`Pulled ${branch}: ${out || 'Already up to date.'}`);
+          vscode.window.showInformationMessage(`Updated ${branch}: ${out || 'Already up to date.'}`);
           this.loadInitialData();
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Pull failed: ${err.message}`);
+          vscode.window.showErrorMessage(`Update failed: ${err.message}`);
         }
         break;
       }

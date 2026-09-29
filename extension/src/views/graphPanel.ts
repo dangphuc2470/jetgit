@@ -14,6 +14,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private lastBranches: BranchInfo[] = [];
   private lastTags: TagInfo[] = [];
   private hasInitializedFilter = false;
+  private isRefreshing = false;
+  private queuedRefresh = false;
   private currentFilter: {
     branch?: string;
     author?: string;
@@ -716,6 +718,11 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
   async refresh(): Promise<void> {
     if (!this.view || !this.view.visible) return;
+    if (this.isRefreshing) {
+      this.queuedRefresh = true;
+      return;
+    }
+    this.isRefreshing = true;
     this.hasReachedEnd = false;
     this.isLoadingMore = false;
     try {
@@ -738,7 +745,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       this.graphNodes = buildGraph(this.allCommits);
       this.sendCommits();
       this.sendBranches(branches, tags);
-    } catch { /* ignore */ }
+    } catch { /* ignore */ } finally {
+      this.isRefreshing = false;
+      if (this.queuedRefresh) {
+        this.queuedRefresh = false;
+        this.refresh();
+      }
+    }
   }
 
   show(): void {

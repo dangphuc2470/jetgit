@@ -9,8 +9,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
   private view?: vscode.WebviewView;
   private allFilePaths: string[] = [];
-  private pollTimer?: NodeJS.Timeout;
   private lastStatusHash = '';
+  private isRefreshing = false;
+  private queuedRefresh = false;
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -39,60 +40,36 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
-        this.startPolling();
-      } else {
-        this.stopPolling();
       }
     });
-
-    if (webviewView.visible) {
-      this.startPolling();
-    }
 
     this.refresh();
   }
 
-  private startPolling(): void {
-    if (this.pollTimer) return;
-    this.pollTimer = setInterval(async () => {
-      if (!this.view || !this.view.visible) return;
-      try {
-        const quickStatus = await this.gitService.exec(['status', '--porcelain=v1', '-uall']).catch(() => '');
-        if (quickStatus !== this.lastStatusHash) {
-          await this.refresh();
-        }
-      } catch {
-        // ignore
-      }
-    }, 2000);
-  }
-
-  private stopPolling(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = undefined;
-    }
-  }
-
   async refresh(): Promise<void> {
     if (!this.view) return;
-
-    const isRepo = await this.gitService.isGitRepo();
-    if (!isRepo) {
-      this.view.webview.postMessage({
-        type: 'status',
-        payload: {
-          files: [],
-          changesCount: 0,
-          unversionedCount: 0,
-          recentMessages: [],
-          stashes: [],
-        },
-      });
+    if (this.isRefreshing) {
+      this.queuedRefresh = true;
       return;
     }
+    this.isRefreshing = true;
 
     try {
+      const isRepo = await this.gitService.isGitRepo();
+      if (!isRepo) {
+        this.view.webview.postMessage({
+          type: 'status',
+          payload: {
+            files: [],
+            changesCount: 0,
+            unversionedCount: 0,
+            recentMessages: [],
+            stashes: [],
+          },
+        });
+        return;
+      }
+
       const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
@@ -154,6 +131,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       });
     } catch (err: any) {
       this.log.appendLine(`Commit panel status fetch failed: ${err.message}`);
+    } finally {
+      this.isRefreshing = false;
+      if (this.queuedRefresh) {
+        this.queuedRefresh = false;
+        this.refresh();
+      }
     }
   }
 

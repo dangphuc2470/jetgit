@@ -37,9 +37,14 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
     this.dataPath = path.join(vscodePath, 'changelists.json');
     this.load();
 
-    // Watch for file changes that should auto-assign to active changelist
-    vscode.workspace.onDidCreateFiles(() => this.syncWithGitStatus());
-    vscode.workspace.onDidSaveTextDocument(() => this.syncWithGitStatus());
+    // Watch for file changes that should auto-assign to active changelist (debounced)
+    let syncTimer: NodeJS.Timeout | undefined;
+    const debouncedSync = () => {
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => this.syncWithGitStatus(), 300);
+    };
+    vscode.workspace.onDidCreateFiles(debouncedSync);
+    vscode.workspace.onDidSaveTextDocument(debouncedSync);
   }
 
   refresh(): void {

@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { GitService } from '../git/gitService';
 
 export class MergeProvider implements vscode.Disposable {
@@ -11,17 +13,29 @@ export class MergeProvider implements vscode.Disposable {
       100,
     );
     this.statusBarItem.command = 'intellij-git.resolveConflicts';
-
-    // Watch for git status changes by polling (no FS watcher needed for .git internals)
-    const interval = setInterval(() => this.checkForConflicts(), 3000);
-    this.disposables.push({ dispose: () => clearInterval(interval) });
     this.disposables.push(this.statusBarItem);
 
     this.checkForConflicts();
   }
 
+  refresh(): void {
+    this.checkForConflicts();
+  }
+
   private async checkForConflicts(): Promise<void> {
     try {
+      const gitDir = path.join(this.workspaceRoot, '.git');
+      // Only execute git commands when an active merge/rebase/cherry-pick conflict actually exists
+      const hasConflictState =
+        fs.existsSync(path.join(gitDir, 'MERGE_HEAD')) ||
+        fs.existsSync(path.join(gitDir, 'rebase-apply')) ||
+        fs.existsSync(path.join(gitDir, 'rebase-merge')) ||
+        fs.existsSync(path.join(gitDir, 'CHERRY_PICK_HEAD'));
+
+      if (!hasConflictState) {
+        this.statusBarItem.hide();
+        return;
+      }
       const unmerged = await this.gitService.getUnmergedFiles();
       if (unmerged.length > 0) {
         this.statusBarItem.text = `$(git-merge) ${unmerged.length} conflict${unmerged.length > 1 ? 's' : ''}`;

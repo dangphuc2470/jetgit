@@ -307,7 +307,7 @@ export function activate(context: vscode.ExtensionContext): void {
     };
   }
 
-  // 1. Watch for git changes (commits, branches, index, tags, logs) to refresh views in real-time
+  // 1. Watch for git changes (commits, branches, index, tags, logs, conflicts) in real-time
   const gitWatcher = vscode.workspace.createFileSystemWatcher(
     new vscode.RelativePattern(workspaceRoot, '.git/**'),
   );
@@ -316,16 +316,18 @@ export function activate(context: vscode.ExtensionContext): void {
     branchTree.refresh();
     graphViewProvider.refresh();
     commitViewProvider.refresh();
+    mergeProvider.refresh();
     if (CommitReviewPanel.currentPanel) {
       CommitReviewPanel.currentPanel.refresh();
     }
-  }, 200);
+  }, 250);
   gitWatcher.onDidChange(onGitChange);
   gitWatcher.onDidCreate(onGitChange);
   gitWatcher.onDidDelete(onGitChange);
   context.subscriptions.push(gitWatcher);
 
   // Hook into built-in vscode.git extension for guaranteed instant git state changes
+  // Note: vscode.git already handles .gitignore rules and working tree file watching without CPU overhead
   try {
     const gitExt = vscode.extensions.getExtension('vscode.git');
     if (gitExt) {
@@ -358,23 +360,20 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // 3. Watch for workspace file create / delete / modify to update changes in real-time
-  const workspaceWatcher = vscode.workspace.createFileSystemWatcher('**/*');
-  const onWorkspaceFsChange = debounce((uri: vscode.Uri) => {
-    if (uri.fsPath.includes('/.git/') || uri.fsPath.includes('/node_modules/')) return;
-    commitViewProvider.refresh();
-  }, 300);
-  workspaceWatcher.onDidCreate(onWorkspaceFsChange);
-  workspaceWatcher.onDidDelete(onWorkspaceFsChange);
-  workspaceWatcher.onDidChange(onWorkspaceFsChange);
-  context.subscriptions.push(workspaceWatcher);
+  // 3. Watch for file create / delete / rename within editor workspace (respects editor boundaries)
+  context.subscriptions.push(
+    vscode.workspace.onDidCreateFiles(() => commitViewProvider.refresh()),
+    vscode.workspace.onDidDeleteFiles(() => commitViewProvider.refresh()),
+    vscode.workspace.onDidRenameFiles(() => commitViewProvider.refresh()),
+  );
 
-  // 4. Auto-sync on window focus (like IntelliJ frame deactivation/activation sync)
+  // 4. Auto-sync on window focus (IntelliJ frame activation sync)
   context.subscriptions.push(
     vscode.window.onDidChangeWindowState(e => {
       if (e.focused) {
         commitViewProvider.refresh();
         branchTree.refresh();
+        mergeProvider.refresh();
       }
     }),
   );

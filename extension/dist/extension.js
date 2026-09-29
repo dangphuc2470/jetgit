@@ -393,8 +393,8 @@ var GitService = class {
     const output = await this.exec(["diff", "--name-only", "--diff-filter=U"]);
     return output.split("\n").filter((l) => l.trim());
   }
-  async stageFile(path6) {
-    await this.exec(["add", path6]);
+  async stageFile(path7) {
+    await this.exec(["add", path7]);
   }
   async stageFiles(paths) {
     await this.exec(["add", "--", ...paths]);
@@ -410,8 +410,8 @@ var GitService = class {
       proc.stdin?.end();
     });
   }
-  async unstageFile(path6) {
-    await this.exec(["reset", "HEAD", "--", path6]);
+  async unstageFile(path7) {
+    await this.exec(["reset", "HEAD", "--", path7]);
   }
   async unstageFiles(paths) {
     await this.exec(["reset", "HEAD", "--", ...paths]);
@@ -822,6 +822,8 @@ var GraphViewProvider = class {
   lastBranches = [];
   lastTags = [];
   hasInitializedFilter = false;
+  isRefreshing = false;
+  queuedRefresh = false;
   currentFilter = {};
   resolveWebviewView(webviewView, _context, _token) {
     this.view = webviewView;
@@ -1178,8 +1180,8 @@ var GraphViewProvider = class {
           if (picked) {
             const filePath = picked.file.path;
             const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
-            const path6 = require("path");
-            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
+            const path7 = require("path");
+            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode2.Uri.file(path7.join(this.gitService.getCwd(), filePath));
             const fileName = filePath.split("/").pop() || filePath;
             await vscode2.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${branch} \u2194 Working Tree)`);
           }
@@ -1351,8 +1353,8 @@ var GraphViewProvider = class {
           if (picked) {
             const filePath = picked.file.path;
             const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
-            const path6 = require("path");
-            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode2.Uri.file(path6.join(this.gitService.getCwd(), filePath));
+            const path7 = require("path");
+            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode2.Uri.file(path7.join(this.gitService.getCwd(), filePath));
             const fileName = filePath.split("/").pop() || filePath;
             await vscode2.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${hash.slice(0, 8)} \u2194 Working Tree)`);
           }
@@ -1468,6 +1470,11 @@ var GraphViewProvider = class {
   }
   async refresh() {
     if (!this.view || !this.view.visible) return;
+    if (this.isRefreshing) {
+      this.queuedRefresh = true;
+      return;
+    }
+    this.isRefreshing = true;
     this.hasReachedEnd = false;
     this.isLoadingMore = false;
     try {
@@ -1491,6 +1498,12 @@ var GraphViewProvider = class {
       this.sendCommits();
       this.sendBranches(branches, tags);
     } catch {
+    } finally {
+      this.isRefreshing = false;
+      if (this.queuedRefresh) {
+        this.queuedRefresh = false;
+        this.refresh();
+      }
     }
   }
   show() {
@@ -1891,8 +1904,9 @@ var CommitViewProvider = class {
   static viewType = "intellij-git.commitView";
   view;
   allFilePaths = [];
-  pollTimer;
   lastStatusHash = "";
+  isRefreshing = false;
+  queuedRefresh = false;
   resolveWebviewView(webviewView, _context, _token) {
     this.view = webviewView;
     webviewView.webview.options = {
@@ -1906,52 +1920,32 @@ var CommitViewProvider = class {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
-        this.startPolling();
-      } else {
-        this.stopPolling();
       }
     });
-    if (webviewView.visible) {
-      this.startPolling();
-    }
     this.refresh();
-  }
-  startPolling() {
-    if (this.pollTimer) return;
-    this.pollTimer = setInterval(async () => {
-      if (!this.view || !this.view.visible) return;
-      try {
-        const quickStatus = await this.gitService.exec(["status", "--porcelain=v1", "-uall"]).catch(() => "");
-        if (quickStatus !== this.lastStatusHash) {
-          await this.refresh();
-        }
-      } catch {
-      }
-    }, 2e3);
-  }
-  stopPolling() {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = void 0;
-    }
   }
   async refresh() {
     if (!this.view) return;
-    const isRepo = await this.gitService.isGitRepo();
-    if (!isRepo) {
-      this.view.webview.postMessage({
-        type: "status",
-        payload: {
-          files: [],
-          changesCount: 0,
-          unversionedCount: 0,
-          recentMessages: [],
-          stashes: []
-        }
-      });
+    if (this.isRefreshing) {
+      this.queuedRefresh = true;
       return;
     }
+    this.isRefreshing = true;
     try {
+      const isRepo = await this.gitService.isGitRepo();
+      if (!isRepo) {
+        this.view.webview.postMessage({
+          type: "status",
+          payload: {
+            files: [],
+            changesCount: 0,
+            unversionedCount: 0,
+            recentMessages: [],
+            stashes: []
+          }
+        });
+        return;
+      }
       const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
@@ -2006,6 +2000,12 @@ var CommitViewProvider = class {
       });
     } catch (err) {
       this.log.appendLine(`Commit panel status fetch failed: ${err.message}`);
+    } finally {
+      this.isRefreshing = false;
+      if (this.queuedRefresh) {
+        this.queuedRefresh = false;
+        this.refresh();
+      }
     }
   }
   parseChangesPerFile(diffText) {
@@ -2556,8 +2556,13 @@ var ChangelistTreeProvider = class {
     const vscodePath = path5.join(workspaceRoot, ".vscode");
     this.dataPath = path5.join(vscodePath, "changelists.json");
     this.load();
-    vscode7.workspace.onDidCreateFiles(() => this.syncWithGitStatus());
-    vscode7.workspace.onDidSaveTextDocument(() => this.syncWithGitStatus());
+    let syncTimer;
+    const debouncedSync = () => {
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => this.syncWithGitStatus(), 300);
+    };
+    vscode7.workspace.onDidCreateFiles(debouncedSync);
+    vscode7.workspace.onDidSaveTextDocument(debouncedSync);
   }
   gitService;
   workspaceRoot;
@@ -2996,6 +3001,8 @@ var BlameDecorationProvider = class {
 
 // src/providers/mergeProvider.ts
 var vscode9 = __toESM(require("vscode"));
+var path6 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
 var MergeProvider = class {
   constructor(gitService, workspaceRoot) {
     this.gitService = gitService;
@@ -3005,8 +3012,6 @@ var MergeProvider = class {
       100
     );
     this.statusBarItem.command = "intellij-git.resolveConflicts";
-    const interval = setInterval(() => this.checkForConflicts(), 3e3);
-    this.disposables.push({ dispose: () => clearInterval(interval) });
     this.disposables.push(this.statusBarItem);
     this.checkForConflicts();
   }
@@ -3014,8 +3019,17 @@ var MergeProvider = class {
   workspaceRoot;
   disposables = [];
   statusBarItem;
+  refresh() {
+    this.checkForConflicts();
+  }
   async checkForConflicts() {
     try {
+      const gitDir = path6.join(this.workspaceRoot, ".git");
+      const hasConflictState = fs5.existsSync(path6.join(gitDir, "MERGE_HEAD")) || fs5.existsSync(path6.join(gitDir, "rebase-apply")) || fs5.existsSync(path6.join(gitDir, "rebase-merge")) || fs5.existsSync(path6.join(gitDir, "CHERRY_PICK_HEAD"));
+      if (!hasConflictState) {
+        this.statusBarItem.hide();
+        return;
+      }
       const unmerged = await this.gitService.getUnmergedFiles();
       if (unmerged.length > 0) {
         this.statusBarItem.text = `$(git-merge) ${unmerged.length} conflict${unmerged.length > 1 ? "s" : ""}`;
@@ -3328,10 +3342,11 @@ function activate(context) {
     branchTree.refresh();
     graphViewProvider.refresh();
     commitViewProvider.refresh();
+    mergeProvider.refresh();
     if (CommitReviewPanel.currentPanel) {
       CommitReviewPanel.currentPanel.refresh();
     }
-  }, 200);
+  }, 250);
   gitWatcher.onDidChange(onGitChange);
   gitWatcher.onDidCreate(onGitChange);
   gitWatcher.onDidDelete(onGitChange);
@@ -3362,20 +3377,17 @@ function activate(context) {
       }
     })
   );
-  const workspaceWatcher = vscode10.workspace.createFileSystemWatcher("**/*");
-  const onWorkspaceFsChange = debounce((uri) => {
-    if (uri.fsPath.includes("/.git/") || uri.fsPath.includes("/node_modules/")) return;
-    commitViewProvider.refresh();
-  }, 300);
-  workspaceWatcher.onDidCreate(onWorkspaceFsChange);
-  workspaceWatcher.onDidDelete(onWorkspaceFsChange);
-  workspaceWatcher.onDidChange(onWorkspaceFsChange);
-  context.subscriptions.push(workspaceWatcher);
+  context.subscriptions.push(
+    vscode10.workspace.onDidCreateFiles(() => commitViewProvider.refresh()),
+    vscode10.workspace.onDidDeleteFiles(() => commitViewProvider.refresh()),
+    vscode10.workspace.onDidRenameFiles(() => commitViewProvider.refresh())
+  );
   context.subscriptions.push(
     vscode10.window.onDidChangeWindowState((e) => {
       if (e.focused) {
         commitViewProvider.refresh();
         branchTree.refresh();
+        mergeProvider.refresh();
       }
     })
   );

@@ -5704,22 +5704,11 @@ ${component_stack}
   function computeAngularPath(x1, y1, x2, y2) {
     if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return "";
     const dx = x2 - x1;
-    const dy = y2 - y1;
-    const absDx = Math.abs(dx);
-
-    if (absDx < 0.5) {
+    if (Math.abs(dx) < 0.5) {
       return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
-
-    const diagH = Math.min(absDx, dy);
-
-    if (dx > 0) {
-      const cornerY = y1 + diagH;
-      return `M ${x1} ${y1} L ${x2} ${cornerY} L ${x2} ${y2}`;
-    } else {
-      const cornerY = y2 - diagH;
-      return `M ${x1} ${y1} L ${x1} ${cornerY} L ${x2} ${y2}`;
-    }
+    const midY = (y1 + y2) / 2;
+    return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
   }
 
 

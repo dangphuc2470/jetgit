@@ -155,7 +155,7 @@ var GitService = class {
     return out.trim();
   }
   async getLog(options = {}) {
-    const args = ["log", `--format=${LOG_FORMAT}`];
+    const args = ["log", `--format=${LOG_FORMAT}`, "--topo-order"];
     if (options.all === true || !options.branch && options.all !== false) {
       args.push("--all");
     }
@@ -667,7 +667,7 @@ var vscode2 = __toESM(require("vscode"));
 function buildGraph(commits) {
   if (commits.length === 0) return [];
   const nodes = [];
-  const lanes = [];
+  let lanes = [];
   const colorMap = /* @__PURE__ */ new Map();
   let nextColor = 0;
   for (let row = 0; row < commits.length; row++) {
@@ -675,12 +675,8 @@ function buildGraph(commits) {
     const lines = [];
     let col = lanes.indexOf(commit.hash);
     if (col === -1) {
-      col = lanes.indexOf(null);
-      if (col === -1) {
-        col = lanes.length;
-        lanes.push(null);
-      }
-      lanes[col] = commit.hash;
+      col = lanes.length;
+      lanes.push(commit.hash);
     }
     if (!colorMap.has(commit.hash)) {
       colorMap.set(commit.hash, nextColor++);
@@ -705,17 +701,10 @@ function buildGraph(commits) {
       } else {
         lanes[col] = p0;
         if (!colorMap.has(p0)) colorMap.set(p0, color);
-        lines.push({
-          fromColumn: col,
-          fromRow: row,
-          toColumn: col,
-          toRow: row + 1,
-          color: colorMap.get(p0)
-        });
       }
       for (let pi = 1; pi < parents.length; pi++) {
         const p = parents[pi];
-        let pCol = lanes.indexOf(p);
+        const pCol = lanes.indexOf(p);
         if (pCol !== -1) {
           lines.push({
             fromColumn: col,
@@ -725,35 +714,59 @@ function buildGraph(commits) {
             color: colorMap.get(p) ?? color
           });
         } else {
-          pCol = lanes.indexOf(null);
-          if (pCol === -1) {
-            pCol = lanes.length;
-            lanes.push(null);
-          }
-          lanes[pCol] = p;
+          const newCol = lanes.length;
+          lanes.push(p);
           if (!colorMap.has(p)) colorMap.set(p, nextColor++);
           lines.push({
             fromColumn: col,
             fromRow: row,
-            toColumn: pCol,
+            toColumn: newCol,
             toRow: row + 1,
             color: colorMap.get(p)
           });
         }
       }
     }
+    const nextLanes = [];
+    const oldToNew = /* @__PURE__ */ new Map();
+    for (let c = 0; c < lanes.length; c++) {
+      if (lanes[c] !== null) {
+        const newIdx = nextLanes.length;
+        nextLanes.push(lanes[c]);
+        oldToNew.set(c, newIdx);
+      }
+    }
+    for (const l of lines) {
+      if (oldToNew.has(l.toColumn)) {
+        l.toColumn = oldToNew.get(l.toColumn);
+      }
+    }
     for (let c = 0; c < prevLanes.length; c++) {
-      if (c !== col && prevLanes[c] !== null && lanes[c] !== null) {
+      const h = prevLanes[c];
+      if (h !== null && oldToNew.has(c)) {
+        const currentHashAtC = lanes[c];
+        const targetCol = oldToNew.get(c);
+        const lineColor = (currentHashAtC ? colorMap.get(currentHashAtC) : void 0) ?? colorMap.get(h) ?? color;
         lines.push({
           fromColumn: c,
           fromRow: row,
-          toColumn: c,
+          toColumn: targetCol,
           toRow: row + 1,
-          color: colorMap.get(lanes[c]) ?? 0
+          color: lineColor
         });
       }
     }
-    nodes.push({ hash: commit.hash, column: col, color, lines });
+    const uniqueLines = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const l of lines) {
+      const key = `${l.fromColumn}->${l.toColumn}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueLines.push(l);
+      }
+    }
+    lanes = nextLanes;
+    nodes.push({ hash: commit.hash, column: col, color, lines: uniqueLines });
   }
   return nodes;
 }

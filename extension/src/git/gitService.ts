@@ -132,7 +132,7 @@ export class GitService {
     all?: boolean;
     query?: string;
   } = {}): Promise<Commit[]> {
-    const args = ['log', `--format=${LOG_FORMAT}`];
+    const args = ['log', `--format=${LOG_FORMAT}`, '--topo-order'];
 
     if (options.all === true || (!options.branch && options.all !== false)) {
       args.push('--all');

@@ -17,13 +17,17 @@ export interface GraphLine {
 
 /**
  * Build a visual DAG layout from a list of commits (topological order, newest first).
- * Assigns columns and colors to branches, producing connection lines.
+ * Follows IntelliJ/Android Studio layout:
+ * - Topological order ensures branches are clustered and parents follow children.
+ * - Primary/first-parent backbone continuity in the same column.
+ * - Non-first parents branch out to the right.
+ * - Automatic compaction of dead lanes to prevent empty vertical gaps.
  */
 export function buildGraph(commits: Commit[]): GraphNode[] {
   if (commits.length === 0) return [];
 
   const nodes: GraphNode[] = [];
-  const lanes: (string | null)[] = [];
+  let lanes: (string | null)[] = [];
   const colorMap = new Map<string, number>();
   let nextColor = 0;
 
@@ -31,15 +35,11 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
     const commit = commits[row];
     const lines: GraphLine[] = [];
 
-    // 1. Find or create lane for this commit
+    // 1. Find or assign lane for this commit
     let col = lanes.indexOf(commit.hash);
     if (col === -1) {
-      col = lanes.indexOf(null);
-      if (col === -1) {
-        col = lanes.length;
-        lanes.push(null);
-      }
-      lanes[col] = commit.hash;
+      col = lanes.length;
+      lanes.push(commit.hash);
     }
 
     if (!colorMap.has(commit.hash)) {
@@ -51,11 +51,13 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
     // 2. Process parents
     const parents = commit.parents;
     if (parents.length === 0) {
+      // Root commit terminates this branch
       lanes[col] = null;
     } else {
       const p0 = parents[0];
       const p0Col = lanes.indexOf(p0);
       if (p0Col !== -1 && p0Col !== col) {
+        // First parent already tracked in another lane -> merge into p0's lane
         lines.push({
           fromColumn: col,
           fromRow: row,
@@ -65,21 +67,16 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
         });
         lanes[col] = null;
       } else {
+        // First parent inherits this lane and color (maintains backbone)
         lanes[col] = p0;
         if (!colorMap.has(p0)) colorMap.set(p0, color);
-        lines.push({
-          fromColumn: col,
-          fromRow: row,
-          toColumn: col,
-          toRow: row + 1,
-          color: colorMap.get(p0)!,
-        });
       }
 
       for (let pi = 1; pi < parents.length; pi++) {
         const p = parents[pi];
-        let pCol = lanes.indexOf(p);
+        const pCol = lanes.indexOf(p);
         if (pCol !== -1) {
+          // Parent already tracked in another lane
           lines.push({
             fromColumn: col,
             fromRow: row,
@@ -88,17 +85,14 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
             color: colorMap.get(p) ?? color,
           });
         } else {
-          pCol = lanes.indexOf(null);
-          if (pCol === -1) {
-            pCol = lanes.length;
-            lanes.push(null);
-          }
-          lanes[pCol] = p;
+          // Branch out to a new lane to the right
+          const newCol = lanes.length;
+          lanes.push(p);
           if (!colorMap.has(p)) colorMap.set(p, nextColor++);
           lines.push({
             fromColumn: col,
             fromRow: row,
-            toColumn: pCol,
+            toColumn: newCol,
             toRow: row + 1,
             color: colorMap.get(p)!,
           });
@@ -106,20 +100,54 @@ export function buildGraph(commits: Commit[]): GraphNode[] {
       }
     }
 
-    // 3. Continuation lines for all other active lanes
+    // 3. Compact lanes for the next row (eliminates empty vertical lanes)
+    const nextLanes: string[] = [];
+    const oldToNew = new Map<number, number>();
+    for (let c = 0; c < lanes.length; c++) {
+      if (lanes[c] !== null) {
+        const newIdx = nextLanes.length;
+        nextLanes.push(lanes[c]!);
+        oldToNew.set(c, newIdx);
+      }
+    }
+
+    // Remap target columns of existing lines based on compaction
+    for (const l of lines) {
+      if (oldToNew.has(l.toColumn)) {
+        l.toColumn = oldToNew.get(l.toColumn)!;
+      }
+    }
+
+    // 4. Continuation lines for all active lanes from prevLanes
     for (let c = 0; c < prevLanes.length; c++) {
-      if (c !== col && prevLanes[c] !== null && lanes[c] !== null) {
+      const h = prevLanes[c];
+      if (h !== null && oldToNew.has(c)) {
+        const currentHashAtC = lanes[c];
+        const targetCol = oldToNew.get(c)!;
+        const lineColor = (currentHashAtC ? colorMap.get(currentHashAtC) : undefined) ?? colorMap.get(h) ?? color;
         lines.push({
           fromColumn: c,
           fromRow: row,
-          toColumn: c,
+          toColumn: targetCol,
           toRow: row + 1,
-          color: colorMap.get(lanes[c]!) ?? 0,
+          color: lineColor,
         });
       }
     }
 
-    nodes.push({ hash: commit.hash, column: col, color, lines });
+    // Deduplicate lines (same fromCol -> toCol)
+    const uniqueLines: GraphLine[] = [];
+    const seen = new Set<string>();
+    for (const l of lines) {
+      const key = `${l.fromColumn}->${l.toColumn}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueLines.push(l);
+      }
+    }
+
+    lanes = nextLanes;
+    nodes.push({ hash: commit.hash, column: col, color, lines: uniqueLines });
   }
 
   return nodes;

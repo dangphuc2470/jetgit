@@ -579,6 +579,7 @@
 
   let savedScrollTop = null;
   let isSyncing = false;
+  let isRendering = false;
   let activeScroller = null;
   let scrollerTimeout = null;
   let scrollAnimId = null;
@@ -685,8 +686,21 @@
 
   // Render the whole review interface
   function render() {
-    app.innerHTML = '';
+    // Snapshot scroll position BEFORE wiping DOM so phantom scroll events (scrollTop=0)
+    // fired by the browser when old nodes are removed cannot overwrite it.
+    if (savedScrollTop === null) {
+      const rPaneOld = document.querySelector('.editor-pane.right-pane');
+      if (rPaneOld) savedScrollTop = rPaneOld.scrollTop;
+    }
 
+    // Block all scroll event handlers during DOM rebuild + restore
+    isRendering = true;
+    if (scrollAnimId) {
+      cancelAnimationFrame(scrollAnimId);
+      scrollAnimId = null;
+    }
+
+    app.innerHTML = '';
     parseDiffData(state.diff);
 
     const root = document.createElement('div');
@@ -1171,7 +1185,7 @@
     rightPane.addEventListener('touchstart', () => setScroller('right'), { passive: true });
 
     leftPane.addEventListener('scroll', () => {
-      if (isSyncing || activeScroller === 'right') return;
+      if (isRendering || isSyncing || activeScroller === 'right') return;
       isSyncing = true;
       rightPane.scrollTop = mapLeftToRight(leftPane.scrollTop);
       savedScrollTop = rightPane.scrollTop;
@@ -1182,6 +1196,7 @@
     }, { passive: true });
 
     rightPane.addEventListener('scroll', () => {
+      if (isRendering) return;
       savedScrollTop = rightPane.scrollTop;
       if (isSyncing || activeScroller === 'left') return;
       isSyncing = true;
@@ -1192,22 +1207,29 @@
       });
     }, { passive: true });
 
-    // Initial draw or restore scroll position
+    // Initial draw or restore scroll position.
+    // Use double-rAF: first frame lets browser layout the new nodes,
+    // second frame applies scroll so it lands correctly and we can safely
+    // clear the isRendering guard afterwards.
     requestAnimationFrame(() => {
-      if (savedScrollTop !== null) {
-        isSyncing = true;
-        rightPane.scrollTop = savedScrollTop;
-        leftPane.scrollTop = mapRightToLeft(savedScrollTop);
-        updateRibbons();
-        requestAnimationFrame(() => {
-          isSyncing = false;
-        });
-      } else {
-        updateRibbons();
-        if (state.blocks && state.blocks.length > 0) {
-          jumpToBlock(0, false);
+      requestAnimationFrame(() => {
+        if (savedScrollTop !== null && savedScrollTop > 0) {
+          isSyncing = true;
+          rightPane.scrollTop = savedScrollTop;
+          leftPane.scrollTop = mapRightToLeft(savedScrollTop);
+          updateRibbons();
+          requestAnimationFrame(() => {
+            isSyncing = false;
+            isRendering = false;
+          });
+        } else {
+          isRendering = false;
+          updateRibbons();
+          if (state.blocks && state.blocks.length > 0) {
+            jumpToBlock(0, false);
+          }
         }
-      }
+      });
     });
 
     // Attach toolbar events
@@ -1576,14 +1598,14 @@
             scrollAnimId = null;
           }
           isSyncing = false;
+          isRendering = false;
           activeScroller = null;
           savedScrollTop = null;
           undoStack.length = 0;
           redoStack.length = 0;
-        } else {
-          const rPane = document.querySelector('.editor-pane.right-pane');
-          if (rPane) savedScrollTop = rPane.scrollTop;
         }
+        // For same-file refresh: render() will snapshot the current scroll position
+        // from the live DOM right before clearing it, so we don't touch savedScrollTop here.
         state.filePath = data.path || '';
         state.fileName = data.fileName || state.filePath.split('/').pop() || '';
         state.fileDir = data.fileDir || state.filePath.split('/').slice(0, -1).join('/');

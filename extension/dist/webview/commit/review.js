@@ -578,6 +578,11 @@
   }
 
   let savedScrollTop = null;
+  let isSyncing = false;
+  let activeScroller = null;
+  let scrollerTimeout = null;
+  let scrollAnimId = null;
+  let updateRibbonsFn = null;
   const undoStack = [];
   const redoStack = [];
   const MAX_HISTORY = 50;
@@ -1033,7 +1038,10 @@
       stripe.setAttribute('title', `${b.type.toUpperCase()}: Line ${lineStart}`);
 
       stripe.addEventListener('click', () => {
-        scrollToLine(lineStart);
+        const idx = state.blocks.indexOf(b);
+        if (idx !== -1) {
+          jumpToBlock(idx, true);
+        }
       });
       overviewRuler.appendChild(stripe);
     });
@@ -1045,6 +1053,7 @@
 
     // Dynamic viewport-based ribbon updater
     function updateRibbons() {
+      updateRibbonsFn = updateRibbons;
       const sLeft = leftPane.scrollTop;
       const sRight = rightPane.scrollTop;
       const viewH = middleGutter.clientHeight || 800;
@@ -1141,24 +1150,46 @@
     }
 
     // Anchored Dual Scroll Synchronization
-    let isSyncing = false;
+    const setScroller = (side) => {
+      if (scrollAnimId) {
+        cancelAnimationFrame(scrollAnimId);
+        scrollAnimId = null;
+        isSyncing = false;
+      }
+      activeScroller = side;
+      if (scrollerTimeout) clearTimeout(scrollerTimeout);
+      scrollerTimeout = setTimeout(() => {
+        activeScroller = null;
+      }, 150);
+    };
+
+    leftPane.addEventListener('wheel', () => setScroller('left'), { passive: true });
+    rightPane.addEventListener('wheel', () => setScroller('right'), { passive: true });
+    leftPane.addEventListener('pointerdown', () => setScroller('left'), { passive: true });
+    rightPane.addEventListener('pointerdown', () => setScroller('right'), { passive: true });
+    leftPane.addEventListener('touchstart', () => setScroller('left'), { passive: true });
+    rightPane.addEventListener('touchstart', () => setScroller('right'), { passive: true });
 
     leftPane.addEventListener('scroll', () => {
-      if (isSyncing) return;
+      if (isSyncing || activeScroller === 'right') return;
       isSyncing = true;
       rightPane.scrollTop = mapLeftToRight(leftPane.scrollTop);
       savedScrollTop = rightPane.scrollTop;
       updateRibbons();
-      isSyncing = false;
+      requestAnimationFrame(() => {
+        isSyncing = false;
+      });
     }, { passive: true });
 
     rightPane.addEventListener('scroll', () => {
       savedScrollTop = rightPane.scrollTop;
-      if (isSyncing) return;
+      if (isSyncing || activeScroller === 'left') return;
       isSyncing = true;
       leftPane.scrollTop = mapRightToLeft(rightPane.scrollTop);
       updateRibbons();
-      isSyncing = false;
+      requestAnimationFrame(() => {
+        isSyncing = false;
+      });
     }, { passive: true });
 
     // Initial draw or restore scroll position
@@ -1168,11 +1199,13 @@
         rightPane.scrollTop = savedScrollTop;
         leftPane.scrollTop = mapRightToLeft(savedScrollTop);
         updateRibbons();
-        isSyncing = false;
+        requestAnimationFrame(() => {
+          isSyncing = false;
+        });
       } else {
         updateRibbons();
         if (state.blocks && state.blocks.length > 0) {
-          jumpToBlock(0);
+          jumpToBlock(0, false);
         }
       }
     });
@@ -1206,8 +1239,58 @@
     }
   }
 
-  // Jump to a specific diff block instantly
-  function jumpToBlock(index) {
+  // Smoothly scroll both panes in sync using cubic ease-out
+  function smoothScrollBoth(leftPane, rightPane, targetLeft, targetRight, duration = 240, onComplete) {
+    if (scrollAnimId) {
+      cancelAnimationFrame(scrollAnimId);
+      scrollAnimId = null;
+    }
+
+    const startLeft = leftPane.scrollTop;
+    const startRight = rightPane.scrollTop;
+    const diffLeft = targetLeft - startLeft;
+    const diffRight = targetRight - startRight;
+
+    if (Math.abs(diffLeft) < 1 && Math.abs(diffRight) < 1) {
+      if (onComplete) onComplete();
+      return;
+    }
+
+    isSyncing = true;
+    let startTime = null;
+
+    function step(timestamp) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutCubic: swift start, smooth glide to rest
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      leftPane.scrollTop = Math.round(startLeft + diffLeft * ease);
+      rightPane.scrollTop = Math.round(startRight + diffRight * ease);
+      savedScrollTop = rightPane.scrollTop;
+      if (updateRibbonsFn) updateRibbonsFn();
+
+      if (progress < 1) {
+        scrollAnimId = requestAnimationFrame(step);
+      } else {
+        leftPane.scrollTop = targetLeft;
+        rightPane.scrollTop = targetRight;
+        savedScrollTop = targetRight;
+        if (updateRibbonsFn) updateRibbonsFn();
+        scrollAnimId = null;
+        requestAnimationFrame(() => {
+          isSyncing = false;
+        });
+        if (onComplete) onComplete();
+      }
+    }
+
+    scrollAnimId = requestAnimationFrame(step);
+  }
+
+  // Jump to a specific diff block (smoothly for navigation, instant for initial load)
+  function jumpToBlock(index, smooth = false) {
     if (!state.blocks || state.blocks.length === 0) return;
     if (index < 0) index = state.blocks.length - 1;
     if (index >= state.blocks.length) index = 0;
@@ -1231,13 +1314,25 @@
       targetLeft = mapRightToLeft(targetRight);
     }
 
-    isSyncing = true;
-    rightPane.scrollTop = targetRight;
-    leftPane.scrollTop = targetLeft;
-    updateRibbons();
-    isSyncing = false;
-
-    highlightActiveBlock(b.id);
+    if (smooth) {
+      smoothScrollBoth(leftPane, rightPane, targetLeft, targetRight, 240, () => {
+        highlightActiveBlock(b.id);
+      });
+    } else {
+      if (scrollAnimId) {
+        cancelAnimationFrame(scrollAnimId);
+        scrollAnimId = null;
+      }
+      isSyncing = true;
+      rightPane.scrollTop = targetRight;
+      leftPane.scrollTop = targetLeft;
+      savedScrollTop = targetRight;
+      if (updateRibbonsFn) updateRibbonsFn();
+      requestAnimationFrame(() => {
+        isSyncing = false;
+      });
+      highlightActiveBlock(b.id);
+    }
   }
 
   let pendingNextFile = false;
@@ -1304,7 +1399,7 @@
       let targetIdx = state.blocks.findIndex(b => getBlockY(b) > currentScroll + 70);
       if (targetIdx !== -1) {
         hideDiffNavigationHint();
-        jumpToBlock(targetIdx);
+        jumpToBlock(targetIdx, true);
       } else {
         const hasNextFile = state.currentFileIndex < state.filesList.length - 1;
         if (hasNextFile) {
@@ -1329,7 +1424,7 @@
       }
       if (targetIdx !== -1) {
         hideDiffNavigationHint();
-        jumpToBlock(targetIdx);
+        jumpToBlock(targetIdx, true);
       } else {
         const hasPrevFile = state.currentFileIndex > 0;
         if (hasPrevFile) {
@@ -1476,10 +1571,16 @@
         const data = msg.payload;
         const isSameFile = (state.filePath && state.filePath === (data.path || ''));
         if (!isSameFile) {
+          if (scrollAnimId) {
+            cancelAnimationFrame(scrollAnimId);
+            scrollAnimId = null;
+          }
+          isSyncing = false;
+          activeScroller = null;
           savedScrollTop = null;
           undoStack.length = 0;
           redoStack.length = 0;
-        } else if (savedScrollTop === null) {
+        } else {
           const rPane = document.querySelector('.editor-pane.right-pane');
           if (rPane) savedScrollTop = rPane.scrollTop;
         }

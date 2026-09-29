@@ -194,6 +194,33 @@ var GitService = class {
       this.commitCache.set(commit.hash, commit);
       commits.push(commit);
     }
+    if (options.query && /^[0-9a-f]{4,40}$/i.test(options.query.trim())) {
+      try {
+        const hashOut = await this.exec(["log", "-n1", `--format=${LOG_FORMAT}`, "--decorate=full", options.query.trim()]);
+        for (const chunk of hashOut.split("\0")) {
+          if (!chunk.trim()) continue;
+          const parts = chunk.split(SEP);
+          if (parts.length >= 9) {
+            const hashCommit = {
+              hash: parts[0].trim(),
+              abbreviatedHash: parts[1],
+              parents: parts[2] ? parts[2].split(" ").filter(Boolean) : [],
+              author: parts[3],
+              authorEmail: parts[4],
+              authorDate: parts[5],
+              subject: parts[6],
+              body: parts[7],
+              refs: parts[8] ? parseRefs(parts[8]) : []
+            };
+            this.commitCache.set(hashCommit.hash, hashCommit);
+            if (!commits.some((c) => c.hash === hashCommit.hash)) {
+              commits.unshift(hashCommit);
+            }
+          }
+        }
+      } catch {
+      }
+    }
     return commits;
   }
   async getCommitFiles(hash) {
@@ -1311,47 +1338,44 @@ var GraphViewProvider = class {
           this.loadInitialData();
         } catch (err) {
           const errMsg = err.message || "";
-          const hasConflicts =
-            errMsg.includes("CONFLICT") ||
-            errMsg.includes("conflict") ||
-            errMsg.includes("Automatic merge failed") ||
-            errMsg.includes("fix conflicts");
-
+          const hasConflicts = errMsg.includes("CONFLICT") || errMsg.includes("conflict") || errMsg.includes("Automatic merge failed") || errMsg.includes("fix conflicts");
           if (hasConflicts) {
             this.loadInitialData();
             try {
               const conflictFiles = await this.gitService.getUnmergedFiles();
               if (conflictFiles.length === 0) {
                 vscode2.window.showWarningMessage(`Merge has conflicts. Please resolve them and commit.`);
-                break;
+                return;
               }
-
               const items = conflictFiles.map((f) => ({
                 label: `$(git-merge) ${f}`,
                 description: "Conflict \u2014 click to open merge editor",
-                detail: f,
+                detail: f
               }));
               items.push({
                 label: "$(check-all) All conflicts resolved \u2014 open Commit panel",
                 description: "",
-                detail: "__commit__",
+                detail: "__commit__"
               });
-
               const chosen = await vscode2.window.showQuickPick(items, {
                 placeHolder: `${conflictFiles.length} file(s) with conflicts \u2014 select a file to resolve`,
                 canPickMany: false,
-                title: `Merge conflicts: '${ref}' into current branch`,
+                title: `Merge conflicts: '${ref}' into current branch`
               });
-
               if (chosen && chosen.detail && chosen.detail !== "__commit__") {
                 const fileUri = vscode2.Uri.joinPath(
                   vscode2.Uri.file(this.workspaceRoot),
                   chosen.detail
                 );
+                try {
+                  await vscode2.commands.executeCommand("merge-conflict.accept.all-both");
+                } catch {
+                }
                 await vscode2.commands.executeCommand("vscode.open", fileUri);
                 try {
                   await vscode2.commands.executeCommand("git.openMergeEditor", fileUri);
-                } catch { /* merge editor might not be available */ }
+                } catch {
+                }
               } else if (chosen && chosen.detail === "__commit__") {
                 await vscode2.commands.executeCommand("intellij-git.openCommit");
               }

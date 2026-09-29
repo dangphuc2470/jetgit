@@ -177,6 +177,33 @@ export class GitService {
       commits.push(commit);
     }
 
+    if (options.query && /^[0-9a-f]{4,40}$/i.test(options.query.trim())) {
+      try {
+        const hashOut = await this.exec(['log', '-n1', `--format=${LOG_FORMAT}`, '--decorate=full', options.query.trim()]);
+        for (const chunk of hashOut.split('\0')) {
+          if (!chunk.trim()) continue;
+          const parts = chunk.split(SEP);
+          if (parts.length >= 9) {
+            const hashCommit: Commit = {
+              hash: parts[0].trim(),
+              abbreviatedHash: parts[1],
+              parents: parts[2] ? parts[2].split(' ').filter(Boolean) : [],
+              author: parts[3],
+              authorEmail: parts[4],
+              authorDate: parts[5],
+              subject: parts[6],
+              body: parts[7],
+              refs: parts[8] ? parseRefs(parts[8]) : [],
+            };
+            this.commitCache.set(hashCommit.hash, hashCommit);
+            if (!commits.some(c => c.hash === hashCommit.hash)) {
+              commits.unshift(hashCommit);
+            }
+          }
+        }
+      } catch { /* ignore if not valid hash */ }
+    }
+
     return commits;
   }
 

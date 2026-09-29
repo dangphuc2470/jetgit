@@ -6679,15 +6679,21 @@ ${component_stack}
     searchInput.type = "text";
     searchInput.className = "as-search-input";
     searchInput.placeholder = "Text or hash";
+    let searchDebounceTimer;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        const val = searchInput.value.trim();
+        if (val !== curQuery) {
+          curQuery = val;
+          applyFilter();
+        }
+      }, 300);
+    });
     searchInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
+        clearTimeout(searchDebounceTimer);
         curQuery = searchInput.value.trim();
-        applyFilter();
-      }
-    });
-    searchInput.addEventListener("input", () => {
-      if (!searchInput.value && curQuery) {
-        curQuery = "";
         applyFilter();
       }
     });
@@ -7133,7 +7139,7 @@ ${component_stack}
   var root5 = from_html(`<div class="app svelte-1lrl78g"><!> <div class="main-area svelte-1lrl78g"><div class="center-area svelte-1lrl78g"><!></div> <!></div></div>`);
   var $$css6 = {
     hash: "svelte-1lrl78g",
-    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:140px;background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:0.9em;transition:width 0.12s ease;}.branch-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.branch-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.branch-splitter:hover, .branch-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.branch-sidebar.collapsed + .branch-splitter {display:none !important;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.9em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.branch-tree-content::-webkit-scrollbar {width:6px;height:6px;}.branch-tree-content::-webkit-scrollbar-track {background:transparent;}.branch-tree-content::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.branch-tree-content::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.tree-section-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.92em;}.tree-section-header:hover {background:var(--vscode-list-hoverBackground);}.tree-folder-header {padding:3px 6px;font-weight:400;color:#9aa0a6;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:0.9em;border-radius:3px;margin:1px 4px;user-select:none;}.tree-folder-header:hover {background:var(--vscode-list-hoverBackground);color:#dfe1e5;}.tree-folder-header:hover .tree-item-icon {color:#dfe1e5 !important;}.tree-item-icon {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:4px;}.tree-item {display:flex;align-items:center;gap:0px;padding:3px 6px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:0.95em;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.active {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);font-weight:600;}.tree-item.current-head {color:#388bfd;font-weight:600;}.branch-icon {color:#dfe1e5;}.branch-icon.remote {color:#dfe1e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#8c8c8c;}.arrow {font-size:0.8em;color:var(--vscode-descriptionForeground);width:14px;text-align:center;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {position:relative;width:300px;min-width:180px;overflow-y:auto;flex-shrink:0;box-sizing:border-box;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar {width:6px;height:6px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-track {background:transparent;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.detail-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.detail-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.detail-splitter:hover, .detail-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.detail-close-btn {position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:4px;color:var(--vscode-foreground, #cccccc);opacity:0.7;cursor:pointer;z-index:10;transition:all 0.15s ease;padding:0;}.detail-close-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;}.app-tooltip {position:fixed;z-index:99999;pointer-events:none;background:var(--vscode-editorHoverWidget-background, #252526);color:var(--vscode-editorHoverWidget-foreground, #cccccc);border:1px solid var(--vscode-editorHoverWidget-border, #454545);box-shadow:0 4px 14px rgba(0,0,0,0.45);padding:4px 8px;border-radius:4px;font-size:11px;font-family:var(--vscode-font-family, system-ui, sans-serif);line-height:1.4;white-space:nowrap;opacity:0;visibility:hidden;transition:opacity 0.12s ease, visibility 0.12s ease;}.app-tooltip.visible {opacity:1;visibility:visible;}.app-tooltip .tooltip-shortcut {margin-left:6px;opacity:0.65;font-size:10px;background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);}.app-tooltip::before {content:\"\";position:absolute;top:50%;left:-5px;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--vscode-editorHoverWidget-border, #454545);}"
+    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:140px;background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:0.9em;transition:width 0.12s ease;}.branch-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.branch-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.branch-splitter:hover, .branch-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.branch-sidebar.collapsed + .branch-splitter {display:none !important;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.9em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.branch-tree-content::-webkit-scrollbar {width:6px;height:6px;}.branch-tree-content::-webkit-scrollbar-track {background:transparent;}.branch-tree-content::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.branch-tree-content::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.tree-section-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:0.92em;}.tree-section-header:hover {background:var(--vscode-list-hoverBackground);}.tree-folder-header {padding:3px 6px;font-weight:400;color:#9aa0a6;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:0.9em;border-radius:3px;margin:1px 4px;user-select:none;}.tree-folder-header:hover {background:var(--vscode-list-hoverBackground);color:#dfe1e5;}.tree-folder-header:hover .tree-item-icon {color:#dfe1e5 !important;}.tree-item-icon {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:4px;}.tree-item {display:flex;align-items:center;gap:0px;padding:3px 6px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:0.95em;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.active {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);font-weight:600;}.tree-item.current-head {color:#388bfd;font-weight:600;}.branch-icon {color:#dfe1e5;}.branch-icon.remote {color:#dfe1e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#8c8c8c;}.arrow {color:var(--vscode-descriptionForeground, #8c8c8c);width:16px;height:16px;min-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;opacity:0.85;transition:opacity 0.1s ease, color 0.1s ease;}.arrow:hover {opacity:1;color:var(--vscode-foreground, #dfe1e5);}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {position:relative;width:300px;min-width:180px;overflow-y:auto;flex-shrink:0;box-sizing:border-box;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar {width:6px;height:6px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-track {background:transparent;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.detail-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.detail-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.detail-splitter:hover, .detail-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.detail-close-btn {position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:4px;color:var(--vscode-foreground, #cccccc);opacity:0.7;cursor:pointer;z-index:10;transition:all 0.15s ease;padding:0;}.detail-close-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;}.app-tooltip {position:fixed;z-index:99999;pointer-events:none;background:var(--vscode-editorHoverWidget-background, #252526);color:var(--vscode-editorHoverWidget-foreground, #cccccc);border:1px solid var(--vscode-editorHoverWidget-border, #454545);box-shadow:0 4px 14px rgba(0,0,0,0.45);padding:4px 8px;border-radius:4px;font-size:11px;font-family:var(--vscode-font-family, system-ui, sans-serif);line-height:1.4;white-space:nowrap;opacity:0;visibility:hidden;transition:opacity 0.12s ease, visibility 0.12s ease;}.app-tooltip.visible {opacity:1;visibility:visible;}.app-tooltip .tooltip-shortcut {margin-left:6px;opacity:0.65;font-size:10px;background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);}.app-tooltip::before {content:\"\";position:absolute;top:50%;left:-5px;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--vscode-editorHoverWidget-border, #454545);}"
   };
   function App($$anchor, $$props) {
     push($$props, true);
@@ -7436,11 +7442,30 @@ ${component_stack}
       let sInput = container.querySelector(".branch-search-input");
       let treeContent = container.querySelector(".branch-tree-content");
 
+      if (!container._folderCollapseState) {
+        container._folderCollapseState = new Map();
+      }
+      if (!container._sectionCollapseState) {
+        container._sectionCollapseState = new Map();
+      }
+      const folderCollapseState = container._folderCollapseState;
+      const sectionCollapseState = container._sectionCollapseState;
+
+      const svgArrowRight = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 3.5L10.5 8L6 12.5"/></svg>';
+      const svgArrowDown = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3.5 6L8 10.5L12.5 6"/></svg>';
+      const svgTagIcon = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="display:block;"><path d="M1.5 7.5V2.5C1.5 1.95 1.95 1.5 2.5 1.5H7.5L14.5 8.5C15.1 9.1 15.1 10.1 14.5 10.7L10.7 14.5C10.1 15.1 9.1 15.1 8.5 14.5L1.5 7.5Z" stroke="#e5a50a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/><circle cx="5" cy="5" r="1.2" fill="#e5a50a"/></svg>';
+      const svgBranchWhite = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="display:block;color:#dfe1e5;"><path d="M11.75 2.5a1.75 1.75 0 1 0-2.45 1.6 4.75 4.75 0 0 0-4.05 4.65v.5a2.5 2.5 0 1 0 1.5 0v-.5c0-1.8 1.45-3.25 3.25-3.25h.25a1.75 1.75 0 0 0 1.5-3zM4 12.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm7-9a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>';
+
       function populateTree(searchQuery) {
         if (!treeContent) return;
         treeContent.innerHTML = "";
+        const latestData = get(branchData) || {};
+        const branches = latestData.branches || [];
+        const tags = latestData.tags || [];
+        const currentBranch = latestData.currentBranch || "";
+        const currentActive = get(activeBranch);
         const favOnly = container.dataset.favOnly === "true";
-        const query = (searchQuery !== undefined ? searchQuery : (sInput ? sInput.value : "")).toLowerCase();
+        const query = (searchQuery !== undefined ? searchQuery : (sInput ? sInput.value : "")).toLowerCase().trim();
         const isFavoriteBranch = (name) => name === currentBranch || name === "develop" || name === "main" || name === "master" || name.endsWith("/develop") || name.endsWith("/main");
         const filterFn = (name) => {
           if (query && !name.toLowerCase().includes(query)) return false;
@@ -7453,14 +7478,20 @@ ${component_stack}
           sec.className = "tree-section";
           const hdr = document.createElement("div");
           hdr.className = "tree-section-header";
-          hdr.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> <span>' + title + '</span>';
+          const isCollapsed = sectionCollapseState.has(title)
+            ? sectionCollapseState.get(title)
+            : !isOpenDefault;
+          hdr.innerHTML = '<span class="arrow">' + (isCollapsed ? svgArrowRight : svgArrowDown) + '</span> <span>' + title + '</span>';
           const bdy = document.createElement("div");
           bdy.className = "tree-section-body";
-          bdy.style.display = isOpenDefault ? "block" : "none";
-          hdr.addEventListener("click", () => {
-            const open = bdy.style.display !== "none";
-            bdy.style.display = open ? "none" : "block";
-            hdr.querySelector(".arrow").textContent = open ? "▸" : "▾";
+          bdy.style.display = isCollapsed ? "none" : "block";
+          hdr.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isNowCollapsed = bdy.style.display !== "none";
+            bdy.style.display = isNowCollapsed ? "none" : "block";
+            const arrow = hdr.querySelector(".arrow");
+            if (arrow) arrow.innerHTML = isNowCollapsed ? svgArrowRight : svgArrowDown;
+            sectionCollapseState.set(title, isNowCollapsed);
           });
           sec.appendChild(hdr);
           sec.appendChild(bdy);
@@ -7494,9 +7525,6 @@ ${component_stack}
           }
           return trackHtml;
         }
-
-        const svgTagIcon = '<svg width="13" height="13" viewBox="0 0 16 16" fill="#e5a50a" style="display:block;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>';
-        const svgBranchWhite = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="display:block;color:#dfe1e5;"><path d="M11.75 2.5a1.75 1.75 0 1 0-2.45 1.6 4.75 4.75 0 0 0-4.05 4.65v.5a2.5 2.5 0 1 0 1.5 0v-.5c0-1.8 1.45-3.25 3.25-3.25h.25a1.75 1.75 0 0 0 1.5-3zM4 12.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm7-9a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>';
 
         if (currentBranch && filterFn(currentBranch)) {
           const headSec = createSec("HEAD (Current Branch)", true);
@@ -7533,7 +7561,7 @@ ${component_stack}
           current.branches.push({ ...branchObj, leafName });
         }
 
-        function renderTreeLevel(lvlContainer, node, isOpenDefault = true) {
+        function renderTreeLevel(lvlContainer, node) {
           const folderKeys = Object.keys(node.folders).sort((a, b) => a.localeCompare(b));
           for (const fk of folderKeys) {
             const subNode = node.folders[fk];
@@ -7543,21 +7571,29 @@ ${component_stack}
             const fHdr = document.createElement("div");
             fHdr.className = "tree-folder-header";
             const folderIconSvg = '<span class="tree-item-icon" style="color:#8c8c8c;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M1.5 3.5C1.5 2.67 2.17 2 3 2H6.2C6.6 2 6.98 2.16 7.26 2.44L8.56 3.74C8.84 4.02 9.22 4.18 9.62 4.18H13C13.83 4.18 14.5 4.85 14.5 5.68V12.5C14.5 13.33 13.83 14 13 14H3C2.17 14 1.5 13.33 1.5 12.5V3.5Z"/></svg></span>';
-            fHdr.innerHTML = '<span class="arrow">' + (isOpenDefault ? "▾" : "▸") + '</span> ' + folderIconSvg + ' <span>' + fk + '</span>';
+
+            const isFolderCollapsed = folderCollapseState.has(subNode.fullPath)
+              ? folderCollapseState.get(subNode.fullPath)
+              : false;
+
+            fHdr.innerHTML = '<span class="arrow">' + (isFolderCollapsed ? svgArrowRight : svgArrowDown) + '</span> ' + folderIconSvg + ' <span>' + fk + '</span>';
 
             const fBdy = document.createElement("div");
             fBdy.className = "tree-folder-body";
             fBdy.style.paddingLeft = "14px";
-            fBdy.style.display = isOpenDefault ? "block" : "none";
+            fBdy.style.display = isFolderCollapsed ? "none" : "block";
 
-            fHdr.addEventListener("click", () => {
-              const open = fBdy.style.display !== "none";
-              fBdy.style.display = open ? "none" : "block";
-              fHdr.querySelector(".arrow").textContent = open ? "▸" : "▾";
+            fHdr.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const isNowCollapsed = fBdy.style.display !== "none";
+              fBdy.style.display = isNowCollapsed ? "none" : "block";
+              const arrow = fHdr.querySelector(".arrow");
+              if (arrow) arrow.innerHTML = isNowCollapsed ? svgArrowRight : svgArrowDown;
+              folderCollapseState.set(subNode.fullPath, isNowCollapsed);
             });
 
             fDiv.appendChild(fHdr);
-            renderTreeLevel(fBdy, subNode, isOpenDefault);
+            renderTreeLevel(fBdy, subNode);
             fDiv.appendChild(fBdy);
             lvlContainer.appendChild(fDiv);
           }
@@ -7596,7 +7632,7 @@ ${component_stack}
             const parts = b.name.split("/");
             insertBranchIntoTree(localTree, parts, b);
           }
-          renderTreeLevel(localSec.bdy, localTree, true);
+          renderTreeLevel(localSec.bdy, localTree);
           treeContent.appendChild(localSec.sec);
         }
 
@@ -7608,7 +7644,7 @@ ${component_stack}
             const parts = b.name.split("/");
             insertBranchIntoTree(remoteTree, parts, { ...b, remote: true });
           }
-          renderTreeLevel(remoteSec.bdy, remoteTree, true);
+          renderTreeLevel(remoteSec.bdy, remoteTree);
           treeContent.appendChild(remoteSec.sec);
         }
 
@@ -7624,9 +7660,17 @@ ${component_stack}
           treeContent.appendChild(tagSec.sec);
         }
 
+        if (localList.length === 0 && remoteList.length === 0 && (!tags || tags.filter(t => filterFn(t.name)).length === 0) && (!currentBranch || !filterFn(currentBranch))) {
+          const emptyEl = document.createElement("div");
+          emptyEl.style.cssText = "padding:16px 12px;text-align:center;color:var(--vscode-descriptionForeground);font-size:12px;";
+          emptyEl.textContent = query ? ('No branches matching "' + query + '"') : "No branches";
+          treeContent.appendChild(emptyEl);
+        }
+
         treeContent.querySelectorAll(".track-badge").forEach((badge) => {
           attachTooltip(badge, badge.dataset.tooltip || badge.title || "", "", "bottom");
         });
+        container._populateTree = populateTree;
       }
 
       if (!strip || !mainArea || !sInput || !treeContent) {
@@ -7708,8 +7752,11 @@ ${component_stack}
           const bodies = treeContent.querySelectorAll(".tree-section-body, .tree-folder-body");
           let anyOpen = false;
           bodies.forEach(b => { if (b.style.display !== "none") anyOpen = true; });
-          bodies.forEach(b => { b.style.display = anyOpen ? "none" : "block"; });
-          treeContent.querySelectorAll(".arrow").forEach(a => { a.textContent = anyOpen ? "▸" : "▾"; });
+          const shouldOpen = !anyOpen;
+          bodies.forEach(b => { b.style.display = shouldOpen ? "block" : "none"; });
+          treeContent.querySelectorAll(".arrow").forEach(a => { a.innerHTML = shouldOpen ? svgArrowDown : svgArrowRight; });
+          folderCollapseState.forEach((_, k) => folderCollapseState.set(k, !shouldOpen));
+          sectionCollapseState.forEach((_, k) => sectionCollapseState.set(k, !shouldOpen));
         });
 
         // Star / Favorites Filter
@@ -7742,7 +7789,11 @@ ${component_stack}
         sInput.className = "branch-search-input";
         sInput.placeholder = "Search branches...";
         sInput.addEventListener("input", (e) => {
-          populateTree(e.target.value);
+          if (container._populateTree) {
+            container._populateTree(e.target.value);
+          } else {
+            populateTree(e.target.value);
+          }
         });
         searchBox.appendChild(sInput);
         mainArea.appendChild(searchBox);

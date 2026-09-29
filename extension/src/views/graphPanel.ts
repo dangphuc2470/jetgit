@@ -478,10 +478,68 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         const ref = msg.payload as string;
         try {
           await this.gitService.merge(ref);
-          vscode.window.showInformationMessage(`Merged ${ref}`);
+          vscode.window.showInformationMessage(`Merged '${ref}' successfully.`);
           this.loadInitialData();
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Merge failed: ${err.message}`);
+          const errMsg: string = err.message || '';
+          const hasConflicts =
+            errMsg.includes('CONFLICT') ||
+            errMsg.includes('conflict') ||
+            errMsg.includes('Automatic merge failed') ||
+            errMsg.includes('fix conflicts');
+
+          if (hasConflicts) {
+            // Merge is running but has conflicts — not a failure
+            this.loadInitialData();
+            try {
+              const conflictFiles = await this.gitService.getUnmergedFiles();
+              if (conflictFiles.length === 0) {
+                vscode.window.showWarningMessage(`Merge has conflicts. Please resolve them and commit.`);
+                return;
+              }
+
+              const items: vscode.QuickPickItem[] = conflictFiles.map(f => ({
+                label: `$(git-merge) ${f}`,
+                description: 'Conflict — click to open merge editor',
+                detail: f,
+              }));
+              items.push({
+                label: '$(check-all) All conflicts resolved — open Commit panel',
+                description: '',
+                detail: '__commit__',
+              });
+
+              const chosen = await vscode.window.showQuickPick(items, {
+                placeHolder: `${conflictFiles.length} file(s) with conflicts — select a file to resolve`,
+                canPickMany: false,
+                title: `Merge conflicts: '${ref}' into current branch`,
+              });
+
+              if (chosen && chosen.detail && chosen.detail !== '__commit__') {
+                const fileUri = vscode.Uri.joinPath(
+                  vscode.Uri.file(this.workspaceRoot),
+                  chosen.detail,
+                );
+                // Open VS Code's built-in 3-way merge editor
+                try {
+                  await vscode.commands.executeCommand('merge-conflict.accept.all-both');
+                } catch { /* ignore */ }
+                await vscode.commands.executeCommand('vscode.open', fileUri);
+                // Try to open in merge editor if available
+                try {
+                  await vscode.commands.executeCommand('git.openMergeEditor', fileUri);
+                } catch { /* merge editor might not be available */ }
+              } else if (chosen && chosen.detail === '__commit__') {
+                await vscode.commands.executeCommand('intellij-git.openCommit');
+              }
+            } catch {
+              vscode.window.showWarningMessage(
+                `Merge has conflicts. Please resolve them in the editor and commit when done.`,
+              );
+            }
+          } else {
+            vscode.window.showErrorMessage(`Merge failed: ${errMsg}`);
+          }
         }
         break;
       }

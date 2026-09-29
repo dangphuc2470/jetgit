@@ -7291,9 +7291,7 @@ ${component_stack}
             postMessage("pull", branchName);
           });
           addItem("Push...", "", () => {
-            if (confirm("Push branch '" + branchName + "' to remote?")) {
-              postMessage("push", branchName);
-            }
+            postMessage("push", branchName);
           });
           addDivider();
           addItem("Rename...", "F2", () => {
@@ -7309,9 +7307,7 @@ ${component_stack}
             if (name) postMessage("createBranch", { name, startPoint: branchName });
           });
           addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
-            if (confirm("Checkout and rebase onto '" + (currentBranch || "HEAD") + "'?")) {
-              postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
-            }
+            postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
           });
           addDivider();
           addItem("Compare with '" + (currentBranch || "HEAD") + "'", "", () => {
@@ -7322,20 +7318,14 @@ ${component_stack}
           });
           addDivider();
           addItem("Rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'", "", () => {
-            if (confirm("Are you sure you want to rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'?")) {
-              postMessage("rebase", branchName);
-            }
+            postMessage("rebase", branchName);
           });
           addItem("Merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'", "", () => {
-            if (confirm("Are you sure you want to merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'?")) {
-              postMessage("mergeBranch", branchName);
-            }
+            postMessage("mergeBranch", branchName);
           });
           addDivider();
           addItem("Delete Remote Branch...", "", () => {
-            if (confirm("Delete remote branch '" + branchName + "'?")) {
-              postMessage("deleteBranch", branchName);
-            }
+            postMessage("deleteBranch", branchName);
           });
         } else {
           addItem("Checkout", "", () => {
@@ -7346,9 +7336,7 @@ ${component_stack}
             if (name) postMessage("createBranch", { name, startPoint: branchName });
           });
           addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
-            if (confirm("Checkout '" + branchName + "' and rebase onto '" + (currentBranch || "HEAD") + "'?")) {
-              postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
-            }
+            postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
           });
           addDivider();
           addItem("Compare with '" + (currentBranch || "HEAD") + "'", "", () => {
@@ -7359,23 +7347,17 @@ ${component_stack}
           });
           addDivider();
           addItem("Rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'", "", () => {
-            if (confirm("Are you sure you want to rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'?")) {
-              postMessage("rebase", branchName);
-            }
+            postMessage("rebase", branchName);
           });
           addItem("Merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'", "", () => {
-            if (confirm("Are you sure you want to merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'?")) {
-              postMessage("mergeBranch", branchName);
-            }
+            postMessage("mergeBranch", branchName);
           });
           addDivider();
           addItem("Update", "", () => {
             postMessage("pull", branchName);
           });
           addItem("Push...", "", () => {
-            if (confirm("Push branch '" + branchName + "' to remote?")) {
-              postMessage("push", branchName);
-            }
+            postMessage("push", branchName);
           });
           addDivider();
           addItem("Rename...", "F2", () => {
@@ -7383,9 +7365,7 @@ ${component_stack}
             if (newName && newName !== branchName) postMessage("renameBranch", { oldName: branchName, newName });
           });
           addItem("Delete", "", () => {
-            if (confirm("Delete branch '" + branchName + "'?")) {
-              postMessage("deleteBranch", branchName);
-            }
+            postMessage("deleteBranch", branchName);
           });
         }
 

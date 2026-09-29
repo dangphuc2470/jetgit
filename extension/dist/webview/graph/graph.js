@@ -7486,6 +7486,10 @@ ${component_stack}
         }
 
         function insertBranchIntoTree(root, parts, branchObj) {
+          if (branchObj.name.startsWith("(") || branchObj.name.startsWith("HEAD")) {
+            root.branches.push({ ...branchObj, leafName: branchObj.name });
+            return;
+          }
           let current = root;
           for (let i = 0; i < parts.length - 1; i++) {
             const part = parts[i];
@@ -7549,13 +7553,12 @@ ${component_stack}
             item.innerHTML = icon + ' <span class="branch-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
             item.title = b.name;
             item.addEventListener("click", () => handleBranchClick(b.name));
-            item.addEventListener("dblclick", () => postMessage("checkout", b.name));
             item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
             lvlContainer.appendChild(item);
           }
         }
 
-        const localList = branches.filter((b) => !b.remote && !b.name.startsWith("origin/") && filterFn(b.name));
+        const localList = branches.filter((b) => !b.remote && !b.name.startsWith("origin/") && !b.name.startsWith("(") && !b.name.includes("detached") && filterFn(b.name));
         if (localList.length > 0) {
           const localSec = createSec("Local", true);
           const localTree = createTreeNode();

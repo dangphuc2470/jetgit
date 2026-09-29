@@ -244,8 +244,12 @@ var GitService = class {
         const behindMatch = track.match(/behind (\d+)/);
         if (behindMatch) behind = parseInt(behindMatch[1], 10);
       }
+      const trimmedName = name.trim();
+      if (trimmedName.startsWith("(") || trimmedName.startsWith("HEAD detached")) {
+        continue;
+      }
       branches.push({
-        name: name.trim(),
+        name: trimmedName,
         current,
         remote: void 0,
         upstream: upstream || void 0,
@@ -291,9 +295,36 @@ var GitService = class {
   }
   async getCurrentBranch() {
     const output = await this.exec(["rev-parse", "--abbrev-ref", "HEAD"]);
-    return output.trim();
+    const branch = output.trim();
+    if (branch === "HEAD") {
+      try {
+        const desc = await this.exec(["describe", "--tags", "--exact-match", "HEAD"]);
+        return `HEAD (detached at ${desc.trim()})`;
+      } catch {
+        const hash = await this.exec(["rev-parse", "--short", "HEAD"]);
+        return `HEAD (detached at ${hash.trim()})`;
+      }
+    }
+    return branch;
   }
   async checkout(ref) {
+    try {
+      const remotesOutput = await this.exec(["remote"]);
+      const remotes = remotesOutput.split("\n").map((s) => s.trim()).filter(Boolean);
+      for (const remote of remotes) {
+        if (ref.startsWith(remote + "/")) {
+          const localBranchName = ref.slice(remote.length + 1);
+          const branchCheck = await this.exec(["branch", "--list", localBranchName]);
+          if (branchCheck.trim()) {
+            await this.exec(["checkout", localBranchName]);
+          } else {
+            await this.exec(["checkout", "-b", localBranchName, "--track", ref]);
+          }
+          return;
+        }
+      }
+    } catch {
+    }
     await this.exec(["checkout", ref]);
   }
   async createBranch(name, startPoint) {

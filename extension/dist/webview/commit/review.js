@@ -688,9 +688,9 @@
   function render() {
     // Snapshot scroll position BEFORE wiping DOM so phantom scroll events (scrollTop=0)
     // fired by the browser when old nodes are removed cannot overwrite it.
-    if (savedScrollTop === null) {
-      const rPaneOld = document.querySelector('.editor-pane.right-pane');
-      if (rPaneOld) savedScrollTop = rPaneOld.scrollTop;
+    const rPaneOld = document.querySelector('.editor-pane.right-pane');
+    if (rPaneOld) {
+      savedScrollTop = rPaneOld.scrollTop;
     }
 
     // Block all scroll event handlers during DOM rebuild + restore
@@ -1207,29 +1207,30 @@
       });
     }, { passive: true });
 
-    // Initial draw or restore scroll position.
-    // Use double-rAF: first frame lets browser layout the new nodes,
-    // second frame applies scroll so it lands correctly and we can safely
-    // clear the isRendering guard afterwards.
+    // Immediate synchronous restore so browser doesn't render 0-scroll top flash
+    if (savedScrollTop !== null) {
+      isSyncing = true;
+      rightPane.scrollTop = savedScrollTop;
+      leftPane.scrollTop = mapRightToLeft(savedScrollTop);
+    }
+
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (savedScrollTop !== null && savedScrollTop > 0) {
-          isSyncing = true;
-          rightPane.scrollTop = savedScrollTop;
-          leftPane.scrollTop = mapRightToLeft(savedScrollTop);
-          updateRibbons();
-          requestAnimationFrame(() => {
-            isSyncing = false;
-            isRendering = false;
-          });
-        } else {
+      if (savedScrollTop !== null) {
+        isSyncing = true;
+        rightPane.scrollTop = savedScrollTop;
+        leftPane.scrollTop = mapRightToLeft(savedScrollTop);
+        updateRibbons();
+        requestAnimationFrame(() => {
+          isSyncing = false;
           isRendering = false;
-          updateRibbons();
-          if (state.blocks && state.blocks.length > 0) {
-            jumpToBlock(0, false);
-          }
+        });
+      } else {
+        isRendering = false;
+        updateRibbons();
+        if (state.blocks && state.blocks.length > 0) {
+          jumpToBlock(0, false);
         }
-      });
+      }
     });
 
     // Attach toolbar events
@@ -1592,6 +1593,18 @@
         hideDiffNavigationHint();
         const data = msg.payload;
         const isSameFile = (state.filePath && state.filePath === (data.path || ''));
+        const isIdentical = isSameFile &&
+          state.diff === (data.diff || '') &&
+          state.stagedDiff === (data.stagedDiff || '') &&
+          state.baseContent === (data.baseContent !== undefined ? data.baseContent : '') &&
+          state.currentContent === (data.currentContent !== undefined ? data.currentContent : '') &&
+          state.readOnly === (data.readOnly === true) &&
+          !data.focusTarget;
+
+        if (isIdentical) {
+          return;
+        }
+
         if (!isSameFile) {
           if (scrollAnimId) {
             cancelAnimationFrame(scrollAnimId);

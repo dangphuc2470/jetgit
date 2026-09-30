@@ -12,6 +12,14 @@ export class CommitReviewPanel {
   private currentFilePath = '';
   private filesList: string[] = [];
   private isReadOnly = false;
+  private lastLoadedState?: {
+    filePath: string;
+    diff: string;
+    stagedDiff: string;
+    baseContent: string;
+    currentContent: string;
+    readOnly: boolean;
+  };
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -107,6 +115,28 @@ export class CommitReviewPanel {
         })(),
         this.gitService.exec(['diff', '--cached', '--', filePath]).catch(() => '')
       ]);
+      const isSameFile = this.lastLoadedState && this.lastLoadedState.filePath === filePath;
+      const isUnchanged = isSameFile &&
+        this.lastLoadedState!.diff === diff &&
+        this.lastLoadedState!.stagedDiff === stagedDiff &&
+        this.lastLoadedState!.baseContent === baseContent &&
+        this.lastLoadedState!.currentContent === currentContent &&
+        this.lastLoadedState!.readOnly === this.isReadOnly &&
+        !focusTarget;
+
+      if (isUnchanged) {
+        return;
+      }
+
+      this.lastLoadedState = {
+        filePath,
+        diff,
+        stagedDiff,
+        baseContent,
+        currentContent,
+        readOnly: this.isReadOnly,
+      };
+
       const currentFileIndex = this.filesList.indexOf(filePath);
       this.panel.webview.postMessage({
         type: 'fileDiff',

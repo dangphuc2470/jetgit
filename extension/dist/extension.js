@@ -1724,6 +1724,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
   currentFilePath = "";
   filesList = [];
   isReadOnly = false;
+  lastLoadedState;
   static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange, readOnly = false) {
     const fileName = path3.basename(filePath);
     if (_CommitReviewPanel.currentPanel) {
@@ -1780,6 +1781,25 @@ var CommitReviewPanel = class _CommitReviewPanel {
         })(),
         this.gitService.exec(["diff", "--cached", "--", filePath]).catch(() => "")
       ]);
+      const isSameFile = this.lastLoadedState && this.lastLoadedState.filePath === filePath;
+      const isUnchanged = isSameFile &&
+        this.lastLoadedState.diff === diff &&
+        this.lastLoadedState.stagedDiff === stagedDiff &&
+        this.lastLoadedState.baseContent === baseContent &&
+        this.lastLoadedState.currentContent === currentContent &&
+        this.lastLoadedState.readOnly === this.isReadOnly &&
+        !focusTarget;
+      if (isUnchanged) {
+        return;
+      }
+      this.lastLoadedState = {
+        filePath,
+        diff,
+        stagedDiff,
+        baseContent,
+        currentContent,
+        readOnly: this.isReadOnly
+      };
       const currentFileIndex = this.filesList.indexOf(filePath);
       this.panel.webview.postMessage({
         type: "fileDiff",
@@ -2282,6 +2302,43 @@ var CommitViewProvider = class {
           await this.refresh();
         } catch (err) {
           vscode4.window.showErrorMessage(`Rollback failed: ${err.message}`);
+        }
+        break;
+      }
+      case "jumpToSource": {
+        const filePath = msg.payload;
+        if (filePath) {
+          const fullPath = path4.join(this.gitService.getCwd(), filePath);
+          if (fs3.existsSync(fullPath)) {
+            vscode4.commands.executeCommand("vscode.open", vscode4.Uri.file(fullPath));
+          }
+        }
+        break;
+      }
+      case "deleteFile": {
+        const filePath = msg.payload;
+        if (!filePath) return;
+        const fileName = path4.basename(filePath);
+        const confirm = await vscode4.window.showWarningMessage(
+          `Are you sure you want to delete "${fileName}"?`,
+          { modal: true },
+          "Delete"
+        );
+        if (confirm !== "Delete") return;
+        try {
+          const fullPath = path4.join(this.gitService.getCwd(), filePath);
+          if (fs3.existsSync(fullPath)) {
+            if (fs3.statSync(fullPath).isDirectory()) {
+              fs3.rmSync(fullPath, { recursive: true, force: true });
+            } else {
+              fs3.unlinkSync(fullPath);
+            }
+          }
+          await this.gitService.exec(["rm", "-f", "--cached", filePath]).catch(() => {});
+          await this.refresh();
+          vscode4.window.showInformationMessage(`Deleted ${fileName}`);
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Delete failed: ${err.message}`);
         }
         break;
       }

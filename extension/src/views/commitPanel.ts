@@ -276,6 +276,43 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'jumpToSource': {
+        const filePath = msg.payload as string;
+        if (filePath) {
+          const fullPath = path.join(this.gitService.getCwd(), filePath);
+          if (fs.existsSync(fullPath)) {
+            vscode.commands.executeCommand('vscode.open', vscode.Uri.file(fullPath));
+          }
+        }
+        break;
+      }
+      case 'deleteFile': {
+        const filePath = msg.payload as string;
+        if (!filePath) return;
+        const fileName = path.basename(filePath);
+        const confirm = await vscode.window.showWarningMessage(
+          `Are you sure you want to delete "${fileName}"?`,
+          { modal: true },
+          'Delete',
+        );
+        if (confirm !== 'Delete') return;
+        try {
+          const fullPath = path.join(this.gitService.getCwd(), filePath);
+          if (fs.existsSync(fullPath)) {
+            if (fs.statSync(fullPath).isDirectory()) {
+              fs.rmSync(fullPath, { recursive: true, force: true });
+            } else {
+              fs.unlinkSync(fullPath);
+            }
+          }
+          await this.gitService.exec(['rm', '-f', '--cached', filePath]).catch(() => {});
+          await this.refresh();
+          vscode.window.showInformationMessage(`Deleted ${fileName}`);
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Delete failed: ${err.message}`);
+        }
+        break;
+      }
       case 'getFileDiff': {
         const filePath = msg.payload as string;
         try {

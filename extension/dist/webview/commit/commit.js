@@ -471,6 +471,10 @@
           vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
         });
 
+        itemEl.addEventListener('contextmenu', (e) => {
+          showFileContextMenu(e, file);
+        });
+
         itemsContainer.appendChild(itemEl);
       });
 
@@ -940,6 +944,155 @@
       }
     });
   }
+
+  // Android Studio Context Menu implementation
+  let activeContextMenu = null;
+
+  function closeContextMenu() {
+    if (activeContextMenu) {
+      activeContextMenu.remove();
+      activeContextMenu = null;
+    }
+  }
+
+  function showFileContextMenu(e, file) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeContextMenu();
+
+    state.selectedFile = file.path;
+    document.querySelectorAll('.file-item').forEach(el => el.classList.remove('selected'));
+    const currentItem = e.currentTarget;
+    if (currentItem) currentItem.classList.add('selected');
+
+    const menu = document.createElement('div');
+    menu.className = 'as-context-menu';
+    activeContextMenu = menu;
+
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const optKey = isMac ? '⌥' : 'Alt+';
+    const cmdKey = isMac ? '⌘' : 'Ctrl+';
+
+    const isStaged = file.staged && !file.partiallyStaged;
+    const vcsActionLabel = file.isUntracked ? 'Add to VCS' : (isStaged ? 'Unstage' : 'Add to VCS');
+
+    const items = [
+      {
+        label: 'Rollback...',
+        shortcut: `${optKey}${cmdKey}Z`,
+        icon: '↶',
+        action: () => vscode.postMessage({ type: 'rollbackFiles', payload: [file.path] })
+      },
+      {
+        label: 'Show Diff',
+        shortcut: `${cmdKey}D`,
+        icon: '⇄',
+        action: () => vscode.postMessage({ type: 'openReviewInCenter', payload: file.path })
+      },
+      {
+        label: 'Jump to Source',
+        shortcut: 'F4',
+        icon: '↗',
+        action: () => vscode.postMessage({ type: 'jumpToSource', payload: file.path })
+      },
+      { separator: true },
+      {
+        label: 'Delete...',
+        shortcut: '⌫',
+        icon: '✕',
+        action: () => vscode.postMessage({ type: 'deleteFile', payload: file.path })
+      },
+      {
+        label: vcsActionLabel,
+        shortcut: `${optKey}${cmdKey}A`,
+        icon: '+',
+        action: () => {
+          if (isStaged) {
+            vscode.postMessage({ type: 'unstageFile', payload: file.path });
+          } else {
+            vscode.postMessage({ type: 'stageFile', payload: file.path });
+          }
+        }
+      },
+      { separator: true },
+      {
+        label: 'Refresh',
+        shortcut: `${cmdKey}R`,
+        icon: '↻',
+        action: () => vscode.postMessage({ type: 'refresh' })
+      }
+    ];
+
+    items.forEach(it => {
+      if (it.separator) {
+        const sep = document.createElement('div');
+        sep.className = 'as-menu-separator';
+        menu.appendChild(sep);
+        return;
+      }
+
+      const row = document.createElement('div');
+      row.className = 'as-menu-item';
+      row.innerHTML = `
+        <div class="as-menu-item-left">
+          <span class="as-menu-icon">${it.icon}</span>
+          <span class="as-menu-label">${escapeHtml(it.label)}</span>
+        </div>
+        ${it.shortcut ? `<span class="as-menu-shortcut">${it.shortcut}</span>` : ''}
+      `;
+
+      row.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        closeContextMenu();
+        it.action();
+      });
+
+      menu.appendChild(row);
+    });
+
+    document.body.appendChild(menu);
+
+    let posX = e.clientX;
+    let posY = e.clientY;
+    const menuRect = menu.getBoundingClientRect();
+    if (posX + menuRect.width > window.innerWidth) {
+      posX = Math.max(8, window.innerWidth - menuRect.width - 8);
+    }
+    if (posY + menuRect.height > window.innerHeight) {
+      posY = Math.max(8, window.innerHeight - menuRect.height - 8);
+    }
+    menu.style.left = `${posX}px`;
+    menu.style.top = `${posY}px`;
+  }
+
+  window.addEventListener('click', closeContextMenu);
+  window.addEventListener('blur', closeContextMenu);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeContextMenu();
+      return;
+    }
+    const isInputFocused = document.activeElement && (
+      document.activeElement.tagName === 'TEXTAREA' ||
+      document.activeElement.tagName === 'INPUT'
+    );
+    if (isInputFocused) return;
+
+    if (state.selectedFile) {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+      if (e.key === 'F4') {
+        e.preventDefault();
+        vscode.postMessage({ type: 'jumpToSource', payload: state.selectedFile });
+      } else if (cmdOrCtrl && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        vscode.postMessage({ type: 'openReviewInCenter', payload: state.selectedFile });
+      } else if (cmdOrCtrl && e.altKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        vscode.postMessage({ type: 'rollbackFiles', payload: [state.selectedFile] });
+      }
+    }
+  });
 
   // Helper escape functions
   function escapeHtml(str) {

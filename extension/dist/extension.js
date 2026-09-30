@@ -143,12 +143,46 @@ var GitService = class {
   async initRepo() {
     await execFileAsync("git", ["init"], { cwd: this.cwd });
   }
-  async exec(args, maxBuffer = 10 * 1024 * 1024) {
-    const { stdout } = await execFileAsync("git", args, {
-      cwd: this.cwd,
-      maxBuffer
-    });
-    return stdout;
+  async exec(args, maxBuffer = 10 * 1024 * 1024, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const { stdout } = await execFileAsync("git", args, {
+          cwd: this.cwd,
+          maxBuffer
+        });
+        return stdout;
+      } catch (err) {
+        const isLockError = err?.message && (
+          err.message.includes("index.lock") ||
+          (err.message.includes("Unable to create") && err.message.includes(".lock"))
+        );
+        if (isLockError && attempt < retries - 1) {
+          try {
+            const dotGit = path.join(this.cwd, ".git");
+            let lockPath = path.join(dotGit, "index.lock");
+            if (fs.existsSync(dotGit) && fs.statSync(dotGit).isFile()) {
+              const content = fs.readFileSync(dotGit, "utf8").trim();
+              if (content.startsWith("gitdir:")) {
+                const relOrAbs = content.replace(/^gitdir:\s*/, "");
+                const actualGitDir = path.isAbsolute(relOrAbs) ? relOrAbs : path.resolve(this.cwd, relOrAbs);
+                lockPath = path.join(actualGitDir, "index.lock");
+              }
+            }
+            if (fs.existsSync(lockPath)) {
+              const stat = fs.statSync(lockPath);
+              if (Date.now() - stat.mtimeMs > 5000) {
+                fs.unlinkSync(lockPath);
+                continue;
+              }
+            }
+          } catch {}
+          await new Promise((res) => setTimeout(res, 200 * (attempt + 1)));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error("Git command failed after retries");
   }
   async getRepoRoot() {
     const out = await this.exec(["rev-parse", "--show-toplevel"]);

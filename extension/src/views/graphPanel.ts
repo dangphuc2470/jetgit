@@ -91,7 +91,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       this.isLoadingMore = false;
       if (!this.hasInitializedFilter) {
         this.hasInitializedFilter = true;
-        this.currentFilter = currentBranch ? { branch: currentBranch, all: false } : { all: true };
+        this.currentFilter = currentBranch ? { branch: 'HEAD', all: false } : { all: true };
       }
 
       const [commits, branches, tags] = await Promise.all([

@@ -626,6 +626,75 @@ export class GitService {
     }
   }
 
+  async getStagedDiff(): Promise<string> {
+    try {
+      return await this.exec(['diff', '--cached']);
+    } catch {
+      return '';
+    }
+  }
+
+  async getAuthorRecentCommitMessages(count = 10): Promise<string[]> {
+    try {
+      let author = '';
+      try {
+        author = (await this.exec(['config', 'user.email'])).trim();
+      } catch {}
+      if (!author) {
+        try {
+          author = (await this.exec(['config', 'user.name'])).trim();
+        } catch {}
+      }
+
+      const isMergeOrMr = (msg: string) => {
+        const lower = msg.toLowerCase().trim();
+        return (
+          lower.startsWith('merge ') ||
+          lower.startsWith('merge branch') ||
+          lower.startsWith('merge remote-tracking') ||
+          lower.startsWith('revert ') ||
+          lower.startsWith('resolve conflict') ||
+          lower.includes('merge request') ||
+          lower.includes('pull request') ||
+          lower.startsWith('see merge request') ||
+          /^mr\s*!/i.test(lower) ||
+          /^pr\s*#/i.test(lower)
+        );
+      };
+
+      const args = ['log', '-n', '50', '--no-merges', '--pretty=%s'];
+      if (author) {
+        args.push(`--author=${author}`);
+      }
+
+      let out = '';
+      try {
+        out = await this.exec(args);
+      } catch {
+        out = await this.exec(['log', '-n', '30', '--no-merges', '--pretty=%s']);
+      }
+
+      const cleanList = out
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => Boolean(s) && !isMergeOrMr(s));
+
+      if (cleanList.length > 0) {
+        return cleanList.slice(0, count);
+      }
+
+      // Fallback to repo commits without merges if author is new
+      const fallbackOut = await this.exec(['log', '-n', '30', '--no-merges', '--pretty=%s']);
+      return fallbackOut
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => Boolean(s) && !isMergeOrMr(s))
+        .slice(0, count);
+    } catch {
+      return [];
+    }
+  }
+
   async getMergeMessage(): Promise<string> {
     try {
       const mergeMsgPath = path.join(this.cwd, '.git', 'MERGE_MSG');

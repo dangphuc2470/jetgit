@@ -152,10 +152,7 @@ var GitService = class {
         });
         return stdout;
       } catch (err) {
-        const isLockError = err?.message && (
-          err.message.includes("index.lock") ||
-          (err.message.includes("Unable to create") && err.message.includes(".lock"))
-        );
+        const isLockError = err?.message && (err.message.includes("index.lock") || err.message.includes("Unable to create") && err.message.includes(".lock"));
         if (isLockError && attempt < retries - 1) {
           try {
             const dotGit = path.join(this.cwd, ".git");
@@ -170,12 +167,13 @@ var GitService = class {
             }
             if (fs.existsSync(lockPath)) {
               const stat = fs.statSync(lockPath);
-              if (Date.now() - stat.mtimeMs > 5000) {
+              if (Date.now() - stat.mtimeMs > 5e3) {
                 fs.unlinkSync(lockPath);
                 continue;
               }
             }
-          } catch {}
+          } catch {
+          }
           await new Promise((res) => setTimeout(res, 200 * (attempt + 1)));
           continue;
         }
@@ -515,11 +513,11 @@ var GitService = class {
     await this.exec(["add", "--", ...paths]);
   }
   async stageFileContent(filePath, content) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve2, reject) => {
       const proc = (0, import_child_process.execFile)("git", ["hash-object", "-w", "--stdin"], { cwd: this.cwd }, (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr || err.message));
         const sha = stdout.trim();
-        this.exec(["update-index", "--cacheinfo", `100644,${sha},${filePath}`]).then(() => resolve()).catch(reject);
+        this.exec(["update-index", "--cacheinfo", `100644,${sha},${filePath}`]).then(() => resolve2()).catch(reject);
       });
       proc.stdin?.write(content);
       proc.stdin?.end();
@@ -590,13 +588,13 @@ var GitService = class {
     }
   }
   async applyHunkPatch(patchContent, reverse = false) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve2, reject) => {
       const args = ["apply", "--cached", "--recount", "--whitespace=nowarn"];
       if (reverse) args.push("--reverse");
       args.push("-");
       const proc = (0, import_child_process.execFile)("git", args, { cwd: this.cwd }, (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr || err.message));
-        resolve(stdout);
+        resolve2(stdout);
       });
       proc.stdin?.write(patchContent);
       proc.stdin?.end();
@@ -606,6 +604,50 @@ var GitService = class {
     try {
       const out = await this.exec(["log", `-n${count}`, "--pretty=%s"]);
       return out.split("\n").map((s) => s.trim()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+  async getStagedDiff() {
+    try {
+      return await this.exec(["diff", "--cached"]);
+    } catch {
+      return "";
+    }
+  }
+  async getAuthorRecentCommitMessages(count = 10) {
+    try {
+      let author = "";
+      try {
+        author = (await this.exec(["config", "user.email"])).trim();
+      } catch {
+      }
+      if (!author) {
+        try {
+          author = (await this.exec(["config", "user.name"])).trim();
+        } catch {
+        }
+      }
+      const isMergeOrMr = (msg) => {
+        const lower = msg.toLowerCase().trim();
+        return lower.startsWith("merge ") || lower.startsWith("merge branch") || lower.startsWith("merge remote-tracking") || lower.startsWith("revert ") || lower.startsWith("resolve conflict") || lower.includes("merge request") || lower.includes("pull request") || lower.startsWith("see merge request") || /^mr\s*!/i.test(lower) || /^pr\s*#/i.test(lower);
+      };
+      const args = ["log", "-n", "50", "--no-merges", "--pretty=%s"];
+      if (author) {
+        args.push(`--author=${author}`);
+      }
+      let out = "";
+      try {
+        out = await this.exec(args);
+      } catch {
+        out = await this.exec(["log", "-n", "30", "--no-merges", "--pretty=%s"]);
+      }
+      const cleanList = out.split("\n").map((s) => s.trim()).filter((s) => Boolean(s) && !isMergeOrMr(s));
+      if (cleanList.length > 0) {
+        return cleanList.slice(0, count);
+      }
+      const fallbackOut = await this.exec(["log", "-n", "30", "--no-merges", "--pretty=%s"]);
+      return fallbackOut.split("\n").map((s) => s.trim()).filter((s) => Boolean(s) && !isMergeOrMr(s)).slice(0, count);
     } catch {
       return [];
     }
@@ -1726,6 +1768,7 @@ function getNonce() {
 // src/views/commitPanel.ts
 var vscode4 = __toESM(require("vscode"));
 var path4 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
 
 // src/views/commitReviewPanel.ts
 var vscode3 = __toESM(require("vscode"));
@@ -1823,13 +1866,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
         this.gitService.exec(["diff", "--cached", "--", filePath]).catch(() => "")
       ]);
       const isSameFile = this.lastLoadedState && this.lastLoadedState.filePath === filePath;
-      const isUnchanged = isSameFile &&
-        this.lastLoadedState.diff === diff &&
-        this.lastLoadedState.stagedDiff === stagedDiff &&
-        this.lastLoadedState.baseContent === baseContent &&
-        this.lastLoadedState.currentContent === currentContent &&
-        this.lastLoadedState.readOnly === this.isReadOnly &&
-        !focusTarget;
+      const isUnchanged = isSameFile && this.lastLoadedState.diff === diff && this.lastLoadedState.stagedDiff === stagedDiff && this.lastLoadedState.baseContent === baseContent && this.lastLoadedState.currentContent === currentContent && this.lastLoadedState.readOnly === this.isReadOnly && !focusTarget;
       if (isUnchanged) {
         return;
       }
@@ -2108,11 +2145,11 @@ var CommitViewProvider = class _CommitViewProvider {
       this.selectFile(filePath);
     };
   }
-  static currentProvider;
   extensionUri;
   gitService;
   log;
   static viewType = "intellij-git.commitView";
+  static currentProvider;
   view;
   changesFilePaths = [];
   unversionedFilePaths = [];
@@ -2204,12 +2241,8 @@ var CommitViewProvider = class _CommitViewProvider {
           partiallyStaged: isPartiallyStaged
         };
       });
-      const changesFiles = files
-        .filter((f) => !f.isUntracked)
-        .sort((a, b) => a.name.localeCompare(b.name, void 0, { sensitivity: "base" }) || a.path.localeCompare(b.path));
-      const unversionedFiles = files
-        .filter((f) => f.isUntracked)
-        .sort((a, b) => a.name.localeCompare(b.name, void 0, { sensitivity: "base" }) || a.path.localeCompare(b.path));
+      const changesFiles = files.filter((f) => !f.isUntracked).sort((a, b) => a.name.localeCompare(b.name, void 0, { sensitivity: "base" }) || a.path.localeCompare(b.path));
+      const unversionedFiles = files.filter((f) => f.isUntracked).sort((a, b) => a.name.localeCompare(b.name, void 0, { sensitivity: "base" }) || a.path.localeCompare(b.path));
       const sortedFiles = [...changesFiles, ...unversionedFiles];
       const changesCount = changesFiles.length;
       const unversionedCount = unversionedFiles.length;
@@ -2374,7 +2407,7 @@ var CommitViewProvider = class _CommitViewProvider {
         const filePath = msg.payload;
         if (filePath) {
           const fullPath = path4.join(this.gitService.getCwd(), filePath);
-          if (fs3.existsSync(fullPath)) {
+          if (fs4.existsSync(fullPath)) {
             vscode4.commands.executeCommand("vscode.open", vscode4.Uri.file(fullPath));
           }
         }
@@ -2392,14 +2425,15 @@ var CommitViewProvider = class _CommitViewProvider {
         if (confirm !== "Delete") return;
         try {
           const fullPath = path4.join(this.gitService.getCwd(), filePath);
-          if (fs3.existsSync(fullPath)) {
-            if (fs3.statSync(fullPath).isDirectory()) {
-              fs3.rmSync(fullPath, { recursive: true, force: true });
+          if (fs4.existsSync(fullPath)) {
+            if (fs4.statSync(fullPath).isDirectory()) {
+              fs4.rmSync(fullPath, { recursive: true, force: true });
             } else {
-              fs3.unlinkSync(fullPath);
+              fs4.unlinkSync(fullPath);
             }
           }
-          await this.gitService.exec(["rm", "-f", "--cached", filePath]).catch(() => {});
+          await this.gitService.exec(["rm", "-f", "--cached", filePath]).catch(() => {
+          });
           await this.refresh();
           vscode4.window.showInformationMessage(`Deleted ${fileName}`);
         } catch (err) {
@@ -2462,6 +2496,7 @@ var CommitViewProvider = class _CommitViewProvider {
           if (Array.isArray(files) && files.length > 0) {
             await this.gitService.stageFiles(files);
           }
+          const authorSamples = await this.gitService.getAuthorRecentCommitMessages(10);
           const repoRoot = this.gitService.getCwd();
           const gitExt = vscode4.extensions.getExtension("vscode.git");
           let gitRepo;
@@ -2477,15 +2512,49 @@ var CommitViewProvider = class _CommitViewProvider {
           setTimeout(restoreFocus, 80);
           setTimeout(restoreFocus, 180);
           setTimeout(restoreFocus, 350);
-          let aiMsg = await vscode4.commands.executeCommand("antigravity.generateCommitMessage", repoRoot);
+          let aiMsg = "";
+          try {
+            if (vscode4.lm && typeof vscode4.lm.selectChatModels === "function") {
+              const models = await vscode4.lm.selectChatModels({ family: "gemini-1.5-pro" }).catch(() => []);
+              const model = models[0] || (await vscode4.lm.selectChatModels().catch(() => []))[0];
+              if (model) {
+                const stagedDiff = await this.gitService.getStagedDiff();
+                if (stagedDiff && stagedDiff.trim()) {
+                  const prompt = [
+                    "You are an expert Git commit message generator.",
+                    authorSamples.length > 0 ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:
+${authorSamples.map((s) => `- ${s}`).join("\n")}` : "Write a concise, high quality commit message.",
+                    "Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.",
+                    `Git diff:
+${stagedDiff.slice(0, 8e3)}`
+                  ].join("\n\n");
+                  const response = await model.sendRequest([
+                    vscode4.LanguageModelChatMessage.User(prompt)
+                  ]);
+                  let accumulated = "";
+                  for await (const chunk of response.text) {
+                    accumulated += chunk;
+                  }
+                  if (accumulated.trim()) {
+                    aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, "");
+                  }
+                }
+              }
+            }
+          } catch {
+          }
+          if (!aiMsg) {
+            aiMsg = await vscode4.commands.executeCommand("antigravity.generateCommitMessage", repoRoot) || "";
+          }
           if (!aiMsg && gitRepo?.inputBox?.value) {
             aiMsg = gitRepo.inputBox.value;
           }
           restoreFocus();
           if (aiMsg && typeof aiMsg === "string") {
+            const finalMessage = adaptCommitMessageStyle(aiMsg, authorSamples);
             this.view?.webview.postMessage({
               type: "setCommitMessage",
-              payload: { message: aiMsg.trim() }
+              payload: { message: finalMessage.trim() }
             });
           } else {
             this.view?.webview.postMessage({ type: "generateAiError" });
@@ -2610,6 +2679,66 @@ function getNonce3() {
     text += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return text;
+}
+function detectAuthorStyle(messages) {
+  if (!messages || messages.length === 0) {
+    return { type: "imperative", endsWithPeriod: false };
+  }
+  let conventionalCount = 0;
+  let imperativeCount = 0;
+  let periodCount = 0;
+  let scopeCount = 0;
+  const conventionalRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?:\s*(.+)/i;
+  for (const msg of messages) {
+    if (msg.endsWith(".")) periodCount++;
+    const convMatch = msg.match(conventionalRegex);
+    if (convMatch) {
+      conventionalCount++;
+      if (convMatch[2]) scopeCount++;
+    } else if (/^[A-Z][a-zA-Z0-9_\-]*\s+/.test(msg)) {
+      imperativeCount++;
+    }
+  }
+  return {
+    type: conventionalCount > imperativeCount ? "conventional" : "imperative",
+    hasScope: scopeCount > conventionalCount / 2,
+    endsWithPeriod: periodCount > messages.length / 2
+  };
+}
+function adaptCommitMessageStyle(raw, samples) {
+  if (!raw) return raw;
+  const style = detectAuthorStyle(samples);
+  let msg = raw.trim();
+  if (style.type === "imperative") {
+    msg = msg.replace(/^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^\)]+\))?!?:\s*/i, "");
+    msg = msg.charAt(0).toUpperCase() + msg.slice(1);
+    if (!style.endsWithPeriod) {
+      msg = msg.replace(/\.+$/, "");
+    } else if (!msg.endsWith(".")) {
+      msg += ".";
+    }
+    return msg;
+  } else {
+    const convRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?!?:\s*(.+)/i;
+    const match = msg.match(convRegex);
+    if (match) {
+      const type2 = match[1].toLowerCase();
+      const scope = match[2] ? match[2].toLowerCase() : "";
+      let desc2 = match[3].trim();
+      desc2 = desc2.charAt(0).toLowerCase() + desc2.slice(1);
+      desc2 = desc2.replace(/\.+$/, "");
+      return `${type2}${scope}: ${desc2}`;
+    }
+    let type = "feat";
+    if (/^(fix|resolve|prevent|handle|correct)\b/i.test(msg)) type = "fix";
+    else if (/^(refactor|clean|simplify)\b/i.test(msg)) type = "refactor";
+    else if (/^(doc|document|docs)\b/i.test(msg)) type = "docs";
+    else if (/^(test|tests)\b/i.test(msg)) type = "test";
+    else if (/^(chore|build|ci)\b/i.test(msg)) type = "chore";
+    let desc = msg.charAt(0).toLowerCase() + msg.slice(1);
+    desc = desc.replace(/\.+$/, "");
+    return `${type}: ${desc}`;
+  }
 }
 
 // src/views/rebasePanel.ts
@@ -2886,7 +3015,7 @@ var BranchTreeProvider = class {
 // src/views/changelistTree.ts
 var vscode7 = __toESM(require("vscode"));
 var path5 = __toESM(require("path"));
-var fs4 = __toESM(require("fs"));
+var fs5 = __toESM(require("fs"));
 var DEFAULT_DATA = {
   changelists: [{ name: "Default", files: [] }],
   active: "Default"
@@ -2898,7 +3027,6 @@ var ChangelistTreeProvider = class {
     const vscodePath = path5.join(workspaceRoot, ".vscode");
     this.dataPath = path5.join(vscodePath, "changelists.json");
     this.load();
-    // File-save / file-create listeners removed — extension.ts shared handler calls syncChangelists()
   }
   gitService;
   workspaceRoot;
@@ -3055,11 +3183,7 @@ var ChangelistTreeProvider = class {
       if (!activeCl) return;
       let changed = false;
       for (const entry of status) {
-        if (
-          entry.path === '.vscode' ||
-          entry.path.startsWith('.vscode/') ||
-          entry.path.includes('changelists.json')
-        ) {
+        if (entry.path === ".vscode" || entry.path.startsWith(".vscode/") || entry.path.includes("changelists.json")) {
           continue;
         }
         if (!allFiles.has(entry.path)) {
@@ -3071,10 +3195,7 @@ var ChangelistTreeProvider = class {
       for (const cl of this.data.changelists) {
         const before = cl.files.length;
         cl.files = cl.files.filter(
-          (f) =>
-            statusPaths.has(f) &&
-            !f.startsWith('.vscode/') &&
-            !f.includes('changelists.json')
+          (f) => statusPaths.has(f) && !f.startsWith(".vscode/") && !f.includes("changelists.json")
         );
         if (cl.files.length !== before) changed = true;
       }
@@ -3087,8 +3208,8 @@ var ChangelistTreeProvider = class {
   }
   load() {
     try {
-      if (fs4.existsSync(this.dataPath)) {
-        const raw = fs4.readFileSync(this.dataPath, "utf-8");
+      if (fs5.existsSync(this.dataPath)) {
+        const raw = fs5.readFileSync(this.dataPath, "utf-8");
         this.data = JSON.parse(raw);
       }
     } catch {
@@ -3099,17 +3220,17 @@ var ChangelistTreeProvider = class {
     }
     for (const cl of this.data.changelists) {
       cl.files = cl.files.filter(
-        (f) => !f.startsWith('.vscode/') && !f.includes('changelists.json')
+        (f) => !f.startsWith(".vscode/") && !f.includes("changelists.json")
       );
     }
   }
   save() {
     try {
       const dir = path5.dirname(this.dataPath);
-      if (!fs4.existsSync(dir)) {
-        fs4.mkdirSync(dir, { recursive: true });
+      if (!fs5.existsSync(dir)) {
+        fs5.mkdirSync(dir, { recursive: true });
       }
-      fs4.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2), "utf-8");
+      fs5.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2), "utf-8");
     } catch {
     }
   }
@@ -3371,7 +3492,7 @@ var BlameDecorationProvider = class {
 // src/providers/mergeProvider.ts
 var vscode9 = __toESM(require("vscode"));
 var path6 = __toESM(require("path"));
-var fs5 = __toESM(require("fs"));
+var fs6 = __toESM(require("fs"));
 var MergeProvider = class {
   constructor(gitService, workspaceRoot) {
     this.gitService = gitService;
@@ -3394,7 +3515,7 @@ var MergeProvider = class {
   async checkForConflicts() {
     try {
       const gitDir = path6.join(this.workspaceRoot, ".git");
-      const hasConflictState = fs5.existsSync(path6.join(gitDir, "MERGE_HEAD")) || fs5.existsSync(path6.join(gitDir, "rebase-apply")) || fs5.existsSync(path6.join(gitDir, "rebase-merge")) || fs5.existsSync(path6.join(gitDir, "CHERRY_PICK_HEAD"));
+      const hasConflictState = fs6.existsSync(path6.join(gitDir, "MERGE_HEAD")) || fs6.existsSync(path6.join(gitDir, "rebase-apply")) || fs6.existsSync(path6.join(gitDir, "rebase-merge")) || fs6.existsSync(path6.join(gitDir, "CHERRY_PICK_HEAD"));
       if (!hasConflictState) {
         this.statusBarItem.hide();
         return;
@@ -3719,12 +3840,7 @@ function activate(context) {
   }, 600);
   const handleGitFsEvent = (uri) => {
     const fsPath = uri?.fsPath || uri?.path || "";
-    if (
-      fsPath.endsWith(".lock") ||
-      fsPath.includes("/objects/") ||
-      fsPath.includes("\\objects\\") ||
-      fsPath.endsWith("COMMIT_EDITMSG")
-    ) {
+    if (fsPath.endsWith(".lock") || fsPath.includes("/objects/") || fsPath.includes("\\objects\\") || fsPath.endsWith("COMMIT_EDITMSG")) {
       return;
     }
     onGitChange();
@@ -3752,11 +3868,7 @@ function activate(context) {
   const onWorkspaceFileChange = debounce((doc) => {
     commitViewProvider.refresh();
     changelistTree.syncChangelists();
-    if (
-      doc &&
-      CommitReviewPanel.currentPanel &&
-      doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())
-    ) {
+    if (doc && CommitReviewPanel.currentPanel && doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())) {
       CommitReviewPanel.currentPanel.refresh();
     }
   }, 400);

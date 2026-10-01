@@ -1114,25 +1114,22 @@
         vscode.postMessage({ type: 'rollbackFiles', payload: [state.selectedFile] });
       } else if (e.key === 'F7' || e.keyCode === 118) {
         e.preventDefault();
-        const changesFiles = state.files.filter(f => !f.isUntracked);
-        const unversionedFiles = state.files.filter(f => f.isUntracked);
-        const isCurrentInChanges = changesFiles.some(f => f.path === state.selectedFile);
-        const activeList = (isCurrentInChanges || unversionedFiles.length === 0) ? changesFiles : unversionedFiles;
-        const currentIndex = activeList.findIndex(f => f.path === state.selectedFile);
-        if (e.shiftKey) {
-          if (currentIndex > 0) {
-            const prevFile = activeList[currentIndex - 1].path;
-            state.selectedFile = prevFile;
-            render();
-            vscode.postMessage({ type: 'openReviewInCenter', payload: prevFile });
-          }
-        } else {
-          if (currentIndex !== -1 && currentIndex < activeList.length - 1) {
-            const nextFile = activeList[currentIndex + 1].path;
-            state.selectedFile = nextFile;
-            render();
-            vscode.postMessage({ type: 'openReviewInCenter', payload: nextFile });
-          }
+        let targetFile = state.selectedFile;
+        if (!targetFile && state.files && state.files.length > 0) {
+          targetFile = state.files[0].path;
+          state.selectedFile = targetFile;
+          render();
+        }
+        if (targetFile) {
+          vscode.postMessage({
+            type: 'openReviewInCenter',
+            payload: {
+              filePath: targetFile,
+              jumpDiff: true,
+              fromFileList: true,
+              direction: e.shiftKey ? -1 : 1,
+            },
+          });
         }
       }
     }

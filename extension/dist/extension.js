@@ -1840,6 +1840,13 @@ var CommitReviewPanel = class _CommitReviewPanel {
     _CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
     return _CommitReviewPanel.currentPanel;
   }
+  focusAndJumpDiff(direction = 1, fromFileList = false) {
+    this.panel.reveal(vscode3.ViewColumn.Active, false);
+    this.panel.webview.postMessage({
+      type: "jumpDiff",
+      payload: { direction, fromFileList }
+    });
+  }
   async loadFile(filePath, filesList, readOnly, focusTarget) {
     this.currentFilePath = filePath;
     if (filesList) this.filesList = filesList;
@@ -2313,15 +2320,21 @@ var CommitViewProvider = class _CommitViewProvider {
       }
       case "selectFile":
       case "openReviewInCenter": {
-        const filePath = msg.payload;
+        const filePath = typeof msg.payload === "string" ? msg.payload : msg.payload?.filePath;
+        const jumpDiff = typeof msg.payload === "object" ? Boolean(msg.payload?.jumpDiff) : false;
+        const fromFileList = typeof msg.payload === "object" ? Boolean(msg.payload?.fromFileList) : false;
+        const direction = typeof msg.payload === "object" ? msg.payload?.direction || 1 : 1;
         if (filePath) {
-          CommitReviewPanel.createOrShow(
+          const panel = CommitReviewPanel.createOrShow(
             this.extensionUri,
             this.gitService,
             filePath,
             this.getReviewFilesList(filePath),
             () => this.refresh()
           );
+          if (jumpDiff) {
+            panel.focusAndJumpDiff(direction, fromFileList);
+          }
         }
         break;
       }

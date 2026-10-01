@@ -780,6 +780,7 @@
     // Right Editor Scroll Container
     const rightPane = document.createElement('div');
     rightPane.className = 'editor-pane right-pane';
+    rightPane.tabIndex = 0;
 
     // Build line maps for quick lookup of which block each line belongs to
     const leftLineMap = {};
@@ -1233,6 +1234,23 @@
       }
     });
 
+    if (state.pendingJumpDirection && state.blocks && state.blocks.length > 0) {
+      const dir = state.pendingJumpDirection;
+      const fromFileList = state.pendingFromFileList;
+      state.pendingJumpDirection = null;
+      state.pendingFromFileList = null;
+      requestAnimationFrame(() => {
+        if (fromFileList) {
+          jumpFirstOrLastDiff(dir);
+        } else {
+          jumpDiff(dir);
+        }
+        window.focus();
+        const rightPane = document.querySelector('.editor-pane.right-pane');
+        if (rightPane) rightPane.focus();
+      });
+    }
+
     // Attach toolbar events
     attachToolbarEvents(toolbar);
 
@@ -1394,6 +1412,16 @@
     hintTimeout = setTimeout(() => {
       hideDiffNavigationHint();
     }, duration);
+  }
+
+  function jumpFirstOrLastDiff(direction) {
+    if (!state.blocks || state.blocks.length === 0) return;
+    const targetIdx = direction > 0 ? 0 : state.blocks.length - 1;
+    hideDiffNavigationHint();
+    jumpToBlock(targetIdx, true);
+    window.focus();
+    const rightPane = document.querySelector('.editor-pane.right-pane');
+    if (rightPane) rightPane.focus();
   }
 
   // Jump to diff block relative to current scroll position (F7 / Shift+F7)
@@ -1649,6 +1677,28 @@
           masterChk.indeterminate = stagedCount > 0 && stagedCount < totalCount;
         }
         updateRibbons();
+        break;
+      }
+      case 'jumpDiff': {
+        const direction = msg.payload?.direction || 1;
+        const fromFileList = msg.payload?.fromFileList === true;
+        if (state.blocks && state.blocks.length > 0) {
+          if (fromFileList) {
+            jumpFirstOrLastDiff(direction);
+          } else {
+            jumpDiff(direction);
+          }
+        } else {
+          state.pendingJumpDirection = direction;
+          state.pendingFromFileList = fromFileList;
+        }
+        window.focus();
+        requestAnimationFrame(() => {
+          const rightPane = document.querySelector('.editor-pane.right-pane');
+          if (rightPane) {
+            rightPane.focus();
+          }
+        });
         break;
       }
       case 'themeTokens': {

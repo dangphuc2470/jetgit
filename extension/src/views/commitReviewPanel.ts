@@ -89,6 +89,14 @@ export class CommitReviewPanel {
     return CommitReviewPanel.currentPanel;
   }
 
+  public focusAndJumpDiff(direction = 1, fromFileList = false): void {
+    this.panel.reveal(vscode.ViewColumn.Active, false);
+    this.panel.webview.postMessage({
+      type: 'jumpDiff',
+      payload: { direction, fromFileList },
+    });
+  }
+
   async loadFile(
     filePath: string,
     filesList?: string[],

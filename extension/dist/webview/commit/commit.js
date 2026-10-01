@@ -331,8 +331,7 @@
           </button>
           <button class="tool-btn-sm ${state.isGeneratingAi ? 'spinning' : ''}" id="btn-generate-ai" title="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" ${state.isGeneratingAi ? 'disabled' : ''}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-              <path d="M8 1.5L9.5 6L14 7.5L9.5 9L8 13.5L6.5 9L2 7.5L6.5 6L8 1.5Z"/>
-              <path d="M12.5 1.5L13.2 3.5L15 4.2L13.2 4.9L12.5 6.8L11.8 4.9L10 4.2L11.8 3.5L12.5 1.5Z"/>
+              <path d="M8 1.5L9.5 6.5L14.5 8L9.5 9.5L8 14.5L6.5 9.5L1.5 8L6.5 6.5L8 1.5Z"/>
             </svg>
           </button>
         </div>

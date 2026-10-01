@@ -615,6 +615,14 @@ var GitService = class {
       return "";
     }
   }
+  async setAssumeUnchanged(paths, assume) {
+    if (!paths || paths.length === 0) return;
+    const flag = assume ? "--assume-unchanged" : "--no-assume-unchanged";
+    try {
+      await this.exec(["update-index", flag, "--", ...paths]);
+    } catch {
+    }
+  }
   async getAuthorRecentCommitMessages(count = 10) {
     try {
       let author = "";
@@ -2505,9 +2513,37 @@ var CommitViewProvider = class _CommitViewProvider {
       }
       case "generateAiCommitMessage": {
         const { files } = msg.payload || {};
+        const checkedFiles = Array.isArray(files) ? files : [];
+        const assumedFiles = [];
+        const temporarilyUnstaged = [];
         try {
-          if (Array.isArray(files) && files.length > 0) {
-            await this.gitService.stageFiles(files);
+          const allStatus = await this.gitService.getStatus();
+          const trackedToMask = [];
+          for (const s of allStatus) {
+            const isUntracked = s.x === "?" && s.y === "?";
+            const isChecked = checkedFiles.includes(s.path);
+            if (isChecked) {
+              if (s.y !== " " && s.x === " ") {
+                await this.gitService.stageFiles([s.path]);
+              } else if (isUntracked) {
+                await this.gitService.stageFiles([s.path]);
+              }
+              if (s.y !== " " && s.x !== " ") {
+                trackedToMask.push(s.path);
+              }
+            } else {
+              if (s.x !== " " && s.x !== "?") {
+                temporarilyUnstaged.push(s.path);
+                await this.gitService.unstageFile(s.path);
+              }
+              if (!isUntracked) {
+                trackedToMask.push(s.path);
+              }
+            }
+          }
+          if (trackedToMask.length > 0) {
+            await this.gitService.setAssumeUnchanged(trackedToMask, true);
+            assumedFiles.push(...trackedToMask);
           }
           const authorSamples = await this.gitService.getAuthorRecentCommitMessages(10);
           const repoRoot = this.gitService.getCwd();
@@ -2576,6 +2612,13 @@ ${stagedDiff.slice(0, 8e3)}`
         } catch (err) {
           this.view?.webview.postMessage({ type: "generateAiError" });
           vscode4.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
+        } finally {
+          if (assumedFiles.length > 0) {
+            await this.gitService.setAssumeUnchanged(assumedFiles, false);
+          }
+          if (temporarilyUnstaged.length > 0) {
+            await this.gitService.stageFiles(temporarilyUnstaged);
+          }
         }
         break;
       }

@@ -397,9 +397,47 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       }
       case 'generateAiCommitMessage': {
         const { files } = msg.payload || {};
+        const checkedFiles: string[] = Array.isArray(files) ? files : [];
+        const assumedFiles: string[] = [];
+        const temporarilyUnstaged: string[] = [];
+
         try {
-          if (Array.isArray(files) && files.length > 0) {
-            await this.gitService.stageFiles(files);
+          // Strictly isolate checked files so AI only generates message for ticked files
+          const allStatus = await this.gitService.getStatus();
+          const trackedToMask: string[] = [];
+
+          for (const s of allStatus) {
+            const isUntracked = s.x === '?' && s.y === '?';
+            const isChecked = checkedFiles.includes(s.path);
+
+            if (isChecked) {
+              // Ensure checked files are staged in git index so AI sees them
+              if (s.y !== ' ' && s.x === ' ') {
+                await this.gitService.stageFiles([s.path]);
+              } else if (isUntracked) {
+                await this.gitService.stageFiles([s.path]);
+              }
+              // If file has unstaged changes/hunks, assume-unchanged ensures AI only sees the staged part!
+              if (s.y !== ' ' && s.x !== ' ') {
+                trackedToMask.push(s.path);
+              }
+            } else {
+              // UNCHECKED file: must be completely hidden from AI
+              if (s.x !== ' ' && s.x !== '?') {
+                // If it was staged in index, unstage it so git diff HEAD won't include it
+                temporarilyUnstaged.push(s.path);
+                await this.gitService.unstageFile(s.path);
+              }
+              if (!isUntracked) {
+                // Tracked file with changes -> mask it from git diff HEAD
+                trackedToMask.push(s.path);
+              }
+            }
+          }
+
+          if (trackedToMask.length > 0) {
+            await this.gitService.setAssumeUnchanged(trackedToMask, true);
+            assumedFiles.push(...trackedToMask);
           }
 
           // Fetch only the current author's recent clean commits (excluding merge/MR commits)
@@ -483,6 +521,14 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         } catch (err: any) {
           this.view?.webview.postMessage({ type: 'generateAiError' });
           vscode.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
+        } finally {
+          // ALWAYS restore assume-unchanged and previously staged files cleanly
+          if (assumedFiles.length > 0) {
+            await this.gitService.setAssumeUnchanged(assumedFiles, false);
+          }
+          if (temporarilyUnstaged.length > 0) {
+            await this.gitService.stageFiles(temporarilyUnstaged);
+          }
         }
         break;
       }

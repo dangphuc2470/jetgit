@@ -634,6 +634,14 @@ export class GitService {
     }
   }
 
+  async setAssumeUnchanged(paths: string[], assume: boolean): Promise<void> {
+    if (!paths || paths.length === 0) return;
+    const flag = assume ? '--assume-unchanged' : '--no-assume-unchanged';
+    try {
+      await this.exec(['update-index', flag, '--', ...paths]);
+    } catch {}
+  }
+
   async getAuthorRecentCommitMessages(count = 10): Promise<string[]> {
     try {
       let author = '';

@@ -37,19 +37,19 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
     this.dataPath = path.join(vscodePath, 'changelists.json');
     this.load();
 
-    // Watch for file changes that should auto-assign to active changelist (debounced)
-    let syncTimer: NodeJS.Timeout | undefined;
-    const debouncedSync = () => {
-      if (syncTimer) clearTimeout(syncTimer);
-      syncTimer = setTimeout(() => this.syncWithGitStatus(), 300);
-    };
-    vscode.workspace.onDidCreateFiles(debouncedSync);
-    vscode.workspace.onDidSaveTextDocument(debouncedSync);
+    // File-save / file-create listeners are intentionally removed here.
+    // extension.ts owns a single shared debounced handler that calls syncChangelists()
+    // to avoid running git status twice on every save event.
   }
 
   refresh(): void {
     this.load();
     this._onDidChangeTreeData.fire(undefined);
+  }
+
+  /** Called by extension.ts shared debounce handler on file save / create. */
+  syncChangelists(): void {
+    this.syncWithGitStatus();
   }
 
   getTreeItem(element: ChangelistNode): vscode.TreeItem {

@@ -360,26 +360,34 @@ export function activate(context: vscode.ExtensionContext): void {
     log.appendLine(`Failed to hook into vscode.git: ${err.message}`);
   }
 
-  // 2. Watch for file saves across workspace to update Commit changes in real-time
+  // 2. Unified debounced handler for all workspace file events (save, create, delete, rename)
+  // Prevents the previous pattern where onDidSaveTextDocument fired commitViewProvider.refresh()
+  // (6 git commands) AND changelistTree.syncWithGitStatus() (1 more git status) simultaneously.
+  const onWorkspaceFileChange = debounce((doc?: vscode.TextDocument) => {
+    commitViewProvider.refresh();
+    changelistTree.syncChangelists();
+    if (
+      doc &&
+      CommitReviewPanel.currentPanel &&
+      doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())
+    ) {
+      CommitReviewPanel.currentPanel.refresh();
+    }
+  }, 400);
+
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(doc => {
       if (doc.uri.scheme === 'file') {
-        commitViewProvider.refresh();
-        if (
-          CommitReviewPanel.currentPanel &&
-          doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())
-        ) {
-          CommitReviewPanel.currentPanel.refresh();
-        }
+        onWorkspaceFileChange(doc);
       }
     }),
   );
 
   // 3. Watch for file create / delete / rename within editor workspace (respects editor boundaries)
   context.subscriptions.push(
-    vscode.workspace.onDidCreateFiles(() => commitViewProvider.refresh()),
-    vscode.workspace.onDidDeleteFiles(() => commitViewProvider.refresh()),
-    vscode.workspace.onDidRenameFiles(() => commitViewProvider.refresh()),
+    vscode.workspace.onDidCreateFiles(() => onWorkspaceFileChange()),
+    vscode.workspace.onDidDeleteFiles(() => onWorkspaceFileChange()),
+    vscode.workspace.onDidRenameFiles(() => onWorkspaceFileChange()),
   );
 
   // 4. Auto-sync on window focus (IntelliJ frame activation sync)

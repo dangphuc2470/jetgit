@@ -2846,13 +2846,7 @@ var ChangelistTreeProvider = class {
     const vscodePath = path5.join(workspaceRoot, ".vscode");
     this.dataPath = path5.join(vscodePath, "changelists.json");
     this.load();
-    let syncTimer;
-    const debouncedSync = () => {
-      if (syncTimer) clearTimeout(syncTimer);
-      syncTimer = setTimeout(() => this.syncWithGitStatus(), 300);
-    };
-    vscode7.workspace.onDidCreateFiles(debouncedSync);
-    vscode7.workspace.onDidSaveTextDocument(debouncedSync);
+    // File-save / file-create listeners removed — extension.ts shared handler calls syncChangelists()
   }
   gitService;
   workspaceRoot;
@@ -2863,6 +2857,10 @@ var ChangelistTreeProvider = class {
   refresh() {
     this.load();
     this._onDidChangeTreeData.fire(void 0);
+  }
+  /** Called by extension.ts shared debounce handler on file save / create. */
+  syncChangelists() {
+    this.syncWithGitStatus();
   }
   getTreeItem(element) {
     if (element.type === "changelist") {
@@ -3669,20 +3667,28 @@ function activate(context) {
   } catch (err) {
     log.appendLine(`Failed to hook into vscode.git: ${err.message}`);
   }
+  const onWorkspaceFileChange = debounce((doc) => {
+    commitViewProvider.refresh();
+    changelistTree.syncChangelists();
+    if (
+      doc &&
+      CommitReviewPanel.currentPanel &&
+      doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())
+    ) {
+      CommitReviewPanel.currentPanel.refresh();
+    }
+  }, 400);
   context.subscriptions.push(
     vscode10.workspace.onDidSaveTextDocument((doc) => {
       if (doc.uri.scheme === "file") {
-        commitViewProvider.refresh();
-        if (CommitReviewPanel.currentPanel && doc.uri.fsPath.endsWith(CommitReviewPanel.currentPanel.getCurrentFilePath())) {
-          CommitReviewPanel.currentPanel.refresh();
-        }
+        onWorkspaceFileChange(doc);
       }
     })
   );
   context.subscriptions.push(
-    vscode10.workspace.onDidCreateFiles(() => commitViewProvider.refresh()),
-    vscode10.workspace.onDidDeleteFiles(() => commitViewProvider.refresh()),
-    vscode10.workspace.onDidRenameFiles(() => commitViewProvider.refresh())
+    vscode10.workspace.onDidCreateFiles(() => onWorkspaceFileChange()),
+    vscode10.workspace.onDidDeleteFiles(() => onWorkspaceFileChange()),
+    vscode10.workspace.onDidRenameFiles(() => onWorkspaceFileChange())
   );
   context.subscriptions.push(
     vscode10.window.onDidChangeWindowState((e) => {

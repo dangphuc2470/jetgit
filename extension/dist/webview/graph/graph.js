@@ -5683,6 +5683,302 @@ ${component_stack}
     return () => window.removeEventListener("message", listener);
   }
 
+  function openCreateBranchDialog(startPoint) {
+    const existing = document.querySelector(".as-branch-dialog-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "as-branch-dialog-overlay";
+    overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+
+    const baseName = startPoint || "HEAD";
+    const displayBase = baseName.length > 30 ? baseName.slice(0, 27) + "..." : baseName;
+
+    const card = document.createElement("div");
+    card.className = "as-dialog-card";
+    card.style.cssText = "background:#1e1f22;border:1px solid #393b40;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;";
+
+    card.innerHTML = `
+      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #393b40;user-select:none;">
+        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
+          <span class="as-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
+        </div>
+        <div class="as-cb-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:13px;color:#dfe1e5;pointer-events:none;">
+        </div>
+      </div>
+      <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label for="as-cb-name" style="font-size:13px;color:#dfe1e5;white-space:nowrap;font-weight:500;">Branch Name:</label>
+          <input type="text" id="as-cb-name" style="flex:1;background:#1e1f22;color:#dfe1e5;border:1.5px solid #3574f0;border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
+        </div>
+        <div style="display:flex;align-items:center;gap:20px;padding-left:102px;">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:#dfe1e5;user-select:none;">
+            <input type="checkbox" id="as-cb-checkout" checked style="accent-color:#3574f0;width:14px;height:14px;cursor:pointer;margin:0;">
+            <span>Checkout branch</span>
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:#dfe1e5;user-select:none;">
+            <input type="checkbox" id="as-cb-overwrite" style="accent-color:#3574f0;width:14px;height:14px;cursor:pointer;margin:0;">
+            <span>Overwrite existing branch</span>
+          </label>
+        </div>
+      </div>
+      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#1e1f22;">
+        <button class="as-dialog-btn" id="as-cb-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+        <button class="as-dialog-btn" id="as-cb-create" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const titleEl = card.querySelector(".as-cb-title");
+    titleEl.textContent = "Create Branch from " + displayBase;
+    const nameInput = card.querySelector("#as-cb-name");
+    nameInput.value = baseName;
+    const checkoutBox = card.querySelector("#as-cb-checkout");
+    const overwriteBox = card.querySelector("#as-cb-overwrite");
+    const btnCancel = card.querySelector("#as-cb-cancel");
+    const btnCreate = card.querySelector("#as-cb-create");
+    const dotClose = card.querySelector(".as-dot-close");
+
+    btnCancel.onmouseenter = () => { btnCancel.style.background = "#35383d"; btnCancel.style.borderColor = "#60646c"; };
+    btnCancel.onmouseleave = () => { btnCancel.style.background = "#2b2d30"; btnCancel.style.borderColor = "#4e5157"; };
+    btnCreate.onmouseenter = () => { btnCreate.style.background = "#4682f7"; };
+    btnCreate.onmouseleave = () => { btnCreate.style.background = "#3574f0"; };
+
+    const closeDialog = () => {
+      overlay.remove();
+      document.removeEventListener("keydown", onKeyDown);
+    };
+
+    const submitDialog = () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        nameInput.focus();
+        return;
+      }
+      const checkout = checkoutBox.checked;
+      const force = overwriteBox.checked;
+      postMessage("createBranch", { name, startPoint: baseName, checkout, force });
+      closeDialog();
+    };
+
+    btnCancel.addEventListener("click", closeDialog);
+    if (dotClose) dotClose.addEventListener("click", closeDialog);
+    btnCreate.addEventListener("click", submitDialog);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeDialog();
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeDialog();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        submitDialog();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+
+    setTimeout(() => {
+      nameInput.focus();
+      nameInput.select();
+    }, 50);
+  }
+
+  function openRenameBranchDialog(oldName) {
+    const existing = document.querySelector(".as-branch-dialog-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "as-branch-dialog-overlay";
+    overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+
+    const card = document.createElement("div");
+    card.className = "as-dialog-card";
+    card.style.cssText = "background:#1e1f22;border:1px solid #393b40;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;";
+
+    card.innerHTML = `
+      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #393b40;user-select:none;">
+        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
+          <span class="as-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
+        </div>
+        <div class="as-rb-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:13px;color:#dfe1e5;pointer-events:none;">
+        </div>
+      </div>
+      <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label for="as-rb-name" style="font-size:13px;color:#dfe1e5;white-space:nowrap;font-weight:500;">Branch Name:</label>
+          <input type="text" id="as-rb-name" style="flex:1;background:#1e1f22;color:#dfe1e5;border:1.5px solid #3574f0;border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
+        </div>
+      </div>
+      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#1e1f22;">
+        <button class="as-dialog-btn" id="as-rb-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+        <button class="as-dialog-btn" id="as-rb-ok" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Rename</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const titleEl = card.querySelector(".as-rb-title");
+    titleEl.textContent = "Rename Branch '" + (oldName || "") + "'";
+    const nameInput = card.querySelector("#as-rb-name");
+    nameInput.value = oldName || "";
+    const btnCancel = card.querySelector("#as-rb-cancel");
+    const btnOk = card.querySelector("#as-rb-ok");
+    const dotClose = card.querySelector(".as-dot-close");
+
+    btnCancel.onmouseenter = () => { btnCancel.style.background = "#35383d"; btnCancel.style.borderColor = "#60646c"; };
+    btnCancel.onmouseleave = () => { btnCancel.style.background = "#2b2d30"; btnCancel.style.borderColor = "#4e5157"; };
+    btnOk.onmouseenter = () => { btnOk.style.background = "#4682f7"; };
+    btnOk.onmouseleave = () => { btnOk.style.background = "#3574f0"; };
+
+    const closeDialog = () => {
+      overlay.remove();
+      document.removeEventListener("keydown", onKeyDown);
+    };
+
+    const submitDialog = () => {
+      const newName = nameInput.value.trim();
+      if (!newName) {
+        nameInput.focus();
+        return;
+      }
+      if (newName !== oldName) {
+        postMessage("renameBranch", { oldName, newName });
+      }
+      closeDialog();
+    };
+
+    btnCancel.addEventListener("click", closeDialog);
+    if (dotClose) dotClose.addEventListener("click", closeDialog);
+    btnOk.addEventListener("click", submitDialog);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeDialog();
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeDialog();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        submitDialog();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+
+    setTimeout(() => {
+      nameInput.focus();
+      nameInput.select();
+    }, 50);
+  }
+
+  function openCreateTagDialog(hash) {
+    const existing = document.querySelector(".as-branch-dialog-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "as-branch-dialog-overlay";
+    overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+
+    const shortHash = hash ? hash.slice(0, 8) : "";
+
+    const card = document.createElement("div");
+    card.className = "as-dialog-card";
+    card.style.cssText = "background:#1e1f22;border:1px solid #393b40;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;";
+
+    card.innerHTML = `
+      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #393b40;user-select:none;">
+        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
+          <span class="as-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
+        </div>
+        <div class="as-tag-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:13px;color:#dfe1e5;pointer-events:none;">
+        </div>
+      </div>
+      <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label for="as-tag-name" style="font-size:13px;color:#dfe1e5;white-space:nowrap;font-weight:500;">Tag Name:</label>
+          <input type="text" id="as-tag-name" placeholder="v1.0.0" style="flex:1;background:#1e1f22;color:#dfe1e5;border:1.5px solid #3574f0;border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
+        </div>
+      </div>
+      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#1e1f22;">
+        <button class="as-dialog-btn" id="as-tag-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+        <button class="as-dialog-btn" id="as-tag-ok" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const titleEl = card.querySelector(".as-tag-title");
+    titleEl.textContent = "Create Tag at " + shortHash;
+    const nameInput = card.querySelector("#as-tag-name");
+    const btnCancel = card.querySelector("#as-tag-cancel");
+    const btnOk = card.querySelector("#as-tag-ok");
+    const dotClose = card.querySelector(".as-dot-close");
+
+    btnCancel.onmouseenter = () => { btnCancel.style.background = "#35383d"; btnCancel.style.borderColor = "#60646c"; };
+    btnCancel.onmouseleave = () => { btnCancel.style.background = "#2b2d30"; btnCancel.style.borderColor = "#4e5157"; };
+    btnOk.onmouseenter = () => { btnOk.style.background = "#4682f7"; };
+    btnOk.onmouseleave = () => { btnOk.style.background = "#3574f0"; };
+
+    const closeDialog = () => {
+      overlay.remove();
+      document.removeEventListener("keydown", onKeyDown);
+    };
+
+    const submitDialog = () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        nameInput.focus();
+        return;
+      }
+      postMessage("createTag", { name, hash });
+      closeDialog();
+    };
+
+    btnCancel.addEventListener("click", closeDialog);
+    if (dotClose) dotClose.addEventListener("click", closeDialog);
+    btnOk.addEventListener("click", submitDialog);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeDialog();
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeDialog();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        submitDialog();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+
+    setTimeout(() => {
+      nameInput.focus();
+    }, 50);
+  }
+
+  window.openCreateBranchDialog = openCreateBranchDialog;
+  window.openRenameBranchDialog = openRenameBranchDialog;
+  window.openCreateTagDialog = openCreateTagDialog;
+
   // webview/shared/theme.ts
   var GRAPH_COLORS = [
     "#a6823c", // Android Studio gold/ocher
@@ -6256,8 +6552,7 @@ ${component_stack}
         addSubItem("Update", () => postMessage("pull", cleanBranch));
         addSubItem("Push...", () => postMessage("push", cleanBranch));
         addSubItem("Rename...", () => {
-          const newName = prompt("Rename branch '" + cleanBranch + "' to:", cleanBranch);
-          if (newName && newName !== cleanBranch) postMessage("renameBranch", { oldName: cleanBranch, newName });
+          openRenameBranchDialog(cleanBranch);
         });
 
         let subMenuTimer;
@@ -6294,14 +6589,12 @@ ${component_stack}
 
       // 17. New Branch...
       addItem("New Branch...", "⌥⌘N", "", () => {
-        const name = prompt("New branch name:", "");
-        if (name && name.trim()) postMessage("createBranch", { name: name.trim(), startPoint: commit.hash });
+        openCreateBranchDialog(commit.hash);
       });
 
       // 18. New Tag...
       addItem("New Tag...", "", "", () => {
-        const name = prompt("New tag name:", "");
-        if (name && name.trim()) postMessage("createTag", { name: name.trim(), hash: commit.hash });
+        openCreateTagDialog(commit.hash);
       });
 
       addDivider();
@@ -7378,8 +7671,7 @@ ${component_stack}
 
         if (isCurrent) {
           addItem("New Branch from '" + branchName + "'...", "", () => {
-            const name = prompt("New branch name:");
-            if (name) postMessage("createBranch", { name, startPoint: branchName });
+            openCreateBranchDialog(branchName);
           });
           addItem("Show Diff with Working Tree", "", () => {
             postMessage("showDiff", { branch: branchName });
@@ -7393,16 +7685,14 @@ ${component_stack}
           });
           addDivider();
           addItem("Rename...", "F2", () => {
-            const newName = prompt("Rename branch '" + branchName + "' to:", branchName);
-            if (newName && newName !== branchName) postMessage("renameBranch", { oldName: branchName, newName });
+            openRenameBranchDialog(branchName);
           });
         } else if (isRemote) {
           addItem("Checkout", "", () => {
             postMessage("checkout", branchName);
           });
           addItem("New Branch from '" + branchName + "'...", "", () => {
-            const name = prompt("New branch name:");
-            if (name) postMessage("createBranch", { name, startPoint: branchName });
+            openCreateBranchDialog(branchName);
           });
           addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
             postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
@@ -7430,8 +7720,7 @@ ${component_stack}
             postMessage("checkout", branchName);
           });
           addItem("New Branch from '" + branchName + "'...", "", () => {
-            const name = prompt("New branch name:");
-            if (name) postMessage("createBranch", { name, startPoint: branchName });
+            openCreateBranchDialog(branchName);
           });
           addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
             postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
@@ -7459,8 +7748,7 @@ ${component_stack}
           });
           addDivider();
           addItem("Rename...", "F2", () => {
-            const newName = prompt("Rename branch '" + branchName + "' to:", branchName);
-            if (newName && newName !== branchName) postMessage("renameBranch", { oldName: branchName, newName });
+            openRenameBranchDialog(branchName);
           });
           addItem("Delete", "", () => {
             postMessage("deleteBranch", branchName);
@@ -7808,8 +8096,7 @@ ${component_stack}
         // New branch (+)
         addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch...", () => {
           const base = get(activeBranch) || currentBranch || "HEAD";
-          const name = prompt("New branch name (from '" + base + "'):");
-          if (name && name.trim()) postMessage("createBranch", { name: name.trim(), startPoint: base });
+          openCreateBranchDialog(base);
         }, "", "+");
 
         // Fetch / Update Selected Branch (↙)
@@ -7823,11 +8110,7 @@ ${component_stack}
         // Delete Selected Branch (🗑)
         addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch", () => {
           const target = get(activeBranch);
-          if (!target) {
-            alert("Please select a branch to delete");
-          } else if (target === currentBranch) {
-            alert("Cannot delete the currently checked out branch '" + target + "'");
-          } else if (confirm("Delete branch '" + target + "'?")) {
+          if (target && target !== currentBranch) {
             postMessage("deleteBranch", target);
           }
         }, "", "Delete");

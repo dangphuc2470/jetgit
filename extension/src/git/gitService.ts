@@ -376,10 +376,18 @@ export class GitService {
     await this.exec(['checkout', ref]);
   }
 
-  async createBranch(name: string, startPoint?: string): Promise<void> {
-    const args = ['checkout', '-b', name];
-    if (startPoint) args.push(startPoint);
-    await this.exec(args);
+  async createBranch(name: string, startPoint?: string, checkout: boolean = true, force: boolean = false): Promise<void> {
+    if (checkout) {
+      const args = ['checkout', force ? '-B' : '-b', name];
+      if (startPoint) args.push(startPoint);
+      await this.exec(args);
+    } else {
+      const args = ['branch'];
+      if (force) args.push('-f');
+      args.push(name);
+      if (startPoint) args.push(startPoint);
+      await this.exec(args);
+    }
   }
 
   async cherryPick(hash: string): Promise<string> {

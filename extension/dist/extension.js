@@ -386,10 +386,18 @@ var GitService = class {
     }
     await this.exec(["checkout", ref]);
   }
-  async createBranch(name, startPoint) {
-    const args = ["checkout", "-b", name];
-    if (startPoint) args.push(startPoint);
-    await this.exec(args);
+  async createBranch(name, startPoint, checkout = true, force = false) {
+    if (checkout) {
+      const args = ["checkout", force ? "-B" : "-b", name];
+      if (startPoint) args.push(startPoint);
+      await this.exec(args);
+    } else {
+      const args = ["branch"];
+      if (force) args.push("-f");
+      args.push(name);
+      if (startPoint) args.push(startPoint);
+      await this.exec(args);
+    }
   }
   async cherryPick(hash) {
     return this.exec(["cherry-pick", hash]);
@@ -1266,9 +1274,16 @@ var GraphViewProvider = class {
         break;
       }
       case "createBranch": {
-        const { name, startPoint } = msg.payload;
+        let { name, startPoint, checkout, force } = msg.payload || {};
+        if (!name) {
+          name = await vscode2.window.showInputBox({
+            prompt: `New branch name (from '${startPoint || "HEAD"}'):`,
+            placeHolder: "feature/..."
+          });
+          if (!name) return;
+        }
         try {
-          await this.gitService.createBranch(name, startPoint);
+          await this.gitService.createBranch(name, startPoint, checkout !== false, force === true);
           vscode2.window.showInformationMessage(`Created branch ${name}`);
           this.loadInitialData();
         } catch (err) {
@@ -1404,7 +1419,15 @@ var GraphViewProvider = class {
         break;
       }
       case "renameBranch": {
-        const { oldName, newName } = msg.payload;
+        let { oldName, newName } = msg.payload || {};
+        if (!newName && oldName) {
+          newName = await vscode2.window.showInputBox({
+            prompt: `Rename branch '${oldName}' to:`,
+            value: oldName
+          });
+          if (!newName || newName === oldName) return;
+        }
+        if (!oldName || !newName) return;
         try {
           await this.gitService.renameBranch(oldName, newName);
           vscode2.window.showInformationMessage(`Renamed branch '${oldName}' to '${newName}'`);
@@ -1538,10 +1561,17 @@ var GraphViewProvider = class {
         break;
       }
       case "createTag": {
-        const { name, hash } = msg.payload;
+        let { name, hash } = msg.payload || {};
+        if (!name) {
+          name = await vscode2.window.showInputBox({
+            prompt: `New tag name at ${hash?.slice(0, 8) || "commit"}:`,
+            placeHolder: "v1.0.0"
+          });
+          if (!name) return;
+        }
         try {
           await this.gitService.createTag(name, hash);
-          vscode2.window.showInformationMessage(`Created tag ${name} at ${hash.slice(0, 8)}`);
+          vscode2.window.showInformationMessage(`Created tag ${name} at ${hash ? hash.slice(0, 8) : ""}`);
           this.loadInitialData();
         } catch (err) {
           vscode2.window.showErrorMessage(`Create tag failed: ${err.message}`);

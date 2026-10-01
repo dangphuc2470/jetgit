@@ -322,9 +322,21 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'createBranch': {
-        const { name, startPoint } = msg.payload;
+        let { name, startPoint, checkout, force } = (msg.payload || {}) as {
+          name?: string;
+          startPoint?: string;
+          checkout?: boolean;
+          force?: boolean;
+        };
+        if (!name) {
+          name = await vscode.window.showInputBox({
+            prompt: `New branch name (from '${startPoint || 'HEAD'}'):`,
+            placeHolder: 'feature/...',
+          });
+          if (!name) return;
+        }
         try {
-          await this.gitService.createBranch(name, startPoint);
+          await this.gitService.createBranch(name, startPoint, checkout !== false, force === true);
           vscode.window.showInformationMessage(`Created branch ${name}`);
           this.loadInitialData();
         } catch (err: any) {
@@ -464,7 +476,15 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'renameBranch': {
-        const { oldName, newName } = msg.payload;
+        let { oldName, newName } = (msg.payload || {}) as { oldName?: string; newName?: string };
+        if (!newName && oldName) {
+          newName = await vscode.window.showInputBox({
+            prompt: `Rename branch '${oldName}' to:`,
+            value: oldName,
+          });
+          if (!newName || newName === oldName) return;
+        }
+        if (!oldName || !newName) return;
         try {
           await this.gitService.renameBranch(oldName, newName);
           vscode.window.showInformationMessage(`Renamed branch '${oldName}' to '${newName}'`);
@@ -607,10 +627,17 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'createTag': {
-        const { name, hash } = msg.payload;
+        let { name, hash } = (msg.payload || {}) as { name?: string; hash?: string };
+        if (!name) {
+          name = await vscode.window.showInputBox({
+            prompt: `New tag name at ${hash?.slice(0, 8) || 'commit'}:`,
+            placeHolder: 'v1.0.0',
+          });
+          if (!name) return;
+        }
         try {
           await this.gitService.createTag(name, hash);
-          vscode.window.showInformationMessage(`Created tag ${name} at ${hash.slice(0, 8)}`);
+          vscode.window.showInformationMessage(`Created tag ${name} at ${hash ? hash.slice(0, 8) : ''}`);
           this.loadInitialData();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Create tag failed: ${err.message}`);

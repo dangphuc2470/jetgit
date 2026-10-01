@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { GitService } from '../git/gitService';
+import { getThemeTokens, getNonce } from '../utils/themeTokens';
 
 export interface ReviewRevisions {
   baseRef?: string;
@@ -319,81 +320,11 @@ export class CommitReviewPanel {
   }
 
   private sendThemeTokens(): void {
-    const tokens = this.getThemeTokens();
+    const tokens = getThemeTokens();
     this.panel.webview.postMessage({
       type: 'themeTokens',
       payload: tokens,
     });
-  }
-
-  private getThemeTokens(): Record<string, string> {
-    const defaultTokens: Record<string, string> = {
-      kwd: '#fd6883',
-      type: '#85dacc',
-      fn: '#adda78',
-      str: '#f9cc6c',
-      num: '#a8a9eb',
-      constVal: '#a8a9eb',
-      varVal: '#fff1f3',
-      comment: '#72696a',
-      anno: '#85dacc',
-      punct: '#948a8b',
-    };
-    try {
-      const activeThemeName = vscode.workspace.getConfiguration('workbench').get<string>('colorTheme');
-      if (!activeThemeName) return defaultTokens;
-
-      for (const ext of vscode.extensions.all) {
-        const themes = ext.packageJSON?.contributes?.themes;
-        if (!Array.isArray(themes)) continue;
-        const matched = themes.find((t: any) => t.label === activeThemeName || t.id === activeThemeName);
-        if (!matched || !matched.path) continue;
-
-        const themePath = path.join(ext.extensionPath, matched.path);
-        if (!fs.existsSync(themePath)) continue;
-
-        let content = fs.readFileSync(themePath, 'utf8');
-        content = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
-        const themeJson = JSON.parse(content);
-        const tc = themeJson.tokenColors || [];
-
-        const findColor = (targetScopes: string[]): string | null => {
-          for (const target of targetScopes) {
-            for (const rule of tc) {
-              if (!rule.settings || !rule.settings.foreground) continue;
-              const scopes = Array.isArray(rule.scope) ? rule.scope : (typeof rule.scope === 'string' ? rule.scope.split(',').map((s: string) => s.trim()) : []);
-              if (scopes.includes(target)) return rule.settings.foreground;
-            }
-          }
-          for (const target of targetScopes) {
-            for (const rule of tc) {
-              if (!rule.settings || !rule.settings.foreground) continue;
-              const scopes = Array.isArray(rule.scope) ? rule.scope : (typeof rule.scope === 'string' ? rule.scope.split(',').map((s: string) => s.trim()) : []);
-              for (const s of scopes) {
-                if (!s.includes(' ') && s.startsWith(target + '.')) return rule.settings.foreground;
-              }
-            }
-          }
-          return null;
-        };
-
-        const kwd = findColor(['keyword']) || defaultTokens.kwd;
-        const type = findColor(['entity.name.type', 'support.type', 'storage.type']) || defaultTokens.type;
-        const fn = findColor(['entity.name.function', 'support.function']) || defaultTokens.fn;
-        const str = findColor(['string']) || defaultTokens.str;
-        const num = findColor(['constant.numeric']) || defaultTokens.num;
-        const constVal = findColor(['constant.language']) || defaultTokens.constVal;
-        const comment = findColor(['comment']) || defaultTokens.comment;
-        const varVal = findColor(['variable']) || defaultTokens.varVal;
-        const anno = findColor(['punctuation.definition.annotation', 'meta.annotation']) || type;
-        const punct = findColor(['punctuation']) || defaultTokens.punct;
-
-        return { kwd, type, fn, str, num, constVal, varVal, comment, anno, punct };
-      }
-    } catch {
-      // Fall back to defaults
-    }
-    return defaultTokens;
   }
 
   private getHtml(): string {
@@ -404,7 +335,7 @@ export class CommitReviewPanel {
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'commit', 'commit.css'),
     );
     const nonce = getNonce();
-    const tokens = this.getThemeTokens();
+    const tokens = getThemeTokens();
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -441,13 +372,4 @@ export class CommitReviewPanel {
     CommitReviewPanel.currentPanel = undefined;
     for (const d of this.disposables) d.dispose();
   }
-}
-
-function getNonce(): string {
-  let text = '';
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
 }

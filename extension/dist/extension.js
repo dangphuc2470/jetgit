@@ -33,13 +33,13 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode13 = __toESM(require("vscode"));
+var vscode16 = __toESM(require("vscode"));
 
 // src/git/gitService.ts
-var import_child_process = require("child_process");
+var import_child_process2 = require("child_process");
 var import_util = require("util");
-var fs = __toESM(require("fs"));
-var path = __toESM(require("path"));
+var fs3 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
 
 // src/cache.ts
 var LRUCache = class {
@@ -79,8 +79,7 @@ var LRUCache = class {
   }
 };
 
-// src/git/gitService.ts
-var execFileAsync = (0, import_util.promisify)(import_child_process.execFile);
+// src/git/gitTypes.ts
 var SEP = "";
 var LOG_FORMAT = [
   "%x00%H",
@@ -102,6 +101,719 @@ var LOG_FORMAT = [
   "%D"
   // ref names
 ].join(SEP);
+
+// src/git/operations/conflictOperations.ts
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
+async function getUnmergedFiles(ctx) {
+  const output = await ctx.exec(["diff", "--name-only", "--diff-filter=U"]);
+  return output.split("\n").filter((l) => l.trim());
+}
+async function getConflictInfo(ctx) {
+  const gitDir = path.join(ctx.cwd, ".git");
+  const isMerging = fs.existsSync(path.join(gitDir, "MERGE_HEAD"));
+  const isRebasing = fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"));
+  const isCherryPicking = fs.existsSync(path.join(gitDir, "CHERRY_PICK_HEAD"));
+  let yoursBranch = "";
+  try {
+    yoursBranch = await ctx.getCurrentBranch();
+  } catch {
+  }
+  if (!yoursBranch) yoursBranch = "HEAD";
+  let theirsBranch = "";
+  if (isMerging) {
+    try {
+      const mergeMsg = await ctx.getMergeMessage();
+      const m = mergeMsg.match(/Merge branch '([^']+)'/) || mergeMsg.match(/Merge commit '([^']+)'/);
+      if (m) {
+        theirsBranch = m[1];
+      } else {
+        const mergeHead = fs.readFileSync(path.join(gitDir, "MERGE_HEAD"), "utf8").trim();
+        theirsBranch = mergeHead.slice(0, 7);
+      }
+    } catch {
+    }
+  } else if (isRebasing) {
+    try {
+      const headNamePath = path.join(gitDir, "rebase-merge", "head-name");
+      if (fs.existsSync(headNamePath)) {
+        theirsBranch = fs.readFileSync(headNamePath, "utf8").trim().replace("refs/heads/", "");
+      }
+    } catch {
+    }
+  }
+  if (!theirsBranch) theirsBranch = "Theirs";
+  const statusEntries = await ctx.getStatus();
+  const conflictCodes = /* @__PURE__ */ new Set(["UU", "UD", "DU", "AA", "DD", "AU", "UA"]);
+  const conflictEntries = statusEntries.filter(
+    (e) => conflictCodes.has(`${e.x}${e.y}`) || e.x === "U" || e.y === "U"
+  );
+  const conflicts = conflictEntries.map((e) => {
+    let yours = "Modified";
+    let theirs = "Modified";
+    const code = `${e.x}${e.y}`;
+    if (code === "UD") {
+      yours = "Modified";
+      theirs = "Deleted";
+    } else if (code === "DU") {
+      yours = "Deleted";
+      theirs = "Modified";
+    } else if (code === "AA") {
+      yours = "Added";
+      theirs = "Added";
+    } else if (code === "DD") {
+      yours = "Deleted";
+      theirs = "Deleted";
+    } else if (code === "AU") {
+      yours = "Added";
+      theirs = "Modified";
+    } else if (code === "UA") {
+      yours = "Modified";
+      theirs = "Added";
+    }
+    return {
+      path: e.path,
+      name: path.basename(e.path),
+      dir: path.dirname(e.path) === "." ? "" : path.dirname(e.path),
+      yours,
+      theirs,
+      hasBothModified: yours === "Modified" && theirs === "Modified"
+    };
+  });
+  return {
+    hasConflicts: conflicts.length > 0,
+    isMerging,
+    isRebasing: isRebasing || isCherryPicking,
+    yoursBranch,
+    theirsBranch,
+    conflicts
+  };
+}
+async function acceptYours(ctx, filePath) {
+  const status = await ctx.getStatus();
+  const entry = status.find((s) => s.path === filePath);
+  const code = entry ? `${entry.x}${entry.y}` : "";
+  if (code === "DU" || code === "DD") {
+    await ctx.exec(["rm", "-f", "--", filePath]).catch(
+      () => ctx.exec(["rm", "--cached", "--ignore-unmatch", "--", filePath])
+    );
+  } else {
+    await ctx.exec(["checkout", "--ours", "--", filePath]);
+    await ctx.stageFiles([filePath]);
+  }
+}
+async function acceptTheirs(ctx, filePath) {
+  const status = await ctx.getStatus();
+  const entry = status.find((s) => s.path === filePath);
+  const code = entry ? `${entry.x}${entry.y}` : "";
+  if (code === "UD" || code === "DD") {
+    await ctx.exec(["rm", "-f", "--", filePath]).catch(
+      () => ctx.exec(["rm", "--cached", "--ignore-unmatch", "--", filePath])
+    );
+  } else {
+    await ctx.exec(["checkout", "--theirs", "--", filePath]);
+    await ctx.stageFiles([filePath]);
+  }
+}
+async function abortMerge(ctx) {
+  const gitDir = path.join(ctx.cwd, ".git");
+  if (fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"))) {
+    await ctx.exec(["rebase", "--abort"]);
+  } else if (fs.existsSync(path.join(gitDir, "CHERRY_PICK_HEAD"))) {
+    await ctx.exec(["cherry-pick", "--abort"]);
+  } else {
+    await ctx.exec(["merge", "--abort"]);
+  }
+}
+async function getMergeMessage(cwd) {
+  try {
+    const mergeMsgPath = path.join(cwd, ".git", "MERGE_MSG");
+    if (fs.existsSync(mergeMsgPath)) {
+      return fs.readFileSync(mergeMsgPath, "utf8").trim();
+    }
+  } catch {
+  }
+  return "";
+}
+
+// src/git/operations/branchOperations.ts
+var path2 = __toESM(require("path"));
+async function getBranches(ctx) {
+  const localOutput = await ctx.exec([
+    "branch",
+    "--format",
+    "%(HEAD)%(refname:short)	%(objectname:short)	%(upstream:short)	%(upstream:track,nobracket)"
+  ]);
+  const remoteOutput = await ctx.exec([
+    "branch",
+    "-r",
+    "--format",
+    "%(refname:short)	%(objectname:short)"
+  ]);
+  const branches = [];
+  for (const line of localOutput.split("\n")) {
+    if (!line.trim()) continue;
+    const current = line[0] === "*";
+    const rest = line.slice(1);
+    const [name, hash, upstream, track] = rest.split("	");
+    let ahead = 0;
+    let behind = 0;
+    if (track) {
+      const aheadMatch = track.match(/ahead (\d+)/);
+      if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
+      const behindMatch = track.match(/behind (\d+)/);
+      if (behindMatch) behind = parseInt(behindMatch[1], 10);
+    }
+    const trimmedName = name.trim();
+    if (trimmedName.startsWith("(") || trimmedName.startsWith("HEAD detached")) {
+      continue;
+    }
+    branches.push({
+      name: trimmedName,
+      current,
+      remote: void 0,
+      upstream: upstream || void 0,
+      hash: hash.trim(),
+      ahead: ahead || void 0,
+      behind: behind || void 0
+    });
+  }
+  for (const line of remoteOutput.split("\n")) {
+    if (!line.trim()) continue;
+    if (line.includes(" -> ")) continue;
+    const [name, hash] = line.split("	");
+    const trimmedName = name.trim();
+    const slashIdx = trimmedName.indexOf("/");
+    const remoteName = slashIdx !== -1 ? trimmedName.slice(0, slashIdx) : "origin";
+    branches.push({
+      name: trimmedName,
+      current: false,
+      remote: remoteName,
+      upstream: void 0,
+      hash: hash.trim()
+    });
+  }
+  return branches;
+}
+async function getTags(ctx) {
+  const output = await ctx.exec([
+    "tag",
+    "-l",
+    "--format",
+    "%(refname:short)	%(objectname:short)"
+  ]);
+  const tags = [];
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const [name, hash] = line.split("	");
+    tags.push({ name, hash });
+  }
+  return tags;
+}
+async function getCurrentBranch(ctx) {
+  const output = await ctx.exec(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const branch = output.trim();
+  if (branch === "HEAD") {
+    try {
+      const desc = await ctx.exec(["describe", "--tags", "--exact-match", "HEAD"]);
+      return `HEAD (detached at ${desc.trim()})`;
+    } catch {
+      const hash = await ctx.exec(["rev-parse", "--short", "HEAD"]);
+      return `HEAD (detached at ${hash.trim()})`;
+    }
+  }
+  return branch;
+}
+async function checkout(ctx, ref) {
+  try {
+    const remotes = await ctx.getRemotes();
+    for (const remote of remotes) {
+      if (ref.startsWith(remote + "/")) {
+        const localBranchName = ref.slice(remote.length + 1);
+        const branchCheck = await ctx.exec(["branch", "--list", localBranchName]);
+        if (branchCheck.trim()) {
+          await ctx.exec(["checkout", localBranchName]);
+        } else {
+          await ctx.exec(["checkout", "-b", localBranchName, "--track", ref]);
+        }
+        return;
+      }
+    }
+  } catch {
+  }
+  await ctx.exec(["checkout", ref]);
+}
+async function createBranch(ctx, name, startPoint, checkout2 = true, force = false) {
+  if (checkout2) {
+    const args = ["checkout", force ? "-B" : "-b", name];
+    if (startPoint) args.push(startPoint);
+    await ctx.exec(args);
+  } else {
+    const args = ["branch"];
+    if (force) args.push("-f");
+    args.push(name);
+    if (startPoint) args.push(startPoint);
+    await ctx.exec(args);
+  }
+}
+async function getRemotes(ctx) {
+  try {
+    const out = await ctx.exec(["remote"]);
+    return out.split("\n").map((s) => s.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+async function getDefaultRemote(ctx, branch) {
+  try {
+    const curBranch = branch || await ctx.getCurrentBranch().catch(() => "");
+    if (curBranch) {
+      try {
+        const r = await ctx.exec(["config", `branch.${curBranch}.remote`]);
+        if (r.trim()) return r.trim();
+      } catch {
+      }
+    }
+    const remotes = await getRemotes(ctx);
+    if (remotes.includes("origin")) return "origin";
+    if (remotes.length > 0) return remotes[0];
+  } catch {
+  }
+  return "origin";
+}
+async function getRemoteUrl(ctx) {
+  try {
+    const remote = await getDefaultRemote(ctx);
+    const out = await ctx.exec(["remote", "get-url", remote]);
+    return out.trim();
+  } catch {
+    return "";
+  }
+}
+async function pull(ctx, branch) {
+  const curBranch = await ctx.getCurrentBranch();
+  if (!branch || branch === curBranch) {
+    return ctx.exec(["pull"]);
+  }
+  try {
+    const remote = await getDefaultRemote(ctx, branch);
+    let targetBranch = branch;
+    if (branch.startsWith(remote + "/")) {
+      targetBranch = branch.slice(remote.length + 1);
+    }
+    const branchCheck = await ctx.exec(["branch", "--list", targetBranch]);
+    if (branchCheck.trim()) {
+      const out = await ctx.exec(["fetch", remote, `${targetBranch}:${targetBranch}`]);
+      return out || `Updated branch '${targetBranch}' successfully.`;
+    } else {
+      const out = await ctx.exec(["fetch", remote, targetBranch]);
+      return out || `Fetched '${targetBranch}' successfully.`;
+    }
+  } catch (err) {
+    if (err.message && (err.message.includes("non-fast-forward") || err.message.includes("rejected"))) {
+      throw new Error(`Cannot fast-forward branch '${branch}' because local commits diverged. Please checkout '${branch}' to merge or rebase.`);
+    }
+    throw err;
+  }
+}
+async function getPushInfo(ctx, targetBranch) {
+  const currentBranch = targetBranch || await ctx.getCurrentBranch();
+  const remote = await getDefaultRemote(ctx, currentBranch);
+  const remoteBranch = currentBranch;
+  const repoRoot = await ctx.getRepoRoot().catch(() => ctx.cwd);
+  const repoName = path2.basename(repoRoot);
+  let isNew = true;
+  try {
+    await ctx.exec(["rev-parse", "--verify", `refs/remotes/${remote}/${currentBranch}`]);
+    isNew = false;
+  } catch {
+    isNew = true;
+  }
+  let logArgs = [];
+  if (!isNew) {
+    logArgs = ["log", `${remote}/${currentBranch}..${currentBranch}`, "--format=%H%x00%h%x00%an%x00%ad%x00%s"];
+  } else {
+    logArgs = ["log", currentBranch, `--not`, `--remotes=${remote}`, "--format=%H%x00%h%x00%an%x00%ad%x00%s"];
+  }
+  let rawLog = "";
+  try {
+    rawLog = await ctx.exec(logArgs);
+  } catch {
+    try {
+      rawLog = await ctx.exec(["log", "-n", "10", "--format=%H%x00%h%x00%an%x00%ad%x00%s"]);
+    } catch {
+    }
+  }
+  const lines = rawLog.split("\n").filter((l) => l.trim());
+  const commits = [];
+  const fileMap = /* @__PURE__ */ new Map();
+  for (const line of lines) {
+    const parts = line.split("\0");
+    if (parts.length < 5) continue;
+    const [hash, shortHash, author, date, message] = parts;
+    let commitFiles2 = [];
+    try {
+      const diffOut = await ctx.exec(["diff-tree", "--no-commit-id", "--name-status", "-r", hash]);
+      commitFiles2 = diffOut.split("\n").filter((l) => l.trim()).map((dl) => {
+        const tokens = dl.trim().split(/\s+/);
+        const status = tokens[0] || "M";
+        const p = tokens.length > 2 ? tokens[2] : tokens[1] || "";
+        const dir = path2.dirname(p) === "." ? "" : path2.dirname(p);
+        const fObj = {
+          status: status.charAt(0),
+          path: p,
+          name: path2.basename(p),
+          dir
+        };
+        if (!fileMap.has(p)) {
+          fileMap.set(p, fObj);
+        }
+        return fObj;
+      });
+    } catch {
+    }
+    commits.push({
+      hash,
+      shortHash,
+      message,
+      author,
+      date,
+      files: commitFiles2
+    });
+  }
+  const totalFiles = Array.from(fileMap.values());
+  const remotes = await getRemotes(ctx);
+  return {
+    currentBranch,
+    remote,
+    remoteBranch,
+    remotes: remotes.length > 0 ? remotes : [remote],
+    repoName,
+    isNew,
+    commits,
+    totalFiles
+  };
+}
+async function push(ctx, branch, force = false, setUpstream = false, remoteName, tags = false, targetBranch) {
+  const curBranch = branch || await ctx.getCurrentBranch();
+  const remote = remoteName || await getDefaultRemote(ctx, curBranch);
+  const args = ["push"];
+  if (force) args.push("--force-with-lease");
+  if (tags) args.push("--tags");
+  let hasUpstream = false;
+  try {
+    const upstream = await ctx.exec(["rev-parse", "--abbrev-ref", `${curBranch}@{u}`]);
+    if (upstream.trim()) hasUpstream = true;
+  } catch {
+  }
+  const remoteRef = targetBranch && targetBranch.trim() ? targetBranch.trim() : curBranch;
+  const isCustomTarget = remoteRef !== curBranch;
+  const refspec = isCustomTarget ? `${curBranch}:${remoteRef}` : curBranch;
+  if (setUpstream || !hasUpstream || isCustomTarget) {
+    args.push("-u", remote, refspec);
+  } else {
+    args.push(remote, refspec);
+  }
+  return ctx.exec(args);
+}
+
+// src/git/operations/stagingOperations.ts
+var fs2 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
+var import_child_process = require("child_process");
+async function getStatus(ctx) {
+  const output = await ctx.exec(["status", "--porcelain=v1", "-uall"]);
+  const entries = [];
+  for (const line of output.split("\n")) {
+    if (!line) continue;
+    const x = line[0];
+    const y = line[1];
+    const rest = line.slice(3);
+    const arrowIdx = rest.indexOf(" -> ");
+    if (arrowIdx !== -1) {
+      entries.push({
+        x,
+        y,
+        origPath: rest.slice(0, arrowIdx),
+        path: rest.slice(arrowIdx + 4)
+      });
+    } else {
+      entries.push({ x, y, path: rest });
+    }
+  }
+  return entries;
+}
+async function stageFiles(ctx, paths) {
+  if (!paths || paths.length === 0) return;
+  const existing = [];
+  const missing = [];
+  for (const p of paths) {
+    const full = path3.isAbsolute(p) ? p : path3.join(ctx.cwd, p);
+    if (fs2.existsSync(full)) {
+      existing.push(p);
+    } else {
+      missing.push(p);
+    }
+  }
+  if (existing.length > 0) {
+    await ctx.exec(["add", "--", ...existing]);
+  }
+  if (missing.length > 0) {
+    await ctx.exec(["rm", "--cached", "--ignore-unmatch", "--", ...missing]);
+  }
+}
+async function stageFileContent(ctx, filePath, content) {
+  return new Promise((resolve2, reject) => {
+    const proc = (0, import_child_process.execFile)("git", ["hash-object", "-w", "--stdin"], { cwd: ctx.cwd }, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      const sha = stdout.trim();
+      ctx.exec(["update-index", "--cacheinfo", `100644,${sha},${filePath}`]).then(() => resolve2()).catch(reject);
+    });
+    proc.stdin?.write(content);
+    proc.stdin?.end();
+  });
+}
+async function unstageFiles(ctx, paths) {
+  await ctx.exec(["reset", "HEAD", "--", ...paths]);
+}
+async function rollbackFiles(ctx, paths) {
+  const status = await ctx.getStatus();
+  const untracked = new Set(status.filter((s) => s.x === "?" && s.y === "?").map((s) => s.path));
+  const toClean = [];
+  const toRestore = [];
+  for (const p of paths) {
+    if (untracked.has(p)) {
+      toClean.push(p);
+    } else {
+      toRestore.push(p);
+    }
+  }
+  if (toRestore.length > 0) {
+    try {
+      await ctx.exec(["checkout", "HEAD", "--", ...toRestore]);
+    } catch {
+      await ctx.exec(["restore", "--staged", "--worktree", "--", ...toRestore]);
+    }
+  }
+  for (const p of toClean) {
+    try {
+      const fullPath = path3.join(ctx.cwd, p);
+      if (fs2.existsSync(fullPath)) {
+        if (fs2.statSync(fullPath).isDirectory()) {
+          fs2.rmSync(fullPath, { recursive: true, force: true });
+        } else {
+          fs2.unlinkSync(fullPath);
+        }
+      }
+    } catch {
+    }
+  }
+}
+async function getFileDiff(ctx, filePath) {
+  const status = await ctx.getStatus();
+  const entry = status.find((s) => s.path === filePath);
+  if (entry && entry.x === "?" && entry.y === "?") {
+    try {
+      const fullPath = path3.join(ctx.cwd, filePath);
+      const content = fs2.readFileSync(fullPath, "utf8");
+      const lines = content.split("\n");
+      const diffHeader = `--- /dev/null
++++ b/${filePath}
+@@ -0,0 +1,${lines.length} @@
+`;
+      return diffHeader + lines.map((l) => `+${l}`).join("\n");
+    } catch {
+      return "";
+    }
+  }
+  try {
+    const diff = await ctx.exec(["diff", "HEAD", "--", filePath]);
+    if (diff.trim()) return diff;
+    return await ctx.exec(["diff", "--", filePath]);
+  } catch {
+    return await ctx.exec(["diff", "--", filePath]);
+  }
+}
+async function applyHunkPatch(ctx, patchContent, reverse = false) {
+  return new Promise((resolve2, reject) => {
+    const args = ["apply", "--cached", "--recount", "--whitespace=nowarn"];
+    if (reverse) args.push("--reverse");
+    args.push("-");
+    const proc = (0, import_child_process.execFile)("git", args, { cwd: ctx.cwd }, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      resolve2(stdout);
+    });
+    proc.stdin?.write(patchContent);
+    proc.stdin?.end();
+  });
+}
+
+// src/git/operations/commitOperations.ts
+function parseRefs(raw) {
+  if (!raw.trim()) return [];
+  return raw.split(",").map((r) => {
+    r = r.trim();
+    r = r.replace(/^HEAD -> /, "");
+    r = r.replace(/^refs\/heads\//, "");
+    r = r.replace(/^refs\/tags\//, "tag: ");
+    r = r.replace(/^refs\/remotes\//, "");
+    return r;
+  });
+}
+async function getLog(ctx, options = {}) {
+  const args = ["log", `--format=${LOG_FORMAT}`, "--topo-order"];
+  if (options.all === true || !options.branch && options.all !== false) {
+    args.push("--all");
+  }
+  args.push("--decorate=full");
+  if (options.maxCount) args.push(`-n${options.maxCount}`);
+  if (options.skip) args.push(`--skip=${options.skip}`);
+  if (options.author) args.push(`--author=${options.author}`);
+  if (options.after) args.push(`--after=${options.after}`);
+  if (options.before) args.push(`--before=${options.before}`);
+  if (options.query) {
+    args.push(`--grep=${options.query}`);
+    args.push("-i");
+  }
+  if (options.branch) args.push(options.branch);
+  if (options.path) {
+    args.push("--");
+    args.push(options.path);
+  }
+  const output = await ctx.exec(args);
+  const commits = [];
+  for (const chunk of output.split("\0")) {
+    if (!chunk.trim()) continue;
+    const parts = chunk.split(SEP);
+    if (parts.length < 9) continue;
+    const commit = {
+      hash: parts[0].trim(),
+      abbreviatedHash: parts[1],
+      parents: parts[2] ? parts[2].split(" ").filter(Boolean) : [],
+      author: parts[3],
+      authorEmail: parts[4],
+      authorDate: parts[5],
+      subject: parts[6],
+      body: parts[7],
+      refs: parts[8] ? parseRefs(parts[8]) : []
+    };
+    ctx.commitCache.set(commit.hash, commit);
+    commits.push(commit);
+  }
+  if (options.query && /^[0-9a-f]{4,40}$/i.test(options.query.trim())) {
+    try {
+      const hashOut = await ctx.exec(["log", "-n1", `--format=${LOG_FORMAT}`, "--decorate=full", options.query.trim()]);
+      for (const chunk of hashOut.split("\0")) {
+        if (!chunk.trim()) continue;
+        const parts = chunk.split(SEP);
+        if (parts.length >= 9) {
+          const hashCommit = {
+            hash: parts[0].trim(),
+            abbreviatedHash: parts[1],
+            parents: parts[2] ? parts[2].split(" ").filter(Boolean) : [],
+            author: parts[3],
+            authorEmail: parts[4],
+            authorDate: parts[5],
+            subject: parts[6],
+            body: parts[7],
+            refs: parts[8] ? parseRefs(parts[8]) : []
+          };
+          ctx.commitCache.set(hashCommit.hash, hashCommit);
+          if (!commits.some((c) => c.hash === hashCommit.hash)) {
+            commits.unshift(hashCommit);
+          }
+        }
+      }
+    } catch {
+    }
+  }
+  return commits;
+}
+async function getCommitFiles(ctx, hash) {
+  const output = await ctx.exec([
+    "diff-tree",
+    "--no-commit-id",
+    "-r",
+    "--name-status",
+    "-M",
+    hash
+  ]);
+  const changes = [];
+  for (const line of output.split("\n")) {
+    if (!line.trim()) continue;
+    const parts = line.split("	");
+    const status = parts[0][0];
+    if (parts.length === 3) {
+      changes.push({ status, path: parts[2], oldPath: parts[1] });
+    } else {
+      changes.push({ status, path: parts[1] });
+    }
+  }
+  return changes;
+}
+async function getAuthorRecentCommitMessages(ctx, count = 10) {
+  try {
+    let author = "";
+    try {
+      author = (await ctx.exec(["config", "user.email"])).trim();
+    } catch {
+    }
+    if (!author) {
+      try {
+        author = (await ctx.exec(["config", "user.name"])).trim();
+      } catch {
+      }
+    }
+    const isMergeOrMr = (msg) => {
+      const lower = msg.toLowerCase().trim();
+      return lower.startsWith("merge ") || lower.startsWith("merge branch") || lower.startsWith("merge remote-tracking") || lower.startsWith("revert ") || lower.startsWith("resolve conflict") || lower.includes("merge request") || lower.includes("pull request") || lower.startsWith("see merge request") || /^mr\s*!/i.test(lower) || /^pr\s*#/i.test(lower);
+    };
+    const args = ["log", "-n", "50", "--no-merges", "--pretty=%s"];
+    if (author) {
+      args.push(`--author=${author}`);
+    }
+    let out = "";
+    try {
+      out = await ctx.exec(args);
+    } catch {
+      out = await ctx.exec(["log", "-n", "30", "--no-merges", "--pretty=%s"]);
+    }
+    const cleanList = out.split("\n").map((s) => s.trim()).filter((s) => Boolean(s) && !isMergeOrMr(s));
+    if (cleanList.length > 0) {
+      return cleanList.slice(0, count);
+    }
+    const fallbackOut = await ctx.exec(["log", "-n", "30", "--no-merges", "--pretty=%s"]);
+    return fallbackOut.split("\n").map((s) => s.trim()).filter((s) => Boolean(s) && !isMergeOrMr(s)).slice(0, count);
+  } catch {
+    return [];
+  }
+}
+async function getStashes(ctx) {
+  try {
+    const out = await ctx.exec(["stash", "list", "--format=%gd%gs%cr"]);
+    const list = [];
+    for (const line of out.split("\n")) {
+      if (!line.trim()) continue;
+      const [index, message, date] = line.split("");
+      list.push({ index: index?.trim(), message: message?.trim(), date: date?.trim() });
+    }
+    return list;
+  } catch {
+    return [];
+  }
+}
+async function commitFiles(ctx, message, filesToStage, amend = false) {
+  if (filesToStage && filesToStage.length > 0) {
+    await ctx.stageFiles(filesToStage);
+  }
+  const args = ["commit"];
+  if (amend) args.push("--amend");
+  args.push("-m", message);
+  await ctx.exec(args);
+}
+
+// src/git/gitService.ts
+var execFileAsync = (0, import_util.promisify)(import_child_process2.execFile);
 var GitService = class {
   commitCache = new LRUCache(5e3);
   cwd;
@@ -126,12 +838,12 @@ var GitService = class {
   async findSubRepos() {
     const results = [];
     try {
-      const entries = fs.readdirSync(this.cwd, { withFileTypes: true });
+      const entries = fs3.readdirSync(this.cwd, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-          const subPath = path.join(this.cwd, entry.name);
-          const subGit = path.join(subPath, ".git");
-          if (fs.existsSync(subGit)) {
+          const subPath = path4.join(this.cwd, entry.name);
+          const subGit = path4.join(subPath, ".git");
+          if (fs3.existsSync(subGit)) {
             results.push({ name: entry.name, path: subPath });
           }
         }
@@ -155,20 +867,20 @@ var GitService = class {
         const isLockError = err?.message && (err.message.includes("index.lock") || err.message.includes("Unable to create") && err.message.includes(".lock"));
         if (isLockError && attempt < retries - 1) {
           try {
-            const dotGit = path.join(this.cwd, ".git");
-            let lockPath = path.join(dotGit, "index.lock");
-            if (fs.existsSync(dotGit) && fs.statSync(dotGit).isFile()) {
-              const content = fs.readFileSync(dotGit, "utf8").trim();
+            const dotGit = path4.join(this.cwd, ".git");
+            let lockPath = path4.join(dotGit, "index.lock");
+            if (fs3.existsSync(dotGit) && fs3.statSync(dotGit).isFile()) {
+              const content = fs3.readFileSync(dotGit, "utf8").trim();
               if (content.startsWith("gitdir:")) {
                 const relOrAbs = content.replace(/^gitdir:\s*/, "");
-                const actualGitDir = path.isAbsolute(relOrAbs) ? relOrAbs : path.resolve(this.cwd, relOrAbs);
-                lockPath = path.join(actualGitDir, "index.lock");
+                const actualGitDir = path4.isAbsolute(relOrAbs) ? relOrAbs : path4.resolve(this.cwd, relOrAbs);
+                lockPath = path4.join(actualGitDir, "index.lock");
               }
             }
-            if (fs.existsSync(lockPath)) {
-              const stat = fs.statSync(lockPath);
+            if (fs3.existsSync(lockPath)) {
+              const stat = fs3.statSync(lockPath);
               if (Date.now() - stat.mtimeMs > 5e3) {
-                fs.unlinkSync(lockPath);
+                fs3.unlinkSync(lockPath);
                 continue;
               }
             }
@@ -186,269 +898,58 @@ var GitService = class {
     const out = await this.exec(["rev-parse", "--show-toplevel"]);
     return out.trim();
   }
+  // --- Log & Commit Operations ---
   async getLog(options = {}) {
-    const args = ["log", `--format=${LOG_FORMAT}`, "--topo-order"];
-    if (options.all === true || !options.branch && options.all !== false) {
-      args.push("--all");
-    }
-    args.push("--decorate=full");
-    if (options.maxCount) args.push(`-n${options.maxCount}`);
-    if (options.skip) args.push(`--skip=${options.skip}`);
-    if (options.author) args.push(`--author=${options.author}`);
-    if (options.after) args.push(`--after=${options.after}`);
-    if (options.before) args.push(`--before=${options.before}`);
-    if (options.query) {
-      args.push(`--grep=${options.query}`);
-      args.push("-i");
-    }
-    if (options.branch) args.push(options.branch);
-    if (options.path) {
-      args.push("--");
-      args.push(options.path);
-    }
-    const output = await this.exec(args);
-    const commits = [];
-    for (const chunk of output.split("\0")) {
-      if (!chunk.trim()) continue;
-      const parts = chunk.split(SEP);
-      if (parts.length < 9) continue;
-      const commit = {
-        hash: parts[0].trim(),
-        abbreviatedHash: parts[1],
-        parents: parts[2] ? parts[2].split(" ").filter(Boolean) : [],
-        author: parts[3],
-        authorEmail: parts[4],
-        authorDate: parts[5],
-        subject: parts[6],
-        body: parts[7],
-        refs: parts[8] ? parseRefs(parts[8]) : []
-      };
-      this.commitCache.set(commit.hash, commit);
-      commits.push(commit);
-    }
-    if (options.query && /^[0-9a-f]{4,40}$/i.test(options.query.trim())) {
-      try {
-        const hashOut = await this.exec(["log", "-n1", `--format=${LOG_FORMAT}`, "--decorate=full", options.query.trim()]);
-        for (const chunk of hashOut.split("\0")) {
-          if (!chunk.trim()) continue;
-          const parts = chunk.split(SEP);
-          if (parts.length >= 9) {
-            const hashCommit = {
-              hash: parts[0].trim(),
-              abbreviatedHash: parts[1],
-              parents: parts[2] ? parts[2].split(" ").filter(Boolean) : [],
-              author: parts[3],
-              authorEmail: parts[4],
-              authorDate: parts[5],
-              subject: parts[6],
-              body: parts[7],
-              refs: parts[8] ? parseRefs(parts[8]) : []
-            };
-            this.commitCache.set(hashCommit.hash, hashCommit);
-            if (!commits.some((c) => c.hash === hashCommit.hash)) {
-              commits.unshift(hashCommit);
-            }
-          }
-        }
-      } catch {
-      }
-    }
-    return commits;
+    return getLog(this.asCommitContext(), options);
   }
   async getCommitFiles(hash) {
-    const output = await this.exec([
-      "diff-tree",
-      "--no-commit-id",
-      "-r",
-      "--name-status",
-      "-M",
-      hash
-    ]);
-    const changes = [];
-    for (const line of output.split("\n")) {
-      if (!line.trim()) continue;
-      const parts = line.split("	");
-      const status = parts[0][0];
-      if (parts.length === 3) {
-        changes.push({ status, path: parts[2], oldPath: parts[1] });
-      } else {
-        changes.push({ status, path: parts[1] });
-      }
-    }
-    return changes;
+    return getCommitFiles(this.asCommitContext(), hash);
   }
-  async getBranches() {
-    const localOutput = await this.exec([
-      "branch",
-      "--format",
-      "%(HEAD)%(refname:short)	%(objectname:short)	%(upstream:short)	%(upstream:track,nobracket)"
-    ]);
-    const remoteOutput = await this.exec([
-      "branch",
-      "-r",
-      "--format",
-      "%(refname:short)	%(objectname:short)"
-    ]);
-    const branches = [];
-    for (const line of localOutput.split("\n")) {
-      if (!line.trim()) continue;
-      const current = line[0] === "*";
-      const rest = line.slice(1);
-      const [name, hash, upstream, track] = rest.split("	");
-      let ahead = 0;
-      let behind = 0;
-      if (track) {
-        const aheadMatch = track.match(/ahead (\d+)/);
-        if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
-        const behindMatch = track.match(/behind (\d+)/);
-        if (behindMatch) behind = parseInt(behindMatch[1], 10);
-      }
-      const trimmedName = name.trim();
-      if (trimmedName.startsWith("(") || trimmedName.startsWith("HEAD detached")) {
-        continue;
-      }
-      branches.push({
-        name: trimmedName,
-        current,
-        remote: void 0,
-        upstream: upstream || void 0,
-        hash: hash.trim(),
-        ahead: ahead || void 0,
-        behind: behind || void 0
-      });
-    }
-    for (const line of remoteOutput.split("\n")) {
-      if (!line.trim()) continue;
-      if (line.includes(" -> ")) continue;
-      const [name, hash] = line.split("	");
-      const trimmedName = name.trim();
-      const slashIdx = trimmedName.indexOf("/");
-      const remoteName = slashIdx !== -1 ? trimmedName.slice(0, slashIdx) : "origin";
-      branches.push({
-        name: trimmedName,
-        current: false,
-        remote: remoteName,
-        upstream: void 0,
-        hash: hash.trim()
-      });
-    }
-    return branches;
+  async getAuthorRecentCommitMessages(count = 10) {
+    return getAuthorRecentCommitMessages(this.asCommitContext(), count);
   }
-  async fetchAll() {
-    return this.exec(["fetch", "--all", "--prune"]);
-  }
-  async getTags() {
-    const output = await this.exec([
-      "tag",
-      "-l",
-      "--format",
-      "%(refname:short)	%(objectname:short)"
-    ]);
-    const tags = [];
-    for (const line of output.split("\n")) {
-      if (!line.trim()) continue;
-      const [name, hash] = line.split("	");
-      tags.push({ name, hash });
-    }
-    return tags;
-  }
-  async getCurrentBranch() {
-    const output = await this.exec(["rev-parse", "--abbrev-ref", "HEAD"]);
-    const branch = output.trim();
-    if (branch === "HEAD") {
-      try {
-        const desc = await this.exec(["describe", "--tags", "--exact-match", "HEAD"]);
-        return `HEAD (detached at ${desc.trim()})`;
-      } catch {
-        const hash = await this.exec(["rev-parse", "--short", "HEAD"]);
-        return `HEAD (detached at ${hash.trim()})`;
-      }
-    }
-    return branch;
-  }
-  async checkout(ref) {
+  async getRecentCommitMessages(count = 10) {
     try {
-      const remotesOutput = await this.exec(["remote"]);
-      const remotes = remotesOutput.split("\n").map((s) => s.trim()).filter(Boolean);
-      for (const remote of remotes) {
-        if (ref.startsWith(remote + "/")) {
-          const localBranchName = ref.slice(remote.length + 1);
-          const branchCheck = await this.exec(["branch", "--list", localBranchName]);
-          if (branchCheck.trim()) {
-            await this.exec(["checkout", localBranchName]);
-          } else {
-            await this.exec(["checkout", "-b", localBranchName, "--track", ref]);
-          }
-          return;
-        }
-      }
-    } catch {
-    }
-    await this.exec(["checkout", ref]);
-  }
-  async createBranch(name, startPoint, checkout = true, force = false) {
-    if (checkout) {
-      const args = ["checkout", force ? "-B" : "-b", name];
-      if (startPoint) args.push(startPoint);
-      await this.exec(args);
-    } else {
-      const args = ["branch"];
-      if (force) args.push("-f");
-      args.push(name);
-      if (startPoint) args.push(startPoint);
-      await this.exec(args);
-    }
-  }
-  async cherryPick(hash) {
-    return this.exec(["cherry-pick", hash]);
-  }
-  async revertCommit(hash) {
-    return this.exec(["revert", "--no-edit", hash]);
-  }
-  async reset(hash, mode = "mixed") {
-    return this.exec(["reset", `--${mode}`, hash]);
-  }
-  async createTag(name, hash) {
-    const args = ["tag", name];
-    if (hash) args.push(hash);
-    await this.exec(args);
-  }
-  async createPatch(hash) {
-    return this.exec(["format-patch", "-1", hash, "--stdout"]);
-  }
-  async getRemotes() {
-    try {
-      const out = await this.exec(["remote"]);
+      const out = await this.exec(["log", `-n${count}`, "--pretty=%s"]);
       return out.split("\n").map((s) => s.trim()).filter(Boolean);
     } catch {
       return [];
     }
   }
-  async getDefaultRemote(branch) {
-    try {
-      const curBranch = branch || await this.getCurrentBranch().catch(() => "");
-      if (curBranch) {
-        try {
-          const r = await this.exec(["config", `branch.${curBranch}.remote`]);
-          if (r.trim()) return r.trim();
-        } catch {
-        }
-      }
-      const remotes = await this.getRemotes();
-      if (remotes.includes("origin")) return "origin";
-      if (remotes.length > 0) return remotes[0];
-    } catch {
-    }
-    return "origin";
+  async commitFiles(message, filesToStage, amend = false) {
+    return commitFiles(this.asCommitContext(), message, filesToStage, amend);
   }
-  async getRemoteUrl() {
-    try {
-      const remote = await this.getDefaultRemote();
-      const out = await this.exec(["remote", "get-url", remote]);
-      return out.trim();
-    } catch {
-      return "";
-    }
+  async commitAndPush(message, filesToStage, amend = false) {
+    await this.commitFiles(message, filesToStage, amend);
+    return await this.push();
+  }
+  async commit(message) {
+    await this.exec(["commit", "-m", message]);
+  }
+  async showFileAtCommit(hash, filePath) {
+    return this.exec(["show", `${hash}:${filePath}`]);
+  }
+  async diff(ref1, ref2) {
+    return this.exec(["diff", ref1, ref2]);
+  }
+  async getLogRange(base, head = "HEAD") {
+    return this.getLog({ all: false, branch: `${base}..${head}` });
+  }
+  // --- Branch & Remote Operations ---
+  async getBranches() {
+    return getBranches(this.asBranchContext());
+  }
+  async getTags() {
+    return getTags(this.asBranchContext());
+  }
+  async getCurrentBranch() {
+    return getCurrentBranch(this.asBranchContext());
+  }
+  async checkout(ref) {
+    return checkout(this.asBranchContext(), ref);
+  }
+  async createBranch(name, startPoint, checkout2 = true, force = false) {
+    return createBranch(this.asBranchContext(), name, startPoint, checkout2, force);
   }
   async deleteBranch(name, force = false) {
     await this.exec(["branch", force ? "-D" : "-d", name]);
@@ -456,131 +957,26 @@ var GitService = class {
   async renameBranch(oldName, newName) {
     await this.exec(["branch", "-m", oldName, newName]);
   }
+  async getRemotes() {
+    return getRemotes(this.asBranchContext());
+  }
+  async getDefaultRemote(branch) {
+    return getDefaultRemote(this.asBranchContext(), branch);
+  }
+  async getRemoteUrl() {
+    return getRemoteUrl(this.asBranchContext());
+  }
   async pull(branch) {
-    const currentBranch = await this.getCurrentBranch();
-    if (!branch || branch === currentBranch) {
-      return this.exec(["pull"]);
-    }
-    try {
-      const remote = await this.getDefaultRemote(branch);
-      let targetBranch = branch;
-      if (branch.startsWith(remote + "/")) {
-        targetBranch = branch.slice(remote.length + 1);
-      }
-      const branchCheck = await this.exec(["branch", "--list", targetBranch]);
-      if (branchCheck.trim()) {
-        const out = await this.exec(["fetch", remote, `${targetBranch}:${targetBranch}`]);
-        return out || `Updated branch '${targetBranch}' successfully.`;
-      } else {
-        const out = await this.exec(["fetch", remote, targetBranch]);
-        return out || `Fetched '${targetBranch}' successfully.`;
-      }
-    } catch (err) {
-      if (err.message && (err.message.includes("non-fast-forward") || err.message.includes("rejected"))) {
-        throw new Error(`Cannot fast-forward branch '${branch}' because local commits diverged. Please checkout '${branch}' to merge or rebase.`);
-      }
-      throw err;
-    }
+    return pull(this.asBranchContext(), branch);
   }
   async getPushInfo(targetBranch) {
-    const currentBranch = targetBranch || await this.getCurrentBranch();
-    const remote = await this.getDefaultRemote(currentBranch);
-    const remoteBranch = currentBranch;
-    const repoRoot = await this.getRepoRoot().catch(() => this.cwd);
-    const repoName = path.basename(repoRoot);
-    let isNew = true;
-    try {
-      await this.exec(["rev-parse", "--verify", `refs/remotes/${remote}/${currentBranch}`]);
-      isNew = false;
-    } catch {
-      isNew = true;
-    }
-    let logArgs = [];
-    if (!isNew) {
-      logArgs = ["log", `${remote}/${currentBranch}..${currentBranch}`, "--format=%H%x00%h%x00%an%x00%ad%x00%s"];
-    } else {
-      logArgs = ["log", currentBranch, `--not`, `--remotes=${remote}`, "--format=%H%x00%h%x00%an%x00%ad%x00%s"];
-    }
-    let rawLog = "";
-    try {
-      rawLog = await this.exec(logArgs);
-    } catch {
-      try {
-        rawLog = await this.exec(["log", "-n", "10", "--format=%H%x00%h%x00%an%x00%ad%x00%s"]);
-      } catch {
-      }
-    }
-    const lines = rawLog.split("\n").filter((l) => l.trim());
-    const commits = [];
-    const fileMap = /* @__PURE__ */ new Map();
-    for (const line of lines) {
-      const parts = line.split("\0");
-      if (parts.length < 5) continue;
-      const [hash, shortHash, author, date, message] = parts;
-      let commitFiles = [];
-      try {
-        const diffOut = await this.exec(["diff-tree", "--no-commit-id", "--name-status", "-r", hash]);
-        commitFiles = diffOut.split("\n").filter((l) => l.trim()).map((dl) => {
-          const tokens = dl.trim().split(/\s+/);
-          const status = tokens[0] || "M";
-          const p = tokens.length > 2 ? tokens[2] : tokens[1] || "";
-          const dir = path.dirname(p) === "." ? "" : path.dirname(p);
-          const fObj = {
-            status: status.charAt(0),
-            path: p,
-            name: path.basename(p),
-            dir
-          };
-          if (!fileMap.has(p)) {
-            fileMap.set(p, fObj);
-          }
-          return fObj;
-        });
-      } catch {
-      }
-      commits.push({
-        hash,
-        shortHash,
-        message,
-        author,
-        date,
-        files: commitFiles
-      });
-    }
-    const totalFiles = Array.from(fileMap.values());
-    const remotes = await this.getRemotes();
-    return {
-      currentBranch,
-      remote,
-      remoteBranch,
-      remotes: remotes.length > 0 ? remotes : [remote],
-      repoName,
-      isNew,
-      commits,
-      totalFiles
-    };
+    return getPushInfo(this.asBranchContext(), targetBranch);
   }
   async push(branch, force = false, setUpstream = false, remoteName, tags = false, targetBranch) {
-    const curBranch = branch || await this.getCurrentBranch();
-    const remote = remoteName || await this.getDefaultRemote(curBranch);
-    const args = ["push"];
-    if (force) args.push("--force-with-lease");
-    if (tags) args.push("--tags");
-    let hasUpstream = false;
-    try {
-      const upstream = await this.exec(["rev-parse", "--abbrev-ref", `${curBranch}@{u}`]);
-      if (upstream.trim()) hasUpstream = true;
-    } catch {
-    }
-    const remoteRef = targetBranch && targetBranch.trim() ? targetBranch.trim() : curBranch;
-    const isCustomTarget = remoteRef !== curBranch;
-    const refspec = isCustomTarget ? `${curBranch}:${remoteRef}` : curBranch;
-    if (setUpstream || !hasUpstream || isCustomTarget) {
-      args.push("-u", remote, refspec);
-    } else {
-      args.push(remote, refspec);
-    }
-    return this.exec(args);
+    return push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch);
+  }
+  async fetchAll() {
+    return this.exec(["fetch", "--all", "--prune"]);
   }
   async checkoutAndRebase(branch, onto) {
     await this.checkout(branch);
@@ -607,264 +1003,50 @@ var GitService = class {
     }
     return changes;
   }
+  async cherryPick(hash) {
+    return this.exec(["cherry-pick", hash]);
+  }
+  async revertCommit(hash) {
+    return this.exec(["revert", "--no-edit", hash]);
+  }
+  async reset(hash, mode = "mixed") {
+    return this.exec(["reset", `--${mode}`, hash]);
+  }
+  async createTag(name, hash) {
+    const args = ["tag", name];
+    if (hash) args.push(hash);
+    await this.exec(args);
+  }
+  async createPatch(hash) {
+    return this.exec(["format-patch", "-1", hash, "--stdout"]);
+  }
+  // --- Staging & Worktree Operations ---
   async getStatus() {
-    const output = await this.exec(["status", "--porcelain=v1", "-uall"]);
-    const entries = [];
-    for (const line of output.split("\n")) {
-      if (!line) continue;
-      const x = line[0];
-      const y = line[1];
-      const rest = line.slice(3);
-      const arrowIdx = rest.indexOf(" -> ");
-      if (arrowIdx !== -1) {
-        entries.push({
-          x,
-          y,
-          origPath: rest.slice(0, arrowIdx),
-          path: rest.slice(arrowIdx + 4)
-        });
-      } else {
-        entries.push({ x, y, path: rest });
-      }
-    }
-    return entries;
+    return getStatus(this.asStagingContext());
   }
-  async getUnmergedFiles() {
-    const output = await this.exec(["diff", "--name-only", "--diff-filter=U"]);
-    return output.split("\n").filter((l) => l.trim());
-  }
-  async getConflictInfo() {
-    const gitDir = path.join(this.cwd, ".git");
-    const isMerging = fs.existsSync(path.join(gitDir, "MERGE_HEAD"));
-    const isRebasing = fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"));
-    const isCherryPicking = fs.existsSync(path.join(gitDir, "CHERRY_PICK_HEAD"));
-    let yoursBranch = "";
-    try {
-      yoursBranch = await this.getCurrentBranch();
-    } catch {
-    }
-    if (!yoursBranch) yoursBranch = "HEAD";
-    let theirsBranch = "";
-    if (isMerging) {
-      try {
-        const mergeMsg = await this.getMergeMessage();
-        const m = mergeMsg.match(/Merge branch '([^']+)'/) || mergeMsg.match(/Merge commit '([^']+)'/);
-        if (m) {
-          theirsBranch = m[1];
-        } else {
-          const mergeHead = fs.readFileSync(path.join(gitDir, "MERGE_HEAD"), "utf8").trim();
-          theirsBranch = mergeHead.slice(0, 7);
-        }
-      } catch {
-      }
-    } else if (isRebasing) {
-      try {
-        const headNamePath = path.join(gitDir, "rebase-merge", "head-name");
-        if (fs.existsSync(headNamePath)) {
-          theirsBranch = fs.readFileSync(headNamePath, "utf8").trim().replace("refs/heads/", "");
-        }
-      } catch {
-      }
-    }
-    if (!theirsBranch) theirsBranch = "Theirs";
-    const statusEntries = await this.getStatus();
-    const conflictCodes = /* @__PURE__ */ new Set(["UU", "UD", "DU", "AA", "DD", "AU", "UA"]);
-    const conflictEntries = statusEntries.filter(
-      (e) => conflictCodes.has(`${e.x}${e.y}`) || e.x === "U" || e.y === "U"
-    );
-    const conflicts = conflictEntries.map((e) => {
-      let yours = "Modified";
-      let theirs = "Modified";
-      const code = `${e.x}${e.y}`;
-      if (code === "UD") {
-        yours = "Modified";
-        theirs = "Deleted";
-      } else if (code === "DU") {
-        yours = "Deleted";
-        theirs = "Modified";
-      } else if (code === "AA") {
-        yours = "Added";
-        theirs = "Added";
-      } else if (code === "DD") {
-        yours = "Deleted";
-        theirs = "Deleted";
-      } else if (code === "AU") {
-        yours = "Added";
-        theirs = "Modified";
-      } else if (code === "UA") {
-        yours = "Modified";
-        theirs = "Added";
-      }
-      return {
-        path: e.path,
-        name: path.basename(e.path),
-        dir: path.dirname(e.path) === "." ? "" : path.dirname(e.path),
-        yours,
-        theirs
-      };
-    });
-    return {
-      hasConflicts: conflicts.length > 0,
-      isMerging,
-      isRebasing: isRebasing || isCherryPicking,
-      yoursBranch,
-      theirsBranch,
-      conflicts
-    };
-  }
-  async acceptYours(filePath) {
-    const status = await this.getStatus();
-    const entry = status.find((s) => s.path === filePath);
-    const code = entry ? `${entry.x}${entry.y}` : "";
-    if (code === "DU" || code === "DD") {
-      await this.exec(["rm", "-f", "--", filePath]).catch(
-        () => this.exec(["rm", "--cached", "--ignore-unmatch", "--", filePath])
-      );
-    } else {
-      await this.exec(["checkout", "--ours", "--", filePath]);
-      await this.stageFiles([filePath]);
-    }
-  }
-  async acceptTheirs(filePath) {
-    const status = await this.getStatus();
-    const entry = status.find((s) => s.path === filePath);
-    const code = entry ? `${entry.x}${entry.y}` : "";
-    if (code === "UD" || code === "DD") {
-      await this.exec(["rm", "-f", "--", filePath]).catch(
-        () => this.exec(["rm", "--cached", "--ignore-unmatch", "--", filePath])
-      );
-    } else {
-      await this.exec(["checkout", "--theirs", "--", filePath]);
-      await this.stageFiles([filePath]);
-    }
-  }
-  async abortMerge() {
-    const gitDir = path.join(this.cwd, ".git");
-    if (fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"))) {
-      await this.exec(["rebase", "--abort"]);
-    } else if (fs.existsSync(path.join(gitDir, "CHERRY_PICK_HEAD"))) {
-      await this.exec(["cherry-pick", "--abort"]);
-    } else {
-      await this.exec(["merge", "--abort"]);
-    }
-  }
-  async stageFile(path8) {
-    await this.stageFiles([path8]);
+  async stageFile(filePath) {
+    await this.stageFiles([filePath]);
   }
   async stageFiles(paths) {
-    if (!paths || paths.length === 0) return;
-    const existing = [];
-    const missing = [];
-    for (const p of paths) {
-      const full = path.isAbsolute(p) ? p : path.join(this.cwd, p);
-      if (fs.existsSync(full)) {
-        existing.push(p);
-      } else {
-        missing.push(p);
-      }
-    }
-    if (existing.length > 0) {
-      await this.exec(["add", "--", ...existing]);
-    }
-    if (missing.length > 0) {
-      await this.exec(["rm", "--cached", "--ignore-unmatch", "--", ...missing]);
-    }
+    return stageFiles(this.asStagingContext(), paths);
   }
   async stageFileContent(filePath, content) {
-    return new Promise((resolve2, reject) => {
-      const proc = (0, import_child_process.execFile)("git", ["hash-object", "-w", "--stdin"], { cwd: this.cwd }, (err, stdout, stderr) => {
-        if (err) return reject(new Error(stderr || err.message));
-        const sha = stdout.trim();
-        this.exec(["update-index", "--cacheinfo", `100644,${sha},${filePath}`]).then(() => resolve2()).catch(reject);
-      });
-      proc.stdin?.write(content);
-      proc.stdin?.end();
-    });
+    return stageFileContent(this.asStagingContext(), filePath, content);
   }
-  async unstageFile(path8) {
-    await this.exec(["reset", "HEAD", "--", path8]);
+  async unstageFile(filePath) {
+    await this.unstageFiles([filePath]);
   }
   async unstageFiles(paths) {
-    await this.exec(["reset", "HEAD", "--", ...paths]);
+    return unstageFiles(this.asStagingContext(), paths);
   }
   async rollbackFiles(paths) {
-    const status = await this.getStatus();
-    const untracked = new Set(status.filter((s) => s.x === "?" && s.y === "?").map((s) => s.path));
-    const toClean = [];
-    const toRestore = [];
-    for (const p of paths) {
-      if (untracked.has(p)) {
-        toClean.push(p);
-      } else {
-        toRestore.push(p);
-      }
-    }
-    if (toRestore.length > 0) {
-      try {
-        await this.exec(["checkout", "HEAD", "--", ...toRestore]);
-      } catch {
-        await this.exec(["restore", "--staged", "--worktree", "--", ...toRestore]);
-      }
-    }
-    for (const p of toClean) {
-      try {
-        const fullPath = path.join(this.cwd, p);
-        if (fs.existsSync(fullPath)) {
-          if (fs.statSync(fullPath).isDirectory()) {
-            fs.rmSync(fullPath, { recursive: true, force: true });
-          } else {
-            fs.unlinkSync(fullPath);
-          }
-        }
-      } catch {
-      }
-    }
+    return rollbackFiles(this.asStagingContext(), paths);
   }
   async getFileDiff(filePath) {
-    const status = await this.getStatus();
-    const entry = status.find((s) => s.path === filePath);
-    if (entry && entry.x === "?" && entry.y === "?") {
-      try {
-        const fullPath = path.join(this.cwd, filePath);
-        const content = fs.readFileSync(fullPath, "utf8");
-        const lines = content.split("\n");
-        const diffHeader = `--- /dev/null
-+++ b/${filePath}
-@@ -0,0 +1,${lines.length} @@
-`;
-        return diffHeader + lines.map((l) => `+${l}`).join("\n");
-      } catch {
-        return "";
-      }
-    }
-    try {
-      const diff = await this.exec(["diff", "HEAD", "--", filePath]);
-      if (diff.trim()) return diff;
-      return await this.exec(["diff", "--", filePath]);
-    } catch {
-      return await this.exec(["diff", "--", filePath]);
-    }
+    return getFileDiff(this.asStagingContext(), filePath);
   }
   async applyHunkPatch(patchContent, reverse = false) {
-    return new Promise((resolve2, reject) => {
-      const args = ["apply", "--cached", "--recount", "--whitespace=nowarn"];
-      if (reverse) args.push("--reverse");
-      args.push("-");
-      const proc = (0, import_child_process.execFile)("git", args, { cwd: this.cwd }, (err, stdout, stderr) => {
-        if (err) return reject(new Error(stderr || err.message));
-        resolve2(stdout);
-      });
-      proc.stdin?.write(patchContent);
-      proc.stdin?.end();
-    });
-  }
-  async getRecentCommitMessages(count = 10) {
-    try {
-      const out = await this.exec(["log", `-n${count}`, "--pretty=%s"]);
-      return out.split("\n").map((s) => s.trim()).filter(Boolean);
-    } catch {
-      return [];
-    }
+    return applyHunkPatch(this.asStagingContext(), patchContent, reverse);
   }
   async getStagedDiff() {
     try {
@@ -881,66 +1063,28 @@ var GitService = class {
     } catch {
     }
   }
-  async getAuthorRecentCommitMessages(count = 10) {
-    try {
-      let author = "";
-      try {
-        author = (await this.exec(["config", "user.email"])).trim();
-      } catch {
-      }
-      if (!author) {
-        try {
-          author = (await this.exec(["config", "user.name"])).trim();
-        } catch {
-        }
-      }
-      const isMergeOrMr = (msg) => {
-        const lower = msg.toLowerCase().trim();
-        return lower.startsWith("merge ") || lower.startsWith("merge branch") || lower.startsWith("merge remote-tracking") || lower.startsWith("revert ") || lower.startsWith("resolve conflict") || lower.includes("merge request") || lower.includes("pull request") || lower.startsWith("see merge request") || /^mr\s*!/i.test(lower) || /^pr\s*#/i.test(lower);
-      };
-      const args = ["log", "-n", "50", "--no-merges", "--pretty=%s"];
-      if (author) {
-        args.push(`--author=${author}`);
-      }
-      let out = "";
-      try {
-        out = await this.exec(args);
-      } catch {
-        out = await this.exec(["log", "-n", "30", "--no-merges", "--pretty=%s"]);
-      }
-      const cleanList = out.split("\n").map((s) => s.trim()).filter((s) => Boolean(s) && !isMergeOrMr(s));
-      if (cleanList.length > 0) {
-        return cleanList.slice(0, count);
-      }
-      const fallbackOut = await this.exec(["log", "-n", "30", "--no-merges", "--pretty=%s"]);
-      return fallbackOut.split("\n").map((s) => s.trim()).filter((s) => Boolean(s) && !isMergeOrMr(s)).slice(0, count);
-    } catch {
-      return [];
-    }
+  // --- Conflict Operations ---
+  async getUnmergedFiles() {
+    return getUnmergedFiles(this.asConflictContext());
+  }
+  async getConflictInfo() {
+    return getConflictInfo(this.asConflictContext());
+  }
+  async acceptYours(filePath) {
+    return acceptYours(this.asConflictContext(), filePath);
+  }
+  async acceptTheirs(filePath) {
+    return acceptTheirs(this.asConflictContext(), filePath);
+  }
+  async abortMerge() {
+    return abortMerge(this.asConflictContext());
   }
   async getMergeMessage() {
-    try {
-      const mergeMsgPath = path.join(this.cwd, ".git", "MERGE_MSG");
-      if (fs.existsSync(mergeMsgPath)) {
-        return fs.readFileSync(mergeMsgPath, "utf8").trim();
-      }
-    } catch {
-    }
-    return "";
+    return getMergeMessage(this.cwd);
   }
+  // --- Stash Operations ---
   async getStashes() {
-    try {
-      const out = await this.exec(["stash", "list", "--format=%gd%gs%cr"]);
-      const list = [];
-      for (const line of out.split("\n")) {
-        if (!line.trim()) continue;
-        const [index, message, date] = line.split("");
-        list.push({ index: index?.trim(), message: message?.trim(), date: date?.trim() });
-      }
-      return list;
-    } catch {
-      return [];
-    }
+    return getStashes(this.asCommitContext());
   }
   async stashSave(message) {
     const args = ["stash", "push"];
@@ -956,58 +1100,59 @@ var GitService = class {
   async stashDrop(index = "stash@{0}") {
     return this.exec(["stash", "drop", index]);
   }
-  async commitFiles(message, filesToStage, amend = false) {
-    if (filesToStage && filesToStage.length > 0) {
-      await this.stageFiles(filesToStage);
-    }
-    const args = ["commit"];
-    if (amend) args.push("--amend");
-    args.push("-m", message);
-    await this.exec(args);
-  }
-  async commitAndPush(message, filesToStage, amend = false) {
-    await this.commitFiles(message, filesToStage, amend);
-    return await this.push();
-  }
-  async commit(message) {
-    await this.exec(["commit", "-m", message]);
-  }
-  async showFileAtCommit(hash, filePath) {
-    return this.exec(["show", `${hash}:${filePath}`]);
-  }
-  async diff(ref1, ref2) {
-    return this.exec(["diff", ref1, ref2]);
-  }
-  async getLogRange(base, head = "HEAD") {
-    return this.getLog({ all: false, branch: `${base}..${head}` });
-  }
   clearCache() {
     this.commitCache.clear();
   }
+  // --- Private Execution Contexts ---
+  asBranchContext() {
+    return {
+      cwd: this.cwd,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      getCurrentBranch: () => this.getCurrentBranch(),
+      getRepoRoot: () => this.getRepoRoot(),
+      getRemotes: () => this.getRemotes(),
+      getDefaultRemote: (b) => this.getDefaultRemote(b)
+    };
+  }
+  asStagingContext() {
+    return {
+      cwd: this.cwd,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      getStatus: () => this.getStatus()
+    };
+  }
+  asCommitContext() {
+    return {
+      cwd: this.cwd,
+      commitCache: this.commitCache,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      stageFiles: (paths) => this.stageFiles(paths),
+      push: () => this.push()
+    };
+  }
+  asConflictContext() {
+    return {
+      cwd: this.cwd,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      getStatus: () => this.getStatus(),
+      getCurrentBranch: () => this.getCurrentBranch(),
+      stageFiles: (paths) => this.stageFiles(paths),
+      getMergeMessage: () => this.getMergeMessage()
+    };
+  }
 };
-function parseRefs(raw) {
-  if (!raw.trim()) return [];
-  return raw.split(",").map((r) => {
-    r = r.trim();
-    r = r.replace(/^HEAD -> /, "");
-    r = r.replace(/^refs\/heads\//, "");
-    r = r.replace(/^refs\/tags\//, "tag: ");
-    r = r.replace(/^refs\/remotes\//, "");
-    return r;
-  });
-}
 
 // src/git/rebaseHandler.ts
-var import_child_process2 = require("child_process");
+var import_child_process3 = require("child_process");
 var import_util2 = require("util");
-var fs2 = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
 var os = __toESM(require("os"));
-var execFileAsync2 = (0, import_util2.promisify)(import_child_process2.execFile);
-var writeFileAsync = (0, import_util2.promisify)(fs2.writeFile);
-var mkdtempAsync = (0, import_util2.promisify)(fs2.mkdtemp);
-var unlinkAsync = (0, import_util2.promisify)(fs2.unlink);
-var rmdirAsync = (0, import_util2.promisify)(fs2.rmdir);
+var execFileAsync2 = (0, import_util2.promisify)(import_child_process3.execFile);
+var writeFileAsync = (0, import_util2.promisify)(fs4.writeFile);
+var mkdtempAsync = (0, import_util2.promisify)(fs4.mkdtemp);
+var unlinkAsync = (0, import_util2.promisify)(fs4.unlink);
+var rmdirAsync = (0, import_util2.promisify)(fs4.rmdir);
 var RebaseHandler = class {
   constructor(cwd) {
     this.cwd = cwd;
@@ -1019,9 +1164,9 @@ var RebaseHandler = class {
    */
   async executeRebase(base, todoItems) {
     const todoContent = todoItems.map((item) => `${item.action} ${item.hash} ${item.message}`).join("\n") + "\n";
-    const tmpDir = await mkdtempAsync(path2.join(os.tmpdir(), "ijgit-rebase-"));
-    const todoPath = path2.join(tmpDir, "todo");
-    const scriptPath = path2.join(tmpDir, "editor.sh");
+    const tmpDir = await mkdtempAsync(path5.join(os.tmpdir(), "ijgit-rebase-"));
+    const todoPath = path5.join(tmpDir, "todo");
+    const scriptPath = path5.join(tmpDir, "editor.sh");
     try {
       await writeFileAsync(todoPath, todoContent, "utf-8");
       await writeFileAsync(scriptPath, `#!/bin/sh
@@ -1074,9 +1219,9 @@ cp "${todoPath}" "$1"
   }
   async isRebaseInProgress() {
     try {
-      const rebaseMergePath = path2.join(this.cwd, ".git", "rebase-merge");
-      const rebaseApplyPath = path2.join(this.cwd, ".git", "rebase-apply");
-      return fs2.existsSync(rebaseMergePath) || fs2.existsSync(rebaseApplyPath);
+      const rebaseMergePath = path5.join(this.cwd, ".git", "rebase-merge");
+      const rebaseApplyPath = path5.join(this.cwd, ".git", "rebase-apply");
+      return fs4.existsSync(rebaseMergePath) || fs4.existsSync(rebaseApplyPath);
     } catch {
       return false;
     }
@@ -1084,7 +1229,7 @@ cp "${todoPath}" "$1"
 };
 
 // src/views/graphPanel.ts
-var vscode4 = __toESM(require("vscode"));
+var vscode6 = __toESM(require("vscode"));
 
 // src/git/graphBuilder.ts
 function buildGraph(commits) {
@@ -1240,12 +1385,89 @@ var GitContentProvider = class _GitContentProvider {
 };
 
 // src/views/pushDialogPanel.ts
-var vscode3 = __toESM(require("vscode"));
+var vscode4 = __toESM(require("vscode"));
 
 // src/views/commitReviewPanel.ts
+var vscode3 = __toESM(require("vscode"));
+var path7 = __toESM(require("path"));
+var fs6 = __toESM(require("fs"));
+
+// src/utils/themeTokens.ts
 var vscode2 = __toESM(require("vscode"));
-var path3 = __toESM(require("path"));
-var fs3 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
+var defaultThemeTokens = {
+  kwd: "#fd6883",
+  type: "#85dacc",
+  fn: "#adda78",
+  str: "#f9cc6c",
+  num: "#a8a9eb",
+  constVal: "#a8a9eb",
+  varVal: "#fff1f3",
+  comment: "#72696a",
+  anno: "#85dacc",
+  punct: "#948a8b"
+};
+function getThemeTokens() {
+  try {
+    const activeThemeName = vscode2.workspace.getConfiguration("workbench").get("colorTheme");
+    if (!activeThemeName) return defaultThemeTokens;
+    for (const ext of vscode2.extensions.all) {
+      const themes = ext.packageJSON?.contributes?.themes;
+      if (!Array.isArray(themes)) continue;
+      const matched = themes.find((t) => t.label === activeThemeName || t.id === activeThemeName);
+      if (!matched || !matched.path) continue;
+      const themePath = path6.join(ext.extensionPath, matched.path);
+      if (!fs5.existsSync(themePath)) continue;
+      let content = fs5.readFileSync(themePath, "utf8");
+      content = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
+      const themeJson = JSON.parse(content);
+      const tc = themeJson.tokenColors || [];
+      const findColor = (targetScopes) => {
+        for (const target of targetScopes) {
+          for (const rule of tc) {
+            if (!rule.settings || !rule.settings.foreground) continue;
+            const scopes = Array.isArray(rule.scope) ? rule.scope : typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : [];
+            if (scopes.includes(target)) return rule.settings.foreground;
+          }
+        }
+        for (const target of targetScopes) {
+          for (const rule of tc) {
+            if (!rule.settings || !rule.settings.foreground) continue;
+            const scopes = Array.isArray(rule.scope) ? rule.scope : typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : [];
+            for (const s of scopes) {
+              if (!s.includes(" ") && s.startsWith(target + ".")) return rule.settings.foreground;
+            }
+          }
+        }
+        return null;
+      };
+      const kwd = findColor(["keyword"]) || defaultThemeTokens.kwd;
+      const type = findColor(["entity.name.type", "support.type", "storage.type"]) || defaultThemeTokens.type;
+      const fn = findColor(["entity.name.function", "support.function"]) || defaultThemeTokens.fn;
+      const str = findColor(["string"]) || defaultThemeTokens.str;
+      const num = findColor(["constant.numeric"]) || defaultThemeTokens.num;
+      const constVal = findColor(["constant.language"]) || defaultThemeTokens.constVal;
+      const comment = findColor(["comment"]) || defaultThemeTokens.comment;
+      const varVal = findColor(["variable"]) || defaultThemeTokens.varVal;
+      const anno = findColor(["punctuation.definition.annotation", "meta.annotation"]) || type;
+      const punct = findColor(["punctuation"]) || defaultThemeTokens.punct;
+      return { kwd, type, fn, str, num, constVal, varVal, comment, anno, punct };
+    }
+  } catch {
+  }
+  return defaultThemeTokens;
+}
+function getNonce() {
+  let text = "";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return text;
+}
+
+// src/views/commitReviewPanel.ts
 var CommitReviewPanel = class _CommitReviewPanel {
   constructor(panel, extensionUri, gitService, onStageChange, readOnly = false, revisions) {
     this.extensionUri = extensionUri;
@@ -1255,7 +1477,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
     this.isReadOnly = readOnly;
     this.revisions = revisions;
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    vscode2.window.onDidChangeActiveColorTheme(
+    vscode3.window.onDidChangeActiveColorTheme(
       () => this.sendThemeTokens(),
       null,
       this.disposables
@@ -1281,7 +1503,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
   revisions;
   lastLoadedState;
   static createOrShow(extensionUri, gitService, filePath, filesList = [], onStageChange, readOnly = false, revisions) {
-    const fileName = path3.basename(filePath);
+    const fileName = path7.basename(filePath);
     if (_CommitReviewPanel.currentPanel) {
       if (onStageChange) {
         _CommitReviewPanel.currentPanel.onStageChange = onStageChange;
@@ -1289,19 +1511,19 @@ var CommitReviewPanel = class _CommitReviewPanel {
       _CommitReviewPanel.currentPanel.isReadOnly = readOnly;
       _CommitReviewPanel.currentPanel.revisions = revisions;
       _CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
-      _CommitReviewPanel.currentPanel.panel.reveal(vscode2.ViewColumn.Active, true);
+      _CommitReviewPanel.currentPanel.panel.reveal(vscode3.ViewColumn.Active, true);
       _CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
       return _CommitReviewPanel.currentPanel;
     }
-    const panel = vscode2.window.createWebviewPanel(
+    const panel = vscode3.window.createWebviewPanel(
       _CommitReviewPanel.viewType,
       `Diff: ${fileName}`,
-      vscode2.ViewColumn.Active,
+      vscode3.ViewColumn.Active,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [
-          vscode2.Uri.joinPath(extensionUri, "dist", "webview")
+          vscode3.Uri.joinPath(extensionUri, "dist", "webview")
         ]
       }
     );
@@ -1317,7 +1539,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
     return _CommitReviewPanel.currentPanel;
   }
   focusAndJumpDiff(direction = 1, fromFileList = false) {
-    this.panel.reveal(vscode2.ViewColumn.Active, false);
+    this.panel.reveal(vscode3.ViewColumn.Active, false);
     this.panel.webview.postMessage({
       type: "jumpDiff",
       payload: { direction, fromFileList }
@@ -1327,7 +1549,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
     this.currentFilePath = filePath;
     if (filesList) this.filesList = filesList;
     if (readOnly !== void 0) this.isReadOnly = readOnly;
-    const fileName = path3.basename(filePath);
+    const fileName = path7.basename(filePath);
     this.panel.title = `Diff: ${fileName}`;
     if (_CommitReviewPanel.onFileNavigateListener) {
       _CommitReviewPanel.onFileNavigateListener(filePath);
@@ -1346,14 +1568,14 @@ var CommitReviewPanel = class _CommitReviewPanel {
           this.gitService.exec(["show", `${targetRef}:${filePath}`]).catch(() => "")
         ]);
       } else {
-        const fullPath = path3.join(this.gitService.getCwd(), filePath);
+        const fullPath = path7.join(this.gitService.getCwd(), filePath);
         [diff, baseContent, currentContent, stagedDiff] = await Promise.all([
           this.gitService.getFileDiff(filePath).catch(() => ""),
           this.gitService.exec(["show", `HEAD:${filePath}`]).catch(() => ""),
           (async () => {
             try {
-              if (fs3.existsSync(fullPath)) {
-                return fs3.readFileSync(fullPath, "utf8");
+              if (fs6.existsSync(fullPath)) {
+                return fs6.readFileSync(fullPath, "utf8");
               }
             } catch {
             }
@@ -1381,7 +1603,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
         payload: {
           path: filePath,
           fileName,
-          fileDir: path3.dirname(filePath) === "." ? "" : path3.dirname(filePath),
+          fileDir: path7.dirname(filePath) === "." ? "" : path7.dirname(filePath),
           diff,
           stagedDiff,
           baseContent,
@@ -1395,7 +1617,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
         }
       });
     } catch (err) {
-      vscode2.window.showErrorMessage(`Failed to load diff: ${err.message}`);
+      vscode3.window.showErrorMessage(`Failed to load diff: ${err.message}`);
     }
   }
   async handleMessage(msg) {
@@ -1442,31 +1664,31 @@ var CommitReviewPanel = class _CommitReviewPanel {
             payload: { stagedDiff }
           });
         } catch (err) {
-          vscode2.window.showErrorMessage(`Update stage failed: ${err.message}`);
+          vscode3.window.showErrorMessage(`Update stage failed: ${err.message}`);
         }
         break;
       }
       case "revertBlockContent": {
         const { filePath, newContent } = msg.payload;
         try {
-          const fullPath = path3.join(this.gitService.getCwd(), filePath);
-          fs3.writeFileSync(fullPath, newContent, "utf8");
+          const fullPath = path7.join(this.gitService.getCwd(), filePath);
+          fs6.writeFileSync(fullPath, newContent, "utf8");
           if (this.onStageChange) this.onStageChange();
           await this.loadFile(this.currentFilePath, this.filesList, this.isReadOnly);
         } catch (err) {
-          vscode2.window.showErrorMessage(`Revert failed: ${err.message}`);
+          vscode3.window.showErrorMessage(`Revert failed: ${err.message}`);
         }
         break;
       }
       case "saveFileContent": {
         const { filePath, content, focusLine, focusOffset } = msg.payload;
         try {
-          const fullPath = path3.join(this.gitService.getCwd(), filePath);
-          fs3.writeFileSync(fullPath, content, "utf8");
+          const fullPath = path7.join(this.gitService.getCwd(), filePath);
+          fs6.writeFileSync(fullPath, content, "utf8");
           if (this.onStageChange) this.onStageChange();
           await this.loadFile(this.currentFilePath, this.filesList, this.isReadOnly, { focusLine, focusOffset });
         } catch (err) {
-          vscode2.window.showErrorMessage(`Save failed: ${err.message}`);
+          vscode3.window.showErrorMessage(`Save failed: ${err.message}`);
         }
         break;
       }
@@ -1477,15 +1699,15 @@ var CommitReviewPanel = class _CommitReviewPanel {
           if (this.onStageChange) this.onStageChange();
           this.loadFile(this.currentFilePath, this.filesList);
         } catch (err) {
-          vscode2.window.showErrorMessage(`Apply patch failed: ${err.message}`);
+          vscode3.window.showErrorMessage(`Apply patch failed: ${err.message}`);
         }
         break;
       }
       case "openFile": {
         const filePath = msg.payload;
         if (filePath) {
-          const fullPath = path3.join(this.gitService.getCwd(), filePath);
-          vscode2.commands.executeCommand("vscode.open", vscode2.Uri.file(fullPath));
+          const fullPath = path7.join(this.gitService.getCwd(), filePath);
+          vscode3.commands.executeCommand("vscode.open", vscode3.Uri.file(fullPath));
         }
         break;
       }
@@ -1495,9 +1717,9 @@ var CommitReviewPanel = class _CommitReviewPanel {
           await this.gitService.applyHunkPatch(patch, true);
           if (this.onStageChange) this.onStageChange();
           this.loadFile(this.currentFilePath, this.filesList);
-          vscode2.window.showInformationMessage("Hunk rolled back.");
+          vscode3.window.showInformationMessage("Hunk rolled back.");
         } catch (err) {
-          vscode2.window.showErrorMessage(`Rollback hunk failed: ${err.message}`);
+          vscode3.window.showErrorMessage(`Rollback hunk failed: ${err.message}`);
         }
         break;
       }
@@ -1512,83 +1734,21 @@ var CommitReviewPanel = class _CommitReviewPanel {
     }
   }
   sendThemeTokens() {
-    const tokens = this.getThemeTokens();
+    const tokens = getThemeTokens();
     this.panel.webview.postMessage({
       type: "themeTokens",
       payload: tokens
     });
   }
-  getThemeTokens() {
-    const defaultTokens = {
-      kwd: "#fd6883",
-      type: "#85dacc",
-      fn: "#adda78",
-      str: "#f9cc6c",
-      num: "#a8a9eb",
-      constVal: "#a8a9eb",
-      varVal: "#fff1f3",
-      comment: "#72696a",
-      anno: "#85dacc",
-      punct: "#948a8b"
-    };
-    try {
-      const activeThemeName = vscode2.workspace.getConfiguration("workbench").get("colorTheme");
-      if (!activeThemeName) return defaultTokens;
-      for (const ext of vscode2.extensions.all) {
-        const themes = ext.packageJSON?.contributes?.themes;
-        if (!Array.isArray(themes)) continue;
-        const matched = themes.find((t) => t.label === activeThemeName || t.id === activeThemeName);
-        if (!matched || !matched.path) continue;
-        const themePath = path3.join(ext.extensionPath, matched.path);
-        if (!fs3.existsSync(themePath)) continue;
-        let content = fs3.readFileSync(themePath, "utf8");
-        content = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
-        const themeJson = JSON.parse(content);
-        const tc = themeJson.tokenColors || [];
-        const findColor = (targetScopes) => {
-          for (const target of targetScopes) {
-            for (const rule of tc) {
-              if (!rule.settings || !rule.settings.foreground) continue;
-              const scopes = Array.isArray(rule.scope) ? rule.scope : typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : [];
-              if (scopes.includes(target)) return rule.settings.foreground;
-            }
-          }
-          for (const target of targetScopes) {
-            for (const rule of tc) {
-              if (!rule.settings || !rule.settings.foreground) continue;
-              const scopes = Array.isArray(rule.scope) ? rule.scope : typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : [];
-              for (const s of scopes) {
-                if (!s.includes(" ") && s.startsWith(target + ".")) return rule.settings.foreground;
-              }
-            }
-          }
-          return null;
-        };
-        const kwd = findColor(["keyword"]) || defaultTokens.kwd;
-        const type = findColor(["entity.name.type", "support.type", "storage.type"]) || defaultTokens.type;
-        const fn = findColor(["entity.name.function", "support.function"]) || defaultTokens.fn;
-        const str = findColor(["string"]) || defaultTokens.str;
-        const num = findColor(["constant.numeric"]) || defaultTokens.num;
-        const constVal = findColor(["constant.language"]) || defaultTokens.constVal;
-        const comment = findColor(["comment"]) || defaultTokens.comment;
-        const varVal = findColor(["variable"]) || defaultTokens.varVal;
-        const anno = findColor(["punctuation.definition.annotation", "meta.annotation"]) || type;
-        const punct = findColor(["punctuation"]) || defaultTokens.punct;
-        return { kwd, type, fn, str, num, constVal, varVal, comment, anno, punct };
-      }
-    } catch {
-    }
-    return defaultTokens;
-  }
   getHtml() {
     const scriptUri = this.panel.webview.asWebviewUri(
-      vscode2.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "review.js")
+      vscode3.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "review.js")
     );
     const styleUri = this.panel.webview.asWebviewUri(
-      vscode2.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
+      vscode3.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
     );
     const nonce = getNonce();
-    const tokens = this.getThemeTokens();
+    const tokens = getThemeTokens();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1624,167 +1784,10 @@ var CommitReviewPanel = class _CommitReviewPanel {
     for (const d of this.disposables) d.dispose();
   }
 };
-function getNonce() {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
-}
 
-// src/views/pushDialogPanel.ts
-var PushDialogPanel = class _PushDialogPanel {
-  constructor(panel, extensionUri, gitService, pushInfo) {
-    this.extensionUri = extensionUri;
-    this.gitService = gitService;
-    this.pushInfo = pushInfo;
-    this.panel = panel;
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    this.panel.webview.html = this.getHtml();
-    this.panel.webview.onDidReceiveMessage(
-      (msg) => this.handleMessage(msg),
-      null,
-      this.disposables
-    );
-  }
-  extensionUri;
-  gitService;
-  pushInfo;
-  static currentPanel;
-  static viewType = "intellij-git.pushDialogWindow";
-  panel;
-  disposables = [];
-  static async createOrShow(extensionUri, gitService, targetBranch) {
-    try {
-      const pushInfo = await gitService.getPushInfo(targetBranch);
-      if (!pushInfo) {
-        vscode3.window.showInformationMessage("No branch or commits found to push.");
-        return void 0;
-      }
-      if (_PushDialogPanel.currentPanel) {
-        _PushDialogPanel.currentPanel.panel.reveal();
-        _PushDialogPanel.currentPanel.update(pushInfo);
-        return _PushDialogPanel.currentPanel;
-      }
-      const panel = vscode3.window.createWebviewPanel(
-        _PushDialogPanel.viewType,
-        `Push Commits - ${pushInfo.currentBranch}`,
-        vscode3.ViewColumn.Active,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [
-            vscode3.Uri.joinPath(extensionUri, "dist", "webview"),
-            vscode3.Uri.joinPath(extensionUri, "resources")
-          ]
-        }
-      );
-      _PushDialogPanel.currentPanel = new _PushDialogPanel(
-        panel,
-        extensionUri,
-        gitService,
-        pushInfo
-      );
-      try {
-        await vscode3.commands.executeCommand("workbench.action.moveEditorToNewWindow");
-      } catch {
-      }
-      return _PushDialogPanel.currentPanel;
-    } catch (err) {
-      vscode3.window.showErrorMessage(`Failed to open Push dialog: ${err?.message || err}`);
-      return void 0;
-    }
-  }
-  update(pushInfo) {
-    this.pushInfo = pushInfo;
-    this.panel.title = `Push Commits - ${pushInfo.currentBranch}`;
-    this.panel.webview.postMessage({
-      type: "updatePushInfo",
-      payload: pushInfo
-    });
-  }
-  async handleMessage(msg) {
-    switch (msg.type) {
-      case "close": {
-        this.dispose();
-        break;
-      }
-      case "openReviewInCenter": {
-        const { filePath, commitHash, filesList } = msg.payload || {};
-        if (filePath) {
-          let revisions = void 0;
-          if (commitHash && commitHash !== "ALL") {
-            revisions = {
-              baseRef: `${commitHash}~1`,
-              targetRef: commitHash,
-              baseTitle: `Parent (${commitHash.slice(0, 7)}~1)`,
-              targetTitle: `Commit (${commitHash.slice(0, 7)})`
-            };
-          } else {
-            const commits = this.pushInfo.commits || [];
-            if (commits.length > 0) {
-              const oldestHash = commits[commits.length - 1].hash;
-              revisions = {
-                baseRef: `${oldestHash}~1`,
-                targetRef: "HEAD",
-                baseTitle: `${this.pushInfo.remote}/${this.pushInfo.remoteBranch || this.pushInfo.currentBranch}`,
-                targetTitle: `${this.pushInfo.currentBranch} (HEAD)`
-              };
-            }
-          }
-          CommitReviewPanel.createOrShow(
-            this.extensionUri,
-            this.gitService,
-            filePath,
-            filesList || [],
-            void 0,
-            true,
-            // readOnly
-            revisions
-          );
-        }
-        break;
-      }
-      case "executePush": {
-        const payload = msg.payload || {};
-        try {
-          await this.gitService.push(
-            payload.branch,
-            payload.force,
-            payload.setUpstream,
-            payload.remote,
-            payload.tags,
-            payload.targetBranch
-          );
-          vscode3.window.showInformationMessage(
-            `Pushed branch '${payload.branch}' to ${payload.remote}/${payload.targetBranch || payload.branch} successfully!`
-          );
-          this.dispose();
-        } catch (err) {
-          this.panel.webview.postMessage({
-            type: "pushFailed",
-            error: err?.message || String(err)
-          });
-          vscode3.window.showErrorMessage(`Push failed: ${err?.message || err}`);
-        }
-        break;
-      }
-    }
-  }
-  dispose() {
-    _PushDialogPanel.currentPanel = void 0;
-    this.panel.dispose();
-    while (this.disposables.length) {
-      const x = this.disposables.pop();
-      if (x) {
-        x.dispose();
-      }
-    }
-  }
-  getHtml() {
-    const rawPushInfo = JSON.stringify(this.pushInfo);
-    return `<!DOCTYPE html>
+// src/views/pushDialogHtml.ts
+function getPushDialogHtml(rawPushInfo) {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -2277,8 +2280,640 @@ var PushDialogPanel = class _PushDialogPanel {
   </script>
 </body>
 </html>`;
+}
+
+// src/views/pushDialogPanel.ts
+var PushDialogPanel = class _PushDialogPanel {
+  constructor(panel, extensionUri, gitService, pushInfo) {
+    this.extensionUri = extensionUri;
+    this.gitService = gitService;
+    this.pushInfo = pushInfo;
+    this.panel = panel;
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    this.panel.webview.html = this.getHtml();
+    this.panel.webview.onDidReceiveMessage(
+      (msg) => this.handleMessage(msg),
+      null,
+      this.disposables
+    );
+  }
+  extensionUri;
+  gitService;
+  pushInfo;
+  static currentPanel;
+  static viewType = "intellij-git.pushDialogWindow";
+  panel;
+  disposables = [];
+  static async createOrShow(extensionUri, gitService, targetBranch) {
+    try {
+      const pushInfo = await gitService.getPushInfo(targetBranch);
+      if (!pushInfo) {
+        vscode4.window.showInformationMessage("No branch or commits found to push.");
+        return void 0;
+      }
+      if (_PushDialogPanel.currentPanel) {
+        _PushDialogPanel.currentPanel.panel.reveal();
+        _PushDialogPanel.currentPanel.update(pushInfo);
+        return _PushDialogPanel.currentPanel;
+      }
+      const panel = vscode4.window.createWebviewPanel(
+        _PushDialogPanel.viewType,
+        `Push Commits - ${pushInfo.currentBranch}`,
+        vscode4.ViewColumn.Active,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          localResourceRoots: [
+            vscode4.Uri.joinPath(extensionUri, "dist", "webview"),
+            vscode4.Uri.joinPath(extensionUri, "resources")
+          ]
+        }
+      );
+      _PushDialogPanel.currentPanel = new _PushDialogPanel(
+        panel,
+        extensionUri,
+        gitService,
+        pushInfo
+      );
+      try {
+        await vscode4.commands.executeCommand("workbench.action.moveEditorToNewWindow");
+      } catch {
+      }
+      return _PushDialogPanel.currentPanel;
+    } catch (err) {
+      vscode4.window.showErrorMessage(`Failed to open Push dialog: ${err?.message || err}`);
+      return void 0;
+    }
+  }
+  update(pushInfo) {
+    this.pushInfo = pushInfo;
+    this.panel.title = `Push Commits - ${pushInfo.currentBranch}`;
+    this.panel.webview.postMessage({
+      type: "updatePushInfo",
+      payload: pushInfo
+    });
+  }
+  async handleMessage(msg) {
+    switch (msg.type) {
+      case "close": {
+        this.dispose();
+        break;
+      }
+      case "openReviewInCenter": {
+        const { filePath, commitHash, filesList } = msg.payload || {};
+        if (filePath) {
+          let revisions = void 0;
+          if (commitHash && commitHash !== "ALL") {
+            revisions = {
+              baseRef: `${commitHash}~1`,
+              targetRef: commitHash,
+              baseTitle: `Parent (${commitHash.slice(0, 7)}~1)`,
+              targetTitle: `Commit (${commitHash.slice(0, 7)})`
+            };
+          } else {
+            const commits = this.pushInfo.commits || [];
+            if (commits.length > 0) {
+              const oldestHash = commits[commits.length - 1].hash;
+              revisions = {
+                baseRef: `${oldestHash}~1`,
+                targetRef: "HEAD",
+                baseTitle: `${this.pushInfo.remote}/${this.pushInfo.remoteBranch || this.pushInfo.currentBranch}`,
+                targetTitle: `${this.pushInfo.currentBranch} (HEAD)`
+              };
+            }
+          }
+          CommitReviewPanel.createOrShow(
+            this.extensionUri,
+            this.gitService,
+            filePath,
+            filesList || [],
+            void 0,
+            true,
+            // readOnly
+            revisions
+          );
+        }
+        break;
+      }
+      case "executePush": {
+        const payload = msg.payload || {};
+        try {
+          await this.gitService.push(
+            payload.branch,
+            payload.force,
+            payload.setUpstream,
+            payload.remote,
+            payload.tags,
+            payload.targetBranch
+          );
+          vscode4.window.showInformationMessage(
+            `Pushed branch '${payload.branch}' to ${payload.remote}/${payload.targetBranch || payload.branch} successfully!`
+          );
+          this.dispose();
+        } catch (err) {
+          this.panel.webview.postMessage({
+            type: "pushFailed",
+            error: err?.message || String(err)
+          });
+          vscode4.window.showErrorMessage(`Push failed: ${err?.message || err}`);
+        }
+        break;
+      }
+    }
+  }
+  dispose() {
+    _PushDialogPanel.currentPanel = void 0;
+    this.panel.dispose();
+    while (this.disposables.length) {
+      const x = this.disposables.pop();
+      if (x) {
+        x.dispose();
+      }
+    }
+  }
+  getHtml() {
+    const rawPushInfo = JSON.stringify(this.pushInfo);
+    return getPushDialogHtml(rawPushInfo);
   }
 };
+
+// src/views/graphActionHandlers.ts
+var vscode5 = __toESM(require("vscode"));
+var path8 = __toESM(require("path"));
+async function handleGraphAction(type, payload, host) {
+  const { gitService } = host;
+  switch (type) {
+    case "checkout": {
+      const ref = payload;
+      try {
+        await gitService.checkout(ref);
+        vscode5.window.showInformationMessage(`Checked out ${ref}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Checkout failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "createBranch": {
+      let { name, startPoint, checkout: checkout2, force } = payload || {};
+      if (!name) {
+        name = await vscode5.window.showInputBox({
+          prompt: `New branch name (from '${startPoint || "HEAD"}'):`,
+          placeHolder: "feature/..."
+        });
+        if (!name) return true;
+      }
+      try {
+        await gitService.createBranch(name, startPoint, checkout2 !== false, force === true);
+        vscode5.window.showInformationMessage(`Created branch ${name}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Create branch failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "deleteBranch": {
+      const ref = payload;
+      try {
+        await gitService.deleteBranch(ref);
+        vscode5.window.showInformationMessage(`Deleted branch '${ref}'`);
+        host.loadInitialData();
+      } catch (err) {
+        if (err.message && (err.message.includes("not fully merged") || err.message.includes("not merged"))) {
+          const force = await vscode5.window.showWarningMessage(
+            `Branch '${ref}' is not fully merged. Do you want to force delete it?`,
+            { modal: true },
+            "Force Delete"
+          );
+          if (force === "Force Delete") {
+            try {
+              await gitService.deleteBranch(ref, true);
+              vscode5.window.showInformationMessage(`Force deleted branch '${ref}'`);
+              host.loadInitialData();
+            } catch (e) {
+              vscode5.window.showErrorMessage(`Delete failed: ${e.message}`);
+            }
+          }
+        } else {
+          vscode5.window.showErrorMessage(`Delete failed: ${err.message}`);
+        }
+      }
+      return true;
+    }
+    case "checkoutAndRebase": {
+      const { branch, onto } = payload || {};
+      try {
+        await gitService.checkoutAndRebase(branch, onto);
+        vscode5.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Checkout and rebase failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "rebase": {
+      const branch = payload;
+      try {
+        await gitService.rebase(branch);
+        vscode5.window.showInformationMessage(`Rebased onto ${branch}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Rebase failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "compareBranch": {
+      const { branch, withBranch } = payload || {};
+      try {
+        const commits = await gitService.getLog({
+          branch: `${withBranch}..${branch}`,
+          all: false
+        });
+        host.updateGraph(commits);
+        vscode5.window.showInformationMessage(`Comparing commits between ${branch} and ${withBranch}`);
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Compare failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "showDiff": {
+      const { branch } = payload || {};
+      try {
+        const files = await gitService.getDiffFiles(branch);
+        if (files.length === 0) {
+          vscode5.window.showInformationMessage(`No differences between ${branch} and working tree.`);
+          return true;
+        }
+        const items = files.map((f) => ({
+          label: `${f.status} ${f.path}`,
+          description: f.oldPath ? `from ${f.oldPath}` : "",
+          file: f
+        }));
+        const picked = await vscode5.window.showQuickPick(items, {
+          placeHolder: `Select a file changed against ${branch} to view diff`
+        });
+        if (picked) {
+          const filePath = picked.file.path;
+          const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
+          const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode5.Uri.file(path8.join(gitService.getCwd(), filePath));
+          const fileName = filePath.split("/").pop() || filePath;
+          await vscode5.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${branch} \u2194 Working Tree)`);
+        }
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Show diff failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "pull": {
+      const branch = payload;
+      try {
+        const out = await gitService.pull(branch);
+        vscode5.window.showInformationMessage(`Updated ${branch}: ${out || "Already up to date."}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Update failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "fetchAll": {
+      try {
+        vscode5.window.showInformationMessage("Fetching all remotes...");
+        await gitService.fetchAll();
+        vscode5.window.showInformationMessage("Fetched all remotes successfully.");
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Fetch all failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "push":
+    case "openPushDialog": {
+      const branch = payload;
+      await host.openPushDialog(branch);
+      return true;
+    }
+    case "executePush": {
+      const { branch, targetBranch, force, setUpstream, remote, tags } = payload || {};
+      try {
+        await gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
+        vscode5.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
+        host.loadInitialData();
+        vscode5.commands.executeCommand("intellij-git.refreshBranches");
+        host.view?.webview.postMessage({ type: "pushSuccess" });
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Push failed: ${err.message}`);
+        host.view?.webview.postMessage({ type: "pushError", payload: { error: err.message } });
+      }
+      return true;
+    }
+    case "renameBranch": {
+      let { oldName, newName } = payload || {};
+      if (!newName && oldName) {
+        newName = await vscode5.window.showInputBox({
+          prompt: `Rename branch '${oldName}' to:`,
+          value: oldName
+        });
+        if (!newName || newName === oldName) return true;
+      }
+      if (!oldName || !newName) return true;
+      try {
+        await gitService.renameBranch(oldName, newName);
+        vscode5.window.showInformationMessage(`Renamed branch '${oldName}' to '${newName}'`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Rename failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "mergeBranch": {
+      const ref = payload;
+      try {
+        await gitService.merge(ref);
+        vscode5.window.showInformationMessage(`Merged '${ref}' successfully.`);
+        host.loadInitialData();
+      } catch (err) {
+        const errMsg = err.message || "";
+        const hasConflicts = errMsg.includes("CONFLICT") || errMsg.includes("conflict") || errMsg.includes("Automatic merge failed") || errMsg.includes("fix conflicts");
+        if (hasConflicts) {
+          host.loadInitialData();
+          try {
+            const conflictFiles = await gitService.getUnmergedFiles();
+            if (conflictFiles.length === 0) {
+              vscode5.window.showWarningMessage(`Merge has conflicts. Please resolve them and commit.`);
+              return true;
+            }
+            const items = conflictFiles.map((f) => ({
+              label: `$(git-merge) ${f}`,
+              description: "Conflict \u2014 click to open merge editor",
+              detail: f
+            }));
+            items.push({
+              label: "$(check-all) All conflicts resolved \u2014 open Commit panel",
+              description: "",
+              detail: "__commit__"
+            });
+            const chosen = await vscode5.window.showQuickPick(items, {
+              placeHolder: `${conflictFiles.length} file(s) with conflicts \u2014 select a file to resolve`,
+              canPickMany: false,
+              title: `Merge conflicts: '${ref}' into current branch`
+            });
+            if (chosen && chosen.detail && chosen.detail !== "__commit__") {
+              const fileUri = vscode5.Uri.joinPath(
+                vscode5.Uri.file(gitService.getCwd()),
+                chosen.detail
+              );
+              try {
+                await vscode5.commands.executeCommand("merge-conflict.accept.all-both");
+              } catch {
+              }
+              await vscode5.commands.executeCommand("vscode.open", fileUri);
+              try {
+                await vscode5.commands.executeCommand("git.openMergeEditor", fileUri);
+              } catch {
+              }
+            } else if (chosen && chosen.detail === "__commit__") {
+              await vscode5.commands.executeCommand("intellij-git.openCommit");
+            }
+          } catch {
+            vscode5.window.showWarningMessage(
+              `Merge has conflicts. Please resolve them in the editor and commit when done.`
+            );
+          }
+        } else {
+          vscode5.window.showErrorMessage(`Merge failed: ${errMsg}`);
+        }
+      }
+      return true;
+    }
+    case "rebaseFromHere": {
+      const hash = payload;
+      await vscode5.commands.executeCommand("intellij-git.interactiveRebase", hash);
+      return true;
+    }
+    case "cherryPick": {
+      const { hash } = payload || {};
+      try {
+        await gitService.cherryPick(hash);
+        vscode5.window.showInformationMessage(`Cherry-picked ${hash.slice(0, 8)} successfully`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Cherry-pick failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "revertCommit": {
+      const { hash } = payload || {};
+      try {
+        await gitService.revertCommit(hash);
+        vscode5.window.showInformationMessage(`Reverted commit ${hash.slice(0, 8)}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Revert failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "resetToCommit": {
+      const { hash } = payload || {};
+      const mode = await vscode5.window.showQuickPick([
+        { label: "Soft", description: "Keep all local changes in index (staged)", mode: "soft" },
+        { label: "Mixed", description: "Keep all local changes in working tree (unstaged)", mode: "mixed" },
+        { label: "Hard", description: "Discard all local changes", mode: "hard" }
+      ], { placeHolder: `Reset current branch to ${hash.slice(0, 8)}` });
+      if (mode) {
+        if (mode.mode === "hard") {
+          const confirm = await vscode5.window.showWarningMessage(
+            `Are you sure you want to perform a HARD reset to ${hash.slice(0, 8)}? All uncommitted local changes will be lost!`,
+            { modal: true },
+            "Reset"
+          );
+          if (confirm !== "Reset") return true;
+        }
+        try {
+          await gitService.reset(hash, mode.mode);
+          vscode5.window.showInformationMessage(`Reset branch to ${hash.slice(0, 8)} (${mode.label})`);
+          host.loadInitialData();
+        } catch (err) {
+          vscode5.window.showErrorMessage(`Reset failed: ${err.message}`);
+        }
+      }
+      return true;
+    }
+    case "undoCommit": {
+      try {
+        await gitService.reset("HEAD~1", "soft");
+        vscode5.window.showInformationMessage("Undid last commit (changes kept staged)");
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Undo commit failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "createTag": {
+      let { name, hash } = payload || {};
+      if (!name) {
+        name = await vscode5.window.showInputBox({
+          prompt: `New tag name at ${hash?.slice(0, 8) || "commit"}:`,
+          placeHolder: "v1.0.0"
+        });
+        if (!name) return true;
+      }
+      try {
+        await gitService.createTag(name, hash);
+        vscode5.window.showInformationMessage(`Created tag ${name} at ${hash ? hash.slice(0, 8) : ""}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Create tag failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "createPatch": {
+      const { hash } = payload || {};
+      try {
+        const patch = await gitService.createPatch(hash);
+        const doc = await vscode5.workspace.openTextDocument({
+          content: patch,
+          language: "diff"
+        });
+        await vscode5.window.showTextDocument(doc);
+        vscode5.window.showInformationMessage(`Created patch for ${hash.slice(0, 8)}`);
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Create patch failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "compareWithLocal": {
+      const { hash } = payload || {};
+      try {
+        const files = await gitService.getDiffFiles(hash);
+        if (files.length === 0) {
+          vscode5.window.showInformationMessage(`No differences between ${hash.slice(0, 8)} and working tree.`);
+          return true;
+        }
+        const items = files.map((f) => ({
+          label: `${f.status} ${f.path}`,
+          description: f.oldPath ? `from ${f.oldPath}` : "",
+          file: f
+        }));
+        const picked = await vscode5.window.showQuickPick(items, {
+          placeHolder: `Select a file changed against ${hash.slice(0, 8)} to view diff`
+        });
+        if (picked) {
+          const filePath = picked.file.path;
+          const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
+          const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode5.Uri.file(path8.join(gitService.getCwd(), filePath));
+          const fileName = filePath.split("/").pop() || filePath;
+          await vscode5.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${hash.slice(0, 8)} \u2194 Working Tree)`);
+        }
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Compare with local failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "editCommitMessage": {
+      const { hash, subject, message } = payload || {};
+      let newMsg = message;
+      if (!newMsg) {
+        newMsg = await vscode5.window.showInputBox({
+          prompt: "Edit Commit Message",
+          value: subject || ""
+        });
+      }
+      if (newMsg && newMsg.trim()) {
+        try {
+          const headHash = (await gitService.getLog({ maxCount: 1 }))[0]?.hash;
+          if (headHash === hash) {
+            await gitService.exec(["commit", "--amend", "-m", newMsg.trim()]);
+            vscode5.window.showInformationMessage("Commit message updated");
+            host.loadInitialData();
+          } else {
+            vscode5.window.showWarningMessage("Editing commit message of older commits requires interactive rebase.");
+            await vscode5.commands.executeCommand("intellij-git.interactiveRebase", hash);
+          }
+        } catch (err) {
+          vscode5.window.showErrorMessage(`Edit message failed: ${err.message}`);
+        }
+      }
+      return true;
+    }
+    case "dropCommit": {
+      const { hash } = payload || {};
+      try {
+        const headHash = (await gitService.getLog({ maxCount: 1 }))[0]?.hash;
+        if (headHash === hash) {
+          await gitService.reset("HEAD~1", "hard");
+          vscode5.window.showInformationMessage(`Dropped commit ${hash.slice(0, 8)}`);
+          host.loadInitialData();
+        } else {
+          vscode5.window.showInformationMessage(`Use Interactive Rebase to drop older commit ${hash.slice(0, 8)}`);
+          await vscode5.commands.executeCommand("intellij-git.interactiveRebase", hash);
+        }
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Drop commit failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "pushUpToHere": {
+      const { hash } = payload || {};
+      try {
+        const currentBranch = await gitService.getCurrentBranch();
+        const remote = await gitService.getDefaultRemote(currentBranch);
+        await gitService.exec(["push", remote, `${hash}:refs/heads/${currentBranch}`]);
+        vscode5.window.showInformationMessage(`Pushed up to ${hash.slice(0, 8)} on ${currentBranch}`);
+        host.loadInitialData();
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Push failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "showRepoAtRevision": {
+      const { hash } = payload || {};
+      try {
+        const files = await gitService.getCommitFiles(hash);
+        if (files.length === 0) {
+          vscode5.window.showInformationMessage(`No files changed in ${hash.slice(0, 8)}.`);
+          return true;
+        }
+        const items = files.map((f) => ({
+          label: `${f.status} ${f.path}`,
+          description: f.oldPath ? `from ${f.oldPath}` : "",
+          path: f.path
+        }));
+        const picked = await vscode5.window.showQuickPick(items, {
+          placeHolder: `Files changed in commit ${hash.slice(0, 8)}`
+        });
+        if (picked) {
+          const uri = GitContentProvider.makeUri(hash, picked.path);
+          await vscode5.commands.executeCommand("vscode.open", uri);
+        }
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Show revision failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "openInBrowser": {
+      const { hash } = payload || {};
+      try {
+        const remoteUrl = await gitService.getRemoteUrl();
+        if (!remoteUrl) {
+          vscode5.window.showWarningMessage("No remote URL found for this repository.");
+          return true;
+        }
+        let httpUrl = remoteUrl.replace(/^ssh:\/\/git@([^/:]+)(?::\d+)?\//, "https://$1/").replace(/^git@([^:]+):/, "https://$1/").replace(/^https?:\/\/[^@]+@/, "https://").replace(/\.git$/, "");
+        if (httpUrl.includes("gitlab.com") || httpUrl.includes("gitlab")) {
+          httpUrl = `${httpUrl}/-/commit/${hash}`;
+        } else {
+          httpUrl = `${httpUrl}/commit/${hash}`;
+        }
+        await vscode5.env.openExternal(vscode5.Uri.parse(httpUrl));
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Open in browser failed: ${err.message}`);
+      }
+      return true;
+    }
+    default:
+      return false;
+  }
+}
 
 // src/views/graphPanel.ts
 var GraphViewProvider = class {
@@ -2307,7 +2942,7 @@ var GraphViewProvider = class {
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        vscode4.Uri.joinPath(this.extensionUri, "dist", "webview")
+        vscode6.Uri.joinPath(this.extensionUri, "dist", "webview")
       ]
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
@@ -2421,20 +3056,25 @@ var GraphViewProvider = class {
       case "switchRepo": {
         const repoPath = msg.payload;
         this.log.appendLine(`Switching git repository to: ${repoPath}`);
-        this.gitService.setCwd(repoPath);
-        this.hasInitializedFilter = false;
-        await this.loadInitialData();
+        try {
+          this.gitService.setCwd(repoPath);
+          this.hasInitializedFilter = false;
+          await this.loadInitialData();
+        } catch (err) {
+          this.log.appendLine(`Failed to switch git repository: ${err.message}`);
+          vscode6.window.showErrorMessage(`Failed to switch repository: ${err.message}`);
+        }
         break;
       }
       case "initRepo": {
         this.log.appendLine("Initializing new git repository...");
         try {
           await this.gitService.initRepo();
-          vscode4.window.showInformationMessage("Initialized Git repository successfully.");
+          vscode6.window.showInformationMessage("Initialized Git repository successfully.");
           this.hasInitializedFilter = false;
           await this.loadInitialData();
         } catch (err) {
-          vscode4.window.showErrorMessage(`Failed to init git repository: ${err.message}`);
+          vscode6.window.showErrorMessage(`Failed to init git repository: ${err.message}`);
         }
         break;
       }
@@ -2444,7 +3084,7 @@ var GraphViewProvider = class {
           const files = await this.gitService.getCommitFiles(hash);
           this.view?.webview.postMessage({ type: "commitFiles", payload: { hash, files } });
         } catch (err) {
-          vscode4.window.showErrorMessage(`Failed to get commit files: ${err.message}`);
+          vscode6.window.showErrorMessage(`Failed to get commit files: ${err.message}`);
         }
         break;
       }
@@ -2459,10 +3099,23 @@ var GraphViewProvider = class {
           const rightUri = file.status === "D" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(hash, filePath);
           const fileName = filePath.split("/").pop() || filePath;
           const title = `${fileName} (${hash.slice(0, 7)})`;
-          await vscode4.commands.executeCommand("vscode.diff", leftUri, rightUri, title);
+          await vscode6.commands.executeCommand("vscode.diff", leftUri, rightUri, title);
         } catch (err) {
           this.log.appendLine(`openDiff ERROR: ${err.message}`);
-          vscode4.window.showErrorMessage(`Diff failed: ${err.message}`);
+          vscode6.window.showErrorMessage(`Diff failed: ${err.message}`);
+        }
+        break;
+      }
+      case "openReviewInCenter": {
+        const filePath = typeof msg.payload === "string" ? msg.payload : msg.payload?.filePath;
+        if (filePath) {
+          CommitReviewPanel.createOrShow(
+            this.extensionUri,
+            this.gitService,
+            filePath,
+            [{ path: filePath, name: filePath.split("/").pop() || filePath, dir: "", status: "M" }],
+            () => this.refresh()
+          );
         }
         break;
       }
@@ -2521,10 +3174,11 @@ var GraphViewProvider = class {
           this.graphNodes = buildGraph(this.allCommits);
           this.sendCommits();
         } catch (err) {
-          vscode4.window.showErrorMessage(`Filter failed: ${err.message}`);
+          vscode6.window.showErrorMessage(`Filter failed: ${err.message}`);
         }
         break;
       }
+      case "refreshBranches":
       case "refresh": {
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
@@ -2549,482 +3203,23 @@ var GraphViewProvider = class {
           this.sendCommits();
           this.sendBranches(branches, tags);
         } catch (err) {
-          vscode4.window.showErrorMessage(`Refresh failed: ${err.message}`);
+          vscode6.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }
         break;
       }
-      case "checkout": {
-        const ref = msg.payload;
-        try {
-          await this.gitService.checkout(ref);
-          vscode4.window.showInformationMessage(`Checked out ${ref}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Checkout failed: ${err.message}`);
-        }
-        break;
-      }
-      case "createBranch": {
-        let { name, startPoint, checkout, force } = msg.payload || {};
-        if (!name) {
-          name = await vscode4.window.showInputBox({
-            prompt: `New branch name (from '${startPoint || "HEAD"}'):`,
-            placeHolder: "feature/..."
-          });
-          if (!name) return;
-        }
-        try {
-          await this.gitService.createBranch(name, startPoint, checkout !== false, force === true);
-          vscode4.window.showInformationMessage(`Created branch ${name}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Create branch failed: ${err.message}`);
-        }
-        break;
-      }
-      case "deleteBranch": {
-        const ref = msg.payload;
-        try {
-          await this.gitService.deleteBranch(ref);
-          vscode4.window.showInformationMessage(`Deleted branch '${ref}'`);
-          this.loadInitialData();
-        } catch (err) {
-          if (err.message && (err.message.includes("not fully merged") || err.message.includes("not merged"))) {
-            const force = await vscode4.window.showWarningMessage(
-              `Branch '${ref}' is not fully merged. Do you want to force delete it?`,
-              { modal: true },
-              "Force Delete"
-            );
-            if (force === "Force Delete") {
-              try {
-                await this.gitService.deleteBranch(ref, true);
-                vscode4.window.showInformationMessage(`Force deleted branch '${ref}'`);
-                this.loadInitialData();
-              } catch (e) {
-                vscode4.window.showErrorMessage(`Delete failed: ${e.message}`);
-              }
-            }
-          } else {
-            vscode4.window.showErrorMessage(`Delete failed: ${err.message}`);
+      default: {
+        await handleGraphAction(msg.type, msg.payload, {
+          gitService: this.gitService,
+          extensionUri: this.extensionUri,
+          loadInitialData: () => this.loadInitialData(),
+          openPushDialog: (branch) => this.openPushDialog(branch),
+          view: this.view,
+          updateGraph: (commits) => {
+            this.allCommits = commits;
+            this.graphNodes = buildGraph(this.allCommits);
+            this.sendCommits();
           }
-        }
-        break;
-      }
-      case "checkoutAndRebase": {
-        const { branch, onto } = msg.payload;
-        try {
-          await this.gitService.checkoutAndRebase(branch, onto);
-          vscode4.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Checkout and rebase failed: ${err.message}`);
-        }
-        break;
-      }
-      case "rebase": {
-        const branch = msg.payload;
-        try {
-          await this.gitService.rebase(branch);
-          vscode4.window.showInformationMessage(`Rebased onto ${branch}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Rebase failed: ${err.message}`);
-        }
-        break;
-      }
-      case "compareBranch": {
-        const { branch, withBranch } = msg.payload;
-        try {
-          this.allCommits = await this.gitService.getLog({
-            branch: `${withBranch}..${branch}`,
-            all: false
-          });
-          this.graphNodes = buildGraph(this.allCommits);
-          this.sendCommits();
-          vscode4.window.showInformationMessage(`Comparing commits between ${branch} and ${withBranch}`);
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Compare failed: ${err.message}`);
-        }
-        break;
-      }
-      case "showDiff": {
-        const { branch } = msg.payload;
-        try {
-          const files = await this.gitService.getDiffFiles(branch);
-          if (files.length === 0) {
-            vscode4.window.showInformationMessage(`No differences between ${branch} and working tree.`);
-            break;
-          }
-          const items = files.map((f) => ({
-            label: `${f.status} ${f.path}`,
-            description: f.oldPath ? `from ${f.oldPath}` : "",
-            file: f
-          }));
-          const picked = await vscode4.window.showQuickPick(items, {
-            placeHolder: `Select a file changed against ${branch} to view diff`
-          });
-          if (picked) {
-            const filePath = picked.file.path;
-            const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(branch, picked.file.oldPath || filePath);
-            const path8 = require("path");
-            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode4.Uri.file(path8.join(this.gitService.getCwd(), filePath));
-            const fileName = filePath.split("/").pop() || filePath;
-            await vscode4.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${branch} \u2194 Working Tree)`);
-          }
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Show diff failed: ${err.message}`);
-        }
-        break;
-      }
-      case "pull": {
-        const branch = msg.payload;
-        try {
-          const out = await this.gitService.pull(branch);
-          vscode4.window.showInformationMessage(`Updated ${branch}: ${out || "Already up to date."}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Update failed: ${err.message}`);
-        }
-        break;
-      }
-      case "fetchAll": {
-        try {
-          vscode4.window.showInformationMessage("Fetching all remotes...");
-          await this.gitService.fetchAll();
-          vscode4.window.showInformationMessage("Fetched all remotes successfully.");
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Fetch all failed: ${err.message}`);
-        }
-        break;
-      }
-      case "push": {
-        const branch = msg.payload;
-        await this.openPushDialog(branch);
-        break;
-      }
-      case "openPushDialog": {
-        const branch = msg.payload;
-        await this.openPushDialog(branch);
-        break;
-      }
-      case "executePush": {
-        const { branch, targetBranch, force, setUpstream, remote, tags } = msg.payload || {};
-        try {
-          await this.gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
-          vscode4.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
-          this.loadInitialData();
-          vscode4.commands.executeCommand("intellij-git.refreshBranches");
-          this.view?.webview.postMessage({ type: "pushSuccess" });
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Push failed: ${err.message}`);
-          this.view?.webview.postMessage({ type: "pushError", payload: { error: err.message } });
-        }
-        break;
-      }
-      case "renameBranch": {
-        let { oldName, newName } = msg.payload || {};
-        if (!newName && oldName) {
-          newName = await vscode4.window.showInputBox({
-            prompt: `Rename branch '${oldName}' to:`,
-            value: oldName
-          });
-          if (!newName || newName === oldName) return;
-        }
-        if (!oldName || !newName) return;
-        try {
-          await this.gitService.renameBranch(oldName, newName);
-          vscode4.window.showInformationMessage(`Renamed branch '${oldName}' to '${newName}'`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Rename failed: ${err.message}`);
-        }
-        break;
-      }
-      case "mergeBranch": {
-        const ref = msg.payload;
-        try {
-          await this.gitService.merge(ref);
-          vscode4.window.showInformationMessage(`Merged '${ref}' successfully.`);
-          this.loadInitialData();
-        } catch (err) {
-          const errMsg = err.message || "";
-          const hasConflicts = errMsg.includes("CONFLICT") || errMsg.includes("conflict") || errMsg.includes("Automatic merge failed") || errMsg.includes("fix conflicts");
-          if (hasConflicts) {
-            this.loadInitialData();
-            try {
-              const conflictFiles = await this.gitService.getUnmergedFiles();
-              if (conflictFiles.length === 0) {
-                vscode4.window.showWarningMessage(`Merge has conflicts. Please resolve them and commit.`);
-                return;
-              }
-              const items = conflictFiles.map((f) => ({
-                label: `$(git-merge) ${f}`,
-                description: "Conflict \u2014 click to open merge editor",
-                detail: f
-              }));
-              items.push({
-                label: "$(check-all) All conflicts resolved \u2014 open Commit panel",
-                description: "",
-                detail: "__commit__"
-              });
-              const chosen = await vscode4.window.showQuickPick(items, {
-                placeHolder: `${conflictFiles.length} file(s) with conflicts \u2014 select a file to resolve`,
-                canPickMany: false,
-                title: `Merge conflicts: '${ref}' into current branch`
-              });
-              if (chosen && chosen.detail && chosen.detail !== "__commit__") {
-                const fileUri = vscode4.Uri.joinPath(
-                  vscode4.Uri.file(this.workspaceRoot),
-                  chosen.detail
-                );
-                try {
-                  await vscode4.commands.executeCommand("merge-conflict.accept.all-both");
-                } catch {
-                }
-                await vscode4.commands.executeCommand("vscode.open", fileUri);
-                try {
-                  await vscode4.commands.executeCommand("git.openMergeEditor", fileUri);
-                } catch {
-                }
-              } else if (chosen && chosen.detail === "__commit__") {
-                await vscode4.commands.executeCommand("intellij-git.openCommit");
-              }
-            } catch {
-              vscode4.window.showWarningMessage(
-                `Merge has conflicts. Please resolve them in the editor and commit when done.`
-              );
-            }
-          } else {
-            vscode4.window.showErrorMessage(`Merge failed: ${errMsg}`);
-          }
-        }
-        break;
-      }
-      case "rebaseFromHere": {
-        const hash = msg.payload;
-        await vscode4.commands.executeCommand("intellij-git.interactiveRebase", hash);
-        break;
-      }
-      case "cherryPick": {
-        const { hash } = msg.payload;
-        try {
-          await this.gitService.cherryPick(hash);
-          vscode4.window.showInformationMessage(`Cherry-picked ${hash.slice(0, 8)} successfully`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Cherry-pick failed: ${err.message}`);
-        }
-        break;
-      }
-      case "revertCommit": {
-        const { hash } = msg.payload;
-        try {
-          await this.gitService.revertCommit(hash);
-          vscode4.window.showInformationMessage(`Reverted commit ${hash.slice(0, 8)}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Revert failed: ${err.message}`);
-        }
-        break;
-      }
-      case "resetToCommit": {
-        const { hash } = msg.payload;
-        const mode = await vscode4.window.showQuickPick([
-          { label: "Soft", description: "Keep all local changes in index (staged)", mode: "soft" },
-          { label: "Mixed", description: "Keep all local changes in working tree (unstaged)", mode: "mixed" },
-          { label: "Hard", description: "Discard all local changes", mode: "hard" }
-        ], { placeHolder: `Reset current branch to ${hash.slice(0, 8)}` });
-        if (mode) {
-          if (mode.mode === "hard") {
-            const confirm = await vscode4.window.showWarningMessage(
-              `Are you sure you want to perform a HARD reset to ${hash.slice(0, 8)}? All uncommitted local changes will be lost!`,
-              { modal: true },
-              "Reset"
-            );
-            if (confirm !== "Reset") break;
-          }
-          try {
-            await this.gitService.reset(hash, mode.mode);
-            vscode4.window.showInformationMessage(`Reset branch to ${hash.slice(0, 8)} (${mode.label})`);
-            this.loadInitialData();
-          } catch (err) {
-            vscode4.window.showErrorMessage(`Reset failed: ${err.message}`);
-          }
-        }
-        break;
-      }
-      case "undoCommit": {
-        try {
-          await this.gitService.reset("HEAD~1", "soft");
-          vscode4.window.showInformationMessage("Undid last commit (changes kept staged)");
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Undo commit failed: ${err.message}`);
-        }
-        break;
-      }
-      case "createTag": {
-        let { name, hash } = msg.payload || {};
-        if (!name) {
-          name = await vscode4.window.showInputBox({
-            prompt: `New tag name at ${hash?.slice(0, 8) || "commit"}:`,
-            placeHolder: "v1.0.0"
-          });
-          if (!name) return;
-        }
-        try {
-          await this.gitService.createTag(name, hash);
-          vscode4.window.showInformationMessage(`Created tag ${name} at ${hash ? hash.slice(0, 8) : ""}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Create tag failed: ${err.message}`);
-        }
-        break;
-      }
-      case "createPatch": {
-        const { hash } = msg.payload;
-        try {
-          const patch = await this.gitService.createPatch(hash);
-          const doc = await vscode4.workspace.openTextDocument({
-            content: patch,
-            language: "diff"
-          });
-          await vscode4.window.showTextDocument(doc);
-          vscode4.window.showInformationMessage(`Created patch for ${hash.slice(0, 8)}`);
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Create patch failed: ${err.message}`);
-        }
-        break;
-      }
-      case "compareWithLocal": {
-        const { hash } = msg.payload;
-        try {
-          const files = await this.gitService.getDiffFiles(hash);
-          if (files.length === 0) {
-            vscode4.window.showInformationMessage(`No differences between ${hash.slice(0, 8)} and working tree.`);
-            break;
-          }
-          const items = files.map((f) => ({
-            label: `${f.status} ${f.path}`,
-            description: f.oldPath ? `from ${f.oldPath}` : "",
-            file: f
-          }));
-          const picked = await vscode4.window.showQuickPick(items, {
-            placeHolder: `Select a file changed against ${hash.slice(0, 8)} to view diff`
-          });
-          if (picked) {
-            const filePath = picked.file.path;
-            const leftUri = picked.file.status === "A" ? GitContentProvider.emptyUri() : GitContentProvider.makeUri(hash, picked.file.oldPath || filePath);
-            const path8 = require("path");
-            const rightUri = picked.file.status === "D" ? GitContentProvider.emptyUri() : vscode4.Uri.file(path8.join(this.gitService.getCwd(), filePath));
-            const fileName = filePath.split("/").pop() || filePath;
-            await vscode4.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (${hash.slice(0, 8)} \u2194 Working Tree)`);
-          }
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Compare with local failed: ${err.message}`);
-        }
-        break;
-      }
-      case "editCommitMessage": {
-        const { hash, subject, message } = msg.payload || {};
-        let newMsg = message;
-        if (!newMsg) {
-          newMsg = await vscode4.window.showInputBox({
-            prompt: "Edit Commit Message",
-            value: subject || ""
-          });
-        }
-        if (newMsg && newMsg.trim()) {
-          try {
-            const headHash = (await this.gitService.getLog({ maxCount: 1 }))[0]?.hash;
-            if (headHash === hash) {
-              await this.gitService.exec(["commit", "--amend", "-m", newMsg.trim()]);
-              vscode4.window.showInformationMessage("Commit message updated");
-              this.loadInitialData();
-            } else {
-              vscode4.window.showWarningMessage("Editing commit message of older commits requires interactive rebase.");
-              await vscode4.commands.executeCommand("intellij-git.interactiveRebase", hash);
-            }
-          } catch (err) {
-            vscode4.window.showErrorMessage(`Edit message failed: ${err.message}`);
-          }
-        }
-        break;
-      }
-      case "dropCommit": {
-        const { hash } = msg.payload;
-        try {
-          const headHash = (await this.gitService.getLog({ maxCount: 1 }))[0]?.hash;
-          if (headHash === hash) {
-            await this.gitService.reset("HEAD~1", "hard");
-            vscode4.window.showInformationMessage(`Dropped commit ${hash.slice(0, 8)}`);
-            this.loadInitialData();
-          } else {
-            vscode4.window.showInformationMessage(`Use Interactive Rebase to drop older commit ${hash.slice(0, 8)}`);
-            await vscode4.commands.executeCommand("intellij-git.interactiveRebase", hash);
-          }
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Drop commit failed: ${err.message}`);
-        }
-        break;
-      }
-      case "pushUpToHere": {
-        const { hash } = msg.payload;
-        try {
-          const currentBranch = await this.gitService.getCurrentBranch();
-          const remote = await this.gitService.getDefaultRemote(currentBranch);
-          await this.gitService.exec(["push", remote, `${hash}:refs/heads/${currentBranch}`]);
-          vscode4.window.showInformationMessage(`Pushed up to ${hash.slice(0, 8)} on ${currentBranch}`);
-          this.loadInitialData();
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Push failed: ${err.message}`);
-        }
-        break;
-      }
-      case "showRepoAtRevision": {
-        const { hash } = msg.payload;
-        try {
-          const files = await this.gitService.getCommitFiles(hash);
-          if (files.length === 0) {
-            vscode4.window.showInformationMessage(`No files changed in ${hash.slice(0, 8)}.`);
-            break;
-          }
-          const items = files.map((f) => ({
-            label: `${f.status} ${f.path}`,
-            description: f.oldPath ? `from ${f.oldPath}` : "",
-            path: f.path
-          }));
-          const picked = await vscode4.window.showQuickPick(items, {
-            placeHolder: `Files changed in commit ${hash.slice(0, 8)}`
-          });
-          if (picked) {
-            const uri = GitContentProvider.makeUri(hash, picked.path);
-            await vscode4.commands.executeCommand("vscode.open", uri);
-          }
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Show revision failed: ${err.message}`);
-        }
-        break;
-      }
-      case "openInBrowser": {
-        const { hash } = msg.payload;
-        try {
-          const remoteUrl = await this.gitService.getRemoteUrl();
-          if (!remoteUrl) {
-            vscode4.window.showWarningMessage("No remote URL found for this repository.");
-            break;
-          }
-          let httpUrl = remoteUrl.replace(/^ssh:\/\/git@([^/:]+)(?::\d+)?\//, "https://$1/").replace(/^git@([^:]+):/, "https://$1/").replace(/^https?:\/\/[^@]+@/, "https://").replace(/\.git$/, "");
-          if (httpUrl.includes("gitlab.com") || httpUrl.includes("gitlab")) {
-            httpUrl = `${httpUrl}/-/commit/${hash}`;
-          } else {
-            httpUrl = `${httpUrl}/commit/${hash}`;
-          }
-          await vscode4.env.openExternal(vscode4.Uri.parse(httpUrl));
-        } catch (err) {
-          vscode4.window.showErrorMessage(`Open in browser failed: ${err.message}`);
-        }
+        });
         break;
       }
     }
@@ -3083,9 +3278,9 @@ var GraphViewProvider = class {
   }
   getHtml(webview) {
     const scriptUri = webview.asWebviewUri(
-      vscode4.Uri.joinPath(this.extensionUri, "dist", "webview", "graph", "graph.js")
+      vscode6.Uri.joinPath(this.extensionUri, "dist", "webview", "graph", "graph.js")
     );
-    const nonce = getNonce2();
+    const nonce = getNonce();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3102,305 +3297,28 @@ var GraphViewProvider = class {
 </html>`;
   }
 };
-function getNonce2() {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
-}
 
 // src/views/commitPanel.ts
-var vscode7 = __toESM(require("vscode"));
-var path5 = __toESM(require("path"));
-var fs5 = __toESM(require("fs"));
+var vscode10 = __toESM(require("vscode"));
+var path10 = __toESM(require("path"));
+var fs8 = __toESM(require("fs"));
 
 // src/views/conflictsDialogPanel.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 
 // src/views/mergeEditorPanel.ts
-var vscode5 = __toESM(require("vscode"));
-var path4 = __toESM(require("path"));
-var fs4 = __toESM(require("fs"));
-var MergeEditorPanel = class _MergeEditorPanel {
-  constructor(panel, extensionUri, gitService, filePath) {
-    this.extensionUri = extensionUri;
-    this.gitService = gitService;
-    this.panel = panel;
-    this.currentFilePath = filePath;
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    vscode5.window.onDidChangeActiveColorTheme(
-      () => this.sendThemeTokens(),
-      null,
-      this.disposables
-    );
-    this.panel.webview.html = this.getHtml();
-    this.panel.webview.onDidReceiveMessage(
-      (msg) => this.handleMessage(msg),
-      null,
-      this.disposables
-    );
-  }
-  extensionUri;
-  gitService;
-  static currentPanel;
-  static viewType = "intellij-git.mergeEditor";
-  panel;
-  disposables = [];
-  currentFilePath = "";
-  static async createOrShow(extensionUri, gitService, filePath) {
-    const fileName = path4.basename(filePath);
-    if (_MergeEditorPanel.currentPanel) {
-      _MergeEditorPanel.currentPanel.currentFilePath = filePath;
-      _MergeEditorPanel.currentPanel.panel.title = `Merge: ${fileName}`;
-      _MergeEditorPanel.currentPanel.panel.reveal(vscode5.ViewColumn.Active, true);
-      await _MergeEditorPanel.currentPanel.loadConflictData(filePath);
-      return _MergeEditorPanel.currentPanel;
-    }
-    const panel = vscode5.window.createWebviewPanel(
-      _MergeEditorPanel.viewType,
-      `Merge: ${fileName}`,
-      vscode5.ViewColumn.Active,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode5.Uri.joinPath(extensionUri, "dist", "webview")
-        ]
-      }
-    );
-    _MergeEditorPanel.currentPanel = new _MergeEditorPanel(
-      panel,
-      extensionUri,
-      gitService,
-      filePath
-    );
-    return _MergeEditorPanel.currentPanel;
-  }
-  async loadConflictData(filePath) {
-    try {
-      const fullPath = path4.join(this.gitService.getCwd(), filePath);
-      let fileOnDisk = "";
-      if (fs4.existsSync(fullPath)) {
-        fileOnDisk = fs4.readFileSync(fullPath, "utf8");
-      }
-      let baseContent = "";
-      let yoursContent = "";
-      let theirsContent = "";
-      try {
-        baseContent = await this.gitService.exec(["show", `:1:${filePath}`]);
-      } catch {
-      }
-      try {
-        yoursContent = await this.gitService.exec(["show", `:2:${filePath}`]);
-      } catch {
-      }
-      try {
-        theirsContent = await this.gitService.exec(["show", `:3:${filePath}`]);
-      } catch {
-      }
-      const conflictInfo = await this.gitService.getConflictInfo().catch(() => ({
-        yoursBranch: "HEAD",
-        theirsBranch: "Incoming"
-      }));
-      const hunks = this.parseConflictHunks(fileOnDisk, yoursContent, theirsContent, baseContent);
-      this.panel.webview.postMessage({
-        type: "loadMergeData",
-        payload: {
-          filePath,
-          fileName: path4.basename(filePath),
-          yoursBranch: conflictInfo.yoursBranch || "Current version",
-          theirsBranch: conflictInfo.theirsBranch || "Incoming version",
-          hunks,
-          baseContent,
-          yoursContent,
-          theirsContent
-        }
-      });
-    } catch (err) {
-      vscode5.window.showErrorMessage(`Failed to load merge conflict data: ${err.message || err}`);
-    }
-  }
-  parseConflictHunks(fileOnDisk, yoursContent, theirsContent, baseContent) {
-    const hunks = [];
-    let hunkId = 1;
-    if (fileOnDisk.includes("<<<<<<<") && fileOnDisk.includes("=======")) {
-      const lines = fileOnDisk.split(/\r?\n/);
-      let currentCommon = [];
-      let currentYours = [];
-      let currentTheirs = [];
-      let inOurs = false;
-      let inTheirs = false;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.startsWith("<<<<<<<")) {
-          if (currentCommon.length > 0) {
-            hunks.push({
-              id: hunkId++,
-              type: "common",
-              commonLines: currentCommon
-            });
-            currentCommon = [];
-          }
-          inOurs = true;
-          inTheirs = false;
-          currentYours = [];
-        } else if (inOurs && line.startsWith("=======")) {
-          inOurs = false;
-          inTheirs = true;
-          currentTheirs = [];
-        } else if (inTheirs && line.startsWith(">>>>>>>")) {
-          inTheirs = false;
-          hunks.push({
-            id: hunkId++,
-            type: "conflict",
-            yoursLines: currentYours,
-            theirsLines: currentTheirs,
-            resolved: false,
-            chosen: null,
-            resultLines: []
-          });
-          currentYours = [];
-          currentTheirs = [];
-        } else {
-          if (inOurs) {
-            currentYours.push(line);
-          } else if (inTheirs) {
-            currentTheirs.push(line);
-          } else {
-            currentCommon.push(line);
-          }
-        }
-      }
-      if (currentCommon.length > 0) {
-        hunks.push({
-          id: hunkId++,
-          type: "common",
-          commonLines: currentCommon
-        });
-      }
-      return hunks;
-    }
-    const yLines = yoursContent ? yoursContent.split(/\r?\n/) : [];
-    const tLines = theirsContent ? theirsContent.split(/\r?\n/) : [];
-    if (yoursContent === theirsContent && yoursContent.length > 0) {
-      return [{
-        id: 1,
-        type: "common",
-        commonLines: yLines
-      }];
-    }
-    return [{
-      id: 1,
-      type: "conflict",
-      yoursLines: yLines,
-      theirsLines: tLines,
-      resolved: false,
-      chosen: null,
-      resultLines: []
-    }];
-  }
-  async handleMessage(msg) {
-    switch (msg.type) {
-      case "ready": {
-        this.sendThemeTokens();
-        if (this.currentFilePath) {
-          await this.loadConflictData(this.currentFilePath);
-        }
-        break;
-      }
-      case "applyMerge": {
-        const { filePath, content } = msg.payload;
-        try {
-          const fullPath = path4.join(this.gitService.getCwd(), filePath);
-          fs4.writeFileSync(fullPath, content, "utf8");
-          await this.gitService.stageFile(filePath);
-          if (ConflictsDialogPanel.currentPanel) {
-            await ConflictsDialogPanel.currentPanel.refresh();
-          }
-          vscode5.window.showInformationMessage(`Successfully resolved and staged '${path4.basename(filePath)}'`);
-          this.panel.dispose();
-        } catch (err) {
-          vscode5.window.showErrorMessage(`Failed to apply merge: ${err?.message || err}`);
-        }
-        break;
-      }
-      case "cancelMerge": {
-        this.panel.dispose();
-        break;
-      }
-    }
-  }
-  sendThemeTokens() {
-    const tokens = this.getThemeTokens();
-    this.panel.webview.postMessage({
-      type: "themeTokens",
-      payload: tokens
-    });
-  }
-  getThemeTokens() {
-    const defaultTokens = {
-      kwd: "#fd6883",
-      type: "#85dacc",
-      fn: "#adda78",
-      str: "#f9cc6c",
-      num: "#a8a9eb",
-      constVal: "#a8a9eb",
-      varVal: "#fff1f3",
-      comment: "#72696a",
-      anno: "#85dacc",
-      punct: "#948a8b"
-    };
-    try {
-      const activeThemeName = vscode5.workspace.getConfiguration("workbench").get("colorTheme");
-      if (!activeThemeName) return defaultTokens;
-      for (const ext of vscode5.extensions.all) {
-        const themes = ext.packageJSON?.contributes?.themes;
-        if (!Array.isArray(themes)) continue;
-        const matched = themes.find((t) => t.label === activeThemeName || t.id === activeThemeName);
-        if (!matched || !matched.path) continue;
-        const themePath = path4.join(ext.extensionPath, matched.path);
-        if (!fs4.existsSync(themePath)) continue;
-        let content = fs4.readFileSync(themePath, "utf8");
-        content = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
-        const themeJson = JSON.parse(content);
-        const tc = themeJson.tokenColors || [];
-        const findColor = (targetScopes) => {
-          for (const target of targetScopes) {
-            for (const rule of tc) {
-              if (!rule.settings || !rule.settings.foreground) continue;
-              const scopes = Array.isArray(rule.scope) ? rule.scope : typeof rule.scope === "string" ? rule.scope.split(",").map((s) => s.trim()) : [];
-              if (scopes.includes(target)) return rule.settings.foreground;
-            }
-          }
-          return null;
-        };
-        const kwd = findColor(["keyword"]) || defaultTokens.kwd;
-        const type = findColor(["entity.name.type", "support.type", "storage.type"]) || defaultTokens.type;
-        const fn = findColor(["entity.name.function", "support.function"]) || defaultTokens.fn;
-        const str = findColor(["string"]) || defaultTokens.str;
-        const num = findColor(["constant.numeric"]) || defaultTokens.num;
-        const constVal = findColor(["constant.language"]) || defaultTokens.constVal;
-        const comment = findColor(["comment"]) || defaultTokens.comment;
-        const varVal = findColor(["variable"]) || defaultTokens.varVal;
-        const anno = findColor(["punctuation.definition.annotation", "meta.annotation"]) || type;
-        const punct = findColor(["punctuation"]) || defaultTokens.punct;
-        return { kwd, type, fn, str, num, constVal, varVal, comment, anno, punct };
-      }
-    } catch {
-    }
-    return defaultTokens;
-  }
-  getHtml() {
-    const nonce = getNonce3();
-    const tokens = this.getThemeTokens();
-    return `<!DOCTYPE html>
+var vscode7 = __toESM(require("vscode"));
+var path9 = __toESM(require("path"));
+var fs7 = __toESM(require("fs"));
+
+// src/views/mergeEditorHtml.ts
+function getMergeEditorHtml(cspSource, nonce, tokens) {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}';">
+    content="default-src 'none'; style-src 'unsafe-inline' ${cspSource}; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style id="dynamic-syntax-tokens">
     :root {
@@ -4243,39 +4161,18 @@ var MergeEditorPanel = class _MergeEditorPanel {
   </script>
 </body>
 </html>`;
-  }
-  dispose() {
-    _MergeEditorPanel.currentPanel = void 0;
-    this.panel.dispose();
-    while (this.disposables.length) {
-      const d = this.disposables.pop();
-      if (d) d.dispose();
-    }
-  }
-};
-function getNonce3() {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
 }
 
-// src/views/conflictsDialogPanel.ts
-var ConflictsDialogPanel = class _ConflictsDialogPanel {
-  constructor(panel, extensionUri, gitService, conflictInfo) {
+// src/views/mergeEditorPanel.ts
+var MergeEditorPanel = class _MergeEditorPanel {
+  constructor(panel, extensionUri, gitService, filePath) {
     this.extensionUri = extensionUri;
     this.gitService = gitService;
-    this.conflictInfo = conflictInfo;
     this.panel = panel;
+    this.currentFilePath = filePath;
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    this.panel.onDidChangeViewState(
-      (e) => {
-        if (e.webviewPanel.active) {
-          this.refresh();
-        }
-      },
+    vscode7.window.onDidChangeActiveColorTheme(
+      () => this.sendThemeTokens(),
       null,
       this.disposables
     );
@@ -4288,124 +4185,219 @@ var ConflictsDialogPanel = class _ConflictsDialogPanel {
   }
   extensionUri;
   gitService;
-  conflictInfo;
   static currentPanel;
-  static viewType = "intellij-git.conflictsDialogWindow";
+  static viewType = "intellij-git.mergeEditor";
   panel;
   disposables = [];
-  static async createOrShow(extensionUri, gitService) {
+  currentFilePath = "";
+  static async createOrShow(extensionUri, gitService, filePath) {
+    const fileName = path9.basename(filePath);
+    if (_MergeEditorPanel.currentPanel) {
+      _MergeEditorPanel.currentPanel.currentFilePath = filePath;
+      _MergeEditorPanel.currentPanel.panel.title = `Merge: ${fileName}`;
+      _MergeEditorPanel.currentPanel.panel.reveal(vscode7.ViewColumn.Active, true);
+      await _MergeEditorPanel.currentPanel.loadConflictData(filePath);
+      return _MergeEditorPanel.currentPanel;
+    }
+    const panel = vscode7.window.createWebviewPanel(
+      _MergeEditorPanel.viewType,
+      `Merge: ${fileName}`,
+      vscode7.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode7.Uri.joinPath(extensionUri, "dist", "webview")
+        ]
+      }
+    );
+    _MergeEditorPanel.currentPanel = new _MergeEditorPanel(
+      panel,
+      extensionUri,
+      gitService,
+      filePath
+    );
+    return _MergeEditorPanel.currentPanel;
+  }
+  async loadConflictData(filePath) {
     try {
-      const conflictInfo = await gitService.getConflictInfo();
-      if (!conflictInfo.hasConflicts || conflictInfo.conflicts.length === 0) {
-        vscode6.window.showInformationMessage("No unresolved conflicts found in the repository.");
-        return void 0;
+      const fullPath = path9.join(this.gitService.getCwd(), filePath);
+      let fileOnDisk = "";
+      if (fs7.existsSync(fullPath)) {
+        fileOnDisk = fs7.readFileSync(fullPath, "utf8");
       }
-      if (_ConflictsDialogPanel.currentPanel) {
-        _ConflictsDialogPanel.currentPanel.panel.reveal();
-        _ConflictsDialogPanel.currentPanel.update(conflictInfo);
-        return _ConflictsDialogPanel.currentPanel;
-      }
-      const panel = vscode6.window.createWebviewPanel(
-        _ConflictsDialogPanel.viewType,
-        "Resolve Conflicts",
-        vscode6.ViewColumn.Active,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [
-            vscode6.Uri.joinPath(extensionUri, "dist", "webview"),
-            vscode6.Uri.joinPath(extensionUri, "resources")
-          ]
-        }
-      );
-      _ConflictsDialogPanel.currentPanel = new _ConflictsDialogPanel(
-        panel,
-        extensionUri,
-        gitService,
-        conflictInfo
-      );
+      let baseContent = "";
+      let yoursContent = "";
+      let theirsContent = "";
       try {
-        await vscode6.commands.executeCommand("workbench.action.moveEditorToNewWindow");
+        baseContent = await this.gitService.exec(["show", `:1:${filePath}`]);
       } catch {
       }
-      return _ConflictsDialogPanel.currentPanel;
+      try {
+        yoursContent = await this.gitService.exec(["show", `:2:${filePath}`]);
+      } catch {
+      }
+      try {
+        theirsContent = await this.gitService.exec(["show", `:3:${filePath}`]);
+      } catch {
+      }
+      const conflictInfo = await this.gitService.getConflictInfo().catch(() => ({
+        yoursBranch: "HEAD",
+        theirsBranch: "Incoming"
+      }));
+      const hunks = this.parseConflictHunks(fileOnDisk, yoursContent, theirsContent, baseContent);
+      this.panel.webview.postMessage({
+        type: "loadMergeData",
+        payload: {
+          filePath,
+          fileName: path9.basename(filePath),
+          yoursBranch: conflictInfo.yoursBranch || "Current version",
+          theirsBranch: conflictInfo.theirsBranch || "Incoming version",
+          hunks,
+          baseContent,
+          yoursContent,
+          theirsContent
+        }
+      });
     } catch (err) {
-      vscode6.window.showErrorMessage(`Failed to open Conflicts dialog: ${err?.message || err}`);
-      return void 0;
+      vscode7.window.showErrorMessage(`Failed to load merge conflict data: ${err.message || err}`);
     }
   }
-  async refresh() {
-    try {
-      const conflictInfo = await this.gitService.getConflictInfo();
-      this.update(conflictInfo);
-    } catch {
+  parseConflictHunks(fileOnDisk, yoursContent, theirsContent, baseContent) {
+    const hunks = [];
+    let hunkId = 1;
+    if (fileOnDisk.includes("<<<<<<<") && fileOnDisk.includes("=======")) {
+      const lines = fileOnDisk.split(/\r?\n/);
+      let currentCommon = [];
+      let currentYours = [];
+      let currentTheirs = [];
+      let inOurs = false;
+      let inTheirs = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith("<<<<<<<")) {
+          if (currentCommon.length > 0) {
+            hunks.push({
+              id: hunkId++,
+              type: "common",
+              commonLines: currentCommon
+            });
+            currentCommon = [];
+          }
+          inOurs = true;
+          inTheirs = false;
+          currentYours = [];
+        } else if (inOurs && line.startsWith("=======")) {
+          inOurs = false;
+          inTheirs = true;
+          currentTheirs = [];
+        } else if (inTheirs && line.startsWith(">>>>>>>")) {
+          inTheirs = false;
+          hunks.push({
+            id: hunkId++,
+            type: "conflict",
+            yoursLines: currentYours,
+            theirsLines: currentTheirs,
+            resolved: false,
+            chosen: null,
+            resultLines: []
+          });
+          currentYours = [];
+          currentTheirs = [];
+        } else {
+          if (inOurs) {
+            currentYours.push(line);
+          } else if (inTheirs) {
+            currentTheirs.push(line);
+          } else {
+            currentCommon.push(line);
+          }
+        }
+      }
+      if (currentCommon.length > 0) {
+        hunks.push({
+          id: hunkId++,
+          type: "common",
+          commonLines: currentCommon
+        });
+      }
+      return hunks;
     }
-  }
-  update(conflictInfo) {
-    this.conflictInfo = conflictInfo;
-    this.panel.webview.postMessage({
-      type: "updateConflictInfo",
-      payload: conflictInfo
-    });
+    const yLines = yoursContent ? yoursContent.split(/\r?\n/) : [];
+    const tLines = theirsContent ? theirsContent.split(/\r?\n/) : [];
+    if (yoursContent === theirsContent && yoursContent.length > 0) {
+      return [{
+        id: 1,
+        type: "common",
+        commonLines: yLines
+      }];
+    }
+    return [{
+      id: 1,
+      type: "conflict",
+      yoursLines: yLines,
+      theirsLines: tLines,
+      resolved: false,
+      chosen: null,
+      resultLines: []
+    }];
   }
   async handleMessage(msg) {
     switch (msg.type) {
-      case "close": {
-        this.dispose();
-        break;
-      }
-      case "acceptYours": {
-        const filePath = msg.payload?.path;
-        if (filePath) {
-          try {
-            await this.gitService.acceptYours(filePath);
-            vscode6.window.showInformationMessage(`Accepted Yours for '${filePath}'`);
-            await this.refresh();
-          } catch (err) {
-            vscode6.window.showErrorMessage(`Accept Yours failed: ${err?.message || err}`);
-          }
+      case "ready": {
+        this.sendThemeTokens();
+        if (this.currentFilePath) {
+          await this.loadConflictData(this.currentFilePath);
         }
         break;
       }
-      case "acceptTheirs": {
-        const filePath = msg.payload?.path;
-        if (filePath) {
-          try {
-            await this.gitService.acceptTheirs(filePath);
-            vscode6.window.showInformationMessage(`Accepted Theirs for '${filePath}'`);
-            await this.refresh();
-          } catch (err) {
-            vscode6.window.showErrorMessage(`Accept Theirs failed: ${err?.message || err}`);
+      case "applyMerge": {
+        const { filePath, content } = msg.payload;
+        try {
+          const fullPath = path9.join(this.gitService.getCwd(), filePath);
+          fs7.writeFileSync(fullPath, content, "utf8");
+          await this.gitService.stageFile(filePath);
+          if (ConflictsDialogPanel.currentPanel) {
+            await ConflictsDialogPanel.currentPanel.refresh();
           }
+          vscode7.window.showInformationMessage(`Successfully resolved and staged '${path9.basename(filePath)}'`);
+          this.panel.dispose();
+        } catch (err) {
+          vscode7.window.showErrorMessage(`Failed to apply merge: ${err?.message || err}`);
         }
         break;
       }
-      case "openMergeEditor": {
-        const filePath = msg.payload?.path;
-        if (filePath) {
-          try {
-            await MergeEditorPanel.createOrShow(this.extensionUri, this.gitService, filePath);
-          } catch (err) {
-            vscode6.window.showErrorMessage(`Failed to open merge editor: ${err?.message || err}`);
-          }
-        }
+      case "cancelMerge": {
+        this.panel.dispose();
         break;
       }
     }
   }
-  dispose() {
-    _ConflictsDialogPanel.currentPanel = void 0;
-    this.panel.dispose();
-    while (this.disposables.length) {
-      const x = this.disposables.pop();
-      if (x) {
-        x.dispose();
-      }
-    }
+  sendThemeTokens() {
+    const tokens = getThemeTokens();
+    this.panel.webview.postMessage({
+      type: "themeTokens",
+      payload: tokens
+    });
   }
   getHtml() {
-    const rawConflictInfo = JSON.stringify(this.conflictInfo);
-    return `<!DOCTYPE html>
+    const nonce = getNonce();
+    const tokens = getThemeTokens();
+    return getMergeEditorHtml(this.panel.webview.cspSource, nonce, tokens);
+  }
+  dispose() {
+    _MergeEditorPanel.currentPanel = void 0;
+    this.panel.dispose();
+    while (this.disposables.length) {
+      const d = this.disposables.pop();
+      if (d) d.dispose();
+    }
+  }
+};
+
+// src/views/conflictsDialogHtml.ts
+function getConflictsDialogHtml(rawConflictInfo) {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -4779,8 +4771,316 @@ var ConflictsDialogPanel = class _ConflictsDialogPanel {
   </script>
 </body>
 </html>`;
+}
+
+// src/views/conflictsDialogPanel.ts
+var ConflictsDialogPanel = class _ConflictsDialogPanel {
+  constructor(panel, extensionUri, gitService, conflictInfo) {
+    this.extensionUri = extensionUri;
+    this.gitService = gitService;
+    this.conflictInfo = conflictInfo;
+    this.panel = panel;
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    this.panel.onDidChangeViewState(
+      (e) => {
+        if (e.webviewPanel.active) {
+          this.refresh();
+        }
+      },
+      null,
+      this.disposables
+    );
+    this.panel.webview.html = this.getHtml();
+    this.panel.webview.onDidReceiveMessage(
+      (msg) => this.handleMessage(msg),
+      null,
+      this.disposables
+    );
+  }
+  extensionUri;
+  gitService;
+  conflictInfo;
+  static currentPanel;
+  static viewType = "intellij-git.conflictsDialogWindow";
+  panel;
+  disposables = [];
+  static async createOrShow(extensionUri, gitService) {
+    try {
+      const conflictInfo = await gitService.getConflictInfo();
+      if (!conflictInfo.hasConflicts || conflictInfo.conflicts.length === 0) {
+        vscode8.window.showInformationMessage("No unresolved conflicts found in the repository.");
+        return void 0;
+      }
+      if (_ConflictsDialogPanel.currentPanel) {
+        _ConflictsDialogPanel.currentPanel.panel.reveal();
+        _ConflictsDialogPanel.currentPanel.update(conflictInfo);
+        return _ConflictsDialogPanel.currentPanel;
+      }
+      const panel = vscode8.window.createWebviewPanel(
+        _ConflictsDialogPanel.viewType,
+        "Resolve Conflicts",
+        vscode8.ViewColumn.Active,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          localResourceRoots: [
+            vscode8.Uri.joinPath(extensionUri, "dist", "webview"),
+            vscode8.Uri.joinPath(extensionUri, "resources")
+          ]
+        }
+      );
+      _ConflictsDialogPanel.currentPanel = new _ConflictsDialogPanel(
+        panel,
+        extensionUri,
+        gitService,
+        conflictInfo
+      );
+      try {
+        await vscode8.commands.executeCommand("workbench.action.moveEditorToNewWindow");
+      } catch {
+      }
+      return _ConflictsDialogPanel.currentPanel;
+    } catch (err) {
+      vscode8.window.showErrorMessage(`Failed to open Conflicts dialog: ${err?.message || err}`);
+      return void 0;
+    }
+  }
+  async refresh() {
+    try {
+      const conflictInfo = await this.gitService.getConflictInfo();
+      this.update(conflictInfo);
+    } catch {
+    }
+  }
+  update(conflictInfo) {
+    this.conflictInfo = conflictInfo;
+    this.panel.webview.postMessage({
+      type: "updateConflictInfo",
+      payload: conflictInfo
+    });
+  }
+  async handleMessage(msg) {
+    switch (msg.type) {
+      case "close": {
+        this.dispose();
+        break;
+      }
+      case "acceptYours": {
+        const filePath = msg.payload?.path;
+        if (filePath) {
+          try {
+            await this.gitService.acceptYours(filePath);
+            vscode8.window.showInformationMessage(`Accepted Yours for '${filePath}'`);
+            await this.refresh();
+          } catch (err) {
+            vscode8.window.showErrorMessage(`Accept Yours failed: ${err?.message || err}`);
+          }
+        }
+        break;
+      }
+      case "acceptTheirs": {
+        const filePath = msg.payload?.path;
+        if (filePath) {
+          try {
+            await this.gitService.acceptTheirs(filePath);
+            vscode8.window.showInformationMessage(`Accepted Theirs for '${filePath}'`);
+            await this.refresh();
+          } catch (err) {
+            vscode8.window.showErrorMessage(`Accept Theirs failed: ${err?.message || err}`);
+          }
+        }
+        break;
+      }
+      case "openMergeEditor": {
+        const filePath = msg.payload?.path;
+        if (filePath) {
+          try {
+            await MergeEditorPanel.createOrShow(this.extensionUri, this.gitService, filePath);
+          } catch (err) {
+            vscode8.window.showErrorMessage(`Failed to open merge editor: ${err?.message || err}`);
+          }
+        }
+        break;
+      }
+    }
+  }
+  dispose() {
+    _ConflictsDialogPanel.currentPanel = void 0;
+    this.panel.dispose();
+    while (this.disposables.length) {
+      const x = this.disposables.pop();
+      if (x) {
+        x.dispose();
+      }
+    }
+  }
+  getHtml() {
+    const rawConflictInfo = JSON.stringify(this.conflictInfo);
+    return getConflictsDialogHtml(rawConflictInfo);
   }
 };
+
+// src/utils/aiCommitGenerator.ts
+var vscode9 = __toESM(require("vscode"));
+function detectAuthorStyle(messages) {
+  if (!messages || messages.length === 0) {
+    return { type: "imperative", endsWithPeriod: false };
+  }
+  let conventionalCount = 0;
+  let imperativeCount = 0;
+  let periodCount = 0;
+  let scopeCount = 0;
+  const conventionalRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?:\s*(.+)/i;
+  for (const msg of messages) {
+    if (msg.endsWith(".")) periodCount++;
+    const convMatch = msg.match(conventionalRegex);
+    if (convMatch) {
+      conventionalCount++;
+      if (convMatch[2]) scopeCount++;
+    } else if (/^[A-Z][a-zA-Z0-9_\-]*\s+/.test(msg)) {
+      imperativeCount++;
+    }
+  }
+  return {
+    type: conventionalCount > imperativeCount ? "conventional" : "imperative",
+    hasScope: scopeCount > conventionalCount / 2,
+    endsWithPeriod: periodCount > messages.length / 2
+  };
+}
+function adaptCommitMessageStyle(raw, samples) {
+  if (!raw) return raw;
+  const style = detectAuthorStyle(samples);
+  let msg = raw.trim();
+  if (style.type === "imperative") {
+    msg = msg.replace(/^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^\)]+\))?!?:\s*/i, "");
+    msg = msg.charAt(0).toUpperCase() + msg.slice(1);
+    if (!style.endsWithPeriod) {
+      msg = msg.replace(/\.+$/, "");
+    } else if (!msg.endsWith(".")) {
+      msg += ".";
+    }
+    return msg;
+  } else {
+    const convRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?!?:\s*(.+)/i;
+    const match = msg.match(convRegex);
+    if (match) {
+      const type2 = match[1].toLowerCase();
+      const scope = match[2] ? match[2].toLowerCase() : "";
+      let desc2 = match[3].trim();
+      desc2 = desc2.charAt(0).toLowerCase() + desc2.slice(1);
+      desc2 = desc2.replace(/\.+$/, "");
+      return `${type2}${scope}: ${desc2}`;
+    }
+    let type = "feat";
+    if (/^(fix|resolve|prevent|handle|correct)\b/i.test(msg)) type = "fix";
+    else if (/^(refactor|clean|simplify)\b/i.test(msg)) type = "refactor";
+    else if (/^(doc|document|docs)\b/i.test(msg)) type = "docs";
+    else if (/^(test|tests)\b/i.test(msg)) type = "test";
+    else if (/^(chore|build|ci)\b/i.test(msg)) type = "chore";
+    let desc = msg.charAt(0).toLowerCase() + msg.slice(1);
+    desc = desc.replace(/\.+$/, "");
+    return `${type}: ${desc}`;
+  }
+}
+async function generateAiCommitMessage(gitService, checkedFiles) {
+  const assumedFiles = [];
+  const temporarilyUnstaged = [];
+  try {
+    const allStatus = await gitService.getStatus();
+    const trackedToMask = [];
+    for (const s of allStatus) {
+      const isUntracked = s.x === "?" && s.y === "?";
+      const isChecked = checkedFiles.includes(s.path);
+      if (isChecked) {
+        if (s.y !== " " && s.x === " ") {
+          await gitService.stageFiles([s.path]);
+        } else if (isUntracked) {
+          await gitService.stageFiles([s.path]);
+        }
+        if (s.y !== " " && s.x !== " ") {
+          trackedToMask.push(s.path);
+        }
+      } else {
+        if (s.x !== " " && s.x !== "?") {
+          temporarilyUnstaged.push(s.path);
+          await gitService.unstageFile(s.path);
+        }
+        if (!isUntracked) {
+          trackedToMask.push(s.path);
+        }
+      }
+    }
+    if (trackedToMask.length > 0) {
+      await gitService.setAssumeUnchanged(trackedToMask, true);
+      assumedFiles.push(...trackedToMask);
+    }
+    const authorSamples = await gitService.getAuthorRecentCommitMessages(10);
+    const repoRoot = gitService.getCwd();
+    const gitExt = vscode9.extensions.getExtension("vscode.git");
+    let gitRepo;
+    if (gitExt) {
+      const gitApi = gitExt.exports.getAPI(1);
+      gitRepo = gitApi.repositories.find((r) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
+    }
+    const restoreFocus = () => {
+      vscode9.commands.executeCommand("workbench.view.extension.intellij-git-commit");
+      vscode9.commands.executeCommand("intellij-git.commitView.focus");
+    };
+    setTimeout(restoreFocus, 30);
+    setTimeout(restoreFocus, 80);
+    setTimeout(restoreFocus, 180);
+    setTimeout(restoreFocus, 350);
+    let aiMsg = "";
+    try {
+      if (vscode9.lm && typeof vscode9.lm.selectChatModels === "function") {
+        const models = await vscode9.lm.selectChatModels({ family: "gemini-1.5-pro" }).catch(() => []);
+        const model = models[0] || (await vscode9.lm.selectChatModels().catch(() => []))[0];
+        if (model) {
+          const stagedDiff = await gitService.getStagedDiff();
+          if (stagedDiff && stagedDiff.trim()) {
+            const prompt = [
+              "You are an expert Git commit message generator.",
+              authorSamples.length > 0 ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:
+${authorSamples.map((s) => `- ${s}`).join("\n")}` : "Write a concise, high quality commit message.",
+              "Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.",
+              `Git diff:
+${stagedDiff.slice(0, 8e3)}`
+            ].join("\n\n");
+            const response = await model.sendRequest([
+              vscode9.LanguageModelChatMessage.User(prompt)
+            ]);
+            let accumulated = "";
+            for await (const chunk of response.text) {
+              accumulated += chunk;
+            }
+            if (accumulated.trim()) {
+              aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, "");
+            }
+          }
+        }
+      }
+    } catch {
+    }
+    if (!aiMsg) {
+      aiMsg = await vscode9.commands.executeCommand("antigravity.generateCommitMessage", repoRoot) || "";
+    }
+    if (!aiMsg && gitRepo?.inputBox?.value) {
+      aiMsg = gitRepo.inputBox.value;
+    }
+    restoreFocus();
+    if (aiMsg && typeof aiMsg === "string") {
+      return adaptCommitMessageStyle(aiMsg, authorSamples).trim();
+    }
+    return "";
+  } finally {
+    if (assumedFiles.length > 0) {
+      await gitService.setAssumeUnchanged(assumedFiles, false);
+    }
+    if (temporarilyUnstaged.length > 0) {
+      await gitService.stageFiles(temporarilyUnstaged);
+    }
+  }
+}
 
 // src/views/commitPanel.ts
 var CommitViewProvider = class _CommitViewProvider {
@@ -4824,7 +5124,7 @@ var CommitViewProvider = class _CommitViewProvider {
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        vscode7.Uri.joinPath(this.extensionUri, "dist", "webview")
+        vscode10.Uri.joinPath(this.extensionUri, "dist", "webview")
       ]
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
@@ -4878,8 +5178,8 @@ var CommitViewProvider = class _CommitViewProvider {
       const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
       const files = statusEntries.map((entry) => {
         const filePath = entry.path;
-        const fileName = path5.basename(filePath);
-        const fileDir = path5.dirname(filePath);
+        const fileName = path10.basename(filePath);
+        const fileDir = path10.dirname(filePath);
         const isUntracked = entry.x === "?" && entry.y === "?";
         const isStaged = entry.x !== " " && entry.x !== "?";
         const totalChanges = totalChangesMap.get(filePath) || 0;
@@ -4997,7 +5297,7 @@ var CommitViewProvider = class _CommitViewProvider {
           }
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Stage failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Stage failed: ${err.message}`);
         }
         break;
       }
@@ -5014,7 +5314,7 @@ var CommitViewProvider = class _CommitViewProvider {
           }
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Stage failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Stage failed: ${err.message}`);
         }
         break;
       }
@@ -5027,7 +5327,7 @@ var CommitViewProvider = class _CommitViewProvider {
           }
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Unstage failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Unstage failed: ${err.message}`);
         }
         break;
       }
@@ -5044,14 +5344,14 @@ var CommitViewProvider = class _CommitViewProvider {
           }
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Unstage failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Unstage failed: ${err.message}`);
         }
         break;
       }
       case "rollbackFiles": {
         const filePaths = msg.payload;
         if (!filePaths || filePaths.length === 0) return;
-        const confirm = await vscode7.window.showWarningMessage(
+        const confirm = await vscode10.window.showWarningMessage(
           `Rollback changes in ${filePaths.length} file(s)? This cannot be undone.`,
           { modal: true },
           "Rollback"
@@ -5059,19 +5359,19 @@ var CommitViewProvider = class _CommitViewProvider {
         if (confirm !== "Rollback") return;
         try {
           await this.gitService.rollbackFiles(filePaths);
-          vscode7.window.showInformationMessage(`Rolled back ${filePaths.length} file(s).`);
+          vscode10.window.showInformationMessage(`Rolled back ${filePaths.length} file(s).`);
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Rollback failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Rollback failed: ${err.message}`);
         }
         break;
       }
       case "jumpToSource": {
         const filePath = msg.payload;
         if (filePath) {
-          const fullPath = path5.join(this.gitService.getCwd(), filePath);
-          if (fs5.existsSync(fullPath)) {
-            vscode7.commands.executeCommand("vscode.open", vscode7.Uri.file(fullPath));
+          const fullPath = path10.join(this.gitService.getCwd(), filePath);
+          if (fs8.existsSync(fullPath)) {
+            vscode10.commands.executeCommand("vscode.open", vscode10.Uri.file(fullPath));
           }
         }
         break;
@@ -5079,28 +5379,28 @@ var CommitViewProvider = class _CommitViewProvider {
       case "deleteFile": {
         const filePath = msg.payload;
         if (!filePath) return;
-        const fileName = path5.basename(filePath);
-        const confirm = await vscode7.window.showWarningMessage(
+        const fileName = path10.basename(filePath);
+        const confirm = await vscode10.window.showWarningMessage(
           `Are you sure you want to delete "${fileName}"?`,
           { modal: true },
           "Delete"
         );
         if (confirm !== "Delete") return;
         try {
-          const fullPath = path5.join(this.gitService.getCwd(), filePath);
-          if (fs5.existsSync(fullPath)) {
-            if (fs5.statSync(fullPath).isDirectory()) {
-              fs5.rmSync(fullPath, { recursive: true, force: true });
+          const fullPath = path10.join(this.gitService.getCwd(), filePath);
+          if (fs8.existsSync(fullPath)) {
+            if (fs8.statSync(fullPath).isDirectory()) {
+              fs8.rmSync(fullPath, { recursive: true, force: true });
             } else {
-              fs5.unlinkSync(fullPath);
+              fs8.unlinkSync(fullPath);
             }
           }
           await this.gitService.exec(["rm", "-f", "--cached", filePath]).catch(() => {
           });
           await this.refresh();
-          vscode7.window.showInformationMessage(`Deleted ${fileName}`);
+          vscode10.window.showInformationMessage(`Deleted ${fileName}`);
         } catch (err) {
-          vscode7.window.showErrorMessage(`Delete failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Delete failed: ${err.message}`);
         }
         break;
       }
@@ -5123,7 +5423,7 @@ var CommitViewProvider = class _CommitViewProvider {
           await this.gitService.applyHunkPatch(patch, reverse);
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Apply patch failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Apply patch failed: ${err.message}`);
         }
         break;
       }
@@ -5131,12 +5431,12 @@ var CommitViewProvider = class _CommitViewProvider {
         const { message, files, amend } = msg.payload;
         try {
           await this.gitService.commitFiles(message, files, amend);
-          vscode7.window.showInformationMessage("Committed successfully.");
+          vscode10.window.showInformationMessage("Committed successfully.");
           this.view?.webview.postMessage({ type: "commitSuccess" });
           await this.refresh();
-          vscode7.commands.executeCommand("intellij-git.refreshBranches");
+          vscode10.commands.executeCommand("intellij-git.refreshBranches");
         } catch (err) {
-          vscode7.window.showErrorMessage(`Commit failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Commit failed: ${err.message}`);
         }
         break;
       }
@@ -5144,13 +5444,13 @@ var CommitViewProvider = class _CommitViewProvider {
         const { message, files, amend } = msg.payload;
         try {
           await this.gitService.commitFiles(message, files, amend);
-          vscode7.window.showInformationMessage("Committed successfully.");
+          vscode10.window.showInformationMessage("Committed successfully.");
           this.view?.webview.postMessage({ type: "commitSuccess" });
           await this.refresh();
-          vscode7.commands.executeCommand("intellij-git.refreshBranches");
+          vscode10.commands.executeCommand("intellij-git.refreshBranches");
           await this.openPushDialog();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Commit failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Commit failed: ${err.message}`);
         }
         break;
       }
@@ -5162,12 +5462,12 @@ var CommitViewProvider = class _CommitViewProvider {
         const { branch, targetBranch, force, setUpstream, remote, tags } = msg.payload || {};
         try {
           await this.gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
-          vscode7.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
+          vscode10.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
           await this.refresh();
-          vscode7.commands.executeCommand("intellij-git.refreshBranches");
+          vscode10.commands.executeCommand("intellij-git.refreshBranches");
           this.view?.webview.postMessage({ type: "pushSuccess" });
         } catch (err) {
-          vscode7.window.showErrorMessage(`Push failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Push failed: ${err.message}`);
           this.view?.webview.postMessage({ type: "pushError", payload: { error: err.message } });
         }
         break;
@@ -5176,10 +5476,10 @@ var CommitViewProvider = class _CommitViewProvider {
         const { path: filePath } = msg.payload;
         try {
           await this.gitService.acceptYours(filePath);
-          vscode7.window.showInformationMessage(`Accepted Yours for '${filePath}'`);
+          vscode10.window.showInformationMessage(`Accepted Yours for '${filePath}'`);
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Accept Yours failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Accept Yours failed: ${err.message}`);
         }
         break;
       }
@@ -5187,10 +5487,10 @@ var CommitViewProvider = class _CommitViewProvider {
         const { path: filePath } = msg.payload;
         try {
           await this.gitService.acceptTheirs(filePath);
-          vscode7.window.showInformationMessage(`Accepted Theirs for '${filePath}'`);
+          vscode10.window.showInformationMessage(`Accepted Theirs for '${filePath}'`);
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Accept Theirs failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Accept Theirs failed: ${err.message}`);
         }
         break;
       }
@@ -5199,12 +5499,12 @@ var CommitViewProvider = class _CommitViewProvider {
         try {
           await MergeEditorPanel.createOrShow(this.extensionUri, this.gitService, filePath);
         } catch (err) {
-          vscode7.window.showErrorMessage(`Failed to open merge editor: ${err.message}`);
+          vscode10.window.showErrorMessage(`Failed to open merge editor: ${err.message}`);
         }
         break;
       }
       case "abortMerge": {
-        const confirmed = await vscode7.window.showWarningMessage(
+        const confirmed = await vscode10.window.showWarningMessage(
           "Are you sure you want to abort the current merge/rebase? All uncommitted merge changes will be lost.",
           { modal: true },
           "Abort"
@@ -5212,10 +5512,10 @@ var CommitViewProvider = class _CommitViewProvider {
         if (confirmed === "Abort") {
           try {
             await this.gitService.abortMerge();
-            vscode7.window.showInformationMessage("Merge/rebase aborted.");
+            vscode10.window.showInformationMessage("Merge/rebase aborted.");
             await this.refresh();
           } catch (err) {
-            vscode7.window.showErrorMessage(`Abort failed: ${err.message}`);
+            vscode10.window.showErrorMessage(`Abort failed: ${err.message}`);
           }
         }
         break;
@@ -5227,111 +5527,20 @@ var CommitViewProvider = class _CommitViewProvider {
       case "generateAiCommitMessage": {
         const { files } = msg.payload || {};
         const checkedFiles = Array.isArray(files) ? files : [];
-        const assumedFiles = [];
-        const temporarilyUnstaged = [];
         try {
-          const allStatus = await this.gitService.getStatus();
-          const trackedToMask = [];
-          for (const s of allStatus) {
-            const isUntracked = s.x === "?" && s.y === "?";
-            const isChecked = checkedFiles.includes(s.path);
-            if (isChecked) {
-              if (s.y !== " " && s.x === " ") {
-                await this.gitService.stageFiles([s.path]);
-              } else if (isUntracked) {
-                await this.gitService.stageFiles([s.path]);
-              }
-              if (s.y !== " " && s.x !== " ") {
-                trackedToMask.push(s.path);
-              }
-            } else {
-              if (s.x !== " " && s.x !== "?") {
-                temporarilyUnstaged.push(s.path);
-                await this.gitService.unstageFile(s.path);
-              }
-              if (!isUntracked) {
-                trackedToMask.push(s.path);
-              }
-            }
-          }
-          if (trackedToMask.length > 0) {
-            await this.gitService.setAssumeUnchanged(trackedToMask, true);
-            assumedFiles.push(...trackedToMask);
-          }
-          const authorSamples = await this.gitService.getAuthorRecentCommitMessages(10);
-          const repoRoot = this.gitService.getCwd();
-          const gitExt = vscode7.extensions.getExtension("vscode.git");
-          let gitRepo;
-          if (gitExt) {
-            const gitApi = gitExt.exports.getAPI(1);
-            gitRepo = gitApi.repositories.find((r) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
-          }
-          const restoreFocus = () => {
-            vscode7.commands.executeCommand("workbench.view.extension.intellij-git-commit");
-            vscode7.commands.executeCommand("intellij-git.commitView.focus");
-          };
-          setTimeout(restoreFocus, 30);
-          setTimeout(restoreFocus, 80);
-          setTimeout(restoreFocus, 180);
-          setTimeout(restoreFocus, 350);
-          let aiMsg = "";
-          try {
-            if (vscode7.lm && typeof vscode7.lm.selectChatModels === "function") {
-              const models = await vscode7.lm.selectChatModels({ family: "gemini-1.5-pro" }).catch(() => []);
-              const model = models[0] || (await vscode7.lm.selectChatModels().catch(() => []))[0];
-              if (model) {
-                const stagedDiff = await this.gitService.getStagedDiff();
-                if (stagedDiff && stagedDiff.trim()) {
-                  const prompt = [
-                    "You are an expert Git commit message generator.",
-                    authorSamples.length > 0 ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:
-${authorSamples.map((s) => `- ${s}`).join("\n")}` : "Write a concise, high quality commit message.",
-                    "Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.",
-                    `Git diff:
-${stagedDiff.slice(0, 8e3)}`
-                  ].join("\n\n");
-                  const response = await model.sendRequest([
-                    vscode7.LanguageModelChatMessage.User(prompt)
-                  ]);
-                  let accumulated = "";
-                  for await (const chunk of response.text) {
-                    accumulated += chunk;
-                  }
-                  if (accumulated.trim()) {
-                    aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, "");
-                  }
-                }
-              }
-            }
-          } catch {
-          }
-          if (!aiMsg) {
-            aiMsg = await vscode7.commands.executeCommand("antigravity.generateCommitMessage", repoRoot) || "";
-          }
-          if (!aiMsg && gitRepo?.inputBox?.value) {
-            aiMsg = gitRepo.inputBox.value;
-          }
-          restoreFocus();
-          if (aiMsg && typeof aiMsg === "string") {
-            const finalMessage = adaptCommitMessageStyle(aiMsg, authorSamples);
+          const finalMessage = await generateAiCommitMessage(this.gitService, checkedFiles);
+          if (finalMessage) {
             this.view?.webview.postMessage({
               type: "setCommitMessage",
-              payload: { message: finalMessage.trim() }
+              payload: { message: finalMessage }
             });
           } else {
             this.view?.webview.postMessage({ type: "generateAiError" });
-            vscode7.window.showWarningMessage("No commit message was generated by AI.");
+            vscode10.window.showWarningMessage("No commit message was generated by AI.");
           }
         } catch (err) {
           this.view?.webview.postMessage({ type: "generateAiError" });
-          vscode7.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
-        } finally {
-          if (assumedFiles.length > 0) {
-            await this.gitService.setAssumeUnchanged(assumedFiles, false);
-          }
-          if (temporarilyUnstaged.length > 0) {
-            await this.gitService.stageFiles(temporarilyUnstaged);
-          }
+          vscode10.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
         }
         break;
       }
@@ -5339,26 +5548,26 @@ ${stagedDiff.slice(0, 8e3)}`
         const filePath = msg.payload;
         try {
           const leftUri = GitContentProvider.makeUri("HEAD", filePath);
-          const rightUri = vscode7.Uri.file(path5.join(this.gitService.getCwd(), filePath));
-          const fileName = path5.basename(filePath);
-          await vscode7.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (HEAD \u2194 Working Tree)`);
+          const rightUri = vscode10.Uri.file(path10.join(this.gitService.getCwd(), filePath));
+          const fileName = path10.basename(filePath);
+          await vscode10.commands.executeCommand("vscode.diff", leftUri, rightUri, `${fileName} (HEAD \u2194 Working Tree)`);
         } catch (err) {
-          vscode7.window.showErrorMessage(`Open diff editor failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Open diff editor failed: ${err.message}`);
         }
         break;
       }
       case "createStash": {
-        const msgText = await vscode7.window.showInputBox({
+        const msgText = await vscode10.window.showInputBox({
           prompt: "Stash message (optional)",
           placeHolder: "WIP on feature..."
         });
         if (msgText === void 0) return;
         try {
           await this.gitService.stashSave(msgText);
-          vscode7.window.showInformationMessage("Stashed local changes.");
+          vscode10.window.showInformationMessage("Stashed local changes.");
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Stash failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Stash failed: ${err.message}`);
         }
         break;
       }
@@ -5366,10 +5575,11 @@ ${stagedDiff.slice(0, 8e3)}`
         const idx = msg.payload;
         try {
           await this.gitService.stashPop(idx);
-          vscode7.window.showInformationMessage(`Applied and dropped ${idx}`);
-          await this.refresh();
+          vscode10.window.showInformationMessage(`Applied and dropped ${idx}`);
         } catch (err) {
-          vscode7.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+        } finally {
+          await this.refresh();
         }
         break;
       }
@@ -5377,16 +5587,17 @@ ${stagedDiff.slice(0, 8e3)}`
         const idx = msg.payload;
         try {
           await this.gitService.stashApply(idx);
-          vscode7.window.showInformationMessage(`Applied ${idx}`);
-          await this.refresh();
+          vscode10.window.showInformationMessage(`Applied ${idx}`);
         } catch (err) {
-          vscode7.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+        } finally {
+          await this.refresh();
         }
         break;
       }
       case "stashDrop": {
         const idx = msg.payload;
-        const confirm = await vscode7.window.showWarningMessage(
+        const confirm = await vscode10.window.showWarningMessage(
           `Drop stash ${idx}?`,
           { modal: true },
           "Drop"
@@ -5394,19 +5605,19 @@ ${stagedDiff.slice(0, 8e3)}`
         if (confirm !== "Drop") return;
         try {
           await this.gitService.stashDrop(idx);
-          vscode7.window.showInformationMessage(`Dropped ${idx}`);
+          vscode10.window.showInformationMessage(`Dropped ${idx}`);
           await this.refresh();
         } catch (err) {
-          vscode7.window.showErrorMessage(`Stash drop failed: ${err.message}`);
+          vscode10.window.showErrorMessage(`Stash drop failed: ${err.message}`);
         }
         break;
       }
       case "openLog": {
-        vscode7.commands.executeCommand("intellij-git.openLog");
+        vscode10.commands.executeCommand("intellij-git.openLog");
         break;
       }
       case "collapseView": {
-        vscode7.commands.executeCommand("workbench.action.toggleSidebarVisibility");
+        vscode10.commands.executeCommand("workbench.action.toggleSidebarVisibility");
         break;
       }
     }
@@ -5418,12 +5629,12 @@ ${stagedDiff.slice(0, 8e3)}`
   }
   getHtml(webview) {
     const scriptUri = webview.asWebviewUri(
-      vscode7.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.js")
+      vscode10.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.js")
     );
     const styleUri = webview.asWebviewUri(
-      vscode7.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
+      vscode10.Uri.joinPath(this.extensionUri, "dist", "webview", "commit", "commit.css")
     );
-    const nonce = getNonce4();
+    const nonce = getNonce();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5447,77 +5658,9 @@ ${stagedDiff.slice(0, 8e3)}`
     await PushDialogPanel.createOrShow(this.extensionUri, this.gitService, branch);
   }
 };
-function getNonce4() {
-  let text = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
-}
-function detectAuthorStyle(messages) {
-  if (!messages || messages.length === 0) {
-    return { type: "imperative", endsWithPeriod: false };
-  }
-  let conventionalCount = 0;
-  let imperativeCount = 0;
-  let periodCount = 0;
-  let scopeCount = 0;
-  const conventionalRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?:\s*(.+)/i;
-  for (const msg of messages) {
-    if (msg.endsWith(".")) periodCount++;
-    const convMatch = msg.match(conventionalRegex);
-    if (convMatch) {
-      conventionalCount++;
-      if (convMatch[2]) scopeCount++;
-    } else if (/^[A-Z][a-zA-Z0-9_\-]*\s+/.test(msg)) {
-      imperativeCount++;
-    }
-  }
-  return {
-    type: conventionalCount > imperativeCount ? "conventional" : "imperative",
-    hasScope: scopeCount > conventionalCount / 2,
-    endsWithPeriod: periodCount > messages.length / 2
-  };
-}
-function adaptCommitMessageStyle(raw, samples) {
-  if (!raw) return raw;
-  const style = detectAuthorStyle(samples);
-  let msg = raw.trim();
-  if (style.type === "imperative") {
-    msg = msg.replace(/^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^\)]+\))?!?:\s*/i, "");
-    msg = msg.charAt(0).toUpperCase() + msg.slice(1);
-    if (!style.endsWithPeriod) {
-      msg = msg.replace(/\.+$/, "");
-    } else if (!msg.endsWith(".")) {
-      msg += ".";
-    }
-    return msg;
-  } else {
-    const convRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?!?:\s*(.+)/i;
-    const match = msg.match(convRegex);
-    if (match) {
-      const type2 = match[1].toLowerCase();
-      const scope = match[2] ? match[2].toLowerCase() : "";
-      let desc2 = match[3].trim();
-      desc2 = desc2.charAt(0).toLowerCase() + desc2.slice(1);
-      desc2 = desc2.replace(/\.+$/, "");
-      return `${type2}${scope}: ${desc2}`;
-    }
-    let type = "feat";
-    if (/^(fix|resolve|prevent|handle|correct)\b/i.test(msg)) type = "fix";
-    else if (/^(refactor|clean|simplify)\b/i.test(msg)) type = "refactor";
-    else if (/^(doc|document|docs)\b/i.test(msg)) type = "docs";
-    else if (/^(test|tests)\b/i.test(msg)) type = "test";
-    else if (/^(chore|build|ci)\b/i.test(msg)) type = "chore";
-    let desc = msg.charAt(0).toLowerCase() + msg.slice(1);
-    desc = desc.replace(/\.+$/, "");
-    return `${type}: ${desc}`;
-  }
-}
 
 // src/views/rebasePanel.ts
-var vscode8 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 var RebasePanel = class _RebasePanel {
   constructor(panel, extensionUri, gitService, rebaseHandler, baseHash) {
     this.extensionUri = extensionUri;
@@ -5547,15 +5690,15 @@ var RebasePanel = class _RebasePanel {
       _RebasePanel.currentPanel.panel.reveal();
       return;
     }
-    const panel = vscode8.window.createWebviewPanel(
+    const panel = vscode11.window.createWebviewPanel(
       _RebasePanel.viewType,
       "Interactive Rebase",
-      vscode8.ViewColumn.One,
+      vscode11.ViewColumn.One,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [
-          vscode8.Uri.joinPath(extensionUri, "dist", "webview")
+          vscode11.Uri.joinPath(extensionUri, "dist", "webview")
         ]
       }
     );
@@ -5582,7 +5725,7 @@ var RebasePanel = class _RebasePanel {
         }))
       });
     } catch (err) {
-      vscode8.window.showErrorMessage(`Failed to load commits for rebase: ${err.message}`);
+      vscode11.window.showErrorMessage(`Failed to load commits for rebase: ${err.message}`);
     }
   }
   async handleMessage(msg) {
@@ -5592,20 +5735,20 @@ var RebasePanel = class _RebasePanel {
         this.panel.webview.postMessage({ type: "rebaseStarted" });
         const result = await this.rebaseHandler.executeRebase(this.baseHash, todoItems);
         if (result.success) {
-          vscode8.window.showInformationMessage("Rebase completed successfully.");
+          vscode11.window.showInformationMessage("Rebase completed successfully.");
           this.panel.dispose();
         } else if (result.error === "conflict") {
-          vscode8.window.showWarningMessage(
+          vscode11.window.showWarningMessage(
             "Rebase paused due to conflicts. Resolve them and continue.",
             "Open Merge Editor"
           ).then((choice) => {
             if (choice === "Open Merge Editor") {
-              vscode8.commands.executeCommand("intellij-git.resolveConflicts");
+              vscode11.commands.executeCommand("intellij-git.resolveConflicts");
             }
           });
           this.panel.dispose();
         } else {
-          vscode8.window.showErrorMessage(`Rebase failed: ${result.error}`);
+          vscode11.window.showErrorMessage(`Rebase failed: ${result.error}`);
           this.panel.webview.postMessage({
             type: "rebaseError",
             payload: result.error
@@ -5616,7 +5759,7 @@ var RebasePanel = class _RebasePanel {
       case "abort": {
         try {
           await this.rebaseHandler.abortRebase();
-          vscode8.window.showInformationMessage("Rebase aborted.");
+          vscode11.window.showInformationMessage("Rebase aborted.");
         } catch {
         }
         this.panel.dispose();
@@ -5627,9 +5770,9 @@ var RebasePanel = class _RebasePanel {
   getHtml() {
     const webview = this.panel.webview;
     const scriptUri = webview.asWebviewUri(
-      vscode8.Uri.joinPath(this.extensionUri, "dist", "webview", "rebase", "rebase.js")
+      vscode11.Uri.joinPath(this.extensionUri, "dist", "webview", "rebase", "rebase.js")
     );
-    const nonce = getNonce5();
+    const nonce = getNonce2();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5651,7 +5794,7 @@ var RebasePanel = class _RebasePanel {
     for (const d of this.disposables) d.dispose();
   }
 };
-function getNonce5() {
+function getNonce2() {
   let text = "";
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
@@ -5661,46 +5804,46 @@ function getNonce5() {
 }
 
 // src/views/branchTree.ts
-var vscode9 = __toESM(require("vscode"));
+var vscode12 = __toESM(require("vscode"));
 var BranchTreeProvider = class {
   constructor(gitService) {
     this.gitService = gitService;
   }
   gitService;
-  _onDidChangeTreeData = new vscode9.EventEmitter();
+  _onDidChangeTreeData = new vscode12.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   refresh() {
     this._onDidChangeTreeData.fire(void 0);
   }
   getTreeItem(element) {
-    const collapsible = element.children ? vscode9.TreeItemCollapsibleState.Expanded : vscode9.TreeItemCollapsibleState.None;
-    const item = new vscode9.TreeItem(element.label, collapsible);
+    const collapsible = element.children ? vscode12.TreeItemCollapsibleState.Expanded : vscode12.TreeItemCollapsibleState.None;
+    const item = new vscode12.TreeItem(element.label, collapsible);
     switch (element.type) {
       case "category":
-        item.iconPath = new vscode9.ThemeIcon(
+        item.iconPath = new vscode12.ThemeIcon(
           element.label === "Tags" ? "tag" : "git-branch"
         );
         break;
       case "remote-group":
-        item.iconPath = new vscode9.ThemeIcon("cloud");
+        item.iconPath = new vscode12.ThemeIcon("cloud");
         break;
       case "branch-current":
-        item.iconPath = new vscode9.ThemeIcon("star-full");
+        item.iconPath = new vscode12.ThemeIcon("star-full");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "branch-current";
         break;
       case "branch-local":
-        item.iconPath = new vscode9.ThemeIcon("git-branch");
+        item.iconPath = new vscode12.ThemeIcon("git-branch");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "branch-local";
         break;
       case "branch-remote":
-        item.iconPath = new vscode9.ThemeIcon("git-branch");
+        item.iconPath = new vscode12.ThemeIcon("git-branch");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "branch-remote";
         break;
       case "tag":
-        item.iconPath = new vscode9.ThemeIcon("tag");
+        item.iconPath = new vscode12.ThemeIcon("tag");
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "tag";
         break;
@@ -5788,9 +5931,9 @@ var BranchTreeProvider = class {
 };
 
 // src/views/changelistTree.ts
-var vscode10 = __toESM(require("vscode"));
-var path6 = __toESM(require("path"));
-var fs6 = __toESM(require("fs"));
+var vscode13 = __toESM(require("vscode"));
+var path11 = __toESM(require("path"));
+var fs9 = __toESM(require("fs"));
 var DEFAULT_DATA = {
   changelists: [{ name: "Default", files: [] }],
   active: "Default"
@@ -5799,13 +5942,13 @@ var ChangelistTreeProvider = class {
   constructor(gitService, workspaceRoot) {
     this.gitService = gitService;
     this.workspaceRoot = workspaceRoot;
-    const vscodePath = path6.join(workspaceRoot, ".vscode");
-    this.dataPath = path6.join(vscodePath, "changelists.json");
+    const vscodePath = path11.join(workspaceRoot, ".vscode");
+    this.dataPath = path11.join(vscodePath, "changelists.json");
     this.load();
   }
   gitService;
   workspaceRoot;
-  _onDidChangeTreeData = new vscode10.EventEmitter();
+  _onDidChangeTreeData = new vscode13.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   data = DEFAULT_DATA;
   dataPath;
@@ -5831,12 +5974,12 @@ var ChangelistTreeProvider = class {
   }
   getTreeItem(element) {
     if (element.type === "changelist") {
-      const item = new vscode10.TreeItem(
+      const item = new vscode13.TreeItem(
         element.name,
-        vscode10.TreeItemCollapsibleState.Expanded
+        vscode13.TreeItemCollapsibleState.Expanded
       );
       item.contextValue = element.active ? "changelist-active" : "changelist";
-      item.iconPath = new vscode10.ThemeIcon(
+      item.iconPath = new vscode13.ThemeIcon(
         element.active ? "folder-active" : "folder"
       );
       if (element.active) {
@@ -5844,14 +5987,14 @@ var ChangelistTreeProvider = class {
       }
       return item;
     } else {
-      const item = new vscode10.TreeItem(
-        path6.basename(element.path),
-        vscode10.TreeItemCollapsibleState.None
+      const item = new vscode13.TreeItem(
+        path11.basename(element.path),
+        vscode13.TreeItemCollapsibleState.None
       );
-      item.description = path6.dirname(element.path);
+      item.description = path11.dirname(element.path);
       item.contextValue = "changelist-file";
-      item.resourceUri = vscode10.Uri.joinPath(
-        vscode10.Uri.file(this.workspaceRoot),
+      item.resourceUri = vscode13.Uri.joinPath(
+        vscode13.Uri.file(this.workspaceRoot),
         element.path
       );
       item.command = {
@@ -5882,14 +6025,14 @@ var ChangelistTreeProvider = class {
   }
   async createChangelist(name) {
     if (!name) {
-      name = await vscode10.window.showInputBox({
+      name = await vscode13.window.showInputBox({
         prompt: "Changelist name",
         placeHolder: "Feature: ..."
       });
     }
     if (!name) return;
     if (this.data.changelists.some((c) => c.name === name)) {
-      vscode10.window.showWarningMessage(`Changelist "${name}" already exists.`);
+      vscode13.window.showWarningMessage(`Changelist "${name}" already exists.`);
       return;
     }
     this.data.changelists.push({ name, files: [] });
@@ -5898,7 +6041,7 @@ var ChangelistTreeProvider = class {
   }
   async deleteChangelist(name) {
     if (name === "Default") {
-      vscode10.window.showWarningMessage("Cannot delete the Default changelist.");
+      vscode13.window.showWarningMessage("Cannot delete the Default changelist.");
       return;
     }
     const cl = this.data.changelists.find((c) => c.name === name);
@@ -5923,10 +6066,10 @@ var ChangelistTreeProvider = class {
     const clName = name || this.data.active;
     const cl = this.data.changelists.find((c) => c.name === clName);
     if (!cl || cl.files.length === 0) {
-      vscode10.window.showWarningMessage(`Changelist "${clName}" has no files.`);
+      vscode13.window.showWarningMessage(`Changelist "${clName}" has no files.`);
       return;
     }
-    const message = await vscode10.window.showInputBox({
+    const message = await vscode13.window.showInputBox({
       prompt: "Commit message",
       placeHolder: clName === "Default" ? "Commit message..." : clName,
       value: clName === "Default" ? "" : clName
@@ -5938,9 +6081,9 @@ var ChangelistTreeProvider = class {
       cl.files = [];
       this.save();
       this._onDidChangeTreeData.fire(void 0);
-      vscode10.window.showInformationMessage(`Committed changelist "${clName}".`);
+      vscode13.window.showInformationMessage(`Committed changelist "${clName}".`);
     } catch (err) {
-      vscode10.window.showErrorMessage(`Commit failed: ${err.message}`);
+      vscode13.window.showErrorMessage(`Commit failed: ${err.message}`);
     }
   }
   /**
@@ -5983,8 +6126,8 @@ var ChangelistTreeProvider = class {
   }
   load() {
     try {
-      if (fs6.existsSync(this.dataPath)) {
-        const raw = fs6.readFileSync(this.dataPath, "utf-8");
+      if (fs9.existsSync(this.dataPath)) {
+        const raw = fs9.readFileSync(this.dataPath, "utf-8");
         this.data = JSON.parse(raw);
       }
     } catch {
@@ -6001,23 +6144,23 @@ var ChangelistTreeProvider = class {
   }
   save() {
     try {
-      const dir = path6.dirname(this.dataPath);
-      if (!fs6.existsSync(dir)) {
-        fs6.mkdirSync(dir, { recursive: true });
+      const dir = path11.dirname(this.dataPath);
+      if (!fs9.existsSync(dir)) {
+        fs9.mkdirSync(dir, { recursive: true });
       }
-      fs6.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2), "utf-8");
+      fs9.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2), "utf-8");
     } catch {
     }
   }
 };
 
 // src/providers/blameDecorations.ts
-var vscode11 = __toESM(require("vscode"));
+var vscode14 = __toESM(require("vscode"));
 
 // src/git/blameParser.ts
-var import_child_process3 = require("child_process");
+var import_child_process4 = require("child_process");
 var import_util3 = require("util");
-var execFileAsync3 = (0, import_util3.promisify)(import_child_process3.execFile);
+var execFileAsync3 = (0, import_util3.promisify)(import_child_process4.execFile);
 var blameCache = new LRUCache(200);
 function invalidateBlameCache(file) {
   blameCache.delete(file);
@@ -6098,7 +6241,7 @@ var blameEnabled = /* @__PURE__ */ new Map();
 var decorationType;
 function getOrCreateDecorationType() {
   if (!decorationType) {
-    decorationType = vscode11.window.createTextEditorDecorationType({
+    decorationType = vscode14.window.createTextEditorDecorationType({
       before: {
         width: "22ch",
         fontStyle: "normal"
@@ -6128,18 +6271,18 @@ var BlameDecorationProvider = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
     this.disposables.push(
-      vscode11.window.onDidChangeTextEditorVisibleRanges((e) => {
+      vscode14.window.onDidChangeTextEditorVisibleRanges((e) => {
         if (this.isEnabled(e.textEditor)) {
           this.updateDecorations(e.textEditor);
         }
       })
     );
     this.disposables.push(
-      vscode11.workspace.onDidSaveTextDocument((doc) => {
-        const relativePath = vscode11.workspace.asRelativePath(doc.uri);
+      vscode14.workspace.onDidSaveTextDocument((doc) => {
+        const relativePath = vscode14.workspace.asRelativePath(doc.uri);
         invalidateBlameCache(relativePath);
         this.blameData.delete(doc.uri.toString());
-        const editor = vscode11.window.visibleTextEditors.find(
+        const editor = vscode14.window.visibleTextEditors.find(
           (e) => e.document.uri.toString() === doc.uri.toString()
         );
         if (editor && this.isEnabled(editor)) {
@@ -6148,15 +6291,15 @@ var BlameDecorationProvider = class {
       })
     );
     this.disposables.push(
-      vscode11.window.onDidChangeActiveTextEditor((editor) => {
+      vscode14.window.onDidChangeActiveTextEditor((editor) => {
         if (editor && this.isEnabled(editor)) {
           this.updateDecorations(editor);
         }
       })
     );
     this.disposables.push(
-      vscode11.window.onDidChangeTextEditorSelection((e) => {
-        if (e.kind !== vscode11.TextEditorSelectionChangeKind.Mouse) return;
+      vscode14.window.onDidChangeTextEditorSelection((e) => {
+        if (e.kind !== vscode14.TextEditorSelectionChangeKind.Mouse) return;
         if (!this.isEnabled(e.textEditor)) return;
         const sel = e.selections[0];
         if (!sel || !sel.isEmpty) return;
@@ -6166,11 +6309,11 @@ var BlameDecorationProvider = class {
         if (!lines) return;
         const blameLine = lines.find((l) => l.lineNumber === sel.active.line + 1);
         if (!blameLine || blameLine.hash.startsWith("0000000")) return;
-        vscode11.commands.executeCommand("intellij-git.showCommitInLog", blameLine.hash);
+        vscode14.commands.executeCommand("intellij-git.showCommitInLog", blameLine.hash);
       })
     );
     this.disposables.push(
-      vscode11.languages.registerHoverProvider("*", {
+      vscode14.languages.registerHoverProvider("*", {
         provideHover: (doc, pos) => this.provideHover(doc, pos)
       })
     );
@@ -6195,7 +6338,7 @@ var BlameDecorationProvider = class {
   async updateDecorations(editor) {
     const uri = editor.document.uri.toString();
     if (!blameEnabled.get(uri)) return;
-    const relativePath = vscode11.workspace.asRelativePath(editor.document.uri);
+    const relativePath = vscode14.workspace.asRelativePath(editor.document.uri);
     let lines = this.blameData.get(uri);
     if (!lines) {
       try {
@@ -6218,7 +6361,7 @@ var BlameDecorationProvider = class {
         const author = blameLine.author.length > 10 ? blameLine.author.slice(0, 10) : blameLine.author.padEnd(10);
         const text = `${date}  ${author}`;
         decorations.push({
-          range: new vscode11.Range(lineNum, 0, lineNum, 0),
+          range: new vscode14.Range(lineNum, 0, lineNum, 0),
           renderOptions: {
             before: {
               contentText: text,
@@ -6241,7 +6384,7 @@ var BlameDecorationProvider = class {
     if (!lines) return void 0;
     const blameLine = lines.find((l) => l.lineNumber === position.line + 1);
     if (!blameLine || blameLine.hash.startsWith("0000000")) return void 0;
-    const md = new vscode11.MarkdownString();
+    const md = new vscode14.MarkdownString();
     md.appendMarkdown(`**${blameLine.summary}**
 
 `);
@@ -6251,7 +6394,7 @@ var BlameDecorationProvider = class {
 `);
     md.appendMarkdown(`- **Commit:** \`${blameLine.hash.slice(0, 10)}\`
 `);
-    return new vscode11.Hover(md);
+    return new vscode14.Hover(md);
   }
   dispose() {
     for (const d of this.disposables) d.dispose();
@@ -6265,15 +6408,15 @@ var BlameDecorationProvider = class {
 };
 
 // src/providers/mergeProvider.ts
-var vscode12 = __toESM(require("vscode"));
-var path7 = __toESM(require("path"));
-var fs7 = __toESM(require("fs"));
+var vscode15 = __toESM(require("vscode"));
+var path12 = __toESM(require("path"));
+var fs10 = __toESM(require("fs"));
 var MergeProvider = class {
   constructor(gitService, workspaceRoot) {
     this.gitService = gitService;
     this.workspaceRoot = workspaceRoot;
-    this.statusBarItem = vscode12.window.createStatusBarItem(
-      vscode12.StatusBarAlignment.Left,
+    this.statusBarItem = vscode15.window.createStatusBarItem(
+      vscode15.StatusBarAlignment.Left,
       100
     );
     this.statusBarItem.command = "intellij-git.resolveConflicts";
@@ -6289,8 +6432,8 @@ var MergeProvider = class {
   }
   async checkForConflicts() {
     try {
-      const gitDir = path7.join(this.workspaceRoot, ".git");
-      const hasConflictState = fs7.existsSync(path7.join(gitDir, "MERGE_HEAD")) || fs7.existsSync(path7.join(gitDir, "rebase-apply")) || fs7.existsSync(path7.join(gitDir, "rebase-merge")) || fs7.existsSync(path7.join(gitDir, "CHERRY_PICK_HEAD"));
+      const gitDir = path12.join(this.workspaceRoot, ".git");
+      const hasConflictState = fs10.existsSync(path12.join(gitDir, "MERGE_HEAD")) || fs10.existsSync(path12.join(gitDir, "rebase-apply")) || fs10.existsSync(path12.join(gitDir, "rebase-merge")) || fs10.existsSync(path12.join(gitDir, "CHERRY_PICK_HEAD"));
       if (!hasConflictState) {
         this.statusBarItem.hide();
         return;
@@ -6299,7 +6442,7 @@ var MergeProvider = class {
       if (unmerged.length > 0) {
         this.statusBarItem.text = `$(git-merge) ${unmerged.length} conflict${unmerged.length > 1 ? "s" : ""}`;
         this.statusBarItem.tooltip = `${unmerged.length} unresolved merge conflict(s). Click to resolve.`;
-        this.statusBarItem.backgroundColor = new vscode12.ThemeColor(
+        this.statusBarItem.backgroundColor = new vscode15.ThemeColor(
           "statusBarItem.warningBackground"
         );
         this.statusBarItem.show();
@@ -6313,23 +6456,23 @@ var MergeProvider = class {
   async resolveConflicts() {
     const unmerged = await this.gitService.getUnmergedFiles();
     if (unmerged.length === 0) {
-      vscode12.window.showInformationMessage("No merge conflicts to resolve.");
+      vscode15.window.showInformationMessage("No merge conflicts to resolve.");
       return;
     }
     const items = unmerged.map((f) => ({
       label: f,
       description: "Unresolved conflict"
     }));
-    const selected = await vscode12.window.showQuickPick(items, {
+    const selected = await vscode15.window.showQuickPick(items, {
       placeHolder: `${unmerged.length} file(s) with conflicts \u2014 select to resolve`,
       canPickMany: false
     });
     if (selected) {
-      const fileUri = vscode12.Uri.joinPath(
-        vscode12.Uri.file(this.workspaceRoot),
+      const fileUri = vscode15.Uri.joinPath(
+        vscode15.Uri.file(this.workspaceRoot),
         selected.label
       );
-      await vscode12.commands.executeCommand("vscode.open", fileUri);
+      await vscode15.commands.executeCommand("vscode.open", fileUri);
     }
   }
   async acceptAllNonConflicting() {
@@ -6343,10 +6486,10 @@ var MergeProvider = class {
         }
       }
       if (staged > 0) {
-        vscode12.window.showInformationMessage(`Auto-staged ${staged} resolved file(s).`);
+        vscode15.window.showInformationMessage(`Auto-staged ${staged} resolved file(s).`);
       }
     } catch (err) {
-      vscode12.window.showErrorMessage(`Failed: ${err.message}`);
+      vscode15.window.showErrorMessage(`Failed: ${err.message}`);
     }
   }
   dispose() {
@@ -6357,10 +6500,10 @@ var MergeProvider = class {
 // src/extension.ts
 var log;
 function activate(context) {
-  log = vscode13.window.createOutputChannel("IntelliJ Git");
+  log = vscode16.window.createOutputChannel("IntelliJ Git");
   context.subscriptions.push(log);
   log.appendLine("IntelliJ Git extension activating...");
-  const workspaceFolder = vscode13.workspace.workspaceFolders?.[0];
+  const workspaceFolder = vscode16.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) {
     log.appendLine("No workspace folder found \u2014 aborting activation.");
     return;
@@ -6371,7 +6514,7 @@ function activate(context) {
   const rebaseHandler = new RebaseHandler(workspaceRoot);
   const gitContentProvider = new GitContentProvider(gitService);
   context.subscriptions.push(
-    vscode13.workspace.registerTextDocumentContentProvider(
+    vscode16.workspace.registerTextDocumentContentProvider(
       GitContentProvider.scheme,
       gitContentProvider
     )
@@ -6382,7 +6525,7 @@ function activate(context) {
   );
   const graphViewProvider = new GraphViewProvider(context.extensionUri, gitService, log);
   context.subscriptions.push(
-    vscode13.window.registerWebviewViewProvider(
+    vscode16.window.registerWebviewViewProvider(
       GraphViewProvider.viewType,
       graphViewProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
@@ -6390,20 +6533,20 @@ function activate(context) {
   );
   const commitViewProvider = new CommitViewProvider(context.extensionUri, gitService, log);
   context.subscriptions.push(
-    vscode13.window.registerWebviewViewProvider(
+    vscode16.window.registerWebviewViewProvider(
       CommitViewProvider.viewType,
       commitViewProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
   const branchTree = new BranchTreeProvider(gitService);
-  const branchTreeView = vscode13.window.createTreeView("intellij-git.branches", {
+  const branchTreeView = vscode16.window.createTreeView("intellij-git.branches", {
     treeDataProvider: branchTree,
     showCollapseAll: true
   });
   context.subscriptions.push(branchTreeView);
   const changelistTree = new ChangelistTreeProvider(gitService, workspaceRoot);
-  const changelistTreeView = vscode13.window.createTreeView("intellij-git.changelists", {
+  const changelistTreeView = vscode16.window.createTreeView("intellij-git.changelists", {
     treeDataProvider: changelistTree,
     showCollapseAll: true
   });
@@ -6414,36 +6557,36 @@ function activate(context) {
   const mergeProvider = new MergeProvider(gitService, workspaceRoot);
   context.subscriptions.push(mergeProvider);
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.openCommit", () => {
-      vscode13.commands.executeCommand("intellij-git.commitView.focus");
+    vscode16.commands.registerCommand("intellij-git.openCommit", () => {
+      vscode16.commands.executeCommand("intellij-git.commitView.focus");
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.openLog", () => {
-      vscode13.commands.executeCommand("intellij-git.logView.focus");
+    vscode16.commands.registerCommand("intellij-git.openLog", () => {
+      vscode16.commands.executeCommand("intellij-git.logView.focus");
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.showCommitInLog", (hash) => {
-      vscode13.commands.executeCommand("intellij-git.logView.focus");
+    vscode16.commands.registerCommand("intellij-git.showCommitInLog", (hash) => {
+      vscode16.commands.executeCommand("intellij-git.logView.focus");
       graphViewProvider.selectCommit(hash);
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.toggleBlame", () => {
-      const editor = vscode13.window.activeTextEditor;
+    vscode16.commands.registerCommand("intellij-git.toggleBlame", () => {
+      const editor = vscode16.window.activeTextEditor;
       if (editor) {
         log.appendLine(`Toggling blame on ${editor.document.uri.fsPath}`);
         blameProvider.toggle(editor);
       } else {
-        vscode13.window.showWarningMessage("No active text editor for blame.");
+        vscode16.window.showWarningMessage("No active text editor for blame.");
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.interactiveRebase", async (baseHash) => {
+    vscode16.commands.registerCommand("intellij-git.interactiveRebase", async (baseHash) => {
       if (!baseHash) {
-        baseHash = await vscode13.window.showInputBox({
+        baseHash = await vscode16.window.showInputBox({
           prompt: "Base commit hash (rebase from this point)",
           placeHolder: "e.g. HEAD~5 or a commit hash"
         });
@@ -6453,27 +6596,27 @@ function activate(context) {
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.refreshBranches", () => {
+    vscode16.commands.registerCommand("intellij-git.refreshBranches", () => {
       branchTree.refresh();
       graphViewProvider.refresh();
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.checkoutBranch", async (node) => {
+    vscode16.commands.registerCommand("intellij-git.checkoutBranch", async (node) => {
       const ref = node?.ref;
       if (!ref) return;
       try {
         await gitService.checkout(ref);
         graphViewProvider.refresh();
-        vscode13.window.showInformationMessage(`Checked out ${ref}`);
+        vscode16.window.showInformationMessage(`Checked out ${ref}`);
       } catch (err) {
-        vscode13.window.showErrorMessage(`Checkout failed: ${err.message}`);
+        vscode16.window.showErrorMessage(`Checkout failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.createBranch", async (node) => {
-      const name = await vscode13.window.showInputBox({
+    vscode16.commands.registerCommand("intellij-git.createBranch", async (node) => {
+      const name = await vscode16.window.showInputBox({
         prompt: "New branch name",
         placeHolder: "feature/..."
       });
@@ -6481,17 +6624,17 @@ function activate(context) {
       try {
         await gitService.createBranch(name, node?.ref);
         graphViewProvider.refresh();
-        vscode13.window.showInformationMessage(`Created and checked out ${name}`);
+        vscode16.window.showInformationMessage(`Created and checked out ${name}`);
       } catch (err) {
-        vscode13.window.showErrorMessage(`Create branch failed: ${err.message}`);
+        vscode16.window.showErrorMessage(`Create branch failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.deleteBranch", async (node) => {
+    vscode16.commands.registerCommand("intellij-git.deleteBranch", async (node) => {
       const ref = node?.ref;
       if (!ref) return;
-      const confirm = await vscode13.window.showWarningMessage(
+      const confirm = await vscode16.window.showWarningMessage(
         `Delete branch "${ref}"?`,
         { modal: true },
         "Delete"
@@ -6501,107 +6644,107 @@ function activate(context) {
         await gitService.deleteBranch(ref);
         graphViewProvider.refresh();
       } catch (err) {
-        vscode13.window.showErrorMessage(`Delete failed: ${err.message}`);
+        vscode16.window.showErrorMessage(`Delete failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.mergeBranch", async (node) => {
+    vscode16.commands.registerCommand("intellij-git.mergeBranch", async (node) => {
       const ref = node?.ref;
       if (!ref) return;
       try {
         await gitService.merge(ref);
         graphViewProvider.refresh();
-        vscode13.window.showInformationMessage(`Merged ${ref} into current branch.`);
+        vscode16.window.showInformationMessage(`Merged ${ref} into current branch.`);
       } catch (err) {
         if (err.message?.includes("CONFLICT")) {
-          vscode13.window.showWarningMessage(
+          vscode16.window.showWarningMessage(
             `Merge conflicts detected. Resolve them to complete the merge.`,
             "Resolve"
           ).then((choice) => {
             if (choice === "Resolve") {
-              vscode13.commands.executeCommand("intellij-git.resolveConflicts");
+              vscode16.commands.executeCommand("intellij-git.resolveConflicts");
             }
           });
         } else {
-          vscode13.window.showErrorMessage(`Merge failed: ${err.message}`);
+          vscode16.window.showErrorMessage(`Merge failed: ${err.message}`);
         }
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.rebaseBranch", async (node) => {
+    vscode16.commands.registerCommand("intellij-git.rebaseBranch", async (node) => {
       const ref = node?.ref;
       if (!ref) return;
       try {
         await gitService.rebase(ref);
         graphViewProvider.refresh();
-        vscode13.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
+        vscode16.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
       } catch (err) {
-        vscode13.window.showErrorMessage(`Rebase failed: ${err.message}`);
+        vscode16.window.showErrorMessage(`Rebase failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.compareBranch", async (node) => {
+    vscode16.commands.registerCommand("intellij-git.compareBranch", async (node) => {
       const ref = node?.ref;
       if (!ref) return;
       try {
         const current = await gitService.getCurrentBranch();
-        await vscode13.commands.executeCommand("git.branchCompare", ref, current);
+        await vscode16.commands.executeCommand("git.branchCompare", ref, current);
       } catch (err) {
-        vscode13.window.showErrorMessage(`Compare failed: ${err.message}`);
+        vscode16.window.showErrorMessage(`Compare failed: ${err.message}`);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.resolveConflicts", async () => {
+    vscode16.commands.registerCommand("intellij-git.resolveConflicts", async () => {
       await ConflictsDialogPanel.createOrShow(context.extensionUri, gitService);
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.openMergeEditor", async (filePath) => {
+    vscode16.commands.registerCommand("intellij-git.openMergeEditor", async (filePath) => {
       if (filePath) {
         await MergeEditorPanel.createOrShow(context.extensionUri, gitService, filePath);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.acceptAllNonConflicting", () => {
+    vscode16.commands.registerCommand("intellij-git.acceptAllNonConflicting", () => {
       mergeProvider.acceptAllNonConflicting();
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.pushDialog", async (branch) => {
+    vscode16.commands.registerCommand("intellij-git.pushDialog", async (branch) => {
       await PushDialogPanel.createOrShow(context.extensionUri, gitService, branch);
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.newChangelist", () => {
+    vscode16.commands.registerCommand("intellij-git.newChangelist", () => {
       changelistTree.createChangelist();
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.deleteChangelist", (node) => {
+    vscode16.commands.registerCommand("intellij-git.deleteChangelist", (node) => {
       if (node?.name) {
         changelistTree.deleteChangelist(node.name);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.setActiveChangelist", (node) => {
+    vscode16.commands.registerCommand("intellij-git.setActiveChangelist", (node) => {
       if (node?.name) {
         changelistTree.setActive(node.name);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.commitChangelist", (node) => {
+    vscode16.commands.registerCommand("intellij-git.commitChangelist", (node) => {
       changelistTree.commitChangelist(node?.name);
     })
   );
   context.subscriptions.push(
-    vscode13.commands.registerCommand("intellij-git.refreshChangelists", () => {
+    vscode16.commands.registerCommand("intellij-git.refreshChangelists", () => {
       changelistTree.refresh();
     })
   );
@@ -6612,8 +6755,8 @@ function activate(context) {
       timer = setTimeout(() => fn(...args), delay);
     };
   }
-  const gitWatcher = vscode13.workspace.createFileSystemWatcher(
-    new vscode13.RelativePattern(workspaceRoot, ".git/{HEAD,refs/**,packed-refs}")
+  const gitWatcher = vscode16.workspace.createFileSystemWatcher(
+    new vscode16.RelativePattern(workspaceRoot, ".git/{HEAD,refs/**,packed-refs}")
   );
   const onGitChange = debounce(() => {
     log.appendLine("Git change detected \u2014 refreshing views...");
@@ -6637,7 +6780,7 @@ function activate(context) {
   gitWatcher.onDidDelete(handleGitFsEvent);
   context.subscriptions.push(gitWatcher);
   try {
-    const gitExt = vscode13.extensions.getExtension("vscode.git");
+    const gitExt = vscode16.extensions.getExtension("vscode.git");
     if (gitExt) {
       const gitApi = gitExt.exports.getAPI?.(1);
       if (gitApi) {
@@ -6660,19 +6803,19 @@ function activate(context) {
     }
   }, 400);
   context.subscriptions.push(
-    vscode13.workspace.onDidSaveTextDocument((doc) => {
+    vscode16.workspace.onDidSaveTextDocument((doc) => {
       if (doc.uri.scheme === "file") {
         onWorkspaceFileChange(doc);
       }
     })
   );
   context.subscriptions.push(
-    vscode13.workspace.onDidCreateFiles(() => onWorkspaceFileChange()),
-    vscode13.workspace.onDidDeleteFiles(() => onWorkspaceFileChange()),
-    vscode13.workspace.onDidRenameFiles(() => onWorkspaceFileChange())
+    vscode16.workspace.onDidCreateFiles(() => onWorkspaceFileChange()),
+    vscode16.workspace.onDidDeleteFiles(() => onWorkspaceFileChange()),
+    vscode16.workspace.onDidRenameFiles(() => onWorkspaceFileChange())
   );
   context.subscriptions.push(
-    vscode13.window.onDidChangeWindowState((e) => {
+    vscode16.window.onDidChangeWindowState((e) => {
       if (e.focused) {
         commitViewProvider.refresh();
         branchTree.refresh();

@@ -2,64 +2,38 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 import { LRUCache } from '../cache';
 
+import {
+  Commit,
+  FileChange,
+  BranchInfo,
+  TagInfo,
+  StatusEntry,
+  ConflictInfo,
+  PushInfo,
+  SEP,
+  LOG_FORMAT,
+} from './gitTypes';
+
+import * as conflictOps from './operations/conflictOperations';
+import * as branchOps from './operations/branchOperations';
+import * as stagingOps from './operations/stagingOperations';
+import * as commitOps from './operations/commitOperations';
+
+export {
+  Commit,
+  FileChange,
+  BranchInfo,
+  TagInfo,
+  StatusEntry,
+  ConflictInfo,
+  PushInfo,
+  SEP,
+  LOG_FORMAT,
+};
+
 const execFileAsync = promisify(execFile);
-
-export interface Commit {
-  hash: string;
-  abbreviatedHash: string;
-  parents: string[];
-  author: string;
-  authorEmail: string;
-  authorDate: string;
-  subject: string;
-  body: string;
-  refs: string[];
-}
-
-export interface FileChange {
-  status: string; // 'A' | 'M' | 'D' | 'R' | 'C'
-  path: string;
-  oldPath?: string;
-}
-
-export interface BranchInfo {
-  name: string;
-  current: boolean;
-  remote?: string;
-  upstream?: string;
-  hash: string;
-  ahead?: number;
-  behind?: number;
-}
-
-export interface TagInfo {
-  name: string;
-  hash: string;
-}
-
-export interface StatusEntry {
-  x: string; // index status
-  y: string; // worktree status
-  path: string;
-  origPath?: string;
-}
-
-// Field separator unlikely to appear in commit messages
-const SEP = '\x1e';
-const LOG_FORMAT = [
-  '%x00%H', // hash with null byte commit delimiter
-  '%h',   // abbreviated hash
-  '%P',   // parent hashes
-  '%an',  // author name
-  '%ae',  // author email
-  '%aI',  // author date ISO
-  '%s',   // subject
-  '%b',   // body
-  '%D',   // ref names
-].join(SEP);
 
 export class GitService {
   private commitCache = new LRUCache<string, Commit>(5000);
@@ -155,6 +129,8 @@ export class GitService {
     return out.trim();
   }
 
+  // --- Log & Commit Operations ---
+
   async getLog(options: {
     maxCount?: number;
     skip?: number;
@@ -166,285 +142,71 @@ export class GitService {
     all?: boolean;
     query?: string;
   } = {}): Promise<Commit[]> {
-    const args = ['log', `--format=${LOG_FORMAT}`, '--topo-order'];
-
-    if (options.all === true || (!options.branch && options.all !== false)) {
-      args.push('--all');
-    }
-    args.push('--decorate=full');
-
-    if (options.maxCount) args.push(`-n${options.maxCount}`);
-    if (options.skip) args.push(`--skip=${options.skip}`);
-    if (options.author) args.push(`--author=${options.author}`);
-    if (options.after) args.push(`--after=${options.after}`);
-    if (options.before) args.push(`--before=${options.before}`);
-    if (options.query) {
-      args.push(`--grep=${options.query}`);
-      args.push('-i');
-    }
-    if (options.branch) args.push(options.branch);
-    if (options.path) {
-      args.push('--');
-      args.push(options.path);
-    }
-
-    const output = await this.exec(args);
-    const commits: Commit[] = [];
-
-    for (const chunk of output.split('\0')) {
-      if (!chunk.trim()) continue;
-      const parts = chunk.split(SEP);
-      if (parts.length < 9) continue;
-
-      const commit: Commit = {
-        hash: parts[0].trim(),
-        abbreviatedHash: parts[1],
-        parents: parts[2] ? parts[2].split(' ').filter(Boolean) : [],
-        author: parts[3],
-        authorEmail: parts[4],
-        authorDate: parts[5],
-        subject: parts[6],
-        body: parts[7],
-        refs: parts[8] ? parseRefs(parts[8]) : [],
-      };
-      this.commitCache.set(commit.hash, commit);
-      commits.push(commit);
-    }
-
-    if (options.query && /^[0-9a-f]{4,40}$/i.test(options.query.trim())) {
-      try {
-        const hashOut = await this.exec(['log', '-n1', `--format=${LOG_FORMAT}`, '--decorate=full', options.query.trim()]);
-        for (const chunk of hashOut.split('\0')) {
-          if (!chunk.trim()) continue;
-          const parts = chunk.split(SEP);
-          if (parts.length >= 9) {
-            const hashCommit: Commit = {
-              hash: parts[0].trim(),
-              abbreviatedHash: parts[1],
-              parents: parts[2] ? parts[2].split(' ').filter(Boolean) : [],
-              author: parts[3],
-              authorEmail: parts[4],
-              authorDate: parts[5],
-              subject: parts[6],
-              body: parts[7],
-              refs: parts[8] ? parseRefs(parts[8]) : [],
-            };
-            this.commitCache.set(hashCommit.hash, hashCommit);
-            if (!commits.some(c => c.hash === hashCommit.hash)) {
-              commits.unshift(hashCommit);
-            }
-          }
-        }
-      } catch { /* ignore if not valid hash */ }
-    }
-
-    return commits;
+    return commitOps.getLog(this.asCommitContext(), options);
   }
 
   async getCommitFiles(hash: string): Promise<FileChange[]> {
-    const output = await this.exec([
-      'diff-tree', '--no-commit-id', '-r', '--name-status', '-M', hash,
-    ]);
-    const changes: FileChange[] = [];
-    for (const line of output.split('\n')) {
-      if (!line.trim()) continue;
-      const parts = line.split('\t');
-      const status = parts[0][0]; // First char only (R100 -> R)
-      if (parts.length === 3) {
-        // Rename
-        changes.push({ status, path: parts[2], oldPath: parts[1] });
-      } else {
-        changes.push({ status, path: parts[1] });
-      }
-    }
-    return changes;
+    return commitOps.getCommitFiles(this.asCommitContext(), hash);
   }
 
-  async getBranches(): Promise<BranchInfo[]> {
-    // Get local branches with ahead/behind tracking
-    const localOutput = await this.exec([
-      'branch', '--format',
-      '%(HEAD)%(refname:short)\t%(objectname:short)\t%(upstream:short)\t%(upstream:track,nobracket)',
-    ]);
-    // Get remote branches
-    const remoteOutput = await this.exec([
-      'branch', '-r', '--format',
-      '%(refname:short)\t%(objectname:short)',
-    ]);
-
-    const branches: BranchInfo[] = [];
-
-    for (const line of localOutput.split('\n')) {
-      if (!line.trim()) continue;
-      const current = line[0] === '*';
-      const rest = line.slice(1);
-      const [name, hash, upstream, track] = rest.split('\t');
-      let ahead = 0;
-      let behind = 0;
-      if (track) {
-        const aheadMatch = track.match(/ahead (\d+)/);
-        if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
-        const behindMatch = track.match(/behind (\d+)/);
-        if (behindMatch) behind = parseInt(behindMatch[1], 10);
-      }
-      const trimmedName = name.trim();
-      if (trimmedName.startsWith('(') || trimmedName.startsWith('HEAD detached')) {
-        continue;
-      }
-      branches.push({
-        name: trimmedName,
-        current,
-        remote: undefined,
-        upstream: upstream || undefined,
-        hash: hash.trim(),
-        ahead: ahead || undefined,
-        behind: behind || undefined,
-      });
-    }
-
-    for (const line of remoteOutput.split('\n')) {
-      if (!line.trim()) continue;
-      if (line.includes(' -> ')) continue; // Skip HEAD pointers like origin/HEAD -> origin/main
-      const [name, hash] = line.split('\t');
-      const trimmedName = name.trim();
-      // Extract remote name (first segment before /)
-      const slashIdx = trimmedName.indexOf('/');
-      const remoteName = slashIdx !== -1 ? trimmedName.slice(0, slashIdx) : 'origin';
-      branches.push({
-        name: trimmedName,
-        current: false,
-        remote: remoteName,
-        upstream: undefined,
-        hash: hash.trim(),
-      });
-    }
-
-    return branches;
+  async getAuthorRecentCommitMessages(count = 10): Promise<string[]> {
+    return commitOps.getAuthorRecentCommitMessages(this.asCommitContext(), count);
   }
 
-  async fetchAll(): Promise<string> {
-    return this.exec(['fetch', '--all', '--prune']);
-  }
-
-  async getTags(): Promise<TagInfo[]> {
-    const output = await this.exec([
-      'tag', '-l', '--format', '%(refname:short)\t%(objectname:short)',
-    ]);
-    const tags: TagInfo[] = [];
-    for (const line of output.split('\n')) {
-      if (!line.trim()) continue;
-      const [name, hash] = line.split('\t');
-      tags.push({ name, hash });
-    }
-    return tags;
-  }
-
-  async getCurrentBranch(): Promise<string> {
-    const output = await this.exec(['rev-parse', '--abbrev-ref', 'HEAD']);
-    const branch = output.trim();
-    if (branch === 'HEAD') {
-      try {
-        const desc = await this.exec(['describe', '--tags', '--exact-match', 'HEAD']);
-        return `HEAD (detached at ${desc.trim()})`;
-      } catch {
-        const hash = await this.exec(['rev-parse', '--short', 'HEAD']);
-        return `HEAD (detached at ${hash.trim()})`;
-      }
-    }
-    return branch;
-  }
-
-  async checkout(ref: string): Promise<void> {
+  async getRecentCommitMessages(count = 10): Promise<string[]> {
     try {
-      const remotesOutput = await this.exec(['remote']);
-      const remotes = remotesOutput.split('\n').map(s => s.trim()).filter(Boolean);
-      for (const remote of remotes) {
-        if (ref.startsWith(remote + '/')) {
-          const localBranchName = ref.slice(remote.length + 1);
-          const branchCheck = await this.exec(['branch', '--list', localBranchName]);
-          if (branchCheck.trim()) {
-            await this.exec(['checkout', localBranchName]);
-          } else {
-            await this.exec(['checkout', '-b', localBranchName, '--track', ref]);
-          }
-          return;
-        }
-      }
-    } catch {
-      // Fallback to standard checkout
-    }
-    await this.exec(['checkout', ref]);
-  }
-
-  async createBranch(name: string, startPoint?: string, checkout: boolean = true, force: boolean = false): Promise<void> {
-    if (checkout) {
-      const args = ['checkout', force ? '-B' : '-b', name];
-      if (startPoint) args.push(startPoint);
-      await this.exec(args);
-    } else {
-      const args = ['branch'];
-      if (force) args.push('-f');
-      args.push(name);
-      if (startPoint) args.push(startPoint);
-      await this.exec(args);
-    }
-  }
-
-  async cherryPick(hash: string): Promise<string> {
-    return this.exec(['cherry-pick', hash]);
-  }
-
-  async revertCommit(hash: string): Promise<string> {
-    return this.exec(['revert', '--no-edit', hash]);
-  }
-
-  async reset(hash: string, mode: 'soft' | 'mixed' | 'hard' = 'mixed'): Promise<string> {
-    return this.exec(['reset', `--${mode}`, hash]);
-  }
-
-  async createTag(name: string, hash?: string): Promise<void> {
-    const args = ['tag', name];
-    if (hash) args.push(hash);
-    await this.exec(args);
-  }
-
-  async createPatch(hash: string): Promise<string> {
-    return this.exec(['format-patch', '-1', hash, '--stdout']);
-  }
-
-  async getRemotes(): Promise<string[]> {
-    try {
-      const out = await this.exec(['remote']);
+      const out = await this.exec(['log', `-n${count}`, '--pretty=%s']);
       return out.split('\n').map(s => s.trim()).filter(Boolean);
     } catch {
       return [];
     }
   }
 
-  async getDefaultRemote(branch?: string): Promise<string> {
-    try {
-      const curBranch = branch || await this.getCurrentBranch().catch(() => '');
-      if (curBranch) {
-        try {
-          const r = await this.exec(['config', `branch.${curBranch}.remote`]);
-          if (r.trim()) return r.trim();
-        } catch {}
-      }
-      const remotes = await this.getRemotes();
-      if (remotes.includes('origin')) return 'origin';
-      if (remotes.length > 0) return remotes[0];
-    } catch {}
-    return 'origin';
+  async commitFiles(message: string, filesToStage?: string[], amend = false): Promise<void> {
+    return commitOps.commitFiles(this.asCommitContext(), message, filesToStage, amend);
   }
 
-  async getRemoteUrl(): Promise<string> {
-    try {
-      const remote = await this.getDefaultRemote();
-      const out = await this.exec(['remote', 'get-url', remote]);
-      return out.trim();
-    } catch {
-      return '';
-    }
+  async commitAndPush(message: string, filesToStage?: string[], amend = false): Promise<string> {
+    await this.commitFiles(message, filesToStage, amend);
+    return await this.push();
+  }
+
+  async commit(message: string): Promise<void> {
+    await this.exec(['commit', '-m', message]);
+  }
+
+  async showFileAtCommit(hash: string, filePath: string): Promise<string> {
+    return this.exec(['show', `${hash}:${filePath}`]);
+  }
+
+  async diff(ref1: string, ref2: string): Promise<string> {
+    return this.exec(['diff', ref1, ref2]);
+  }
+
+  async getLogRange(base: string, head = 'HEAD'): Promise<Commit[]> {
+    return this.getLog({ all: false, branch: `${base}..${head}` });
+  }
+
+  // --- Branch & Remote Operations ---
+
+  async getBranches(): Promise<BranchInfo[]> {
+    return branchOps.getBranches(this.asBranchContext());
+  }
+
+  async getTags(): Promise<TagInfo[]> {
+    return branchOps.getTags(this.asBranchContext());
+  }
+
+  async getCurrentBranch(): Promise<string> {
+    return branchOps.getCurrentBranch(this.asBranchContext());
+  }
+
+  async checkout(ref: string): Promise<void> {
+    return branchOps.checkout(this.asBranchContext(), ref);
+  }
+
+  async createBranch(name: string, startPoint?: string, checkout = true, force = false): Promise<void> {
+    return branchOps.createBranch(this.asBranchContext(), name, startPoint, checkout, force);
   }
 
   async deleteBranch(name: string, force = false): Promise<void> {
@@ -455,145 +217,24 @@ export class GitService {
     await this.exec(['branch', '-m', oldName, newName]);
   }
 
-  async pull(branch?: string): Promise<string> {
-    const currentBranch = await this.getCurrentBranch();
-    if (!branch || branch === currentBranch) {
-      return this.exec(['pull']);
-    }
-
-    // Updating a different local branch without checking it out:
-    // Safely update branch ref using git fetch <remote> <branch>:<branch>
-    try {
-      const remote = await this.getDefaultRemote(branch);
-
-      let targetBranch = branch;
-      if (branch.startsWith(remote + '/')) {
-        targetBranch = branch.slice(remote.length + 1);
-      }
-
-      const branchCheck = await this.exec(['branch', '--list', targetBranch]);
-      if (branchCheck.trim()) {
-        const out = await this.exec(['fetch', remote, `${targetBranch}:${targetBranch}`]);
-        return out || `Updated branch '${targetBranch}' successfully.`;
-      } else {
-        const out = await this.exec(['fetch', remote, targetBranch]);
-        return out || `Fetched '${targetBranch}' successfully.`;
-      }
-    } catch (err: any) {
-      if (err.message && (err.message.includes('non-fast-forward') || err.message.includes('rejected'))) {
-        throw new Error(`Cannot fast-forward branch '${branch}' because local commits diverged. Please checkout '${branch}' to merge or rebase.`);
-      }
-      throw err;
-    }
+  async getRemotes(): Promise<string[]> {
+    return branchOps.getRemotes(this.asBranchContext());
   }
 
-  async getPushInfo(targetBranch?: string): Promise<{
-    currentBranch: string;
-    remote: string;
-    remoteBranch: string;
-    repoName: string;
-    isNew: boolean;
-    commits: Array<{
-      hash: string;
-      shortHash: string;
-      message: string;
-      author: string;
-      date: string;
-      files: Array<{ status: string; path: string; name: string; dir: string }>;
-    }>;
-    totalFiles: Array<{ status: string; path: string; name: string; dir: string }>;
-  }> {
-    const currentBranch = targetBranch || await this.getCurrentBranch();
-    const remote = await this.getDefaultRemote(currentBranch);
-    const remoteBranch = currentBranch;
-    const repoRoot = await this.getRepoRoot().catch(() => this.cwd);
-    const repoName = path.basename(repoRoot);
+  async getDefaultRemote(branch?: string): Promise<string> {
+    return branchOps.getDefaultRemote(this.asBranchContext(), branch);
+  }
 
-    let isNew = true;
-    try {
-      await this.exec(['rev-parse', '--verify', `refs/remotes/${remote}/${currentBranch}`]);
-      isNew = false;
-    } catch {
-      isNew = true;
-    }
+  async getRemoteUrl(): Promise<string> {
+    return branchOps.getRemoteUrl(this.asBranchContext());
+  }
 
-    let logArgs: string[] = [];
-    if (!isNew) {
-      logArgs = ['log', `${remote}/${currentBranch}..${currentBranch}`, '--format=%H%x00%h%x00%an%x00%ad%x00%s'];
-    } else {
-      logArgs = ['log', currentBranch, `--not`, `--remotes=${remote}`, '--format=%H%x00%h%x00%an%x00%ad%x00%s'];
-    }
+  async pull(branch?: string): Promise<string> {
+    return branchOps.pull(this.asBranchContext(), branch);
+  }
 
-    let rawLog = '';
-    try {
-      rawLog = await this.exec(logArgs);
-    } catch {
-      try {
-        rawLog = await this.exec(['log', '-n', '10', '--format=%H%x00%h%x00%an%x00%ad%x00%s']);
-      } catch {}
-    }
-
-    const lines = rawLog.split('\n').filter(l => l.trim());
-    const commits: Array<{
-      hash: string;
-      shortHash: string;
-      message: string;
-      author: string;
-      date: string;
-      files: Array<{ status: string; path: string; name: string; dir: string }>;
-    }> = [];
-
-    const fileMap = new Map<string, { status: string; path: string; name: string; dir: string }>();
-
-    for (const line of lines) {
-      const parts = line.split('\0');
-      if (parts.length < 5) continue;
-      const [hash, shortHash, author, date, message] = parts;
-
-      let commitFiles: Array<{ status: string; path: string; name: string; dir: string }> = [];
-      try {
-        const diffOut = await this.exec(['diff-tree', '--no-commit-id', '--name-status', '-r', hash]);
-        commitFiles = diffOut.split('\n').filter(l => l.trim()).map(dl => {
-          const tokens = dl.trim().split(/\s+/);
-          const status = tokens[0] || 'M';
-          const p = tokens.length > 2 ? tokens[2] : (tokens[1] || '');
-          const dir = path.dirname(p) === '.' ? '' : path.dirname(p);
-          const fObj = {
-            status: status.charAt(0),
-            path: p,
-            name: path.basename(p),
-            dir,
-          };
-          if (!fileMap.has(p)) {
-            fileMap.set(p, fObj);
-          }
-          return fObj;
-        });
-      } catch {}
-
-      commits.push({
-        hash,
-        shortHash,
-        message,
-        author,
-        date,
-        files: commitFiles,
-      });
-    }
-
-    const totalFiles = Array.from(fileMap.values());
-    const remotes = await this.getRemotes();
-
-    return {
-      currentBranch,
-      remote,
-      remoteBranch,
-      remotes: remotes.length > 0 ? remotes : [remote],
-      repoName,
-      isNew,
-      commits,
-      totalFiles,
-    };
+  async getPushInfo(targetBranch?: string): Promise<PushInfo> {
+    return branchOps.getPushInfo(this.asBranchContext(), targetBranch);
   }
 
   async push(
@@ -604,29 +245,11 @@ export class GitService {
     tags = false,
     targetBranch?: string
   ): Promise<string> {
-    const curBranch = branch || await this.getCurrentBranch();
-    const remote = remoteName || await this.getDefaultRemote(curBranch);
-    const args = ['push'];
-    if (force) args.push('--force-with-lease');
-    if (tags) args.push('--tags');
+    return branchOps.push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch);
+  }
 
-    let hasUpstream = false;
-    try {
-      const upstream = await this.exec(['rev-parse', '--abbrev-ref', `${curBranch}@{u}`]);
-      if (upstream.trim()) hasUpstream = true;
-    } catch {}
-
-    const remoteRef = targetBranch && targetBranch.trim() ? targetBranch.trim() : curBranch;
-    const isCustomTarget = remoteRef !== curBranch;
-    const refspec = isCustomTarget ? `${curBranch}:${remoteRef}` : curBranch;
-
-    if (setUpstream || !hasUpstream || isCustomTarget) {
-      args.push('-u', remote, refspec);
-    } else {
-      args.push(remote, refspec);
-    }
-
-    return this.exec(args);
+  async fetchAll(): Promise<string> {
+    return this.exec(['fetch', '--all', '--prune']);
   }
 
   async checkoutAndRebase(branch: string, onto: string): Promise<string> {
@@ -658,292 +281,64 @@ export class GitService {
     return changes;
   }
 
+  async cherryPick(hash: string): Promise<string> {
+    return this.exec(['cherry-pick', hash]);
+  }
+
+  async revertCommit(hash: string): Promise<string> {
+    return this.exec(['revert', '--no-edit', hash]);
+  }
+
+  async reset(hash: string, mode: 'soft' | 'mixed' | 'hard' = 'mixed'): Promise<string> {
+    return this.exec(['reset', `--${mode}`, hash]);
+  }
+
+  async createTag(name: string, hash?: string): Promise<void> {
+    const args = ['tag', name];
+    if (hash) args.push(hash);
+    await this.exec(args);
+  }
+
+  async createPatch(hash: string): Promise<string> {
+    return this.exec(['format-patch', '-1', hash, '--stdout']);
+  }
+
+  // --- Staging & Worktree Operations ---
+
   async getStatus(): Promise<StatusEntry[]> {
-    const output = await this.exec(['status', '--porcelain=v1', '-uall']);
-    const entries: StatusEntry[] = [];
-    for (const line of output.split('\n')) {
-      if (!line) continue;
-      const x = line[0];
-      const y = line[1];
-      const rest = line.slice(3);
-      const arrowIdx = rest.indexOf(' -> ');
-      if (arrowIdx !== -1) {
-        entries.push({
-          x, y,
-          origPath: rest.slice(0, arrowIdx),
-          path: rest.slice(arrowIdx + 4),
-        });
-      } else {
-        entries.push({ x, y, path: rest });
-      }
-    }
-    return entries;
+    return stagingOps.getStatus(this.asStagingContext());
   }
 
-  async getUnmergedFiles(): Promise<string[]> {
-    const output = await this.exec(['diff', '--name-only', '--diff-filter=U']);
-    return output.split('\n').filter(l => l.trim());
-  }
-
-  async getConflictInfo(): Promise<{
-    hasConflicts: boolean;
-    isMerging: boolean;
-    isRebasing: boolean;
-    yoursBranch: string;
-    theirsBranch: string;
-    conflicts: Array<{
-      path: string;
-      name: string;
-      dir: string;
-      yours: string;
-      theirs: string;
-    }>;
-  }> {
-    const gitDir = path.join(this.cwd, '.git');
-    const isMerging = fs.existsSync(path.join(gitDir, 'MERGE_HEAD'));
-    const isRebasing =
-      fs.existsSync(path.join(gitDir, 'rebase-merge')) ||
-      fs.existsSync(path.join(gitDir, 'rebase-apply'));
-    const isCherryPicking = fs.existsSync(path.join(gitDir, 'CHERRY_PICK_HEAD'));
-
-    let yoursBranch = '';
-    try {
-      yoursBranch = await this.getCurrentBranch();
-    } catch {}
-    if (!yoursBranch) yoursBranch = 'HEAD';
-
-    let theirsBranch = '';
-    if (isMerging) {
-      try {
-        const mergeMsg = await this.getMergeMessage();
-        const m = mergeMsg.match(/Merge branch '([^']+)'/) || mergeMsg.match(/Merge commit '([^']+)'/);
-        if (m) {
-          theirsBranch = m[1];
-        } else {
-          const mergeHead = fs.readFileSync(path.join(gitDir, 'MERGE_HEAD'), 'utf8').trim();
-          theirsBranch = mergeHead.slice(0, 7);
-        }
-      } catch {}
-    } else if (isRebasing) {
-      try {
-        const headNamePath = path.join(gitDir, 'rebase-merge', 'head-name');
-        if (fs.existsSync(headNamePath)) {
-          theirsBranch = fs.readFileSync(headNamePath, 'utf8').trim().replace('refs/heads/', '');
-        }
-      } catch {}
-    }
-    if (!theirsBranch) theirsBranch = 'Theirs';
-
-    const statusEntries = await this.getStatus();
-    const conflictCodes = new Set(['UU', 'UD', 'DU', 'AA', 'DD', 'AU', 'UA']);
-    const conflictEntries = statusEntries.filter(
-      e => conflictCodes.has(`${e.x}${e.y}`) || e.x === 'U' || e.y === 'U'
-    );
-
-    const conflicts = conflictEntries.map(e => {
-      let yours = 'Modified';
-      let theirs = 'Modified';
-      const code = `${e.x}${e.y}`;
-      if (code === 'UD') {
-        yours = 'Modified';
-        theirs = 'Deleted';
-      } else if (code === 'DU') {
-        yours = 'Deleted';
-        theirs = 'Modified';
-      } else if (code === 'AA') {
-        yours = 'Added';
-        theirs = 'Added';
-      } else if (code === 'DD') {
-        yours = 'Deleted';
-        theirs = 'Deleted';
-      } else if (code === 'AU') {
-        yours = 'Added';
-        theirs = 'Modified';
-      } else if (code === 'UA') {
-        yours = 'Modified';
-        theirs = 'Added';
-      }
-      return {
-        path: e.path,
-        name: path.basename(e.path),
-        dir: path.dirname(e.path) === '.' ? '' : path.dirname(e.path),
-        yours,
-        theirs,
-      };
-    });
-
-    return {
-      hasConflicts: conflicts.length > 0,
-      isMerging,
-      isRebasing: isRebasing || isCherryPicking,
-      yoursBranch,
-      theirsBranch,
-      conflicts,
-    };
-  }
-
-  async acceptYours(filePath: string): Promise<void> {
-    const status = await this.getStatus();
-    const entry = status.find(s => s.path === filePath);
-    const code = entry ? `${entry.x}${entry.y}` : '';
-    if (code === 'DU' || code === 'DD') {
-      await this.exec(['rm', '-f', '--', filePath]).catch(() =>
-        this.exec(['rm', '--cached', '--ignore-unmatch', '--', filePath])
-      );
-    } else {
-      await this.exec(['checkout', '--ours', '--', filePath]);
-      await this.stageFiles([filePath]);
-    }
-  }
-
-  async acceptTheirs(filePath: string): Promise<void> {
-    const status = await this.getStatus();
-    const entry = status.find(s => s.path === filePath);
-    const code = entry ? `${entry.x}${entry.y}` : '';
-    if (code === 'UD' || code === 'DD') {
-      await this.exec(['rm', '-f', '--', filePath]).catch(() =>
-        this.exec(['rm', '--cached', '--ignore-unmatch', '--', filePath])
-      );
-    } else {
-      await this.exec(['checkout', '--theirs', '--', filePath]);
-      await this.stageFiles([filePath]);
-    }
-  }
-
-  async abortMerge(): Promise<void> {
-    const gitDir = path.join(this.cwd, '.git');
-    if (fs.existsSync(path.join(gitDir, 'rebase-merge')) || fs.existsSync(path.join(gitDir, 'rebase-apply'))) {
-      await this.exec(['rebase', '--abort']);
-    } else if (fs.existsSync(path.join(gitDir, 'CHERRY_PICK_HEAD'))) {
-      await this.exec(['cherry-pick', '--abort']);
-    } else {
-      await this.exec(['merge', '--abort']);
-    }
-  }
-
-  async stageFile(path: string): Promise<void> {
-    await this.stageFiles([path]);
+  async stageFile(filePath: string): Promise<void> {
+    await this.stageFiles([filePath]);
   }
 
   async stageFiles(paths: string[]): Promise<void> {
-    if (!paths || paths.length === 0) return;
-    const existing: string[] = [];
-    const missing: string[] = [];
-    for (const p of paths) {
-      const full = path.isAbsolute(p) ? p : path.join(this.cwd, p);
-      if (fs.existsSync(full)) {
-        existing.push(p);
-      } else {
-        missing.push(p);
-      }
-    }
-    if (existing.length > 0) {
-      await this.exec(['add', '--', ...existing]);
-    }
-    if (missing.length > 0) {
-      await this.exec(['rm', '--cached', '--ignore-unmatch', '--', ...missing]);
-    }
+    return stagingOps.stageFiles(this.asStagingContext(), paths);
   }
 
   async stageFileContent(filePath: string, content: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const proc = execFile('git', ['hash-object', '-w', '--stdin'], { cwd: this.cwd }, (err, stdout, stderr) => {
-        if (err) return reject(new Error(stderr || err.message));
-        const sha = stdout.trim();
-        this.exec(['update-index', '--cacheinfo', `100644,${sha},${filePath}`])
-          .then(() => resolve())
-          .catch(reject);
-      });
-      proc.stdin?.write(content);
-      proc.stdin?.end();
-    });
+    return stagingOps.stageFileContent(this.asStagingContext(), filePath, content);
   }
 
-  async unstageFile(path: string): Promise<void> {
-    await this.exec(['reset', 'HEAD', '--', path]);
+  async unstageFile(filePath: string): Promise<void> {
+    await this.unstageFiles([filePath]);
   }
 
   async unstageFiles(paths: string[]): Promise<void> {
-    await this.exec(['reset', 'HEAD', '--', ...paths]);
+    return stagingOps.unstageFiles(this.asStagingContext(), paths);
   }
 
   async rollbackFiles(paths: string[]): Promise<void> {
-    const status = await this.getStatus();
-    const untracked = new Set(status.filter(s => s.x === '?' && s.y === '?').map(s => s.path));
-    const toClean: string[] = [];
-    const toRestore: string[] = [];
-    for (const p of paths) {
-      if (untracked.has(p)) {
-        toClean.push(p);
-      } else {
-        toRestore.push(p);
-      }
-    }
-    if (toRestore.length > 0) {
-      try {
-        await this.exec(['checkout', 'HEAD', '--', ...toRestore]);
-      } catch {
-        await this.exec(['restore', '--staged', '--worktree', '--', ...toRestore]);
-      }
-    }
-    for (const p of toClean) {
-      try {
-        const fullPath = path.join(this.cwd, p);
-        if (fs.existsSync(fullPath)) {
-          if (fs.statSync(fullPath).isDirectory()) {
-            fs.rmSync(fullPath, { recursive: true, force: true });
-          } else {
-            fs.unlinkSync(fullPath);
-          }
-        }
-      } catch {}
-    }
+    return stagingOps.rollbackFiles(this.asStagingContext(), paths);
   }
 
   async getFileDiff(filePath: string): Promise<string> {
-    const status = await this.getStatus();
-    const entry = status.find(s => s.path === filePath);
-    if (entry && entry.x === '?' && entry.y === '?') {
-      try {
-        const fullPath = path.join(this.cwd, filePath);
-        const content = fs.readFileSync(fullPath, 'utf8');
-        const lines = content.split('\n');
-        const diffHeader = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
-        return diffHeader + lines.map(l => `+${l}`).join('\n');
-      } catch {
-        return '';
-      }
-    }
-    try {
-      const diff = await this.exec(['diff', 'HEAD', '--', filePath]);
-      if (diff.trim()) return diff;
-      return await this.exec(['diff', '--', filePath]);
-    } catch {
-      return await this.exec(['diff', '--', filePath]);
-    }
+    return stagingOps.getFileDiff(this.asStagingContext(), filePath);
   }
 
   async applyHunkPatch(patchContent: string, reverse = false): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const args = ['apply', '--cached', '--recount', '--whitespace=nowarn'];
-      if (reverse) args.push('--reverse');
-      args.push('-');
-      const proc = execFile('git', args, { cwd: this.cwd }, (err, stdout, stderr) => {
-        if (err) return reject(new Error(stderr || err.message));
-        resolve(stdout);
-      });
-      proc.stdin?.write(patchContent);
-      proc.stdin?.end();
-    });
-  }
-
-  async getRecentCommitMessages(count = 10): Promise<string[]> {
-    try {
-      const out = await this.exec(['log', `-n${count}`, '--pretty=%s']);
-      return out.split('\n').map(s => s.trim()).filter(Boolean);
-    } catch {
-      return [];
-    }
+    return stagingOps.applyHunkPatch(this.asStagingContext(), patchContent, reverse);
   }
 
   async getStagedDiff(): Promise<string> {
@@ -962,90 +357,36 @@ export class GitService {
     } catch {}
   }
 
-  async getAuthorRecentCommitMessages(count = 10): Promise<string[]> {
-    try {
-      let author = '';
-      try {
-        author = (await this.exec(['config', 'user.email'])).trim();
-      } catch {}
-      if (!author) {
-        try {
-          author = (await this.exec(['config', 'user.name'])).trim();
-        } catch {}
-      }
+  // --- Conflict Operations ---
 
-      const isMergeOrMr = (msg: string) => {
-        const lower = msg.toLowerCase().trim();
-        return (
-          lower.startsWith('merge ') ||
-          lower.startsWith('merge branch') ||
-          lower.startsWith('merge remote-tracking') ||
-          lower.startsWith('revert ') ||
-          lower.startsWith('resolve conflict') ||
-          lower.includes('merge request') ||
-          lower.includes('pull request') ||
-          lower.startsWith('see merge request') ||
-          /^mr\s*!/i.test(lower) ||
-          /^pr\s*#/i.test(lower)
-        );
-      };
+  async getUnmergedFiles(): Promise<string[]> {
+    return conflictOps.getUnmergedFiles(this.asConflictContext());
+  }
 
-      const args = ['log', '-n', '50', '--no-merges', '--pretty=%s'];
-      if (author) {
-        args.push(`--author=${author}`);
-      }
+  async getConflictInfo(): Promise<ConflictInfo> {
+    return conflictOps.getConflictInfo(this.asConflictContext());
+  }
 
-      let out = '';
-      try {
-        out = await this.exec(args);
-      } catch {
-        out = await this.exec(['log', '-n', '30', '--no-merges', '--pretty=%s']);
-      }
+  async acceptYours(filePath: string): Promise<void> {
+    return conflictOps.acceptYours(this.asConflictContext(), filePath);
+  }
 
-      const cleanList = out
-        .split('\n')
-        .map(s => s.trim())
-        .filter(s => Boolean(s) && !isMergeOrMr(s));
+  async acceptTheirs(filePath: string): Promise<void> {
+    return conflictOps.acceptTheirs(this.asConflictContext(), filePath);
+  }
 
-      if (cleanList.length > 0) {
-        return cleanList.slice(0, count);
-      }
-
-      // Fallback to repo commits without merges if author is new
-      const fallbackOut = await this.exec(['log', '-n', '30', '--no-merges', '--pretty=%s']);
-      return fallbackOut
-        .split('\n')
-        .map(s => s.trim())
-        .filter(s => Boolean(s) && !isMergeOrMr(s))
-        .slice(0, count);
-    } catch {
-      return [];
-    }
+  async abortMerge(): Promise<void> {
+    return conflictOps.abortMerge(this.asConflictContext());
   }
 
   async getMergeMessage(): Promise<string> {
-    try {
-      const mergeMsgPath = path.join(this.cwd, '.git', 'MERGE_MSG');
-      if (fs.existsSync(mergeMsgPath)) {
-        return fs.readFileSync(mergeMsgPath, 'utf8').trim();
-      }
-    } catch {}
-    return '';
+    return conflictOps.getMergeMessage(this.cwd);
   }
 
+  // --- Stash Operations ---
+
   async getStashes(): Promise<{ index: string; message: string; date: string }[]> {
-    try {
-      const out = await this.exec(['stash', 'list', '--format=%gd\x1e%gs\x1e%cr']);
-      const list: { index: string; message: string; date: string }[] = [];
-      for (const line of out.split('\n')) {
-        if (!line.trim()) continue;
-        const [index, message, date] = line.split('\x1e');
-        list.push({ index: index?.trim(), message: message?.trim(), date: date?.trim() });
-      }
-      return list;
-    } catch {
-      return [];
-    }
+    return commitOps.getStashes(this.asCommitContext());
   }
 
   async stashSave(message?: string): Promise<string> {
@@ -1066,51 +407,49 @@ export class GitService {
     return this.exec(['stash', 'drop', index]);
   }
 
-  async commitFiles(message: string, filesToStage?: string[], amend = false): Promise<void> {
-    if (filesToStage && filesToStage.length > 0) {
-      await this.stageFiles(filesToStage);
-    }
-    const args = ['commit'];
-    if (amend) args.push('--amend');
-    args.push('-m', message);
-    await this.exec(args);
-  }
-
-  async commitAndPush(message: string, filesToStage?: string[], amend = false): Promise<string> {
-    await this.commitFiles(message, filesToStage, amend);
-    return await this.push();
-  }
-
-  async commit(message: string): Promise<void> {
-    await this.exec(['commit', '-m', message]);
-  }
-
-  async showFileAtCommit(hash: string, filePath: string): Promise<string> {
-    return this.exec(['show', `${hash}:${filePath}`]);
-  }
-
-  async diff(ref1: string, ref2: string): Promise<string> {
-    return this.exec(['diff', ref1, ref2]);
-  }
-
-  async getLogRange(base: string, head = 'HEAD'): Promise<Commit[]> {
-    return this.getLog({ all: false, branch: `${base}..${head}` });
-  }
-
   clearCache(): void {
     this.commitCache.clear();
   }
-}
 
-function parseRefs(raw: string): string[] {
-  if (!raw.trim()) return [];
-  return raw.split(',').map(r => {
-    r = r.trim();
-    // Strip decorators like HEAD -> , refs/heads/, refs/tags/, refs/remotes/
-    r = r.replace(/^HEAD -> /, '');
-    r = r.replace(/^refs\/heads\//, '');
-    r = r.replace(/^refs\/tags\//, 'tag: ');
-    r = r.replace(/^refs\/remotes\//, '');
-    return r;
-  });
+  // --- Private Execution Contexts ---
+
+  private asBranchContext(): branchOps.BranchExecContext {
+    return {
+      cwd: this.cwd,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      getCurrentBranch: () => this.getCurrentBranch(),
+      getRepoRoot: () => this.getRepoRoot(),
+      getRemotes: () => this.getRemotes(),
+      getDefaultRemote: (b) => this.getDefaultRemote(b),
+    };
+  }
+
+  private asStagingContext(): stagingOps.StagingExecContext {
+    return {
+      cwd: this.cwd,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      getStatus: () => this.getStatus(),
+    };
+  }
+
+  private asCommitContext(): commitOps.CommitExecContext {
+    return {
+      cwd: this.cwd,
+      commitCache: this.commitCache,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      stageFiles: (paths) => this.stageFiles(paths),
+      push: () => this.push(),
+    };
+  }
+
+  private asConflictContext(): conflictOps.GitExecContext {
+    return {
+      cwd: this.cwd,
+      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      getStatus: () => this.getStatus(),
+      getCurrentBranch: () => this.getCurrentBranch(),
+      stageFiles: (paths) => this.stageFiles(paths),
+      getMergeMessage: () => this.getMergeMessage(),
+    };
+  }
 }

@@ -7,6 +7,8 @@ import { CommitReviewPanel } from './commitReviewPanel';
 import { PushDialogPanel } from './pushDialogPanel';
 import { ConflictsDialogPanel } from './conflictsDialogPanel';
 import { MergeEditorPanel } from './mergeEditorPanel';
+import { generateAiCommitMessage } from '../utils/aiCommitGenerator';
+import { getNonce } from '../utils/themeTokens';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
@@ -481,121 +483,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'generateAiCommitMessage': {
         const { files } = msg.payload || {};
         const checkedFiles: string[] = Array.isArray(files) ? files : [];
-        const assumedFiles: string[] = [];
-        const temporarilyUnstaged: string[] = [];
-
         try {
-          // Strictly isolate checked files so AI only generates message for ticked files
-          const allStatus = await this.gitService.getStatus();
-          const trackedToMask: string[] = [];
-
-          for (const s of allStatus) {
-            const isUntracked = s.x === '?' && s.y === '?';
-            const isChecked = checkedFiles.includes(s.path);
-
-            if (isChecked) {
-              // Ensure checked files are staged in git index so AI sees them
-              if (s.y !== ' ' && s.x === ' ') {
-                await this.gitService.stageFiles([s.path]);
-              } else if (isUntracked) {
-                await this.gitService.stageFiles([s.path]);
-              }
-              // If file has unstaged changes/hunks, assume-unchanged ensures AI only sees the staged part!
-              if (s.y !== ' ' && s.x !== ' ') {
-                trackedToMask.push(s.path);
-              }
-            } else {
-              // UNCHECKED file: must be completely hidden from AI
-              if (s.x !== ' ' && s.x !== '?') {
-                // If it was staged in index, unstage it so git diff HEAD won't include it
-                temporarilyUnstaged.push(s.path);
-                await this.gitService.unstageFile(s.path);
-              }
-              if (!isUntracked) {
-                // Tracked file with changes -> mask it from git diff HEAD
-                trackedToMask.push(s.path);
-              }
-            }
-          }
-
-          if (trackedToMask.length > 0) {
-            await this.gitService.setAssumeUnchanged(trackedToMask, true);
-            assumedFiles.push(...trackedToMask);
-          }
-
-          // Fetch only the current author's recent clean commits (excluding merge/MR commits)
-          const authorSamples = await this.gitService.getAuthorRecentCommitMessages(10);
-
-          const repoRoot = this.gitService.getCwd();
-          const gitExt = vscode.extensions.getExtension('vscode.git');
-          let gitRepo: any;
-          if (gitExt) {
-            const gitApi = gitExt.exports.getAPI(1);
-            gitRepo = gitApi.repositories.find((r: any) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
-          }
-
-          // Antigravity's command internally triggers 'workbench.view.scm'.
-          // We immediately and repeatedly restore focus back to our commit tool window!
-          const restoreFocus = () => {
-            vscode.commands.executeCommand('workbench.view.extension.intellij-git-commit');
-            vscode.commands.executeCommand('intellij-git.commitView.focus');
-          };
-          setTimeout(restoreFocus, 30);
-          setTimeout(restoreFocus, 80);
-          setTimeout(restoreFocus, 180);
-          setTimeout(restoreFocus, 350);
-
-          let aiMsg = '';
-
-          // 1. Try VS Code Language Model API if available with few-shot author samples
-          try {
-            if ((vscode as any).lm && typeof (vscode as any).lm.selectChatModels === 'function') {
-              const models = await (vscode as any).lm.selectChatModels({ family: 'gemini-1.5-pro' }).catch(() => []);
-              const model = models[0] || (await (vscode as any).lm.selectChatModels().catch(() => []))[0];
-              if (model) {
-                const stagedDiff = await this.gitService.getStagedDiff();
-                if (stagedDiff && stagedDiff.trim()) {
-                  const prompt = [
-                    'You are an expert Git commit message generator.',
-                    authorSamples.length > 0
-                      ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:\n${authorSamples.map(s => `- ${s}`).join('\n')}`
-                      : 'Write a concise, high quality commit message.',
-                    'Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.',
-                    `Git diff:\n${stagedDiff.slice(0, 8000)}`
-                  ].join('\n\n');
-
-                  const response = await model.sendRequest([
-                    (vscode as any).LanguageModelChatMessage.User(prompt)
-                  ]);
-                  let accumulated = '';
-                  for await (const chunk of response.text) {
-                    accumulated += chunk;
-                  }
-                  if (accumulated.trim()) {
-                    aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, '');
-                  }
-                }
-              }
-            }
-          } catch {}
-
-          // 2. Fallback to Antigravity IDE built-in command if LM API was not available
-          if (!aiMsg) {
-            aiMsg = (await vscode.commands.executeCommand<string>('antigravity.generateCommitMessage', repoRoot)) || '';
-          }
-
-          if (!aiMsg && gitRepo?.inputBox?.value) {
-            aiMsg = gitRepo.inputBox.value;
-          }
-
-          restoreFocus();
-
-          if (aiMsg && typeof aiMsg === 'string') {
-            // Adapt to the author's personal style
-            const finalMessage = adaptCommitMessageStyle(aiMsg, authorSamples);
+          const finalMessage = await generateAiCommitMessage(this.gitService, checkedFiles);
+          if (finalMessage) {
             this.view?.webview.postMessage({
               type: 'setCommitMessage',
-              payload: { message: finalMessage.trim() },
+              payload: { message: finalMessage },
             });
           } else {
             this.view?.webview.postMessage({ type: 'generateAiError' });
@@ -604,14 +497,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         } catch (err: any) {
           this.view?.webview.postMessage({ type: 'generateAiError' });
           vscode.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
-        } finally {
-          // ALWAYS restore assume-unchanged and previously staged files cleanly
-          if (assumedFiles.length > 0) {
-            await this.gitService.setAssumeUnchanged(assumedFiles, false);
-          }
-          if (temporarilyUnstaged.length > 0) {
-            await this.gitService.stageFiles(temporarilyUnstaged);
-          }
         }
         break;
       }
@@ -647,9 +532,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         try {
           await this.gitService.stashPop(idx);
           vscode.window.showInformationMessage(`Applied and dropped ${idx}`);
-          await this.refresh();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+        } finally {
+          await this.refresh();
         }
         break;
       }
@@ -658,9 +544,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         try {
           await this.gitService.stashApply(idx);
           vscode.window.showInformationMessage(`Applied ${idx}`);
-          await this.refresh();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+        } finally {
+          await this.refresh();
         }
         break;
       }
@@ -730,91 +617,5 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
   async openPushDialog(branch?: string): Promise<void> {
     await PushDialogPanel.createOrShow(this.extensionUri, this.gitService, branch);
-  }
-}
-
-function getNonce(): string {
-  let text = '';
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
-}
-
-interface AuthorStyle {
-  type: 'imperative' | 'conventional';
-  hasScope?: boolean;
-  endsWithPeriod?: boolean;
-}
-
-function detectAuthorStyle(messages: string[]): AuthorStyle {
-  if (!messages || messages.length === 0) {
-    return { type: 'imperative', endsWithPeriod: false };
-  }
-
-  let conventionalCount = 0;
-  let imperativeCount = 0;
-  let periodCount = 0;
-  let scopeCount = 0;
-
-  const conventionalRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?:\s*(.+)/i;
-
-  for (const msg of messages) {
-    if (msg.endsWith('.')) periodCount++;
-    const convMatch = msg.match(conventionalRegex);
-    if (convMatch) {
-      conventionalCount++;
-      if (convMatch[2]) scopeCount++;
-    } else if (/^[A-Z][a-zA-Z0-9_\-]*\s+/.test(msg)) {
-      imperativeCount++;
-    }
-  }
-
-  return {
-    type: conventionalCount > imperativeCount ? 'conventional' : 'imperative',
-    hasScope: scopeCount > conventionalCount / 2,
-    endsWithPeriod: periodCount > messages.length / 2,
-  };
-}
-
-function adaptCommitMessageStyle(raw: string, samples: string[]): string {
-  if (!raw) return raw;
-  const style = detectAuthorStyle(samples);
-  let msg = raw.trim();
-
-  if (style.type === 'imperative') {
-    // Strip Conventional Commit prefix like feat: or fix(core):
-    msg = msg.replace(/^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^\)]+\))?!?:\s*/i, '');
-    msg = msg.charAt(0).toUpperCase() + msg.slice(1);
-    if (!style.endsWithPeriod) {
-      msg = msg.replace(/\.+$/, '');
-    } else if (!msg.endsWith('.')) {
-      msg += '.';
-    }
-    return msg;
-  } else {
-    // Conventional commit style
-    const convRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\.\/]+\))?!?:\s*(.+)/i;
-    const match = msg.match(convRegex);
-    if (match) {
-      const type = match[1].toLowerCase();
-      const scope = match[2] ? match[2].toLowerCase() : '';
-      let desc = match[3].trim();
-      desc = desc.charAt(0).toLowerCase() + desc.slice(1);
-      desc = desc.replace(/\.+$/, '');
-      return `${type}${scope}: ${desc}`;
-    }
-
-    let type = 'feat';
-    if (/^(fix|resolve|prevent|handle|correct)\b/i.test(msg)) type = 'fix';
-    else if (/^(refactor|clean|simplify)\b/i.test(msg)) type = 'refactor';
-    else if (/^(doc|document|docs)\b/i.test(msg)) type = 'docs';
-    else if (/^(test|tests)\b/i.test(msg)) type = 'test';
-    else if (/^(chore|build|ci)\b/i.test(msg)) type = 'chore';
-
-    let desc = msg.charAt(0).toLowerCase() + msg.slice(1);
-    desc = desc.replace(/\.+$/, '');
-    return `${type}: ${desc}`;
   }
 }

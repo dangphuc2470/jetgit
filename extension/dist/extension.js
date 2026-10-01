@@ -515,10 +515,26 @@ var GitService = class {
     return output.split("\n").filter((l) => l.trim());
   }
   async stageFile(path7) {
-    await this.exec(["add", path7]);
+    await this.stageFiles([path7]);
   }
   async stageFiles(paths) {
-    await this.exec(["add", "--", ...paths]);
+    if (!paths || paths.length === 0) return;
+    const existing = [];
+    const missing = [];
+    for (const p of paths) {
+      const full = path.isAbsolute(p) ? p : path.join(this.cwd, p);
+      if (fs.existsSync(full)) {
+        existing.push(p);
+      } else {
+        missing.push(p);
+      }
+    }
+    if (existing.length > 0) {
+      await this.exec(["add", "--", ...existing]);
+    }
+    if (missing.length > 0) {
+      await this.exec(["rm", "--cached", "--ignore-unmatch", "--", ...missing]);
+    }
   }
   async stageFileContent(filePath, content) {
     return new Promise((resolve2, reject) => {

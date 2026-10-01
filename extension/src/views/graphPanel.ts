@@ -466,12 +466,25 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       }
       case 'push': {
         const branch = msg.payload as string;
+        await this.openPushDialog(branch);
+        break;
+      }
+      case 'openPushDialog': {
+        const branch = msg.payload as string;
+        await this.openPushDialog(branch);
+        break;
+      }
+      case 'executePush': {
+        const { branch, force, setUpstream, remote, tags } = msg.payload || {};
         try {
-          await this.gitService.push(branch);
-          vscode.window.showInformationMessage(`Pushed ${branch} successfully.`);
+          await this.gitService.push(branch, force, setUpstream, remote, tags);
+          vscode.window.showInformationMessage(`Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`);
           this.loadInitialData();
+          vscode.commands.executeCommand('intellij-git.refreshBranches');
+          this.view?.webview.postMessage({ type: 'pushSuccess' });
         } catch (err: any) {
           vscode.window.showErrorMessage(`Push failed: ${err.message}`);
+          this.view?.webview.postMessage({ type: 'pushError', payload: { error: err.message } });
         }
         break;
       }
@@ -739,7 +752,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         const { hash } = msg.payload;
         try {
           const currentBranch = await this.gitService.getCurrentBranch();
-          await this.gitService.exec(['push', 'origin', `${hash}:refs/heads/${currentBranch}`]);
+          const remote = await this.gitService.getDefaultRemote(currentBranch);
+          await this.gitService.exec(['push', remote, `${hash}:refs/heads/${currentBranch}`]);
           vscode.window.showInformationMessage(`Pushed up to ${hash.slice(0, 8)} on ${currentBranch}`);
           this.loadInitialData();
         } catch (err: any) {
@@ -847,6 +861,21 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   show(): void {
     if (this.view) {
       this.view.show(true);
+    }
+  }
+
+  async openPushDialog(branch?: string): Promise<void> {
+    if (this.view) {
+      try {
+        const pushInfo = await this.gitService.getPushInfo(branch);
+        this.view.show(true);
+        this.view.webview.postMessage({
+          type: 'showPushDialog',
+          payload: pushInfo,
+        });
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to get push info: ${err.message}`);
+      }
     }
   }
 

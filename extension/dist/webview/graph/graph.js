@@ -5979,6 +5979,274 @@ ${component_stack}
   window.openRenameBranchDialog = openRenameBranchDialog;
   window.openCreateTagDialog = openCreateTagDialog;
 
+  function getPushFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    if (ext === 'dart') {
+      return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4.5 12L12 4.5L19.5 12L12 19.5L4.5 12Z" stroke="#4fc3f7" stroke-width="2.5" fill="#0288d1"/><circle cx="12" cy="12" r="3" fill="#ffffff"/></svg>';
+    }
+    if (ext === 'xml') {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#e57373"><path d="M8 2L13 6L8 14L3 6L8 2Z" stroke="#ef5350" stroke-width="1.2" fill="#c62828"/></svg>';
+    }
+    if (ext === 'json') {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#ce93d8"><text x="2" y="12" fill="#ab47bc" font-size="12" font-weight="bold">{ }</text></svg>';
+    }
+    return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#90a4ae"><path d="M3 2h7l3 3v9H3V2z" fill="#37474f" stroke="#78909c" stroke-width="1.2"/><path d="M10 2v3h3" fill="none" stroke="#78909c" stroke-width="1.2"/></svg>';
+  }
+
+  function escapePushHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  let activePushDialog = null;
+
+  function openPushDialog(pushInfo) {
+    if (activePushDialog) {
+      activePushDialog.remove();
+      activePushDialog = null;
+    }
+
+    if (!pushInfo) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'as-push-dialog-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+    const card = document.createElement('div');
+    card.className = 'as-push-dialog-card';
+    card.style.cssText = 'background:#1e1f22;border:1px solid #43454a;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:760px;max-width:95vw;height:520px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;';
+
+    const commits = pushInfo.commits || [];
+    const totalFiles = pushInfo.totalFiles || [];
+    let selectedCommitHash = 'ALL';
+
+    card.innerHTML = `
+      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #323438;user-select:none;">
+        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
+          <span class="as-push-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
+        </div>
+        <div style="position:absolute;left:0;right:0;text-align:center;font-weight:600;font-size:13px;color:#dfe1e5;pointer-events:none;">
+          Push Commits to ${escapePushHtml(pushInfo.remote)}
+        </div>
+      </div>
+      <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
+        <!-- Left Column: Branches & Commits -->
+        <div style="width:44%;border-right:1px solid #323438;display:flex;flex-direction:column;background:#1e1f22;overflow-y:auto;">
+          <div id="push-branch-header" style="display:flex;align-items:center;padding:7px 12px;background:#2675bf;color:#ffffff;font-size:12.5px;font-weight:500;cursor:pointer;user-select:none;gap:4px;overflow:hidden;">
+            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapePushHtml(pushInfo.currentBranch)}</span>
+            <span style="opacity:0.7;">&rarr;</span>
+            <span style="color:#d0e3ff;text-decoration:underline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapePushHtml(pushInfo.remote)} : ${escapePushHtml(pushInfo.remoteBranch)}</span>
+            ${pushInfo.isNew ? '<span style="background:rgba(255,255,255,0.22);color:#ffffff;font-size:10.5px;padding:1px 5px;border-radius:3px;margin-left:auto;white-space:nowrap;">New</span>' : ''}
+          </div>
+          <div id="push-commits-container" style="flex:1;overflow-y:auto;padding:4px 0;">
+          </div>
+        </div>
+
+        <!-- Right Column: Files Tree -->
+        <div style="width:56%;display:flex;flex-direction:column;background:#1e1f22;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#26282b;border-bottom:1px solid #323438;user-select:none;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#dfe1e5;">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="#c49000"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A.5.5 0 0 0 8.92 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
+              <span>${escapePushHtml(pushInfo.repoName)}</span>
+              <span id="push-files-count" style="color:#808080;font-size:11.5px;font-weight:normal;"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;color:#9aa0a6;">
+              <span title="View Options" style="cursor:pointer;font-size:12px;">👁</span>
+            </div>
+          </div>
+          <div id="push-files-container" style="flex:1;overflow-y:auto;padding:6px 8px;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#2b2d30;border-top:1px solid #323438;user-select:none;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid #5c6164;color:#adb0b8;font-size:11.5px;cursor:pointer;" title="Help">?</span>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#dfe1e5;cursor:pointer;">
+            <input type="checkbox" id="chk-push-tags" style="accent-color:#3574f0;width:14px;height:14px;cursor:pointer;">
+            <span>Push tags:</span>
+          </label>
+          <select id="sel-push-tags" style="background:#1e1f22;color:#dfe1e5;border:1px solid #4e5157;border-radius:3px;padding:3px 6px;font-size:12px;outline:none;">
+            <option value="all">All</option>
+            <option value="current">Current branch</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;position:relative;">
+          <button id="btn-push-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+          <div style="display:inline-flex;border-radius:4px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.3);">
+            <button id="btn-push-submit" style="background:#3574f0;color:#ffffff;border:none;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Push</button>
+            <button id="btn-push-menu-trigger" style="background:#3574f0;color:#ffffff;border:none;border-left:1px solid rgba(255,255,255,0.25);padding:6px 8px;font-size:11px;cursor:pointer;" title="Push Options">▼</button>
+          </div>
+          <div id="push-dropdown-menu" style="display:none;position:absolute;bottom:36px;right:0;background:#2b2d30;border:1px solid #43454a;border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.7);padding:4px 0;z-index:100;min-width:180px;">
+            <div id="btn-force-push-opt" style="padding:6px 14px;font-size:12.5px;color:#dfe1e5;cursor:pointer;">Force Push (no-verify)...</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    activePushDialog = overlay;
+
+    const branchHeader = card.querySelector('#push-branch-header');
+    const commitsContainer = card.querySelector('#push-commits-container');
+    const filesContainer = card.querySelector('#push-files-container');
+    const filesCountEl = card.querySelector('#push-files-count');
+    const btnCancel = card.querySelector('#btn-push-cancel');
+    const btnSubmit = card.querySelector('#btn-push-submit');
+    const btnMenuTrigger = card.querySelector('#btn-push-menu-trigger');
+    const dropdownMenu = card.querySelector('#push-dropdown-menu');
+    const btnForcePush = card.querySelector('#btn-force-push-opt');
+    const chkTags = card.querySelector('#chk-push-tags');
+    const dotClose = card.querySelector('.as-push-dot-close');
+
+    function renderCommits() {
+      if (commits.length === 0) {
+        commitsContainer.innerHTML = '<div style="padding:16px 12px;color:#808080;font-size:12px;">No unpushed commits on this branch.</div>';
+        return;
+      }
+      let html = '';
+      commits.forEach(c => {
+        const isSel = selectedCommitHash === c.hash;
+        const bg = isSel ? '#2d4b73' : 'transparent';
+        const textColor = isSel ? '#ffffff' : '#dfe1e5';
+        html += `
+          <div class="as-push-commit-item" data-hash="${escapePushHtml(c.hash)}" style="display:flex;align-items:center;padding:5px 12px 5px 22px;background:${bg};color:${textColor};font-size:12.5px;cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            <span style="overflow:hidden;text-overflow:ellipsis;" title="${escapePushHtml(c.message)}">${escapePushHtml(c.message)}</span>
+          </div>
+        `;
+      });
+      commitsContainer.innerHTML = html;
+
+      commitsContainer.querySelectorAll('.as-push-commit-item').forEach(el => {
+        el.addEventListener('click', () => {
+          selectedCommitHash = el.getAttribute('data-hash');
+          branchHeader.style.background = '#203248';
+          renderCommits();
+          renderFiles();
+        });
+      });
+    }
+
+    function renderFiles() {
+      let currentFiles = [];
+      if (selectedCommitHash === 'ALL') {
+        currentFiles = totalFiles;
+      } else {
+        const c = commits.find(x => x.hash === selectedCommitHash);
+        currentFiles = c ? c.files : [];
+      }
+
+      filesCountEl.textContent = `${currentFiles.length} files`;
+
+      if (currentFiles.length === 0) {
+        filesContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#808080;font-size:12px;">No files changed.</div>';
+        return;
+      }
+
+      const groups = new Map();
+      currentFiles.forEach(f => {
+        const d = f.dir || '';
+        if (!groups.has(d)) groups.set(d, []);
+        groups.get(d).push(f);
+      });
+
+      let html = '';
+      for (const [dir, fList] of groups.entries()) {
+        html += `
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;color:#9aa0a6;font-size:11.5px;cursor:pointer;font-weight:500;">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A.5.5 0 0 0 8.92 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
+            <span style="color:#dfe1e5;">${escapePushHtml(dir || 'root')}</span>
+            <span style="color:#808080;font-size:11px;">${fList.length} file${fList.length > 1 ? 's' : ''}</span>
+          </div>
+        `;
+        fList.forEach(file => {
+          let statusBadge = '';
+          if (file.status === 'M') {
+            statusBadge = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:1px solid #499c54;border-radius:2px;font-size:9.5px;color:#499c54;font-weight:bold;margin-right:2px;">M</span>';
+          } else if (file.status === 'A') {
+            statusBadge = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:1px solid #62b543;border-radius:2px;font-size:9.5px;color:#62b543;font-weight:bold;margin-right:2px;">A</span>';
+          } else if (file.status === 'D') {
+            statusBadge = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:1px solid #e05555;border-radius:2px;font-size:9.5px;color:#e05555;font-weight:bold;margin-right:2px;">D</span>';
+          }
+          html += `
+            <div class="as-push-file-item" data-path="${escapePushHtml(file.path)}" style="display:flex;align-items:center;gap:6px;padding:3px 8px 3px 26px;font-size:12.5px;color:#dfe1e5;cursor:pointer;user-select:none;">
+              ${statusBadge}
+              ${getPushFileIcon(file.name)}
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapePushHtml(file.name)}</span>
+            </div>
+          `;
+        });
+      }
+      filesContainer.innerHTML = html;
+
+      filesContainer.querySelectorAll('.as-push-file-item').forEach(el => {
+        el.addEventListener('dblclick', () => {
+          const filePath = el.getAttribute('data-path');
+          if (filePath) {
+            postMessage('openReviewInCenter', { filePath, jumpDiff: true, fromFileList: true });
+          }
+        });
+      });
+    }
+
+    branchHeader.addEventListener('click', () => {
+      selectedCommitHash = 'ALL';
+      branchHeader.style.background = '#2675bf';
+      renderCommits();
+      renderFiles();
+    });
+
+    function close() {
+      overlay.remove();
+      activePushDialog = null;
+    }
+
+    function doPush(force) {
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'Pushing...';
+      btnSubmit.style.opacity = '0.7';
+      postMessage('executePush', {
+        branch: pushInfo.currentBranch,
+        force: !!force,
+        setUpstream: pushInfo.isNew,
+        remote: pushInfo.remote,
+        tags: chkTags.checked,
+      });
+    }
+
+    btnSubmit.addEventListener('click', () => doPush(false));
+    btnCancel.addEventListener('click', close);
+    dotClose.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    btnMenuTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#push-dropdown-menu') && e.target !== btnMenuTrigger) {
+        dropdownMenu.style.display = 'none';
+      }
+    });
+
+    btnForcePush.addEventListener('click', () => {
+      dropdownMenu.style.display = 'none';
+      doPush(true);
+    });
+
+    renderCommits();
+    renderFiles();
+  }
+
+  window.openPushDialog = openPushDialog;
+
   // webview/shared/theme.ts
   var GRAPH_COLORS = [
     "#a6823c", // Android Studio gold/ocher
@@ -7550,6 +7818,28 @@ ${component_stack}
             hasInitializedActiveBranch = false;
             set(loading, false);
             set(noGitData, msg.payload, true);
+            break;
+          }
+          case "showPushDialog": {
+            openPushDialog(msg.payload);
+            break;
+          }
+          case "pushSuccess": {
+            if (activePushDialog) {
+              activePushDialog.remove();
+              activePushDialog = null;
+            }
+            break;
+          }
+          case "pushError": {
+            if (activePushDialog) {
+              const btn = activePushDialog.querySelector('#btn-push-submit');
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Push';
+                btn.style.opacity = '1';
+              }
+            }
             break;
           }
           case "commits": {

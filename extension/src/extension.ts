@@ -264,6 +264,21 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  // Push Commits dialog
+  context.subscriptions.push(
+    vscode.commands.registerCommand('intellij-git.pushDialog', async (branch?: string) => {
+      if (graphViewProvider && graphViewProvider.view?.visible) {
+        await graphViewProvider.openPushDialog(branch);
+      } else if (commitViewProvider && commitViewProvider.view?.visible) {
+        await commitViewProvider.openPushDialog(branch);
+      } else if (commitViewProvider) {
+        await commitViewProvider.openPushDialog(branch);
+      } else if (graphViewProvider) {
+        await graphViewProvider.openPushDialog(branch);
+      }
+    }),
+  );
+
   // Changelist commands
   context.subscriptions.push(
     vscode.commands.registerCommand('intellij-git.newChangelist', () => {

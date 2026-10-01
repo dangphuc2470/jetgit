@@ -416,9 +416,35 @@ var GitService = class {
   async createPatch(hash) {
     return this.exec(["format-patch", "-1", hash, "--stdout"]);
   }
+  async getRemotes() {
+    try {
+      const out = await this.exec(["remote"]);
+      return out.split("\n").map((s) => s.trim()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+  async getDefaultRemote(branch) {
+    try {
+      const curBranch = branch || await this.getCurrentBranch().catch(() => "");
+      if (curBranch) {
+        try {
+          const r = await this.exec(["config", `branch.${curBranch}.remote`]);
+          if (r.trim()) return r.trim();
+        } catch {
+        }
+      }
+      const remotes = await this.getRemotes();
+      if (remotes.includes("origin")) return "origin";
+      if (remotes.length > 0) return remotes[0];
+    } catch {
+    }
+    return "origin";
+  }
   async getRemoteUrl() {
     try {
-      const out = await this.exec(["remote", "get-url", "origin"]);
+      const remote = await this.getDefaultRemote();
+      const out = await this.exec(["remote", "get-url", remote]);
       return out.trim();
     } catch {
       return "";
@@ -436,9 +462,7 @@ var GitService = class {
       return this.exec(["pull"]);
     }
     try {
-      const remotesOutput = await this.exec(["remote"]);
-      const remotes = remotesOutput.split("\n").map((s) => s.trim()).filter(Boolean);
-      const remote = remotes[0] || "origin";
+      const remote = await this.getDefaultRemote(branch);
       let targetBranch = branch;
       if (branch.startsWith(remote + "/")) {
         targetBranch = branch.slice(remote.length + 1);
@@ -458,9 +482,99 @@ var GitService = class {
       throw err;
     }
   }
-  async push(branch) {
+  async getPushInfo(targetBranch) {
+    const currentBranch = targetBranch || await this.getCurrentBranch();
+    const remote = await this.getDefaultRemote(currentBranch);
+    const remoteBranch = currentBranch;
+    const repoRoot = await this.getRepoRoot().catch(() => this.cwd);
+    const repoName = path.basename(repoRoot);
+    let isNew = true;
+    try {
+      await this.exec(["rev-parse", "--verify", `refs/remotes/${remote}/${currentBranch}`]);
+      isNew = false;
+    } catch {
+      isNew = true;
+    }
+    let logArgs = [];
+    if (!isNew) {
+      logArgs = ["log", `${remote}/${currentBranch}..${currentBranch}`, "--format=%H%x00%h%x00%an%x00%ad%x00%s"];
+    } else {
+      logArgs = ["log", currentBranch, `--not`, `--remotes=${remote}`, "--format=%H%x00%h%x00%an%x00%ad%x00%s"];
+    }
+    let rawLog = "";
+    try {
+      rawLog = await this.exec(logArgs);
+    } catch {
+      try {
+        rawLog = await this.exec(["log", "-n", "10", "--format=%H%x00%h%x00%an%x00%ad%x00%s"]);
+      } catch {
+      }
+    }
+    const lines = rawLog.split("\n").filter((l) => l.trim());
+    const commits = [];
+    const fileMap = /* @__PURE__ */ new Map();
+    for (const line of lines) {
+      const parts = line.split("\0");
+      if (parts.length < 5) continue;
+      const [hash, shortHash, author, date, message] = parts;
+      let commitFiles = [];
+      try {
+        const diffOut = await this.exec(["diff-tree", "--no-commit-id", "--name-status", "-r", hash]);
+        commitFiles = diffOut.split("\n").filter((l) => l.trim()).map((dl) => {
+          const tokens = dl.trim().split(/\s+/);
+          const status = tokens[0] || "M";
+          const p = tokens.length > 2 ? tokens[2] : tokens[1] || "";
+          const dir = path.dirname(p) === "." ? "" : path.dirname(p);
+          const fObj = {
+            status: status.charAt(0),
+            path: p,
+            name: path.basename(p),
+            dir
+          };
+          if (!fileMap.has(p)) {
+            fileMap.set(p, fObj);
+          }
+          return fObj;
+        });
+      } catch {
+      }
+      commits.push({
+        hash,
+        shortHash,
+        message,
+        author,
+        date,
+        files: commitFiles
+      });
+    }
+    const totalFiles = Array.from(fileMap.values());
+    return {
+      currentBranch,
+      remote,
+      remoteBranch,
+      repoName,
+      isNew,
+      commits,
+      totalFiles
+    };
+  }
+  async push(branch, force = false, setUpstream = false, remoteName, tags = false) {
+    const curBranch = branch || await this.getCurrentBranch();
+    const remote = remoteName || await this.getDefaultRemote(curBranch);
     const args = ["push"];
-    if (branch) args.push("origin", branch);
+    if (force) args.push("--force-with-lease");
+    if (tags) args.push("--tags");
+    let hasUpstream = false;
+    try {
+      const upstream = await this.exec(["rev-parse", "--abbrev-ref", `${curBranch}@{u}`]);
+      if (upstream.trim()) hasUpstream = true;
+    } catch {
+    }
+    if (setUpstream || !hasUpstream) {
+      args.push("-u", remote, curBranch);
+    } else {
+      args.push(remote, curBranch);
+    }
     return this.exec(args);
   }
   async checkoutAndRebase(branch, onto) {
@@ -1540,12 +1654,25 @@ var GraphViewProvider = class {
       }
       case "push": {
         const branch = msg.payload;
+        await this.openPushDialog(branch);
+        break;
+      }
+      case "openPushDialog": {
+        const branch = msg.payload;
+        await this.openPushDialog(branch);
+        break;
+      }
+      case "executePush": {
+        const { branch, force, setUpstream, remote, tags } = msg.payload || {};
         try {
-          await this.gitService.push(branch);
-          vscode2.window.showInformationMessage(`Pushed ${branch} successfully.`);
+          await this.gitService.push(branch, force, setUpstream, remote, tags);
+          vscode2.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
           this.loadInitialData();
+          vscode2.commands.executeCommand("intellij-git.refreshBranches");
+          this.view?.webview.postMessage({ type: "pushSuccess" });
         } catch (err) {
           vscode2.window.showErrorMessage(`Push failed: ${err.message}`);
+          this.view?.webview.postMessage({ type: "pushError", payload: { error: err.message } });
         }
         break;
       }
@@ -1800,7 +1927,8 @@ var GraphViewProvider = class {
         const { hash } = msg.payload;
         try {
           const currentBranch = await this.gitService.getCurrentBranch();
-          await this.gitService.exec(["push", "origin", `${hash}:refs/heads/${currentBranch}`]);
+          const remote = await this.gitService.getDefaultRemote(currentBranch);
+          await this.gitService.exec(["push", remote, `${hash}:refs/heads/${currentBranch}`]);
           vscode2.window.showInformationMessage(`Pushed up to ${hash.slice(0, 8)} on ${currentBranch}`);
           this.loadInitialData();
         } catch (err) {
@@ -1902,6 +2030,20 @@ var GraphViewProvider = class {
   show() {
     if (this.view) {
       this.view.show(true);
+    }
+  }
+  async openPushDialog(branch) {
+    if (this.view) {
+      try {
+        const pushInfo = await this.gitService.getPushInfo(branch);
+        this.view.show(true);
+        this.view.webview.postMessage({
+          type: "showPushDialog",
+          payload: pushInfo
+        });
+      } catch (err) {
+        vscode2.window.showErrorMessage(`Failed to get push info: ${err.message}`);
+      }
     }
   }
   getHtml(webview) {
@@ -2671,13 +2813,32 @@ var CommitViewProvider = class _CommitViewProvider {
       case "commitAndPush": {
         const { message, files, amend } = msg.payload;
         try {
-          await this.gitService.commitAndPush(message, files, amend);
-          vscode4.window.showInformationMessage("Committed and pushed successfully.");
+          await this.gitService.commitFiles(message, files, amend);
+          vscode4.window.showInformationMessage("Committed successfully.");
           this.view?.webview.postMessage({ type: "commitSuccess" });
           await this.refresh();
           vscode4.commands.executeCommand("intellij-git.refreshBranches");
+          await this.openPushDialog();
         } catch (err) {
-          vscode4.window.showErrorMessage(`Commit and Push failed: ${err.message}`);
+          vscode4.window.showErrorMessage(`Commit failed: ${err.message}`);
+        }
+        break;
+      }
+      case "openPushDialog": {
+        await this.openPushDialog(msg.payload?.branch);
+        break;
+      }
+      case "executePush": {
+        const { branch, force, setUpstream, remote, tags } = msg.payload || {};
+        try {
+          await this.gitService.push(branch, force, setUpstream, remote, tags);
+          vscode4.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
+          await this.refresh();
+          vscode4.commands.executeCommand("intellij-git.refreshBranches");
+          this.view?.webview.postMessage({ type: "pushSuccess" });
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Push failed: ${err.message}`);
+          this.view?.webview.postMessage({ type: "pushError", payload: { error: err.message } });
         }
         break;
       }
@@ -2958,6 +3119,20 @@ ${stagedDiff.slice(0, 8e3)}`
     if (this.view) {
       this.view.show?.(true);
       this.view.webview.postMessage({ type: "showConflictsDialog" });
+    }
+  }
+  async openPushDialog(branch) {
+    if (this.view) {
+      try {
+        const pushInfo = await this.gitService.getPushInfo(branch);
+        this.view.show?.(true);
+        this.view.webview.postMessage({
+          type: "showPushDialog",
+          payload: pushInfo
+        });
+      } catch (err) {
+        vscode4.window.showErrorMessage(`Failed to get push info: ${err.message}`);
+      }
     }
   }
 };
@@ -4076,6 +4251,19 @@ function activate(context) {
   context.subscriptions.push(
     vscode10.commands.registerCommand("intellij-git.acceptAllNonConflicting", () => {
       mergeProvider.acceptAllNonConflicting();
+    })
+  );
+  context.subscriptions.push(
+    vscode10.commands.registerCommand("intellij-git.pushDialog", async (branch) => {
+      if (graphViewProvider && graphViewProvider.view?.visible) {
+        await graphViewProvider.openPushDialog(branch);
+      } else if (commitViewProvider && commitViewProvider.view?.visible) {
+        await commitViewProvider.openPushDialog(branch);
+      } else if (commitViewProvider) {
+        await commitViewProvider.openPushDialog(branch);
+      } else if (graphViewProvider) {
+        await graphViewProvider.openPushDialog(branch);
+      }
     })
   );
   context.subscriptions.push(

@@ -175,9 +175,21 @@
         "title": "Refresh Changelists",
         "category": "IntelliJ Git",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "intellij-git.pushDialog",
+        "title": "Push...",
+        "category": "IntelliJ Git"
       }
     ],
-    "keybindings": [],
+    "keybindings": [
+      {
+        "command": "intellij-git.pushDialog",
+        "key": "shift+cmd+k",
+        "mac": "shift+cmd+k",
+        "win": "shift+ctrl+k"
+      }
+    ],
     "views": {
       "intellij-git-commit": [
         {

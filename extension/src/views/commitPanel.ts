@@ -394,13 +394,32 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'commitAndPush': {
         const { message, files, amend } = msg.payload;
         try {
-          await this.gitService.commitAndPush(message, files, amend);
-          vscode.window.showInformationMessage('Committed and pushed successfully.');
+          await this.gitService.commitFiles(message, files, amend);
+          vscode.window.showInformationMessage('Committed successfully.');
           this.view?.webview.postMessage({ type: 'commitSuccess' });
           await this.refresh();
           vscode.commands.executeCommand('intellij-git.refreshBranches');
+          await this.openPushDialog();
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Commit and Push failed: ${err.message}`);
+          vscode.window.showErrorMessage(`Commit failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'openPushDialog': {
+        await this.openPushDialog(msg.payload?.branch);
+        break;
+      }
+      case 'executePush': {
+        const { branch, force, setUpstream, remote, tags } = msg.payload || {};
+        try {
+          await this.gitService.push(branch, force, setUpstream, remote, tags);
+          vscode.window.showInformationMessage(`Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`);
+          await this.refresh();
+          vscode.commands.executeCommand('intellij-git.refreshBranches');
+          this.view?.webview.postMessage({ type: 'pushSuccess' });
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Push failed: ${err.message}`);
+          this.view?.webview.postMessage({ type: 'pushError', payload: { error: err.message } });
         }
         break;
       }
@@ -711,6 +730,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     if (this.view) {
       this.view.show?.(true);
       this.view.webview.postMessage({ type: 'showConflictsDialog' });
+    }
+  }
+
+  async openPushDialog(branch?: string): Promise<void> {
+    if (this.view) {
+      try {
+        const pushInfo = await this.gitService.getPushInfo(branch);
+        this.view.show?.(true);
+        this.view.webview.postMessage({
+          type: 'showPushDialog',
+          payload: pushInfo,
+        });
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to get push info: ${err.message}`);
+      }
     }
   }
 }

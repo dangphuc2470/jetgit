@@ -412,9 +412,35 @@ export class GitService {
     return this.exec(['format-patch', '-1', hash, '--stdout']);
   }
 
+  async getRemotes(): Promise<string[]> {
+    try {
+      const out = await this.exec(['remote']);
+      return out.split('\n').map(s => s.trim()).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  async getDefaultRemote(branch?: string): Promise<string> {
+    try {
+      const curBranch = branch || await this.getCurrentBranch().catch(() => '');
+      if (curBranch) {
+        try {
+          const r = await this.exec(['config', `branch.${curBranch}.remote`]);
+          if (r.trim()) return r.trim();
+        } catch {}
+      }
+      const remotes = await this.getRemotes();
+      if (remotes.includes('origin')) return 'origin';
+      if (remotes.length > 0) return remotes[0];
+    } catch {}
+    return 'origin';
+  }
+
   async getRemoteUrl(): Promise<string> {
     try {
-      const out = await this.exec(['remote', 'get-url', 'origin']);
+      const remote = await this.getDefaultRemote();
+      const out = await this.exec(['remote', 'get-url', remote]);
       return out.trim();
     } catch {
       return '';
@@ -438,9 +464,7 @@ export class GitService {
     // Updating a different local branch without checking it out:
     // Safely update branch ref using git fetch <remote> <branch>:<branch>
     try {
-      const remotesOutput = await this.exec(['remote']);
-      const remotes = remotesOutput.split('\n').map(s => s.trim()).filter(Boolean);
-      const remote = remotes[0] || 'origin';
+      const remote = await this.getDefaultRemote(branch);
 
       let targetBranch = branch;
       if (branch.startsWith(remote + '/')) {
@@ -463,9 +487,138 @@ export class GitService {
     }
   }
 
-  async push(branch?: string): Promise<string> {
+  async getPushInfo(targetBranch?: string): Promise<{
+    currentBranch: string;
+    remote: string;
+    remoteBranch: string;
+    repoName: string;
+    isNew: boolean;
+    commits: Array<{
+      hash: string;
+      shortHash: string;
+      message: string;
+      author: string;
+      date: string;
+      files: Array<{ status: string; path: string; name: string; dir: string }>;
+    }>;
+    totalFiles: Array<{ status: string; path: string; name: string; dir: string }>;
+  }> {
+    const currentBranch = targetBranch || await this.getCurrentBranch();
+    const remote = await this.getDefaultRemote(currentBranch);
+    const remoteBranch = currentBranch;
+    const repoRoot = await this.getRepoRoot().catch(() => this.cwd);
+    const repoName = path.basename(repoRoot);
+
+    let isNew = true;
+    try {
+      await this.exec(['rev-parse', '--verify', `refs/remotes/${remote}/${currentBranch}`]);
+      isNew = false;
+    } catch {
+      isNew = true;
+    }
+
+    let logArgs: string[] = [];
+    if (!isNew) {
+      logArgs = ['log', `${remote}/${currentBranch}..${currentBranch}`, '--format=%H%x00%h%x00%an%x00%ad%x00%s'];
+    } else {
+      logArgs = ['log', currentBranch, `--not`, `--remotes=${remote}`, '--format=%H%x00%h%x00%an%x00%ad%x00%s'];
+    }
+
+    let rawLog = '';
+    try {
+      rawLog = await this.exec(logArgs);
+    } catch {
+      try {
+        rawLog = await this.exec(['log', '-n', '10', '--format=%H%x00%h%x00%an%x00%ad%x00%s']);
+      } catch {}
+    }
+
+    const lines = rawLog.split('\n').filter(l => l.trim());
+    const commits: Array<{
+      hash: string;
+      shortHash: string;
+      message: string;
+      author: string;
+      date: string;
+      files: Array<{ status: string; path: string; name: string; dir: string }>;
+    }> = [];
+
+    const fileMap = new Map<string, { status: string; path: string; name: string; dir: string }>();
+
+    for (const line of lines) {
+      const parts = line.split('\0');
+      if (parts.length < 5) continue;
+      const [hash, shortHash, author, date, message] = parts;
+
+      let commitFiles: Array<{ status: string; path: string; name: string; dir: string }> = [];
+      try {
+        const diffOut = await this.exec(['diff-tree', '--no-commit-id', '--name-status', '-r', hash]);
+        commitFiles = diffOut.split('\n').filter(l => l.trim()).map(dl => {
+          const tokens = dl.trim().split(/\s+/);
+          const status = tokens[0] || 'M';
+          const p = tokens.length > 2 ? tokens[2] : (tokens[1] || '');
+          const dir = path.dirname(p) === '.' ? '' : path.dirname(p);
+          const fObj = {
+            status: status.charAt(0),
+            path: p,
+            name: path.basename(p),
+            dir,
+          };
+          if (!fileMap.has(p)) {
+            fileMap.set(p, fObj);
+          }
+          return fObj;
+        });
+      } catch {}
+
+      commits.push({
+        hash,
+        shortHash,
+        message,
+        author,
+        date,
+        files: commitFiles,
+      });
+    }
+
+    const totalFiles = Array.from(fileMap.values());
+
+    return {
+      currentBranch,
+      remote,
+      remoteBranch,
+      repoName,
+      isNew,
+      commits,
+      totalFiles,
+    };
+  }
+
+  async push(
+    branch?: string,
+    force = false,
+    setUpstream = false,
+    remoteName?: string,
+    tags = false
+  ): Promise<string> {
+    const curBranch = branch || await this.getCurrentBranch();
+    const remote = remoteName || await this.getDefaultRemote(curBranch);
     const args = ['push'];
-    if (branch) args.push('origin', branch);
+    if (force) args.push('--force-with-lease');
+    if (tags) args.push('--tags');
+
+    let hasUpstream = false;
+    try {
+      const upstream = await this.exec(['rev-parse', '--abbrev-ref', `${curBranch}@{u}`]);
+      if (upstream.trim()) hasUpstream = true;
+    } catch {}
+
+    if (setUpstream || !hasUpstream) {
+      args.push('-u', remote, curBranch);
+    } else {
+      args.push(remote, curBranch);
+    }
+
     return this.exec(args);
   }
 

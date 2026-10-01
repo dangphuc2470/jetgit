@@ -254,7 +254,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Merge conflict resolution
   context.subscriptions.push(
     vscode.commands.registerCommand('intellij-git.resolveConflicts', () => {
-      mergeProvider.resolveConflicts();
+      commitViewProvider.openConflictsDialog();
     }),
   );
 

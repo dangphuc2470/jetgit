@@ -514,6 +514,121 @@ var GitService = class {
     const output = await this.exec(["diff", "--name-only", "--diff-filter=U"]);
     return output.split("\n").filter((l) => l.trim());
   }
+  async getConflictInfo() {
+    const gitDir = path.join(this.cwd, ".git");
+    const isMerging = fs.existsSync(path.join(gitDir, "MERGE_HEAD"));
+    const isRebasing = fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"));
+    const isCherryPicking = fs.existsSync(path.join(gitDir, "CHERRY_PICK_HEAD"));
+    let yoursBranch = "";
+    try {
+      yoursBranch = await this.getCurrentBranch();
+    } catch {
+    }
+    if (!yoursBranch) yoursBranch = "HEAD";
+    let theirsBranch = "";
+    if (isMerging) {
+      try {
+        const mergeMsg = await this.getMergeMessage();
+        const m = mergeMsg.match(/Merge branch '([^']+)'/) || mergeMsg.match(/Merge commit '([^']+)'/);
+        if (m) {
+          theirsBranch = m[1];
+        } else {
+          const mergeHead = fs.readFileSync(path.join(gitDir, "MERGE_HEAD"), "utf8").trim();
+          theirsBranch = mergeHead.slice(0, 7);
+        }
+      } catch {
+      }
+    } else if (isRebasing) {
+      try {
+        const headNamePath = path.join(gitDir, "rebase-merge", "head-name");
+        if (fs.existsSync(headNamePath)) {
+          theirsBranch = fs.readFileSync(headNamePath, "utf8").trim().replace("refs/heads/", "");
+        }
+      } catch {
+      }
+    }
+    if (!theirsBranch) theirsBranch = "Theirs";
+    const statusEntries = await this.getStatus();
+    const conflictCodes = /* @__PURE__ */ new Set(["UU", "UD", "DU", "AA", "DD", "AU", "UA"]);
+    const conflictEntries = statusEntries.filter(
+      (e) => conflictCodes.has(`${e.x}${e.y}`) || e.x === "U" || e.y === "U"
+    );
+    const conflicts = conflictEntries.map((e) => {
+      let yours = "Modified";
+      let theirs = "Modified";
+      const code = `${e.x}${e.y}`;
+      if (code === "UD") {
+        yours = "Modified";
+        theirs = "Deleted";
+      } else if (code === "DU") {
+        yours = "Deleted";
+        theirs = "Modified";
+      } else if (code === "AA") {
+        yours = "Added";
+        theirs = "Added";
+      } else if (code === "DD") {
+        yours = "Deleted";
+        theirs = "Deleted";
+      } else if (code === "AU") {
+        yours = "Added";
+        theirs = "Modified";
+      } else if (code === "UA") {
+        yours = "Modified";
+        theirs = "Added";
+      }
+      return {
+        path: e.path,
+        name: path.basename(e.path),
+        dir: path.dirname(e.path) === "." ? "" : path.dirname(e.path),
+        yours,
+        theirs
+      };
+    });
+    return {
+      hasConflicts: conflicts.length > 0,
+      isMerging,
+      isRebasing: isRebasing || isCherryPicking,
+      yoursBranch,
+      theirsBranch,
+      conflicts
+    };
+  }
+  async acceptYours(filePath) {
+    const status = await this.getStatus();
+    const entry = status.find((s) => s.path === filePath);
+    const code = entry ? `${entry.x}${entry.y}` : "";
+    if (code === "DU" || code === "DD") {
+      await this.exec(["rm", "-f", "--", filePath]).catch(
+        () => this.exec(["rm", "--cached", "--ignore-unmatch", "--", filePath])
+      );
+    } else {
+      await this.exec(["checkout", "--ours", "--", filePath]);
+      await this.stageFiles([filePath]);
+    }
+  }
+  async acceptTheirs(filePath) {
+    const status = await this.getStatus();
+    const entry = status.find((s) => s.path === filePath);
+    const code = entry ? `${entry.x}${entry.y}` : "";
+    if (code === "UD" || code === "DD") {
+      await this.exec(["rm", "-f", "--", filePath]).catch(
+        () => this.exec(["rm", "--cached", "--ignore-unmatch", "--", filePath])
+      );
+    } else {
+      await this.exec(["checkout", "--theirs", "--", filePath]);
+      await this.stageFiles([filePath]);
+    }
+  }
+  async abortMerge() {
+    const gitDir = path.join(this.cwd, ".git");
+    if (fs.existsSync(path.join(gitDir, "rebase-merge")) || fs.existsSync(path.join(gitDir, "rebase-apply"))) {
+      await this.exec(["rebase", "--abort"]);
+    } else if (fs.existsSync(path.join(gitDir, "CHERRY_PICK_HEAD"))) {
+      await this.exec(["cherry-pick", "--abort"]);
+    } else {
+      await this.exec(["merge", "--abort"]);
+    }
+  }
   async stageFile(path7) {
     await this.stageFiles([path7]);
   }
@@ -2271,13 +2386,21 @@ var CommitViewProvider = class _CommitViewProvider {
         });
         return;
       }
-      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
+      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff, conflictInfo] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
         this.gitService.getRecentCommitMessages(10),
         this.gitService.getStashes(),
         this.gitService.exec(["diff", "HEAD"]).catch(() => ""),
-        this.gitService.exec(["diff", "--cached"]).catch(() => "")
+        this.gitService.exec(["diff", "--cached"]).catch(() => ""),
+        this.gitService.getConflictInfo().catch(() => ({
+          hasConflicts: false,
+          isMerging: false,
+          isRebasing: false,
+          yoursBranch: "",
+          theirsBranch: "",
+          conflicts: []
+        }))
       ]);
       const totalChangesMap = this.parseChangesPerFile(totalDiff);
       const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
@@ -2319,7 +2442,8 @@ var CommitViewProvider = class _CommitViewProvider {
           unversionedCount,
           defaultCommitMessage: mergeMsg || "",
           recentMessages,
-          stashes
+          stashes,
+          conflictInfo
         }
       });
     } catch (err) {
@@ -2557,6 +2681,63 @@ var CommitViewProvider = class _CommitViewProvider {
         }
         break;
       }
+      case "acceptYours": {
+        const { path: filePath } = msg.payload;
+        try {
+          await this.gitService.acceptYours(filePath);
+          vscode4.window.showInformationMessage(`Accepted Yours for '${filePath}'`);
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Accept Yours failed: ${err.message}`);
+        }
+        break;
+      }
+      case "acceptTheirs": {
+        const { path: filePath } = msg.payload;
+        try {
+          await this.gitService.acceptTheirs(filePath);
+          vscode4.window.showInformationMessage(`Accepted Theirs for '${filePath}'`);
+          await this.refresh();
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Accept Theirs failed: ${err.message}`);
+        }
+        break;
+      }
+      case "openMergeEditor": {
+        const { path: filePath } = msg.payload;
+        try {
+          const fileUri = vscode4.Uri.file(path4.join(this.workspaceRoot, filePath));
+          try {
+            await vscode4.commands.executeCommand("git.openMergeEditor", fileUri);
+          } catch {
+            await vscode4.commands.executeCommand("vscode.open", fileUri);
+          }
+        } catch (err) {
+          vscode4.window.showErrorMessage(`Failed to open merge editor: ${err.message}`);
+        }
+        break;
+      }
+      case "abortMerge": {
+        const confirmed = await vscode4.window.showWarningMessage(
+          "Are you sure you want to abort the current merge/rebase? All uncommitted merge changes will be lost.",
+          { modal: true },
+          "Abort"
+        );
+        if (confirmed === "Abort") {
+          try {
+            await this.gitService.abortMerge();
+            vscode4.window.showInformationMessage("Merge/rebase aborted.");
+            await this.refresh();
+          } catch (err) {
+            vscode4.window.showErrorMessage(`Abort failed: ${err.message}`);
+          }
+        }
+        break;
+      }
+      case "openConflictsDialog": {
+        this.openConflictsDialog();
+        break;
+      }
       case "generateAiCommitMessage": {
         const { files } = msg.payload || {};
         const checkedFiles = Array.isArray(files) ? files : [];
@@ -2772,6 +2953,12 @@ ${stagedDiff.slice(0, 8e3)}`
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
+  }
+  openConflictsDialog() {
+    if (this.view) {
+      this.view.show?.(true);
+      this.view.webview.postMessage({ type: "showConflictsDialog" });
+    }
   }
 };
 function getNonce3() {
@@ -3883,7 +4070,7 @@ function activate(context) {
   );
   context.subscriptions.push(
     vscode10.commands.registerCommand("intellij-git.resolveConflicts", () => {
-      mergeProvider.resolveConflicts();
+      commitViewProvider.openConflictsDialog();
     })
   );
   context.subscriptions.push(

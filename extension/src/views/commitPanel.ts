@@ -94,13 +94,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff] = await Promise.all([
+      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff, conflictInfo] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
         this.gitService.getRecentCommitMessages(10),
         this.gitService.getStashes(),
         this.gitService.exec(['diff', 'HEAD']).catch(() => ''),
         this.gitService.exec(['diff', '--cached']).catch(() => ''),
+        this.gitService.getConflictInfo().catch(() => ({
+          hasConflicts: false,
+          isMerging: false,
+          isRebasing: false,
+          yoursBranch: '',
+          theirsBranch: '',
+          conflicts: [],
+        })),
       ]);
 
       const totalChangesMap = this.parseChangesPerFile(totalDiff);
@@ -154,6 +162,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           defaultCommitMessage: mergeMsg || '',
           recentMessages,
           stashes,
+          conflictInfo,
         },
       });
     } catch (err: any) {
@@ -393,6 +402,63 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         } catch (err: any) {
           vscode.window.showErrorMessage(`Commit and Push failed: ${err.message}`);
         }
+        break;
+      }
+      case 'acceptYours': {
+        const { path: filePath } = msg.payload;
+        try {
+          await this.gitService.acceptYours(filePath);
+          vscode.window.showInformationMessage(`Accepted Yours for '${filePath}'`);
+          await this.refresh();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Accept Yours failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'acceptTheirs': {
+        const { path: filePath } = msg.payload;
+        try {
+          await this.gitService.acceptTheirs(filePath);
+          vscode.window.showInformationMessage(`Accepted Theirs for '${filePath}'`);
+          await this.refresh();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Accept Theirs failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'openMergeEditor': {
+        const { path: filePath } = msg.payload;
+        try {
+          const fileUri = vscode.Uri.file(path.join(this.workspaceRoot, filePath));
+          try {
+            await vscode.commands.executeCommand('git.openMergeEditor', fileUri);
+          } catch {
+            await vscode.commands.executeCommand('vscode.open', fileUri);
+          }
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Failed to open merge editor: ${err.message}`);
+        }
+        break;
+      }
+      case 'abortMerge': {
+        const confirmed = await vscode.window.showWarningMessage(
+          'Are you sure you want to abort the current merge/rebase? All uncommitted merge changes will be lost.',
+          { modal: true },
+          'Abort'
+        );
+        if (confirmed === 'Abort') {
+          try {
+            await this.gitService.abortMerge();
+            vscode.window.showInformationMessage('Merge/rebase aborted.');
+            await this.refresh();
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`Abort failed: ${err.message}`);
+          }
+        }
+        break;
+      }
+      case 'openConflictsDialog': {
+        this.openConflictsDialog();
         break;
       }
       case 'generateAiCommitMessage': {
@@ -639,6 +705,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
+  }
+
+  openConflictsDialog(): void {
+    if (this.view) {
+      this.view.show?.(true);
+      this.view.webview.postMessage({ type: 'showConflictsDialog' });
+    }
   }
 }
 

@@ -21,6 +21,7 @@
     commitOptionsOpen: false,
     recentOpen: false,
     isGeneratingAi: false,
+    conflictInfo: null,
     splitRatio: 0.6 // 60% file tree, 40% commit box
   };
 
@@ -238,6 +239,23 @@
     // 2. Toolbar
     const toolbar = document.createElement('div');
     toolbar.className = 'commit-toolbar';
+
+    const hasConflictState = state.conflictInfo && (state.conflictInfo.hasConflicts || state.conflictInfo.isMerging || state.conflictInfo.isRebasing);
+    const conflictButtonsHtml = hasConflictState ? `
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+        <button class="tool-btn btn-conflict-resolve" id="btn-resolve-conflicts" title="Resolve Conflicts..." style="color: #62b543; display: inline-flex; align-items: center; justify-content: center;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path fill-rule="evenodd" d="M3.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L9.293 8 3.646 2.354a.5.5 0 0 1 0-.708z"/>
+            <path fill-rule="evenodd" d="M7.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L13.293 8 7.646 2.354a.5.5 0 0 1 0-.708z"/>
+          </svg>
+        </button>
+        <button class="tool-btn btn-conflict-abort" id="btn-abort-merge" title="Abort Merge / Rebase" style="color: #e05555; display: inline-flex; align-items: center; justify-content: center;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+          </svg>
+        </button>
+    ` : '';
+
     toolbar.innerHTML = `
       <div class="tool-left">
         <button class="tool-btn" id="btn-refresh" title="Refresh (Cmd+R)">
@@ -258,6 +276,7 @@
         <button class="tool-btn" id="btn-clear" title="Clear / Deselect All">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
         </button>
+        ${conflictButtonsHtml}
       </div>
     `;
     container.appendChild(toolbar);
@@ -795,6 +814,20 @@
       state.checkedFiles.clear();
       render();
     });
+
+    const btnResolve = toolbar.querySelector('#btn-resolve-conflicts');
+    if (btnResolve) {
+      btnResolve.addEventListener('click', () => {
+        openConflictsDialog();
+      });
+    }
+
+    const btnAbort = toolbar.querySelector('#btn-abort-merge');
+    if (btnAbort) {
+      btnAbort.addEventListener('click', () => {
+        vscode.postMessage({ type: 'abortMerge' });
+      });
+    }
   }
 
   // Attach tree events
@@ -1146,6 +1179,271 @@
     return str.replace(/"/g, '&quot;');
   }
 
+  let activeConflictsDialog = null;
+  let updateConflictsDialog = null;
+
+  function openConflictsDialog() {
+    if (activeConflictsDialog) {
+      activeConflictsDialog.remove();
+      activeConflictsDialog = null;
+    }
+
+    const conflictInfo = state.conflictInfo || {
+      hasConflicts: false,
+      isMerging: false,
+      isRebasing: false,
+      yoursBranch: 'Yours',
+      theirsBranch: 'Theirs',
+      conflicts: [],
+    };
+
+    let conflicts = [...(conflictInfo.conflicts || [])];
+    let selectedPath = conflicts.length > 0 ? conflicts[0].path : null;
+    let groupByDir = false;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'as-conflicts-dialog-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+    const card = document.createElement('div');
+    card.className = 'as-dialog-card';
+    card.style.cssText = 'background:#2b2d30;border:1px solid #43454a;border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.8);width:680px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;';
+
+    const yoursLabel = `Yours (${conflictInfo.yoursBranch || 'HEAD'})`;
+    const theirsLabel = `Theirs (${conflictInfo.theirsBranch || 'MERGE_HEAD'})`;
+
+    card.innerHTML = `
+      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#212224;border-bottom:1px solid #323438;user-select:none;">
+        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
+          <span class="as-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
+        </div>
+        <div style="position:absolute;left:0;right:0;text-align:center;font-weight:600;font-size:13px;color:#dfe1e5;pointer-events:none;">
+          Conflicts
+        </div>
+      </div>
+      <div style="padding:14px 18px 8px;font-size:13px;color:#dfe1e5;font-weight:400;">
+        The following files have unresolved conflicts. You need to resolve them before merge.
+      </div>
+      <div style="display:flex;flex:1;min-height:220px;max-height:450px;padding:8px 18px;gap:14px;">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;border:1px solid #43454a;border-radius:4px;background:#1e1f22;overflow:hidden;">
+          <div style="display:flex;background:#2b2d30;border-bottom:1px solid #3c3f41;padding:6px 10px;font-size:12px;font-weight:600;color:#9aa0a6;user-select:none;">
+            <div style="flex:1.8;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Name</div>
+            <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="lbl-yours">${escapeHtml(yoursLabel)}</div>
+            <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="lbl-theirs">${escapeHtml(theirsLabel)}</div>
+          </div>
+          <div id="conflict-table-body" style="flex:1;overflow-y:auto;min-height:180px;">
+          </div>
+        </div>
+        <div style="width:130px;display:flex;flex-direction:column;gap:8px;padding-top:2px;">
+          <button id="btn-act-yours" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 12px;font-size:12.5px;cursor:pointer;text-align:center;white-space:nowrap;">Accept Yours</button>
+          <button id="btn-act-theirs" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 12px;font-size:12.5px;cursor:pointer;text-align:center;white-space:nowrap;">Accept Theirs</button>
+          <button id="btn-act-merge" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center;white-space:nowrap;margin-top:2px;">Merge...</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px 14px;background:#2b2d30;border-top:1px solid #323438;">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#dfe1e5;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="chk-group-dir" style="accent-color:#3574f0;cursor:pointer;width:14px;height:14px;margin:0;">
+          <span>Group files by directory</span>
+        </label>
+        <button id="btn-dialog-close" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:5px 18px;font-size:12.5px;cursor:pointer;">Close</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    activeConflictsDialog = overlay;
+
+    const tableBody = card.querySelector('#conflict-table-body');
+    const chkGroup = card.querySelector('#chk-group-dir');
+    const btnAcceptYours = card.querySelector('#btn-act-yours');
+    const btnAcceptTheirs = card.querySelector('#btn-act-theirs');
+    const btnMerge = card.querySelector('#btn-act-merge');
+    const btnClose = card.querySelector('#btn-dialog-close');
+    const dotClose = card.querySelector('.as-dot-close');
+
+    function renderTable() {
+      if (conflicts.length === 0) {
+        tableBody.innerHTML = '<div style="padding:24px;text-align:center;color:#808080;font-size:13px;">No unresolved conflicts.</div>';
+        btnAcceptYours.disabled = true;
+        btnAcceptYours.style.opacity = '0.5';
+        btnAcceptTheirs.disabled = true;
+        btnAcceptTheirs.style.opacity = '0.5';
+        btnMerge.disabled = true;
+        btnMerge.style.opacity = '0.5';
+        return;
+      }
+
+      btnAcceptYours.disabled = false;
+      btnAcceptYours.style.opacity = '1';
+      btnAcceptTheirs.disabled = false;
+      btnAcceptTheirs.style.opacity = '1';
+      btnMerge.disabled = false;
+      btnMerge.style.opacity = '1';
+
+      if (!selectedPath || !conflicts.some(c => c.path === selectedPath)) {
+        selectedPath = conflicts[0].path;
+      }
+
+      let html = '';
+      if (!groupByDir) {
+        conflicts.forEach(file => {
+          const isSelected = file.path === selectedPath;
+          const bg = isSelected ? '#2675bf' : 'transparent';
+          const textColor = isSelected ? '#ffffff' : '#e06c75';
+          const dirColor = isSelected ? '#b0d4f1' : '#808080';
+          const statusColor = isSelected ? '#ffffff' : '#dfe1e5';
+          html += `
+            <div class="as-conflict-row" data-path="${escapeAttr(file.path)}" style="display:flex;align-items:center;padding:5px 10px;font-size:12.5px;cursor:pointer;user-select:none;background:${bg};border-bottom:1px solid rgba(255,255,255,0.03);">
+              <div style="flex:1.8;min-width:0;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                ${getFileIcon(file.name)}
+                <span style="color:${textColor};font-weight:500;">${escapeHtml(file.name)}</span>
+                ${file.dir ? `<span style="color:${dirColor};font-size:11.5px;margin-left:4px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(file.dir)}</span>` : ''}
+              </div>
+              <div style="flex:1;min-width:0;color:${statusColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(file.yours)}</div>
+              <div style="flex:1;min-width:0;color:${statusColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(file.theirs)}</div>
+            </div>
+          `;
+        });
+      } else {
+        const groups = new Map();
+        conflicts.forEach(file => {
+          const dir = file.dir || '';
+          if (!groups.has(dir)) groups.set(dir, []);
+          groups.get(dir).push(file);
+        });
+
+        for (const [dir, files] of groups.entries()) {
+          html += `
+            <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:rgba(255,255,255,0.04);color:#9aa0a6;font-size:11.5px;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.04);">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A.5.5 0 0 0 8.92 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
+              <span>${escapeHtml(dir || 'root')}</span>
+            </div>
+          `;
+          files.forEach(file => {
+            const isSelected = file.path === selectedPath;
+            const bg = isSelected ? '#2675bf' : 'transparent';
+            const textColor = isSelected ? '#ffffff' : '#e06c75';
+            const statusColor = isSelected ? '#ffffff' : '#dfe1e5';
+            html += `
+              <div class="as-conflict-row" data-path="${escapeAttr(file.path)}" style="display:flex;align-items:center;padding:5px 10px 5px 22px;font-size:12.5px;cursor:pointer;user-select:none;background:${bg};border-bottom:1px solid rgba(255,255,255,0.03);">
+                <div style="flex:1.8;min-width:0;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                  ${getFileIcon(file.name)}
+                  <span style="color:${textColor};font-weight:500;">${escapeHtml(file.name)}</span>
+                </div>
+                <div style="flex:1;min-width:0;color:${statusColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(file.yours)}</div>
+                <div style="flex:1;min-width:0;color:${statusColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(file.theirs)}</div>
+              </div>
+            `;
+          });
+        }
+      }
+      tableBody.innerHTML = html;
+
+      tableBody.querySelectorAll('.as-conflict-row').forEach(row => {
+        row.addEventListener('click', () => {
+          selectedPath = row.getAttribute('data-path');
+          renderTable();
+        });
+        row.addEventListener('dblclick', () => {
+          selectedPath = row.getAttribute('data-path');
+          doMerge();
+        });
+      });
+    }
+
+    function doMerge() {
+      if (!selectedPath) return;
+      vscode.postMessage({ type: 'openMergeEditor', payload: { path: selectedPath } });
+    }
+
+    function doAcceptYours() {
+      if (!selectedPath) return;
+      const target = selectedPath;
+      vscode.postMessage({ type: 'acceptYours', payload: { path: target } });
+      conflicts = conflicts.filter(c => c.path !== target);
+      if (conflicts.length === 0) {
+        close();
+      } else {
+        selectedPath = conflicts[0].path;
+        renderTable();
+      }
+    }
+
+    function doAcceptTheirs() {
+      if (!selectedPath) return;
+      const target = selectedPath;
+      vscode.postMessage({ type: 'acceptTheirs', payload: { path: target } });
+      conflicts = conflicts.filter(c => c.path !== target);
+      if (conflicts.length === 0) {
+        close();
+      } else {
+        selectedPath = conflicts[0].path;
+        renderTable();
+      }
+    }
+
+    function close() {
+      window.removeEventListener('keydown', handleKey);
+      overlay.remove();
+      activeConflictsDialog = null;
+      updateConflictsDialog = null;
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Escape') {
+        close();
+      } else if (e.key === 'Enter') {
+        doMerge();
+      } else if (e.key === 'ArrowDown') {
+        const idx = conflicts.findIndex(c => c.path === selectedPath);
+        if (idx < conflicts.length - 1) {
+          selectedPath = conflicts[idx + 1].path;
+          renderTable();
+          e.preventDefault();
+        }
+      } else if (e.key === 'ArrowUp') {
+        const idx = conflicts.findIndex(c => c.path === selectedPath);
+        if (idx > 0) {
+          selectedPath = conflicts[idx - 1].path;
+          renderTable();
+          e.preventDefault();
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKey);
+
+    chkGroup.addEventListener('change', () => {
+      groupByDir = chkGroup.checked;
+      renderTable();
+    });
+
+    btnMerge.addEventListener('click', doMerge);
+    btnAcceptYours.addEventListener('click', doAcceptYours);
+    btnAcceptTheirs.addEventListener('click', doAcceptTheirs);
+    btnClose.addEventListener('click', close);
+    dotClose.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    updateConflictsDialog = function() {
+      const updatedInfo = state.conflictInfo;
+      if (updatedInfo) {
+        conflicts = [...(updatedInfo.conflicts || [])];
+        if (conflicts.length === 0) {
+          close();
+          return;
+        }
+        renderTable();
+      }
+    };
+
+    renderTable();
+  }
+
   // Message listener from extension
   window.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1158,6 +1456,18 @@
         state.unversionedCount = data.unversionedCount || 0;
         state.recentMessages = data.recentMessages || [];
         state.stashes = data.stashes || [];
+        state.conflictInfo = data.conflictInfo || {
+          hasConflicts: false,
+          isMerging: false,
+          isRebasing: false,
+          yoursBranch: '',
+          theirsBranch: '',
+          conflicts: [],
+        };
+
+        if (typeof updateConflictsDialog === 'function') {
+          updateConflictsDialog();
+        }
 
         // Synchronize checked files strictly with actual git staged status
         state.checkedFiles.clear();
@@ -1181,6 +1491,10 @@
         }
 
         render();
+        break;
+      }
+      case 'showConflictsDialog': {
+        openConflictsDialog();
         break;
       }
       case 'selectFile': {

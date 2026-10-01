@@ -5,6 +5,7 @@ import { GraphViewProvider } from './views/graphPanel';
 import { CommitViewProvider } from './views/commitPanel';
 import { CommitReviewPanel } from './views/commitReviewPanel';
 import { RebasePanel } from './views/rebasePanel';
+import { PushDialogPanel } from './views/pushDialogPanel';
 import { BranchTreeProvider } from './views/branchTree';
 import { ChangelistTreeProvider } from './views/changelistTree';
 import { BlameDecorationProvider } from './providers/blameDecorations';
@@ -264,18 +265,10 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // Push Commits dialog
+  // Push Commits dialog (Floating Window)
   context.subscriptions.push(
     vscode.commands.registerCommand('intellij-git.pushDialog', async (branch?: string) => {
-      if (graphViewProvider && graphViewProvider.view?.visible) {
-        await graphViewProvider.openPushDialog(branch);
-      } else if (commitViewProvider && commitViewProvider.view?.visible) {
-        await commitViewProvider.openPushDialog(branch);
-      } else if (commitViewProvider) {
-        await commitViewProvider.openPushDialog(branch);
-      } else if (graphViewProvider) {
-        await graphViewProvider.openPushDialog(branch);
-      }
+      await PushDialogPanel.createOrShow(context.extensionUri, gitService, branch);
     }),
   );
 

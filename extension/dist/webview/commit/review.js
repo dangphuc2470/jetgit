@@ -759,11 +759,11 @@
     colHeader.className = 'studio-diff-columns-header';
     colHeader.innerHTML = `
       <div class="col-header-pane left-header">
-        <span class="pane-title">Base revision (HEAD)</span>
+        <span class="pane-title">${state.baseTitle || 'Base revision (HEAD)'}</span>
       </div>
       <div class="col-header-gutter"></div>
       <div class="col-header-pane right-header">
-        <span class="pane-title">Current version</span>
+        <span class="pane-title">${state.targetTitle || 'Current version'}</span>
         ${state.readOnly ? '<span class="readonly-badge" title="Historical commit is read-only">Read-only</span>' : '<span class="editable-badge" title="You can edit this file directly">✎ Editable</span>'}
       </div>
     `;
@@ -1658,6 +1658,8 @@
         state.currentFileIndex = data.currentFileIndex || 0;
         state.currentDiffIndex = 0;
         state.readOnly = data.readOnly === true;
+        state.baseTitle = data.baseTitle || '';
+        state.targetTitle = data.targetTitle || '';
         if (data.focusTarget) {
           state.focusTarget = data.focusTarget;
         }

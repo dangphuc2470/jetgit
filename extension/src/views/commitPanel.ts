@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { GitService, type StatusEntry } from '../git/gitService';
 import { GitContentProvider } from '../providers/gitContentProvider';
 import { CommitReviewPanel } from './commitReviewPanel';
+import { PushDialogPanel } from './pushDialogPanel';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
@@ -734,18 +735,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   }
 
   async openPushDialog(branch?: string): Promise<void> {
-    if (this.view) {
-      try {
-        const pushInfo = await this.gitService.getPushInfo(branch);
-        this.view.show?.(true);
-        this.view.webview.postMessage({
-          type: 'showPushDialog',
-          payload: pushInfo,
-        });
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to get push info: ${err.message}`);
-      }
-    }
+    await PushDialogPanel.createOrShow(this.extensionUri, this.gitService, branch);
   }
 }
 

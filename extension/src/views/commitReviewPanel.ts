@@ -3,6 +3,13 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { GitService } from '../git/gitService';
 
+export interface ReviewRevisions {
+  baseRef?: string;
+  targetRef?: string;
+  baseTitle?: string;
+  targetTitle?: string;
+}
+
 export class CommitReviewPanel {
   public static currentPanel: CommitReviewPanel | undefined;
   public static readonly viewType = 'intellij-git.commitReview';
@@ -13,6 +20,7 @@ export class CommitReviewPanel {
   private currentFilePath = '';
   private filesList: string[] = [];
   private isReadOnly = false;
+  private revisions?: ReviewRevisions;
   private lastLoadedState?: {
     filePath: string;
     diff: string;
@@ -28,9 +36,11 @@ export class CommitReviewPanel {
     private gitService: GitService,
     private onStageChange?: () => void,
     readOnly = false,
+    revisions?: ReviewRevisions,
   ) {
     this.panel = panel;
     this.isReadOnly = readOnly;
+    this.revisions = revisions;
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     vscode.window.onDidChangeActiveColorTheme(
       () => this.sendThemeTokens(),
@@ -52,6 +62,7 @@ export class CommitReviewPanel {
     filesList: string[] = [],
     onStageChange?: () => void,
     readOnly = false,
+    revisions?: ReviewRevisions,
   ): CommitReviewPanel {
     const fileName = path.basename(filePath);
     if (CommitReviewPanel.currentPanel) {
@@ -59,6 +70,7 @@ export class CommitReviewPanel {
         CommitReviewPanel.currentPanel.onStageChange = onStageChange;
       }
       CommitReviewPanel.currentPanel.isReadOnly = readOnly;
+      CommitReviewPanel.currentPanel.revisions = revisions;
       CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
       CommitReviewPanel.currentPanel.panel.reveal(vscode.ViewColumn.Active, true);
       CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
@@ -84,6 +96,7 @@ export class CommitReviewPanel {
       gitService,
       onStageChange,
       readOnly,
+      revisions,
     );
     CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
     return CommitReviewPanel.currentPanel;
@@ -113,20 +126,36 @@ export class CommitReviewPanel {
     }
 
     try {
-      const fullPath = path.join(this.gitService.getCwd(), filePath);
-      const [diff, baseContent, currentContent, stagedDiff] = await Promise.all([
-        this.gitService.getFileDiff(filePath).catch(() => ''),
-        this.gitService.exec(['show', `HEAD:${filePath}`]).catch(() => ''),
-        (async () => {
-          try {
-            if (fs.existsSync(fullPath)) {
-              return fs.readFileSync(fullPath, 'utf8');
-            }
-          } catch {}
-          return '';
-        })(),
-        this.gitService.exec(['diff', '--cached', '--', filePath]).catch(() => '')
-      ]);
+      let diff = '';
+      let baseContent = '';
+      let currentContent = '';
+      let stagedDiff = '';
+
+      if (this.revisions?.baseRef) {
+        const baseRef = this.revisions.baseRef;
+        const targetRef = this.revisions.targetRef || 'HEAD';
+        [diff, baseContent, currentContent] = await Promise.all([
+          this.gitService.exec(['diff', `${baseRef}..${targetRef}`, '--', filePath]).catch(() => ''),
+          this.gitService.exec(['show', `${baseRef}:${filePath}`]).catch(() => ''),
+          this.gitService.exec(['show', `${targetRef}:${filePath}`]).catch(() => ''),
+        ]);
+      } else {
+        const fullPath = path.join(this.gitService.getCwd(), filePath);
+        [diff, baseContent, currentContent, stagedDiff] = await Promise.all([
+          this.gitService.getFileDiff(filePath).catch(() => ''),
+          this.gitService.exec(['show', `HEAD:${filePath}`]).catch(() => ''),
+          (async () => {
+            try {
+              if (fs.existsSync(fullPath)) {
+                return fs.readFileSync(fullPath, 'utf8');
+              }
+            } catch {}
+            return '';
+          })(),
+          this.gitService.exec(['diff', '--cached', '--', filePath]).catch(() => '')
+        ]);
+      }
+
       const isSameFile = this.lastLoadedState && this.lastLoadedState.filePath === filePath;
       const isUnchanged = isSameFile &&
         this.lastLoadedState!.diff === diff &&
@@ -160,6 +189,8 @@ export class CommitReviewPanel {
           stagedDiff,
           baseContent,
           currentContent,
+          baseTitle: this.revisions?.baseTitle,
+          targetTitle: this.revisions?.targetTitle,
           filesList: this.filesList,
           currentFileIndex: currentFileIndex !== -1 ? currentFileIndex : 0,
           readOnly: this.isReadOnly,

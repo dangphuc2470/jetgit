@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { GitService, type Commit, type BranchInfo, type TagInfo } from '../git/gitService';
 import { buildGraph, graphWidth, type GraphNode } from '../git/graphBuilder';
 import { GitContentProvider } from '../providers/gitContentProvider';
+import { PushDialogPanel } from './pushDialogPanel';
 
 export class GraphViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.logView';
@@ -865,18 +866,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   async openPushDialog(branch?: string): Promise<void> {
-    if (this.view) {
-      try {
-        const pushInfo = await this.gitService.getPushInfo(branch);
-        this.view.show(true);
-        this.view.webview.postMessage({
-          type: 'showPushDialog',
-          payload: pushInfo,
-        });
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to get push info: ${err.message}`);
-      }
-    }
+    await PushDialogPanel.createOrShow(this.extensionUri, this.gitService, branch);
   }
 
   private getHtml(webview: vscode.Webview): string {

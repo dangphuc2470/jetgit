@@ -177,25 +177,7 @@
         "icon": "$(refresh)"
       }
     ],
-    "keybindings": [
-      {
-        "command": "intellij-git.openLog",
-        "key": "ctrl+shift+9",
-        "mac": "cmd+9"
-      },
-      {
-        "command": "intellij-git.toggleBlame",
-        "key": "alt+b",
-        "mac": "alt+b",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "intellij-git.openCommit",
-        "key": "ctrl+k",
-        "mac": "cmd+k",
-        "when": "!terminalFocus"
-      }
-    ],
+    "keybindings": [],
     "views": {
       "intellij-git-commit": [
         {

@@ -28,6 +28,7 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
 
   private data: ChangelistData = DEFAULT_DATA;
   private dataPath: string;
+  private treeView?: vscode.TreeView<ChangelistNode>;
 
   constructor(
     private gitService: GitService,
@@ -42,6 +43,15 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
     // to avoid running git status twice on every save event.
   }
 
+  setTreeView(treeView: vscode.TreeView<ChangelistNode>): void {
+    this.treeView = treeView;
+    treeView.onDidChangeVisibility(e => {
+      if (e.visible) {
+        this.syncWithGitStatus();
+      }
+    });
+  }
+
   refresh(): void {
     this.load();
     this._onDidChangeTreeData.fire(undefined);
@@ -49,6 +59,10 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
 
   /** Called by extension.ts shared debounce handler on file save / create. */
   syncChangelists(): void {
+    // Only execute git status if changelist sidebar is actually visible to user
+    if (this.treeView && !this.treeView.visible) {
+      return;
+    }
     this.syncWithGitStatus();
   }
 
@@ -197,17 +211,31 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
 
       let changed = false;
       for (const entry of status) {
+        // Never track .vscode or changelists.json to prevent recursive self-referential git loops
+        if (
+          entry.path === '.vscode' ||
+          entry.path.startsWith('.vscode/') ||
+          entry.path.includes('changelists.json')
+        ) {
+          continue;
+        }
+
         if (!allFiles.has(entry.path)) {
           activeCl.files.push(entry.path);
           changed = true;
         }
       }
 
-      // Remove files that are no longer modified
+      // Remove files that are no longer modified, or any accidentally saved .vscode/changelists.json
       const statusPaths = new Set(status.map(s => s.path));
       for (const cl of this.data.changelists) {
         const before = cl.files.length;
-        cl.files = cl.files.filter(f => statusPaths.has(f));
+        cl.files = cl.files.filter(
+          f =>
+            statusPaths.has(f) &&
+            !f.startsWith('.vscode/') &&
+            !f.includes('changelists.json'),
+        );
         if (cl.files.length !== before) changed = true;
       }
 
@@ -232,6 +260,12 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
     // Ensure Default changelist always exists
     if (!this.data.changelists.some(c => c.name === 'Default')) {
       this.data.changelists.unshift({ name: 'Default', files: [] });
+    }
+    // Clean up any historical .vscode/changelists.json entries
+    for (const cl of this.data.changelists) {
+      cl.files = cl.files.filter(
+        f => !f.startsWith('.vscode/') && !f.includes('changelists.json'),
+      );
     }
   }
 

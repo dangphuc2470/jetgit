@@ -2854,12 +2854,24 @@ var ChangelistTreeProvider = class {
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   data = DEFAULT_DATA;
   dataPath;
+  treeView;
+  setTreeView(treeView) {
+    this.treeView = treeView;
+    treeView.onDidChangeVisibility((e) => {
+      if (e.visible) {
+        this.syncWithGitStatus();
+      }
+    });
+  }
   refresh() {
     this.load();
     this._onDidChangeTreeData.fire(void 0);
   }
   /** Called by extension.ts shared debounce handler on file save / create. */
   syncChangelists() {
+    if (this.treeView && !this.treeView.visible) {
+      return;
+    }
     this.syncWithGitStatus();
   }
   getTreeItem(element) {
@@ -2991,6 +3003,13 @@ var ChangelistTreeProvider = class {
       if (!activeCl) return;
       let changed = false;
       for (const entry of status) {
+        if (
+          entry.path === '.vscode' ||
+          entry.path.startsWith('.vscode/') ||
+          entry.path.includes('changelists.json')
+        ) {
+          continue;
+        }
         if (!allFiles.has(entry.path)) {
           activeCl.files.push(entry.path);
           changed = true;
@@ -2999,7 +3018,12 @@ var ChangelistTreeProvider = class {
       const statusPaths = new Set(status.map((s) => s.path));
       for (const cl of this.data.changelists) {
         const before = cl.files.length;
-        cl.files = cl.files.filter((f) => statusPaths.has(f));
+        cl.files = cl.files.filter(
+          (f) =>
+            statusPaths.has(f) &&
+            !f.startsWith('.vscode/') &&
+            !f.includes('changelists.json')
+        );
         if (cl.files.length !== before) changed = true;
       }
       if (changed) {
@@ -3020,6 +3044,11 @@ var ChangelistTreeProvider = class {
     }
     if (!this.data.changelists.some((c) => c.name === "Default")) {
       this.data.changelists.unshift({ name: "Default", files: [] });
+    }
+    for (const cl of this.data.changelists) {
+      cl.files = cl.files.filter(
+        (f) => !f.startsWith('.vscode/') && !f.includes('changelists.json')
+      );
     }
   }
   save() {
@@ -3430,6 +3459,7 @@ function activate(context) {
     treeDataProvider: changelistTree,
     showCollapseAll: true
   });
+  changelistTree.setTreeView(changelistTreeView);
   context.subscriptions.push(changelistTreeView);
   const blameProvider = new BlameDecorationProvider(workspaceRoot);
   context.subscriptions.push(blameProvider);

@@ -1926,6 +1926,13 @@
     }
   });
 
+  window.addEventListener('contextmenu', (e) => {
+    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
+    if (!isInput) {
+      e.preventDefault();
+    }
+  });
+
   // Ready message to request initial data
   vscode.postMessage({ type: 'ready' });
 })();

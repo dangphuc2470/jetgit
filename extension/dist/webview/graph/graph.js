@@ -8148,7 +8148,50 @@ ${component_stack}
         menu.style.top = Math.max(0, y) + "px";
       }
 
+      function showGeneralBranchContextMenu(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeBranchContextMenu();
+
+        const menu = document.createElement("div");
+        menu.className = "branch-context-menu";
+
+        function addItem(label, shortcut, onClick) {
+          const it = document.createElement("div");
+          it.className = "bcm-item";
+          it.innerHTML = '<span>' + label + '</span>' + (shortcut ? '<span class="bcm-shortcut">' + shortcut + '</span>' : '');
+          it.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            closeBranchContextMenu();
+            onClick();
+          });
+          menu.appendChild(it);
+        }
+
+        addItem("New Branch...", "", () => {
+          openCreateBranchDialog(currentBranch || "HEAD");
+        });
+        addItem("Refresh Branches", "", () => {
+          postMessage("refreshBranches");
+        });
+
+        document.body.appendChild(menu);
+        let x = e.clientX;
+        let y = e.clientY;
+        const rect = menu.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+        menu.style.left = Math.max(0, x) + "px";
+        menu.style.top = Math.max(0, y) + "px";
+      }
+
       document.addEventListener("click", closeBranchContextMenu);
+      window.addEventListener("contextmenu", (e) => {
+        const isInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable;
+        if (!isInput) {
+          e.preventDefault();
+        }
+      });
 
       // 1. Tooltip system attached to document.body
       let tooltipEl = document.querySelector(".app-tooltip");
@@ -8569,7 +8612,23 @@ ${component_stack}
 
         treeContent = document.createElement("div");
         treeContent.className = "branch-tree-content";
+        treeContent.addEventListener("contextmenu", (e) => {
+          const item = e.target.closest(".tree-item, .head-branch-box");
+          if (!item) {
+            e.preventDefault();
+            e.stopPropagation();
+            showGeneralBranchContextMenu(e);
+          }
+        });
         mainArea.appendChild(treeContent);
+        mainArea.addEventListener("contextmenu", (e) => {
+          const item = e.target.closest(".tree-item, .head-branch-box");
+          if (!item) {
+            e.preventDefault();
+            e.stopPropagation();
+            showGeneralBranchContextMenu(e);
+          }
+        });
         container.appendChild(mainArea);
       }
 

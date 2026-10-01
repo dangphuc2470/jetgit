@@ -1092,17 +1092,21 @@
         vscode.postMessage({ type: 'rollbackFiles', payload: [state.selectedFile] });
       } else if (e.key === 'F7' || e.keyCode === 118) {
         e.preventDefault();
-        const currentIndex = state.files.findIndex(f => f.path === state.selectedFile);
+        const changesFiles = state.files.filter(f => !f.isUntracked);
+        const unversionedFiles = state.files.filter(f => f.isUntracked);
+        const isCurrentInChanges = changesFiles.some(f => f.path === state.selectedFile);
+        const activeList = (isCurrentInChanges || unversionedFiles.length === 0) ? changesFiles : unversionedFiles;
+        const currentIndex = activeList.findIndex(f => f.path === state.selectedFile);
         if (e.shiftKey) {
           if (currentIndex > 0) {
-            const prevFile = state.files[currentIndex - 1].path;
+            const prevFile = activeList[currentIndex - 1].path;
             state.selectedFile = prevFile;
             render();
             vscode.postMessage({ type: 'openReviewInCenter', payload: prevFile });
           }
         } else {
-          if (currentIndex !== -1 && currentIndex < state.files.length - 1) {
-            const nextFile = state.files[currentIndex + 1].path;
+          if (currentIndex !== -1 && currentIndex < activeList.length - 1) {
+            const nextFile = activeList[currentIndex + 1].path;
             state.selectedFile = nextFile;
             render();
             vscode.postMessage({ type: 'openReviewInCenter', payload: nextFile });

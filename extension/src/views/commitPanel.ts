@@ -9,6 +9,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
   public static currentProvider?: CommitViewProvider;
   private view?: vscode.WebviewView;
+  private changesFilePaths: string[] = [];
+  private unversionedFilePaths: string[] = [];
   private allFilePaths: string[] = [];
   private lastStatusHash = '';
   private isRefreshing = false;
@@ -32,6 +34,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         payload: filePath,
       });
     }
+  }
+
+  private getReviewFilesList(filePath: string): string[] {
+    if (this.unversionedFilePaths.includes(filePath)) {
+      return this.unversionedFilePaths;
+    }
+    return this.changesFilePaths;
   }
 
   resolveWebviewView(
@@ -120,23 +129,26 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         };
       });
 
-      files.sort((a, b) => {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-        if (nameA !== nameB) return nameA.localeCompare(nameB);
-        return a.path.localeCompare(b.path);
-      });
+      const changesFiles = files
+        .filter(f => !f.isUntracked)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
+      const unversionedFiles = files
+        .filter(f => f.isUntracked)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
+      const sortedFiles = [...changesFiles, ...unversionedFiles];
 
-      const changesCount = files.filter(f => !f.isUntracked).length;
-      const unversionedCount = files.filter(f => f.isUntracked).length;
+      const changesCount = changesFiles.length;
+      const unversionedCount = unversionedFiles.length;
 
-      this.allFilePaths = files.map(f => f.path);
-      this.lastStatusHash = files.map(f => `${f.status}:${f.path}:${f.totalChanges}:${f.staged}`).join('\n');
+      this.changesFilePaths = changesFiles.map(f => f.path);
+      this.unversionedFilePaths = unversionedFiles.map(f => f.path);
+      this.allFilePaths = sortedFiles.map(f => f.path);
+      this.lastStatusHash = sortedFiles.map(f => `${f.status}:${f.path}:${f.totalChanges}:${f.staged}`).join('\n');
 
       this.view.webview.postMessage({
         type: 'status',
         payload: {
-          files,
+          files: sortedFiles,
           changesCount,
           unversionedCount,
           defaultCommitMessage: mergeMsg || '',
@@ -207,7 +219,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             this.extensionUri,
             this.gitService,
             filePath,
-            this.allFilePaths,
+            this.getReviewFilesList(filePath),
             () => this.refresh(),
           );
         }
@@ -218,7 +230,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         try {
           await this.gitService.stageFile(filePath);
           if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
-            await CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+            await CommitReviewPanel.currentPanel.loadFile(filePath, this.getReviewFilesList(filePath));
           }
           await this.refresh();
         } catch (err: any) {
@@ -234,7 +246,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           if (CommitReviewPanel.currentPanel) {
             const current = CommitReviewPanel.currentPanel.getCurrentFilePath();
             if (current && filePaths.includes(current)) {
-              await CommitReviewPanel.currentPanel.loadFile(current, this.allFilePaths);
+              await CommitReviewPanel.currentPanel.loadFile(current, this.getReviewFilesList(current));
             }
           }
           await this.refresh();
@@ -248,7 +260,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         try {
           await this.gitService.unstageFile(filePath);
           if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
-            await CommitReviewPanel.currentPanel.loadFile(filePath, this.allFilePaths);
+            await CommitReviewPanel.currentPanel.loadFile(filePath, this.getReviewFilesList(filePath));
           }
           await this.refresh();
         } catch (err: any) {
@@ -264,7 +276,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           if (CommitReviewPanel.currentPanel) {
             const current = CommitReviewPanel.currentPanel.getCurrentFilePath();
             if (current && filePaths.includes(current)) {
-              await CommitReviewPanel.currentPanel.loadFile(current, this.allFilePaths);
+              await CommitReviewPanel.currentPanel.loadFile(current, this.getReviewFilesList(current));
             }
           }
           await this.refresh();

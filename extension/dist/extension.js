@@ -1753,6 +1753,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
   onStageChange;
   static currentPanel;
   static viewType = "intellij-git.commitReview";
+  static onFileNavigateListener;
   panel;
   disposables = [];
   currentFilePath = "";
@@ -1799,6 +1800,9 @@ var CommitReviewPanel = class _CommitReviewPanel {
     if (readOnly !== void 0) this.isReadOnly = readOnly;
     const fileName = path3.basename(filePath);
     this.panel.title = `Diff: ${fileName}`;
+    if (_CommitReviewPanel.onFileNavigateListener) {
+      _CommitReviewPanel.onFileNavigateListener(filePath);
+    }
     try {
       const fullPath = path3.join(this.gitService.getCwd(), filePath);
       const [diff, baseContent, currentContent, stagedDiff] = await Promise.all([
@@ -2091,12 +2095,17 @@ function getNonce2() {
 }
 
 // src/views/commitPanel.ts
-var CommitViewProvider = class {
+var CommitViewProvider = class _CommitViewProvider {
   constructor(extensionUri, gitService, log2) {
     this.extensionUri = extensionUri;
     this.gitService = gitService;
     this.log = log2;
+    _CommitViewProvider.currentProvider = this;
+    CommitReviewPanel.onFileNavigateListener = (filePath) => {
+      this.selectFile(filePath);
+    };
   }
+  static currentProvider;
   extensionUri;
   gitService;
   log;
@@ -2106,6 +2115,14 @@ var CommitViewProvider = class {
   lastStatusHash = "";
   isRefreshing = false;
   queuedRefresh = false;
+  selectFile(filePath) {
+    if (this.view) {
+      this.view.webview.postMessage({
+        type: "selectFile",
+        payload: filePath
+      });
+    }
+  }
   resolveWebviewView(webviewView, _context, _token) {
     this.view = webviewView;
     webviewView.webview.options = {

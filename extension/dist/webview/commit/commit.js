@@ -1090,6 +1090,24 @@
       } else if (cmdOrCtrl && e.altKey && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
         vscode.postMessage({ type: 'rollbackFiles', payload: [state.selectedFile] });
+      } else if (e.key === 'F7' || e.keyCode === 118) {
+        e.preventDefault();
+        const currentIndex = state.files.findIndex(f => f.path === state.selectedFile);
+        if (e.shiftKey) {
+          if (currentIndex > 0) {
+            const prevFile = state.files[currentIndex - 1].path;
+            state.selectedFile = prevFile;
+            render();
+            vscode.postMessage({ type: 'openReviewInCenter', payload: prevFile });
+          }
+        } else {
+          if (currentIndex !== -1 && currentIndex < state.files.length - 1) {
+            const nextFile = state.files[currentIndex + 1].path;
+            state.selectedFile = nextFile;
+            render();
+            vscode.postMessage({ type: 'openReviewInCenter', payload: nextFile });
+          }
+        }
       }
     }
   });
@@ -1140,6 +1158,26 @@
         }
 
         render();
+        break;
+      }
+      case 'selectFile': {
+        const filePath = typeof msg.payload === 'string' ? msg.payload : msg.payload?.filePath;
+        if (filePath && state.selectedFile !== filePath) {
+          state.selectedFile = filePath;
+          const isUnversioned = state.files.some(f => f.path === filePath && f.isUntracked);
+          if (isUnversioned) {
+            state.expandUnversioned = true;
+          } else {
+            state.expandChanges = true;
+          }
+          render();
+          requestAnimationFrame(() => {
+            const selectedEl = document.querySelector('.file-item.selected');
+            if (selectedEl) {
+              selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+          });
+        }
         break;
       }
       case 'fileDiff': {

@@ -7,6 +7,7 @@ import { CommitReviewPanel } from './commitReviewPanel';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
+  public static currentProvider?: CommitViewProvider;
   private view?: vscode.WebviewView;
   private allFilePaths: string[] = [];
   private lastStatusHash = '';
@@ -17,7 +18,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     private extensionUri: vscode.Uri,
     private gitService: GitService,
     private log: vscode.OutputChannel,
-  ) {}
+  ) {
+    CommitViewProvider.currentProvider = this;
+    CommitReviewPanel.onFileNavigateListener = (filePath: string) => {
+      this.selectFile(filePath);
+    };
+  }
+
+  public selectFile(filePath: string): void {
+    if (this.view) {
+      this.view.webview.postMessage({
+        type: 'selectFile',
+        payload: filePath,
+      });
+    }
+  }
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,

@@ -6,6 +6,7 @@ import { GitService } from '../git/gitService';
 export class CommitReviewPanel {
   public static currentPanel: CommitReviewPanel | undefined;
   public static readonly viewType = 'intellij-git.commitReview';
+  public static onFileNavigateListener?: (filePath: string) => void;
 
   private panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
@@ -99,6 +100,9 @@ export class CommitReviewPanel {
     if (readOnly !== undefined) this.isReadOnly = readOnly;
     const fileName = path.basename(filePath);
     this.panel.title = `Diff: ${fileName}`;
+    if (CommitReviewPanel.onFileNavigateListener) {
+      CommitReviewPanel.onFileNavigateListener(filePath);
+    }
 
     try {
       const fullPath = path.join(this.gitService.getCwd(), filePath);

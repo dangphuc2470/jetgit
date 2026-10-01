@@ -5,6 +5,7 @@ import { GitService, type StatusEntry } from '../git/gitService';
 import { GitContentProvider } from '../providers/gitContentProvider';
 import { CommitReviewPanel } from './commitReviewPanel';
 import { PushDialogPanel } from './pushDialogPanel';
+import { ConflictsDialogPanel } from './conflictsDialogPanel';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
@@ -727,11 +728,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 
-  openConflictsDialog(): void {
-    if (this.view) {
-      this.view.show?.(true);
-      this.view.webview.postMessage({ type: 'showConflictsDialog' });
-    }
+  async openConflictsDialog(): Promise<void> {
+    await ConflictsDialogPanel.createOrShow(this.extensionUri, this.gitService);
   }
 
   async openPushDialog(branch?: string): Promise<void> {

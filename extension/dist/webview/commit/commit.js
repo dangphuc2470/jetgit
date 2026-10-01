@@ -818,7 +818,7 @@
     const btnResolve = toolbar.querySelector('#btn-resolve-conflicts');
     if (btnResolve) {
       btnResolve.addEventListener('click', () => {
-        openConflictsDialog();
+        vscode.postMessage({ type: 'openConflictsDialog' });
       });
     }
 

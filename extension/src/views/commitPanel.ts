@@ -387,6 +387,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         } catch (err: any) {
           vscode.window.showErrorMessage(`Commit and Push failed: ${err.message}`);
         }
+        break;
+      }
       case 'generateAiCommitMessage': {
         const { files } = msg.payload || {};
         try {
@@ -402,11 +404,24 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             gitRepo = gitApi.repositories.find((r: any) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
           }
 
+          // Antigravity's command internally triggers 'workbench.view.scm'.
+          // We immediately and repeatedly restore focus back to our commit tool window!
+          const restoreFocus = () => {
+            vscode.commands.executeCommand('workbench.view.extension.intellij-git-commit');
+            vscode.commands.executeCommand('intellij-git.commitView.focus');
+          };
+          setTimeout(restoreFocus, 30);
+          setTimeout(restoreFocus, 80);
+          setTimeout(restoreFocus, 180);
+          setTimeout(restoreFocus, 350);
+
           let aiMsg = await vscode.commands.executeCommand<string>('antigravity.generateCommitMessage', repoRoot);
 
           if (!aiMsg && gitRepo?.inputBox?.value) {
             aiMsg = gitRepo.inputBox.value;
           }
+
+          restoreFocus();
 
           if (aiMsg && typeof aiMsg === 'string') {
             this.view?.webview.postMessage({

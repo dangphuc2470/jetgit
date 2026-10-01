@@ -2469,10 +2469,19 @@ var CommitViewProvider = class _CommitViewProvider {
             const gitApi = gitExt.exports.getAPI(1);
             gitRepo = gitApi.repositories.find((r) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
           }
+          const restoreFocus = () => {
+            vscode4.commands.executeCommand("workbench.view.extension.intellij-git-commit");
+            vscode4.commands.executeCommand("intellij-git.commitView.focus");
+          };
+          setTimeout(restoreFocus, 30);
+          setTimeout(restoreFocus, 80);
+          setTimeout(restoreFocus, 180);
+          setTimeout(restoreFocus, 350);
           let aiMsg = await vscode4.commands.executeCommand("antigravity.generateCommitMessage", repoRoot);
           if (!aiMsg && gitRepo?.inputBox?.value) {
             aiMsg = gitRepo.inputBox.value;
           }
+          restoreFocus();
           if (aiMsg && typeof aiMsg === "string") {
             this.view?.webview.postMessage({
               type: "setCommitMessage",

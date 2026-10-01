@@ -20,6 +20,7 @@
     showPaths: true,
     commitOptionsOpen: false,
     recentOpen: false,
+    isGeneratingAi: false,
     splitRatio: 0.6 // 60% file tree, 40% commit box
   };
 
@@ -328,7 +329,7 @@
               <polyline points="8 4 8 8 10.5 9.5"/>
             </svg>
           </button>
-          <button class="tool-btn-sm" id="btn-generate-ai" title="Generate Commit Message with AI">
+          <button class="tool-btn-sm ${state.isGeneratingAi ? 'spinning' : ''}" id="btn-generate-ai" title="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" ${state.isGeneratingAi ? 'disabled' : ''}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
               <path d="M8 1.5L9.5 6L14 7.5L9.5 9L8 13.5L6.5 9L2 7.5L6.5 6L8 1.5Z"/>
               <path d="M12.5 1.5L13.2 3.5L15 4.2L13.2 4.9L12.5 6.8L11.8 4.9L10 4.2L11.8 3.5L12.5 1.5Z"/>
@@ -338,7 +339,8 @@
       </div>
 
       <div class="commit-input-wrapper">
-        <textarea id="commit-message-input" placeholder="Commit message...">${escapeHtml(state.commitMessage)}</textarea>
+        <textarea id="commit-message-input" class="${state.isGeneratingAi ? 'ai-generating' : ''}" placeholder="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait...' : 'Commit message...'}">${escapeHtml(state.commitMessage)}</textarea>
+        ${state.isGeneratingAi ? '<div class="ai-status-bar"><span class="ai-status-dot"></span><span>AI is generating commit message...</span></div>' : ''}
         ${state.recentOpen ? renderRecentMessagesDropdown() : ''}
       </div>
 
@@ -831,13 +833,10 @@
     if (btnAi) {
       btnAi.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (state.isGeneratingAi) return;
+        state.isGeneratingAi = true;
         const files = Array.from(state.checkedFiles);
-        btnAi.classList.add('spinning');
-        btnAi.disabled = true;
-        const ta = document.getElementById('commit-message-input');
-        if (ta && !ta.value.trim()) {
-          ta.placeholder = 'Generating commit message with AI...';
-        }
+        render();
         vscode.postMessage({
           type: 'generateAiCommitMessage',
           payload: { files }
@@ -1224,32 +1223,17 @@
         break;
       }
       case 'setCommitMessage': {
+        state.isGeneratingAi = false;
         const newMsg = msg.payload?.message || '';
         if (newMsg) {
           state.commitMessage = newMsg;
-          const ta = document.getElementById('commit-message-input');
-          if (ta) {
-            ta.value = newMsg;
-            ta.placeholder = 'Commit message...';
-          }
         }
-        const btnAi = document.getElementById('btn-generate-ai');
-        if (btnAi) {
-          btnAi.classList.remove('spinning');
-          btnAi.disabled = false;
-        }
+        render();
         break;
       }
       case 'generateAiError': {
-        const btnAi = document.getElementById('btn-generate-ai');
-        if (btnAi) {
-          btnAi.classList.remove('spinning');
-          btnAi.disabled = false;
-        }
-        const ta = document.getElementById('commit-message-input');
-        if (ta && ta.placeholder.includes('Generating')) {
-          ta.placeholder = 'Commit message...';
-        }
+        state.isGeneratingAi = false;
+        render();
         break;
       }
     }

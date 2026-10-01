@@ -323,10 +323,16 @@
         </label>
         <div class="commit-icon-tools">
           <button class="tool-btn-sm" id="btn-recent-msgs" title="Recent Commit Messages">
-            🕒
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+              <circle cx="8" cy="8" r="6.5"/>
+              <polyline points="8 4 8 8 10.5 9.5"/>
+            </svg>
           </button>
-          <button class="tool-btn-sm" id="btn-edit-template" title="Edit Template">
-            ✎
+          <button class="tool-btn-sm" id="btn-generate-ai" title="Generate Commit Message with AI">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+              <path d="M8 1.5L9.5 6L14 7.5L9.5 9L8 13.5L6.5 9L2 7.5L6.5 6L8 1.5Z"/>
+              <path d="M12.5 1.5L13.2 3.5L15 4.2L13.2 4.9L12.5 6.8L11.8 4.9L10 4.2L11.8 3.5L12.5 1.5Z"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -821,6 +827,24 @@
       render();
     });
 
+    const btnAi = commitBox.querySelector('#btn-generate-ai');
+    if (btnAi) {
+      btnAi.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const files = Array.from(state.checkedFiles);
+        btnAi.classList.add('spinning');
+        btnAi.disabled = true;
+        const ta = document.getElementById('commit-message-input');
+        if (ta && !ta.value.trim()) {
+          ta.placeholder = 'Generating commit message with AI...';
+        }
+        vscode.postMessage({
+          type: 'generateAiCommitMessage',
+          payload: { files }
+        });
+      });
+    }
+
     const btnGear = commitBox.querySelector('#btn-commit-gear');
     btnGear.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1197,6 +1221,35 @@
         state.checkedFiles.clear();
         state.diffData = null;
         render();
+        break;
+      }
+      case 'setCommitMessage': {
+        const newMsg = msg.payload?.message || '';
+        if (newMsg) {
+          state.commitMessage = newMsg;
+          const ta = document.getElementById('commit-message-input');
+          if (ta) {
+            ta.value = newMsg;
+            ta.placeholder = 'Commit message...';
+          }
+        }
+        const btnAi = document.getElementById('btn-generate-ai');
+        if (btnAi) {
+          btnAi.classList.remove('spinning');
+          btnAi.disabled = false;
+        }
+        break;
+      }
+      case 'generateAiError': {
+        const btnAi = document.getElementById('btn-generate-ai');
+        if (btnAi) {
+          btnAi.classList.remove('spinning');
+          btnAi.disabled = false;
+        }
+        const ta = document.getElementById('commit-message-input');
+        if (ta && ta.placeholder.includes('Generating')) {
+          ta.placeholder = 'Commit message...';
+        }
         break;
       }
     }

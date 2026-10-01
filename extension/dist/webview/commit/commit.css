@@ -96,6 +96,78 @@ body, html {
   color: #dfe1e5;
 }
 
+/* Conflict Header Bar (Separate dedicated line on top) */
+.conflict-header-bar {
+  height: 28px;
+  background: rgba(229, 165, 10, 0.24);
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.conflict-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #ffb338;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conflict-bar-title {
+  letter-spacing: 0.2px;
+}
+
+.conflict-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.conflict-action-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+  transition: all 0.12s ease;
+}
+
+.conflict-action-btn svg {
+  pointer-events: none;
+}
+
+.conflict-action-btn.btn-resolve {
+  background: #238636;
+  color: #ffffff;
+}
+
+.conflict-action-btn.btn-resolve:hover {
+  background: #2ea043;
+  transform: scale(1.08);
+}
+
+.conflict-action-btn.btn-abort {
+  background: #da3633;
+  color: #ffffff;
+}
+
+.conflict-action-btn.btn-abort:hover {
+  background: #f85149;
+  transform: scale(1.08);
+}
+
 /* 2. Toolbar */
 .commit-toolbar {
   height: 28px;

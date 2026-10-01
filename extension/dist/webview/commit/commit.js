@@ -236,25 +236,39 @@
       return;
     }
 
-    // 2. Toolbar
+    // 2. Conflict Banner Bar (Separate dedicated line on top)
+    const hasConflictState = state.conflictInfo && (state.conflictInfo.hasConflicts || state.conflictInfo.isMerging || state.conflictInfo.isRebasing);
+    if (hasConflictState) {
+      const conflictBar = document.createElement('div');
+      conflictBar.className = 'conflict-header-bar';
+      const numConflicts = state.conflictInfo?.conflicts?.length || 0;
+      const titleText = numConflicts > 0
+        ? `Resolve Conflicts (${numConflicts})`
+        : (state.conflictInfo?.isRebasing ? 'Rebase in Progress' : 'Merge in Progress');
+
+      conflictBar.innerHTML = `
+        <div class="conflict-bar-left">
+          <span class="conflict-bar-title">${titleText}</span>
+        </div>
+        <div class="conflict-bar-actions">
+          <button class="conflict-action-btn btn-resolve" id="btn-resolve-conflicts" title="Resolve Conflicts...">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 3.5L7 8L2.5 12.5M8.5 3.5L13 8L8.5 12.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="conflict-action-btn btn-abort" id="btn-abort-merge" title="Abort Merge / Rebase">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M3.5 3.5L12.5 12.5M12.5 3.5L3.5 12.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      `;
+      container.appendChild(conflictBar);
+    }
+
+    // 3. Toolbar
     const toolbar = document.createElement('div');
     toolbar.className = 'commit-toolbar';
-
-    const hasConflictState = state.conflictInfo && (state.conflictInfo.hasConflicts || state.conflictInfo.isMerging || state.conflictInfo.isRebasing);
-    const conflictButtonsHtml = hasConflictState ? `
-        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
-        <button class="tool-btn btn-conflict-resolve" id="btn-resolve-conflicts" title="Resolve Conflicts..." style="color: #62b543; display: inline-flex; align-items: center; justify-content: center;">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path fill-rule="evenodd" d="M3.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L9.293 8 3.646 2.354a.5.5 0 0 1 0-.708z"/>
-            <path fill-rule="evenodd" d="M7.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L13.293 8 7.646 2.354a.5.5 0 0 1 0-.708z"/>
-          </svg>
-        </button>
-        <button class="tool-btn btn-conflict-abort" id="btn-abort-merge" title="Abort Merge / Rebase" style="color: #e05555; display: inline-flex; align-items: center; justify-content: center;">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
-          </svg>
-        </button>
-    ` : '';
 
     toolbar.innerHTML = `
       <div class="tool-left">
@@ -276,7 +290,6 @@
         <button class="tool-btn" id="btn-clear" title="Clear / Deselect All">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
         </button>
-        ${conflictButtonsHtml}
       </div>
     `;
     container.appendChild(toolbar);
@@ -389,7 +402,7 @@
 
     // Attach all event listeners
     attachTabEvents(container);
-    attachToolbarEvents(toolbar);
+    attachToolbarEvents(toolbar, container);
     attachTreeEvents(treeContainer);
     attachCommitBoxEvents(commitBox);
   }
@@ -774,7 +787,7 @@
   }
 
   // Attach toolbar events
-  function attachToolbarEvents(toolbar) {
+  function attachToolbarEvents(toolbar, container) {
     toolbar.querySelector('#btn-refresh').addEventListener('click', () => {
       vscode.postMessage({ type: 'refresh' });
     });
@@ -815,14 +828,15 @@
       render();
     });
 
-    const btnResolve = toolbar.querySelector('#btn-resolve-conflicts');
+    const targetScope = container || document;
+    const btnResolve = targetScope.querySelector('#btn-resolve-conflicts');
     if (btnResolve) {
       btnResolve.addEventListener('click', () => {
         vscode.postMessage({ type: 'openConflictsDialog' });
       });
     }
 
-    const btnAbort = toolbar.querySelector('#btn-abort-merge');
+    const btnAbort = targetScope.querySelector('#btn-abort-merge');
     if (btnAbort) {
       btnAbort.addEventListener('click', () => {
         vscode.postMessage({ type: 'abortMerge' });

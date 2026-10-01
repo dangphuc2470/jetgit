@@ -6,6 +6,7 @@ import { GitContentProvider } from '../providers/gitContentProvider';
 import { CommitReviewPanel } from './commitReviewPanel';
 import { PushDialogPanel } from './pushDialogPanel';
 import { ConflictsDialogPanel } from './conflictsDialogPanel';
+import { MergeEditorPanel } from './mergeEditorPanel';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
@@ -450,12 +451,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'openMergeEditor': {
         const { path: filePath } = msg.payload;
         try {
-          const fileUri = vscode.Uri.file(path.join(this.workspaceRoot, filePath));
-          try {
-            await vscode.commands.executeCommand('git.openMergeEditor', fileUri);
-          } catch {
-            await vscode.commands.executeCommand('vscode.open', fileUri);
-          }
+          await MergeEditorPanel.createOrShow(this.extensionUri, this.gitService, filePath);
         } catch (err: any) {
           vscode.window.showErrorMessage(`Failed to open merge editor: ${err.message}`);
         }

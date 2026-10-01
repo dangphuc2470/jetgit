@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitService } from '../git/gitService';
+import { MergeEditorPanel } from './mergeEditorPanel';
 
 export class ConflictsDialogPanel {
   public static currentPanel: ConflictsDialogPanel | undefined;
@@ -137,12 +138,7 @@ export class ConflictsDialogPanel {
         const filePath = msg.payload?.path;
         if (filePath) {
           try {
-            const fileUri = vscode.Uri.file(path.join(this.gitService.getCwd(), filePath));
-            try {
-              await vscode.commands.executeCommand('git.openMergeEditor', fileUri);
-            } catch {
-              await vscode.commands.executeCommand('vscode.open', fileUri);
-            }
+            await MergeEditorPanel.createOrShow(this.extensionUri, this.gitService, filePath);
           } catch (err: any) {
             vscode.window.showErrorMessage(`Failed to open merge editor: ${err?.message || err}`);
           }

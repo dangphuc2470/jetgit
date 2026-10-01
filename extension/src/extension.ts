@@ -7,6 +7,7 @@ import { CommitReviewPanel } from './views/commitReviewPanel';
 import { RebasePanel } from './views/rebasePanel';
 import { PushDialogPanel } from './views/pushDialogPanel';
 import { ConflictsDialogPanel } from './views/conflictsDialogPanel';
+import { MergeEditorPanel } from './views/mergeEditorPanel';
 import { BranchTreeProvider } from './views/branchTree';
 import { ChangelistTreeProvider } from './views/changelistTree';
 import { BlameDecorationProvider } from './providers/blameDecorations';
@@ -257,6 +258,14 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('intellij-git.resolveConflicts', async () => {
       await ConflictsDialogPanel.createOrShow(context.extensionUri, gitService);
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('intellij-git.openMergeEditor', async (filePath: string) => {
+      if (filePath) {
+        await MergeEditorPanel.createOrShow(context.extensionUri, gitService, filePath);
+      }
     }),
   );
 

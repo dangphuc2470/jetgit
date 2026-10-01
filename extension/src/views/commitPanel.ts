@@ -410,9 +410,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'executePush': {
-        const { branch, force, setUpstream, remote, tags } = msg.payload || {};
+        const { branch, targetBranch, force, setUpstream, remote, tags } = msg.payload || {};
         try {
-          await this.gitService.push(branch, force, setUpstream, remote, tags);
+          await this.gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
           vscode.window.showInformationMessage(`Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`);
           await this.refresh();
           vscode.commands.executeCommand('intellij-git.refreshBranches');

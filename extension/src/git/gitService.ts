@@ -582,11 +582,13 @@ export class GitService {
     }
 
     const totalFiles = Array.from(fileMap.values());
+    const remotes = await this.getRemotes();
 
     return {
       currentBranch,
       remote,
       remoteBranch,
+      remotes: remotes.length > 0 ? remotes : [remote],
       repoName,
       isNew,
       commits,
@@ -599,7 +601,8 @@ export class GitService {
     force = false,
     setUpstream = false,
     remoteName?: string,
-    tags = false
+    tags = false,
+    targetBranch?: string
   ): Promise<string> {
     const curBranch = branch || await this.getCurrentBranch();
     const remote = remoteName || await this.getDefaultRemote(curBranch);
@@ -613,10 +616,14 @@ export class GitService {
       if (upstream.trim()) hasUpstream = true;
     } catch {}
 
-    if (setUpstream || !hasUpstream) {
-      args.push('-u', remote, curBranch);
+    const remoteRef = targetBranch && targetBranch.trim() ? targetBranch.trim() : curBranch;
+    const isCustomTarget = remoteRef !== curBranch;
+    const refspec = isCustomTarget ? `${curBranch}:${remoteRef}` : curBranch;
+
+    if (setUpstream || !hasUpstream || isCustomTarget) {
+      args.push('-u', remote, refspec);
     } else {
-      args.push(remote, curBranch);
+      args.push(remote, refspec);
     }
 
     return this.exec(args);

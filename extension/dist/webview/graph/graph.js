@@ -5998,6 +5998,11 @@ ${component_stack}
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function escapeAttr(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   let activePushDialog = null;
 
   function openPushDialog(pushInfo) {
@@ -6019,6 +6024,9 @@ ${component_stack}
     const commits = pushInfo.commits || [];
     const totalFiles = pushInfo.totalFiles || [];
     let selectedCommitHash = 'ALL';
+    let currentRemote = pushInfo.remote;
+    let currentTargetBranch = pushInfo.remoteBranch || pushInfo.currentBranch;
+    const availableRemotes = (pushInfo.remotes && pushInfo.remotes.length > 0) ? pushInfo.remotes : [currentRemote];
 
     card.innerHTML = `
       <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #323438;user-select:none;">
@@ -6027,18 +6035,24 @@ ${component_stack}
           <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
           <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
         </div>
-        <div style="position:absolute;left:0;right:0;text-align:center;font-weight:600;font-size:13px;color:#dfe1e5;pointer-events:none;">
-          Push Commits to ${escapePushHtml(pushInfo.remote)}
+        <div id="push-dialog-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:600;font-size:13px;color:#dfe1e5;pointer-events:none;">
+          Push Commits to ${escapePushHtml(currentRemote)}
         </div>
       </div>
       <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
         <!-- Left Column: Branches & Commits -->
         <div style="width:44%;border-right:1px solid #323438;display:flex;flex-direction:column;background:#1e1f22;overflow-y:auto;">
-          <div id="push-branch-header" style="display:flex;align-items:center;padding:7px 12px;background:#2675bf;color:#ffffff;font-size:12.5px;font-weight:500;cursor:pointer;user-select:none;gap:4px;overflow:hidden;">
-            <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapePushHtml(pushInfo.currentBranch)}</span>
-            <span style="opacity:0.7;">&rarr;</span>
-            <span style="color:#d0e3ff;text-decoration:underline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapePushHtml(pushInfo.remote)} : ${escapePushHtml(pushInfo.remoteBranch)}</span>
-            ${pushInfo.isNew ? '<span style="background:rgba(255,255,255,0.22);color:#ffffff;font-size:10.5px;padding:1px 5px;border-radius:3px;margin-left:auto;white-space:nowrap;">New</span>' : ''}
+          <div id="push-branch-header" style="display:flex;align-items:center;padding:7px 12px;background:#2675bf;color:#ffffff;font-size:12.5px;font-weight:500;cursor:pointer;user-select:none;gap:4px;overflow:hidden;position:relative;">
+            <span style="font-weight:600;white-space:nowrap;">${escapePushHtml(pushInfo.currentBranch)}</span>
+            <span style="opacity:0.7;margin:0 2px;">&rarr;</span>
+            <div style="display:inline-flex;align-items:center;gap:2px;position:relative;">
+              <span id="push-remote-label" title="Click to change remote" style="color:#ffffff;font-weight:600;cursor:pointer;border-bottom:1px dashed rgba(255,255,255,0.6);">${escapePushHtml(currentRemote)}</span>
+              <div id="push-remote-dropdown" style="display:none;position:absolute;top:22px;left:0;background:#2b2d30;border:1px solid #43454a;border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.8);z-index:200;min-width:110px;padding:4px 0;"></div>
+            </div>
+            <span style="opacity:0.7;margin:0 2px;">:</span>
+            <span id="push-target-branch-display" title="Click to edit remote branch name" style="color:#d0e3ff;text-decoration:underline;cursor:pointer;font-weight:500;white-space:nowrap;padding:1px 4px;border-radius:3px;">${escapePushHtml(currentTargetBranch)}</span>
+            <input id="push-target-branch-input" type="text" value="${escapeAttr(currentTargetBranch)}" style="display:none;background:#1e1f22;color:#ffffff;border:1.5px solid #3574f0;border-radius:3px;padding:2px 6px;font-size:12px;font-family:inherit;outline:none;width:150px;">
+            <span id="push-new-badge" style="background:rgba(255,255,255,0.22);color:#ffffff;font-size:10.5px;padding:1px 5px;border-radius:3px;margin-left:auto;white-space:nowrap;${pushInfo.isNew ? '' : 'display:none;'}">New</span>
           </div>
           <div id="push-commits-container" style="flex:1;overflow-y:auto;padding:4px 0;">
           </div>
@@ -6091,7 +6105,13 @@ ${component_stack}
     document.body.appendChild(overlay);
     activePushDialog = overlay;
 
+    const titleEl = card.querySelector('#push-dialog-title');
     const branchHeader = card.querySelector('#push-branch-header');
+    const remoteLabel = card.querySelector('#push-remote-label');
+    const remoteDropdown = card.querySelector('#push-remote-dropdown');
+    const branchDisplay = card.querySelector('#push-target-branch-display');
+    const branchInput = card.querySelector('#push-target-branch-input');
+    const newBadge = card.querySelector('#push-new-badge');
     const commitsContainer = card.querySelector('#push-commits-container');
     const filesContainer = card.querySelector('#push-files-container');
     const filesCountEl = card.querySelector('#push-files-count');
@@ -6102,6 +6122,74 @@ ${component_stack}
     const btnForcePush = card.querySelector('#btn-force-push-opt');
     const chkTags = card.querySelector('#chk-push-tags');
     const dotClose = card.querySelector('.as-push-dot-close');
+
+    // Remote dropdown setup
+    if (availableRemotes.length > 0) {
+      remoteDropdown.innerHTML = availableRemotes.map(r => `
+        <div class="as-remote-opt" data-remote="${escapeAttr(r)}" style="padding:5px 12px;font-size:12px;color:#dfe1e5;cursor:pointer;${r === currentRemote ? 'background:#3574f0;color:#fff;' : ''}">${escapePushHtml(r)}</div>
+      `).join('');
+      remoteDropdown.querySelectorAll('.as-remote-opt').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentRemote = opt.getAttribute('data-remote');
+          remoteLabel.textContent = currentRemote;
+          if (titleEl) titleEl.textContent = 'Push Commits to ' + currentRemote;
+          remoteDropdown.style.display = 'none';
+        });
+      });
+    }
+
+    remoteLabel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (availableRemotes.length > 1) {
+        remoteDropdown.style.display = remoteDropdown.style.display === 'none' ? 'block' : 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#push-remote-dropdown') && e.target !== remoteLabel) {
+        remoteDropdown.style.display = 'none';
+      }
+    });
+
+    // Inline edit target branch
+    branchDisplay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      branchDisplay.style.display = 'none';
+      branchInput.style.display = 'inline-block';
+      branchInput.value = currentTargetBranch;
+      branchInput.focus();
+      branchInput.select();
+    });
+
+    function finishEditBranch() {
+      const val = branchInput.value.trim();
+      if (val) {
+        currentTargetBranch = val;
+        branchDisplay.textContent = currentTargetBranch;
+        if (currentTargetBranch !== pushInfo.currentBranch || pushInfo.isNew) {
+          newBadge.style.display = 'inline-block';
+        }
+      }
+      branchInput.style.display = 'none';
+      branchDisplay.style.display = 'inline-block';
+    }
+
+    branchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        finishEditBranch();
+        e.stopPropagation();
+      } else if (e.key === 'Escape') {
+        branchInput.value = currentTargetBranch;
+        branchInput.style.display = 'none';
+        branchDisplay.style.display = 'inline-block';
+        e.stopPropagation();
+      }
+    });
+
+    branchInput.addEventListener('blur', () => {
+      finishEditBranch();
+    });
 
     function renderCommits() {
       if (commits.length === 0) {
@@ -6193,7 +6281,11 @@ ${component_stack}
       });
     }
 
-    branchHeader.addEventListener('click', () => {
+    branchHeader.addEventListener('click', (e) => {
+      if (e.target.closest('#push-remote-label') || e.target.closest('#push-remote-dropdown') ||
+          e.target.closest('#push-target-branch-display') || e.target.closest('#push-target-branch-input')) {
+        return;
+      }
       selectedCommitHash = 'ALL';
       branchHeader.style.background = '#2675bf';
       renderCommits();
@@ -6211,9 +6303,10 @@ ${component_stack}
       btnSubmit.style.opacity = '0.7';
       postMessage('executePush', {
         branch: pushInfo.currentBranch,
+        targetBranch: currentTargetBranch,
         force: !!force,
-        setUpstream: pushInfo.isNew,
-        remote: pushInfo.remote,
+        setUpstream: pushInfo.isNew || (currentTargetBranch !== pushInfo.currentBranch),
+        remote: currentRemote,
         tags: chkTags.checked,
       });
     }

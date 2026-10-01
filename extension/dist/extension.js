@@ -548,17 +548,19 @@ var GitService = class {
       });
     }
     const totalFiles = Array.from(fileMap.values());
+    const remotes = await this.getRemotes();
     return {
       currentBranch,
       remote,
       remoteBranch,
+      remotes: remotes.length > 0 ? remotes : [remote],
       repoName,
       isNew,
       commits,
       totalFiles
     };
   }
-  async push(branch, force = false, setUpstream = false, remoteName, tags = false) {
+  async push(branch, force = false, setUpstream = false, remoteName, tags = false, targetBranch) {
     const curBranch = branch || await this.getCurrentBranch();
     const remote = remoteName || await this.getDefaultRemote(curBranch);
     const args = ["push"];
@@ -570,10 +572,13 @@ var GitService = class {
       if (upstream.trim()) hasUpstream = true;
     } catch {
     }
-    if (setUpstream || !hasUpstream) {
-      args.push("-u", remote, curBranch);
+    const remoteRef = targetBranch && targetBranch.trim() ? targetBranch.trim() : curBranch;
+    const isCustomTarget = remoteRef !== curBranch;
+    const refspec = isCustomTarget ? `${curBranch}:${remoteRef}` : curBranch;
+    if (setUpstream || !hasUpstream || isCustomTarget) {
+      args.push("-u", remote, refspec);
     } else {
-      args.push(remote, curBranch);
+      args.push(remote, refspec);
     }
     return this.exec(args);
   }
@@ -1663,9 +1668,9 @@ var GraphViewProvider = class {
         break;
       }
       case "executePush": {
-        const { branch, force, setUpstream, remote, tags } = msg.payload || {};
+        const { branch, targetBranch, force, setUpstream, remote, tags } = msg.payload || {};
         try {
-          await this.gitService.push(branch, force, setUpstream, remote, tags);
+          await this.gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
           vscode2.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
           this.loadInitialData();
           vscode2.commands.executeCommand("intellij-git.refreshBranches");
@@ -2829,9 +2834,9 @@ var CommitViewProvider = class _CommitViewProvider {
         break;
       }
       case "executePush": {
-        const { branch, force, setUpstream, remote, tags } = msg.payload || {};
+        const { branch, targetBranch, force, setUpstream, remote, tags } = msg.payload || {};
         try {
-          await this.gitService.push(branch, force, setUpstream, remote, tags);
+          await this.gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
           vscode4.window.showInformationMessage(`Pushed ${branch || "branch"} successfully to ${remote || "remote"}.`);
           await this.refresh();
           vscode4.commands.executeCommand("intellij-git.refreshBranches");

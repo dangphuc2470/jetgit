@@ -299,7 +299,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // Helper for debouncing frequent events
-  function debounce(fn: (...args: any[]) => void, delay = 250): (...args: any[]) => void {
+  function debounce(fn: (...args: any[]) => void, delay = 600): (...args: any[]) => void {
     let timer: NodeJS.Timeout | undefined;
     return (...args: any[]) => {
       if (timer) clearTimeout(timer);
@@ -308,8 +308,9 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   // 1. Watch for git changes (commits, branches, index, tags, logs, conflicts) in real-time
+  // Narrow down pattern from .git/** to HEAD, refs, and packed-refs to prevent triggering on transient lock files
   const gitWatcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(workspaceRoot, '.git/**'),
+    new vscode.RelativePattern(workspaceRoot, '.git/{HEAD,refs/**,packed-refs}'),
   );
   const onGitChange = debounce(() => {
     log.appendLine('Git change detected — refreshing views...');
@@ -320,10 +321,24 @@ export function activate(context: vscode.ExtensionContext): void {
     if (CommitReviewPanel.currentPanel) {
       CommitReviewPanel.currentPanel.refresh();
     }
-  }, 250);
-  gitWatcher.onDidChange(onGitChange);
-  gitWatcher.onDidCreate(onGitChange);
-  gitWatcher.onDidDelete(onGitChange);
+  }, 600);
+
+  const handleGitFsEvent = (uri: vscode.Uri) => {
+    const fsPath = uri?.fsPath || uri?.path || '';
+    if (
+      fsPath.endsWith('.lock') ||
+      fsPath.includes('/objects/') ||
+      fsPath.includes('\\objects\\') ||
+      fsPath.endsWith('COMMIT_EDITMSG')
+    ) {
+      return;
+    }
+    onGitChange();
+  };
+
+  gitWatcher.onDidChange(handleGitFsEvent);
+  gitWatcher.onDidCreate(handleGitFsEvent);
+  gitWatcher.onDidDelete(handleGitFsEvent);
   context.subscriptions.push(gitWatcher);
 
   // Hook into built-in vscode.git extension for guaranteed instant git state changes

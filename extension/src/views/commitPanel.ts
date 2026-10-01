@@ -62,7 +62,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   }
 
   async refresh(): Promise<void> {
-    if (!this.view) return;
+    if (!this.view || !this.view.visible) return;
     if (this.isRefreshing) {
       this.queuedRefresh = true;
       return;

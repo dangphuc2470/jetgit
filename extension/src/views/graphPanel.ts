@@ -666,11 +666,14 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'editCommitMessage': {
-        const { hash, subject } = msg.payload;
-        const newMsg = await vscode.window.showInputBox({
-          prompt: 'Edit Commit Message',
-          value: subject || '',
-        });
+        const { hash, subject, message } = msg.payload || {};
+        let newMsg = message;
+        if (!newMsg) {
+          newMsg = await vscode.window.showInputBox({
+            prompt: 'Edit Commit Message',
+            value: subject || '',
+          });
+        }
         if (newMsg && newMsg.trim()) {
           try {
             const headHash = (await this.gitService.getLog({ maxCount: 1 }))[0]?.hash;

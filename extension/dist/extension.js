@@ -1543,11 +1543,14 @@ var GraphViewProvider = class {
         break;
       }
       case "editCommitMessage": {
-        const { hash, subject } = msg.payload;
-        const newMsg = await vscode2.window.showInputBox({
-          prompt: "Edit Commit Message",
-          value: subject || ""
-        });
+        const { hash, subject, message } = msg.payload || {};
+        let newMsg = message;
+        if (!newMsg) {
+          newMsg = await vscode2.window.showInputBox({
+            prompt: "Edit Commit Message",
+            value: subject || ""
+          });
+        }
         if (newMsg && newMsg.trim()) {
           try {
             const headHash = (await this.gitService.getLog({ maxCount: 1 }))[0]?.hash;
@@ -2141,7 +2144,7 @@ var CommitViewProvider = class _CommitViewProvider {
     this.refresh();
   }
   async refresh() {
-    if (!this.view) return;
+    if (!this.view || !this.view.visible) return;
     if (this.isRefreshing) {
       this.queuedRefresh = true;
       return;
@@ -3614,7 +3617,7 @@ function activate(context) {
       changelistTree.refresh();
     })
   );
-  function debounce(fn, delay = 250) {
+  function debounce(fn, delay = 600) {
     let timer;
     return (...args) => {
       if (timer) clearTimeout(timer);
@@ -3622,7 +3625,7 @@ function activate(context) {
     };
   }
   const gitWatcher = vscode10.workspace.createFileSystemWatcher(
-    new vscode10.RelativePattern(workspaceRoot, ".git/**")
+    new vscode10.RelativePattern(workspaceRoot, ".git/{HEAD,refs/**,packed-refs}")
   );
   const onGitChange = debounce(() => {
     log.appendLine("Git change detected \u2014 refreshing views...");
@@ -3633,10 +3636,22 @@ function activate(context) {
     if (CommitReviewPanel.currentPanel) {
       CommitReviewPanel.currentPanel.refresh();
     }
-  }, 250);
-  gitWatcher.onDidChange(onGitChange);
-  gitWatcher.onDidCreate(onGitChange);
-  gitWatcher.onDidDelete(onGitChange);
+  }, 600);
+  const handleGitFsEvent = (uri) => {
+    const fsPath = uri?.fsPath || uri?.path || "";
+    if (
+      fsPath.endsWith(".lock") ||
+      fsPath.includes("/objects/") ||
+      fsPath.includes("\\objects\\") ||
+      fsPath.endsWith("COMMIT_EDITMSG")
+    ) {
+      return;
+    }
+    onGitChange();
+  };
+  gitWatcher.onDidChange(handleGitFsEvent);
+  gitWatcher.onDidCreate(handleGitFsEvent);
+  gitWatcher.onDidDelete(handleGitFsEvent);
   context.subscriptions.push(gitWatcher);
   try {
     const gitExt = vscode10.extensions.getExtension("vscode.git");

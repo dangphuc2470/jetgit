@@ -661,7 +661,18 @@ function parseRefs(raw) {
   });
 }
 async function getLog(ctx, options = {}) {
-  const args = ["log", `--format=${LOG_FORMAT}`, "--topo-order"];
+  const args = ["log", `--format=${LOG_FORMAT}`];
+  if (options.order === "topo") {
+    args.push("--topo-order");
+  } else {
+    args.push("--date-order");
+  }
+  if (options.firstParent) {
+    args.push("--first-parent");
+  }
+  if (options.noMerges) {
+    args.push("--no-merges");
+  }
   if (options.all === true || !options.branch && options.all !== false) {
     args.push("--all");
   }
@@ -3176,7 +3187,7 @@ var GraphViewProvider = class {
         break;
       }
       case "filter": {
-        const { branch, author, after, before, path: filePath, query } = msg.payload || {};
+        const { branch, author, after, before, path: filePath, query, order, firstParent, noMerges } = msg.payload || {};
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
         this.currentFilter = {
@@ -3186,6 +3197,9 @@ var GraphViewProvider = class {
           before: before || void 0,
           path: filePath || void 0,
           query: query || void 0,
+          order: order || void 0,
+          firstParent: firstParent || void 0,
+          noMerges: noMerges || void 0,
           all: !branch
         };
         try {

@@ -27,6 +27,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     before?: string;
     path?: string;
     query?: string;
+    order?: 'date' | 'topo';
+    firstParent?: boolean;
+    noMerges?: boolean;
     all?: boolean;
   } = {};
 
@@ -274,7 +277,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'filter': {
-        const { branch, author, after, before, path: filePath, query } = msg.payload || {};
+        const { branch, author, after, before, path: filePath, query, order, firstParent, noMerges } = msg.payload || {};
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
         this.currentFilter = {
@@ -284,6 +287,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           before: before || undefined,
           path: filePath || undefined,
           query: query || undefined,
+          order: order || undefined,
+          firstParent: firstParent || undefined,
+          noMerges: noMerges || undefined,
           all: !branch,
         };
         try {

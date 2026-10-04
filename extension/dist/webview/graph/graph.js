@@ -12,6 +12,7 @@ window.addEventListener('error', function(e) {
     e.stopImmediatePropagation();
     e.preventDefault();
   }
+});
 if (typeof document !== 'undefined') {
   if (document.body) {
     document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
@@ -7402,7 +7403,7 @@ ${component_stack}
   var root4 = from_html(`<div class="filter-bar svelte-51df0s"><input type="text" placeholder="Branch..." class="filter-input svelte-51df0s"/> <input type="text" placeholder="Author..." class="filter-input svelte-51df0s"/> <input type="date" placeholder="After..." class="filter-input date-input svelte-51df0s"/> <input type="date" placeholder="Before..." class="filter-input date-input svelte-51df0s"/> <input type="text" placeholder="File path..." class="filter-input svelte-51df0s"/> <button class="filter-btn svelte-51df0s">Filter</button> <button class="filter-btn clear svelte-51df0s">Clear</button></div>`);
   var $$css5 = {
     hash: "svelte-51df0s",
-    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;max-height:calc(100vh - 16px);overflow-y:auto;box-sizing:border-box;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.commit-context-menu::-webkit-scrollbar, .branch-context-menu::-webkit-scrollbar {width:5px;}.commit-context-menu::-webkit-scrollbar-thumb, .branch-context-menu::-webkit-scrollbar-thumb {background:rgba(255, 255, 255, 0.2);border-radius:3px;}.commit-context-menu::-webkit-scrollbar-thumb:hover, .branch-context-menu::-webkit-scrollbar-thumb:hover {background:rgba(255, 255, 255, 0.35);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.ccm-item.disabled {opacity:0.38;cursor:default;pointer-events:none;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff);opacity:0.9;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}.as-dialog-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1px);}.as-dialog-card {background:var(--vscode-editor-background, #1e1f22);border:1px solid var(--vscode-panel-border, #393b40);border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.75);width:560px;max-width:92vw;display:flex;flex-direction:column;color:var(--vscode-editor-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;overflow:hidden;box-sizing:border-box;}.as-dialog-header {padding:10px 16px;font-size:13px;font-weight:600;background:var(--vscode-titleBar-activeBackground, #2b2d30);border-bottom:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:space-between;user-select:none;}.as-dialog-close {cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.7;}.as-dialog-close:hover {opacity:1;background:rgba(255,255,255,0.1);}.as-dialog-body {padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}.as-dialog-field-label {font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #8c8c8c);text-transform:uppercase;letter-spacing:0.5px;}.as-dialog-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;}.as-dialog-input:focus, .as-dialog-textarea:focus {border-color:var(--vscode-focusBorder, #3574f0);}.as-dialog-textarea {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:8px 10px;font-size:12px;min-height:140px;max-height:320px;resize:vertical;outline:none;font-family:inherit;line-height:1.45;}.as-dialog-footer {padding:10px 16px;background:var(--vscode-editor-background, #1e1f22);border-top:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box;}.as-dialog-btn {padding:6px 16px;font-size:12px;border-radius:4px;cursor:pointer;border:none;font-weight:500;user-select:none;}.as-dialog-btn-primary {background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);}.as-dialog-btn-primary:hover {background:var(--vscode-button-hoverBackground, #355389);}.as-dialog-btn-secondary {background:transparent;color:var(--vscode-menu-foreground, #dfe1e5);border:1px solid var(--vscode-panel-border, #4e5157);}.as-dialog-btn-secondary:hover {background:rgba(255,255,255,0.08);}"
+    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;max-height:calc(100vh - 16px);overflow-y:auto;box-sizing:border-box;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.commit-context-menu::-webkit-scrollbar, .branch-context-menu::-webkit-scrollbar {width:5px;}.commit-context-menu::-webkit-scrollbar-thumb, .branch-context-menu::-webkit-scrollbar-thumb {background:rgba(255, 255, 255, 0.2);border-radius:3px;}.commit-context-menu::-webkit-scrollbar-thumb:hover, .branch-context-menu::-webkit-scrollbar-thumb:hover {background:rgba(255, 255, 255, 0.35);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.ccm-item.disabled {opacity:0.38;cursor:default;pointer-events:none;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff);opacity:0.9;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}.as-dialog-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1px);}.as-dialog-card {background:var(--vscode-editor-background, #1e1f22);border:1px solid var(--vscode-panel-border, #393b40);border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.75);width:560px;max-width:92vw;display:flex;flex-direction:column;color:var(--vscode-editor-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;overflow:hidden;box-sizing:border-box;}.as-dialog-header {padding:10px 16px;font-size:13px;font-weight:600;background:var(--vscode-titleBar-activeBackground, #2b2d30);border-bottom:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:space-between;user-select:none;}.as-dialog-close {cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.7;}.as-dialog-close:hover {opacity:1;background:rgba(255,255,255,0.1);}.as-dialog-body {padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}.as-dialog-field-label {font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #8c8c8c);text-transform:uppercase;letter-spacing:0.5px;}.as-dialog-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;}.as-dialog-input:focus, .as-dialog-textarea:focus {border-color:var(--vscode-focusBorder, #3574f0);}.as-dialog-textarea {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:8px 10px;font-size:12px;min-height:140px;max-height:320px;resize:vertical;outline:none;font-family:inherit;line-height:1.45;}.as-dialog-footer {padding:10px 16px;background:var(--vscode-editor-background, #1e1f22);border-top:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box;}.as-dialog-btn {padding:6px 16px;font-size:12px;border-radius:4px;cursor:pointer;border:none;font-weight:500;user-select:none;}.as-dialog-btn-primary {background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);}.as-dialog-btn-primary:hover {background:var(--vscode-button-hoverBackground, #355389);}.as-dialog-btn-secondary {background:transparent;color:var(--vscode-menu-foreground, #dfe1e5);border:1px solid var(--vscode-panel-border, #4e5157);}.as-dialog-btn-secondary:hover {background:rgba(255,255,255,0.08);}.as-dropdown-menu {position:absolute;top:calc(100% + 4px);background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;min-width:215px;z-index:2000;display:none;flex-direction:column;color:var(--vscode-menu-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;box-sizing:border-box;}.as-menu-section-header {padding:6px 10px 3px 10px;font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-align:left;}.as-menu-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.as-menu-item {display:flex;align-items:center;padding:3px 8px;border-radius:4px;cursor:pointer;height:24px;box-sizing:border-box;color:var(--vscode-menu-foreground, #dfe1e5);white-space:nowrap;position:relative;}.as-menu-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-item.selected {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-check {width:18px;min-width:18px;display:inline-flex;align-items:center;justify-content:flex-start;color:inherit;flex-shrink:0;}.as-menu-label {flex:1;text-align:left;}.as-menu-arrow {margin-left:auto;font-size:13px;opacity:0.7;}.as-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;min-width:140px;}.has-submenu:hover > .as-submenu {display:flex;}body.hide-col-author .author {display:none !important;}body.hide-col-date .date {display:none !important;}body.show-col-hash .hash {display:inline-block !important;color:#8c8c8c !important;font-family:var(--vscode-editor-font-family, monospace) !important;font-size:11px !important;user-select:text !important;width:68px !important;min-width:68px !important;}body.compact-refs .labels {gap:3px !important;}body.compact-refs .label {padding:0 3px !important;font-size:0.76em !important;}body.refs-on-left .labels {order:0 !important;margin-left:0 !important;margin-right:8px !important;}"
   };
       function FilterBar($$anchor, $$props) {
     push($$props, true);
@@ -7421,6 +7422,42 @@ ${component_stack}
     let isRegex = false;
     let isCase = false;
 
+    // Graph Options state
+    let sortMode = "date"; // "date" | "topo"
+    let isFirstParent = false;
+    let isNoMerges = false;
+
+    // View Options state
+    let viewCompactRefs = true;
+    let viewTagNames = false;
+    let viewLongEdges = false;
+    let viewCommitTimestamp = false;
+    let viewRefsOnLeft = false;
+
+    let colAuthor = true;
+    let colHash = false;
+    let colDate = true;
+    let colGpg = false;
+
+    let hlMyCommits = true;
+    let hlMergeCommits = true;
+    let hlCurrentBranch = true;
+    let hlNotCherryPicked = false;
+
+    let graphOptionPopup = null;
+    let viewOptionPopup = null;
+
+    function applyViewOptions() {
+      if (typeof document !== "undefined" && document.body) {
+        document.body.classList.toggle("hide-col-author", !colAuthor);
+        document.body.classList.toggle("hide-col-date", !colDate);
+        document.body.classList.toggle("show-col-hash", colHash);
+        document.body.classList.toggle("compact-refs", viewCompactRefs);
+        document.body.classList.toggle("refs-on-left", viewRefsOnLeft);
+      }
+    }
+    applyViewOptions();
+
     function applyFilter() {
       $$props.onFilter({
         query: curQuery || void 0,
@@ -7428,9 +7465,56 @@ ${component_stack}
         author: curUser || void 0,
         after: curAfter || void 0,
         before: curBefore || void 0,
-        path: curPath || void 0
+        path: curPath || void 0,
+        order: sortMode,
+        firstParent: isFirstParent,
+        noMerges: isNoMerges
       });
       updateLabels();
+    }
+
+    function createMenuItem(label, isChecked, onClick, hasSubmenu = false) {
+      const item = document.createElement("div");
+      item.className = "as-menu-item" + (hasSubmenu ? " has-submenu" : "");
+      
+      const checkSpan = document.createElement("span");
+      checkSpan.className = "as-menu-check";
+      if (isChecked) {
+        checkSpan.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>';
+      }
+      item.appendChild(checkSpan);
+
+      const labelSpan = document.createElement("span");
+      labelSpan.className = "as-menu-label";
+      labelSpan.textContent = label;
+      item.appendChild(labelSpan);
+
+      if (hasSubmenu) {
+        const arrowSpan = document.createElement("span");
+        arrowSpan.className = "as-menu-arrow";
+        arrowSpan.innerHTML = "›";
+        item.appendChild(arrowSpan);
+      }
+
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onClick(e);
+      });
+
+      return item;
+    }
+
+    function createSectionHeader(title) {
+      const hdr = document.createElement("div");
+      hdr.className = "as-menu-section-header";
+      hdr.textContent = title;
+      return hdr;
+    }
+
+    function createDivider() {
+      const d = document.createElement("div");
+      d.className = "as-menu-divider";
+      return d;
     }
 
     // 1. Search Box with Q icon and .* Cc options
@@ -7488,6 +7572,8 @@ ${component_stack}
       userPopup.style.display = "none";
       datePopup.style.display = "none";
       pathPopup.style.display = "none";
+      if (graphOptionPopup) graphOptionPopup.style.display = "none";
+      if (viewOptionPopup) viewOptionPopup.style.display = "none";
     }
 
     document.addEventListener("click", (e) => {
@@ -7804,20 +7890,291 @@ ${component_stack}
 
     bar.appendChild(pathContainer);
 
-    // 6. Right toolbar actions (matching Android Studio icons)
+    // Graph Option Button & Menu (Image 1 & Image 3)
+    const graphOptionContainer = document.createElement("div");
+    graphOptionContainer.style.position = "relative";
+    const graphOptionBtn = document.createElement("div");
+    graphOptionBtn.className = "as-filter-label as-tool-icon";
+    graphOptionBtn.title = "Graph Options";
+    graphOptionBtn.style.padding = "2px 4px";
+    graphOptionBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <line x1="4.5" y1="2.5" x2="4.5" y2="13.5"/>
+        <polyline points="2.5,10.5 4.5,13.5 6.5,10.5"/>
+        <line x1="11.5" y1="2.5" x2="11.5" y2="13.5"/>
+        <polygon points="11.5,3.5 13.5,5.5 11.5,7.5 9.5,5.5" fill="var(--vscode-editor-background, #1e1f22)" stroke="currentColor" stroke-width="1.2"/>
+        <polygon points="11.5,8.5 13.5,10.5 11.5,12.5 9.5,10.5" fill="var(--vscode-editor-background, #1e1f22)" stroke="currentColor" stroke-width="1.2"/>
+        <polygon points="12,15 15,15 15,12" fill="currentColor" stroke="none"/>
+      </svg>
+    `;
+    graphOptionContainer.appendChild(graphOptionBtn);
+
+    graphOptionPopup = document.createElement("div");
+    graphOptionPopup.className = "as-dropdown-menu";
+    graphOptionPopup.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+    graphOptionContainer.appendChild(graphOptionPopup);
+
+    function renderGraphOptionMenu() {
+      graphOptionPopup.innerHTML = "";
+
+      // Section 1: Sort
+      graphOptionPopup.appendChild(createSectionHeader("Sort"));
+      graphOptionPopup.appendChild(createMenuItem("By Commit Date", sortMode === "date", () => {
+        sortMode = "date";
+        renderGraphOptionMenu();
+        applyFilter();
+      }));
+      graphOptionPopup.appendChild(createMenuItem("Topologically", sortMode === "topo", () => {
+        sortMode = "topo";
+        renderGraphOptionMenu();
+        applyFilter();
+      }));
+
+      graphOptionPopup.appendChild(createDivider());
+
+      // Section 2: Options
+      graphOptionPopup.appendChild(createSectionHeader("Options"));
+      graphOptionPopup.appendChild(createMenuItem("First Parent", isFirstParent, () => {
+        isFirstParent = !isFirstParent;
+        renderGraphOptionMenu();
+        applyFilter();
+      }));
+      graphOptionPopup.appendChild(createMenuItem("No Merges", isNoMerges, () => {
+        isNoMerges = !isNoMerges;
+        renderGraphOptionMenu();
+        applyFilter();
+      }));
+
+      graphOptionPopup.appendChild(createDivider());
+
+      // Section 3: Branch Actions
+      graphOptionPopup.appendChild(createSectionHeader("Branch Actions"));
+      graphOptionPopup.appendChild(createMenuItem("Collapse Linear Branches", false, () => {
+        closeAllPopups();
+        postMessage("collapseLinearBranches");
+        showToast("Collapsed linear branches");
+      }));
+      graphOptionPopup.appendChild(createMenuItem("Expand Linear Branches", false, () => {
+        closeAllPopups();
+        postMessage("expandLinearBranches");
+        showToast("Expanded linear branches");
+      }));
+    }
+
+    graphOptionBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = graphOptionPopup.style.display === "flex";
+      closeAllPopups();
+      if (!open) {
+        renderGraphOptionMenu();
+        graphOptionPopup.style.display = "flex";
+      }
+    });
+
+    bar.appendChild(graphOptionContainer);
+
+    // 6. Right toolbar actions (Refresh, Cherry-Pick, View Options, Search)
     const tbRight = document.createElement("div");
     tbRight.className = "as-toolbar-right";
-    tbRight.innerHTML = `
-      <span class="as-tool-icon" title="Fetch / Run"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5L4 2.5z"/></svg></span>
-      <span class="as-tool-icon" title="Refresh"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 8a6.5 6.5 0 1 1-1.9-4.6l1.4-1.4A8.5 8.5 0 1 0 16 8h-1.5z"/><path d="M16 2v5h-5l2-2 3-3z"/></svg></span>
-      <span class="as-tool-icon" title="Go to Hash / Current Revision"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 1.06L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06z"/></svg></span>
-      <span class="as-tool-icon" title="Presentation Options"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3c-4.5 0-7.5 4.5-7.5 5s3 5 7.5 5 7.5-4.5 7.5-5-3-5-7.5-5zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></span>
-      <span class="as-tool-icon" title="Settings"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M9.1 1.5a1.5 1.5 0 0 0-2.2 0l-.3.3a1.5 1.5 0 0 1-1.8.3l-.4-.2a1.5 1.5 0 0 0-2.1.8l-.1.4a1.5 1.5 0 0 1-1.3 1.3l-.4.1a1.5 1.5 0 0 0-.8 2.1l.2.4a1.5 1.5 0 0 1-.3 1.8l-.3.3a1.5 1.5 0 0 0 0 2.2l.3.3a1.5 1.5 0 0 1 .3 1.8l-.2.4a1.5 1.5 0 0 0 .8 2.1l.4.1a1.5 1.5 0 0 1 1.3 1.3l.1.4a1.5 1.5 0 0 0 2.1.8l.4-.2a1.5 1.5 0 0 1 1.8.3l.3.3a1.5 1.5 0 0 0 2.2 0l.3-.3a1.5 1.5 0 0 1 1.8-.3l.4.2a1.5 1.5 0 0 0 2.1-.8l.1-.4a1.5 1.5 0 0 1 1.3-1.3l.4-.1a1.5 1.5 0 0 0 .8-2.1l-.2-.4a1.5 1.5 0 0 1 .3-1.8l.3-.3a1.5 1.5 0 0 0 0-2.2l-.3-.3a1.5 1.5 0 0 1-.3-1.8l.2-.4a1.5 1.5 0 0 0-.8-2.1l-.4-.1a1.5 1.5 0 0 1-1.3-1.3l-.1-.4a1.5 1.5 0 0 0-2.1-.8l-.4.2a1.5 1.5 0 0 1-1.8-.3l-.3-.3zM8 10.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></span>
+
+    // 1. Refresh
+    const btnRefresh = document.createElement("span");
+    btnRefresh.className = "as-tool-icon";
+    btnRefresh.title = "Refresh";
+    btnRefresh.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2.5 10.5"/>
+        <polyline points="2.5,14 2.5,10.5 6,10.5"/>
+        <path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L13.5 5.5"/>
+        <polyline points="13.5 2 13.5 5.5 10 5.5"/>
+      </svg>
     `;
-    const refreshBtn = tbRight.querySelectorAll(".as-tool-icon")[1];
-    refreshBtn.addEventListener("click", () => {
+    btnRefresh.addEventListener("click", () => {
       postMessage("refresh");
     });
+    tbRight.appendChild(btnRefresh);
+
+    // 2. Cherry-Pick
+    const btnCherry = document.createElement("span");
+    btnCherry.className = "as-tool-icon";
+    btnCherry.title = "Cherry-Pick Commit";
+    btnCherry.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <circle cx="5" cy="11.8" r="2.5"/>
+        <circle cx="11" cy="11.8" r="2.5"/>
+        <path d="M5 9.3C5.2 6.5 7.5 4.2 9 2.5"/>
+        <path d="M11 9.3C10.8 6.5 9.8 4.2 9 2.5"/>
+        <path d="M9 2.5C10.5 1.8 12.5 2.2 13 3.8C11.5 4.2 9.8 3.6 9 2.5Z"/>
+      </svg>
+    `;
+    btnCherry.addEventListener("click", () => {
+      const selHash = $$props.selectedHash;
+      if (selHash) {
+        postMessage("cherryPick", { hash: selHash });
+      } else {
+        showToast("Select a commit from the log to cherry-pick");
+      }
+    });
+    tbRight.appendChild(btnCherry);
+
+    // 3. View Options
+    const viewOptionContainer = document.createElement("div");
+    viewOptionContainer.style.position = "relative";
+    viewOptionContainer.style.display = "inline-flex";
+
+    const btnViewOption = document.createElement("span");
+    btnViewOption.className = "as-tool-icon";
+    btnViewOption.title = "View Options";
+    btnViewOption.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <path d="M1.5 8C3 4.5 7 2.8 8 2.8C9 2.8 13 4.5 14.5 8C13 11.5 9 13.2 8 13.2C7 13.2 3 11.5 1.5 8Z"/>
+        <circle cx="8" cy="8" r="2.2"/>
+        <polygon points="12,15 15,15 15,12" fill="currentColor" stroke="none"/>
+      </svg>
+    `;
+    viewOptionContainer.appendChild(btnViewOption);
+
+    viewOptionPopup = document.createElement("div");
+    viewOptionPopup.className = "as-dropdown-menu";
+    viewOptionPopup.style.right = "0";
+    viewOptionPopup.style.left = "auto";
+    viewOptionPopup.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+    viewOptionContainer.appendChild(viewOptionPopup);
+
+    function renderViewOptionMenu() {
+      viewOptionPopup.innerHTML = "";
+
+      // Section 1: Show
+      viewOptionPopup.appendChild(createSectionHeader("Show"));
+      viewOptionPopup.appendChild(createMenuItem("Compact References View", viewCompactRefs, () => {
+        viewCompactRefs = !viewCompactRefs;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+      viewOptionPopup.appendChild(createMenuItem("Tag Names", viewTagNames, () => {
+        viewTagNames = !viewTagNames;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+      viewOptionPopup.appendChild(createMenuItem("Long Edges", viewLongEdges, () => {
+        viewLongEdges = !viewLongEdges;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+      viewOptionPopup.appendChild(createMenuItem("Commit Timestamp", viewCommitTimestamp, () => {
+        viewCommitTimestamp = !viewCommitTimestamp;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+      viewOptionPopup.appendChild(createMenuItem("References on the Left", viewRefsOnLeft, () => {
+        viewRefsOnLeft = !viewRefsOnLeft;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+
+      // Columns Submenu
+      const columnsItem = createMenuItem("Columns", false, (ev) => {
+        // keep open
+      }, true);
+
+      const subMenu = document.createElement("div");
+      subMenu.className = "as-dropdown-menu as-submenu";
+      subMenu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+
+      function renderColumnsSubMenu() {
+        subMenu.innerHTML = "";
+        subMenu.appendChild(createMenuItem("Author", colAuthor, () => {
+          colAuthor = !colAuthor;
+          applyViewOptions();
+          renderColumnsSubMenu();
+        }));
+        subMenu.appendChild(createMenuItem("Hash", colHash, () => {
+          colHash = !colHash;
+          applyViewOptions();
+          renderColumnsSubMenu();
+        }));
+        subMenu.appendChild(createMenuItem("Date", colDate, () => {
+          colDate = !colDate;
+          applyViewOptions();
+          renderColumnsSubMenu();
+        }));
+        subMenu.appendChild(createMenuItem("GPG Signature", colGpg, () => {
+          colGpg = !colGpg;
+          applyViewOptions();
+          renderColumnsSubMenu();
+        }));
+      }
+      renderColumnsSubMenu();
+      columnsItem.addEventListener("mouseenter", () => {
+        const rect = columnsItem.getBoundingClientRect();
+        if (rect.right + 150 > window.innerWidth) {
+          subMenu.style.left = "auto";
+          subMenu.style.right = "100%";
+          subMenu.style.marginLeft = "0";
+          subMenu.style.marginRight = "2px";
+        } else {
+          subMenu.style.left = "100%";
+          subMenu.style.right = "auto";
+          subMenu.style.marginLeft = "2px";
+          subMenu.style.marginRight = "0";
+        }
+      });
+      columnsItem.appendChild(subMenu);
+      viewOptionPopup.appendChild(columnsItem);
+
+      viewOptionPopup.appendChild(createDivider());
+
+      // Section 2: Highlight
+      viewOptionPopup.appendChild(createSectionHeader("Highlight"));
+      viewOptionPopup.appendChild(createMenuItem("My Commits", hlMyCommits, () => {
+        hlMyCommits = !hlMyCommits;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+      viewOptionPopup.appendChild(createMenuItem("Merge Commits", hlMergeCommits, () => {
+        hlMergeCommits = !hlMergeCommits;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+      viewOptionPopup.appendChild(createMenuItem("Current Branch", hlCurrentBranch, () => {
+        hlCurrentBranch = !hlCurrentBranch;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+      viewOptionPopup.appendChild(createMenuItem("Not Cherry-Picked Commits", hlNotCherryPicked, () => {
+        hlNotCherryPicked = !hlNotCherryPicked;
+        applyViewOptions();
+        renderViewOptionMenu();
+      }));
+    }
+
+    btnViewOption.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = viewOptionPopup.style.display === "flex";
+      closeAllPopups();
+      if (!open) {
+        renderViewOptionMenu();
+        viewOptionPopup.style.display = "flex";
+      }
+    });
+    tbRight.appendChild(viewOptionContainer);
+
+    // 4. Search
+    const btnSearch = document.createElement("span");
+    btnSearch.className = "as-tool-icon";
+    btnSearch.title = "Search Commits (/)";
+    btnSearch.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <circle cx="6.5" cy="6.5" r="4.5"/>
+        <line x1="10" y1="10" x2="14.5" y2="14.5"/>
+      </svg>
+    `;
+    btnSearch.addEventListener("click", () => {
+      searchInput.focus();
+      searchInput.select();
+    });
+    tbRight.appendChild(btnSearch);
+
     bar.appendChild(tbRight);
 
     function updateLabels() {
@@ -7869,7 +8226,7 @@ ${component_stack}
       // Path Label
       if (curPath) {
         pathLabel.className = "as-filter-label active";
-        pathLabel.innerHTML = '<span class="lbl-prefix">Path:</span> <span class="lbl-val">' + curPath + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+        pathLabel.innerHTML = '<span class="lbl-prefix">Paths:</span> <span class="lbl-val">' + curPath + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
         pathLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
           e.stopPropagation();
           curPath = "";
@@ -7877,7 +8234,7 @@ ${component_stack}
         });
       } else {
         pathLabel.className = "as-filter-label";
-        pathLabel.innerHTML = '<span class="lbl-prefix">&gt;</span>';
+        pathLabel.innerHTML = '<span class="lbl-prefix">Paths</span> <span class="lbl-arrow">&#9662;</span>';
       }
     }
 

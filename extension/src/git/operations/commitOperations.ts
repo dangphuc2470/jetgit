@@ -33,9 +33,23 @@ export async function getLog(
     path?: string;
     all?: boolean;
     query?: string;
+    order?: 'date' | 'topo';
+    firstParent?: boolean;
+    noMerges?: boolean;
   } = {}
 ): Promise<Commit[]> {
-  const args = ['log', `--format=${LOG_FORMAT}`, '--topo-order'];
+  const args = ['log', `--format=${LOG_FORMAT}`];
+  if (options.order === 'topo') {
+    args.push('--topo-order');
+  } else {
+    args.push('--date-order');
+  }
+  if (options.firstParent) {
+    args.push('--first-parent');
+  }
+  if (options.noMerges) {
+    args.push('--no-merges');
+  }
 
   if (options.all === true || (!options.branch && options.all !== false)) {
     args.push('--all');

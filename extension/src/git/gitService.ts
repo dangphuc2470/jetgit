@@ -141,6 +141,9 @@ export class GitService {
     path?: string;
     all?: boolean;
     query?: string;
+    order?: 'date' | 'topo';
+    firstParent?: boolean;
+    noMerges?: boolean;
   } = {}): Promise<Commit[]> {
     return commitOps.getLog(this.asCommitContext(), options);
   }

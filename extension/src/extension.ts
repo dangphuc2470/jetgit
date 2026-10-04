@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // --- Branch Tree Sidebar (left) ---
-  const branchTree = new BranchTreeProvider(gitService);
+  const branchTree = new BranchTreeProvider(gitService, context.extensionUri);
   const branchTreeView = vscode.window.createTreeView('intellij-git.branches', {
     treeDataProvider: branchTree,
     showCollapseAll: true,
@@ -77,7 +77,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(branchTreeView);
 
   // --- Changelist Tree Sidebar ---
-  const changelistTree = new ChangelistTreeProvider(gitService, workspaceRoot);
+  const changelistTree = new ChangelistTreeProvider(gitService, workspaceRoot, context.extensionUri);
   const changelistTreeView = vscode.window.createTreeView('intellij-git.changelists', {
     treeDataProvider: changelistTree,
     showCollapseAll: true,

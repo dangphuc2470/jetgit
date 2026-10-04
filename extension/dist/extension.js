@@ -2981,7 +2981,8 @@ var GraphViewProvider = class {
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        vscode6.Uri.joinPath(this.extensionUri, "dist", "webview")
+        vscode6.Uri.joinPath(this.extensionUri, "dist", "webview"),
+        vscode6.Uri.joinPath(this.extensionUri, "resources")
       ]
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
@@ -5183,7 +5184,8 @@ var CommitViewProvider = class _CommitViewProvider {
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        vscode10.Uri.joinPath(this.extensionUri, "dist", "webview")
+        vscode10.Uri.joinPath(this.extensionUri, "dist", "webview"),
+        vscode10.Uri.joinPath(this.extensionUri, "resources")
       ]
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
@@ -5868,10 +5870,12 @@ function getNonce2() {
 // src/views/branchTree.ts
 var vscode12 = __toESM(require("vscode"));
 var BranchTreeProvider = class {
-  constructor(gitService) {
+  constructor(gitService, extensionUri) {
     this.gitService = gitService;
+    this.extensionUri = extensionUri;
   }
   gitService;
+  extensionUri;
   _onDidChangeTreeData = new vscode12.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   refresh() {
@@ -5882,30 +5886,59 @@ var BranchTreeProvider = class {
     const item = new vscode12.TreeItem(element.label, collapsible);
     switch (element.type) {
       case "category":
-        item.iconPath = new vscode12.ThemeIcon(
-          element.label === "Tags" ? "tag" : "git-branch"
-        );
+        if (element.label === "Tags" && this.extensionUri) {
+          item.iconPath = {
+            light: vscode12.Uri.joinPath(this.extensionUri, "resources", "icons", "branchLabel.svg"),
+            dark: vscode12.Uri.joinPath(this.extensionUri, "resources", "icons", "branchLabel_dark.svg")
+          };
+        } else if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode12.Uri.joinPath(this.extensionUri, "resources", "vcs", "branch.svg"),
+            dark: vscode12.Uri.joinPath(this.extensionUri, "resources", "vcs", "branch_dark.svg")
+          };
+        } else {
+          item.iconPath = new vscode12.ThemeIcon(
+            element.label === "Tags" ? "tag" : "git-branch"
+          );
+        }
         break;
       case "remote-group":
         item.iconPath = new vscode12.ThemeIcon("cloud");
         break;
       case "branch-current":
-        item.iconPath = new vscode12.ThemeIcon("star-full");
+        if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode12.Uri.joinPath(this.extensionUri, "resources", "icons", "currentBranchFavoriteLabel.svg"),
+            dark: vscode12.Uri.joinPath(this.extensionUri, "resources", "icons", "currentBranchFavoriteLabel.svg")
+          };
+        } else {
+          item.iconPath = new vscode12.ThemeIcon("star-full");
+        }
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "branch-current";
         break;
       case "branch-local":
-        item.iconPath = new vscode12.ThemeIcon("git-branch");
-        item.description = element.hash?.slice(0, 7);
-        item.contextValue = "branch-local";
-        break;
       case "branch-remote":
-        item.iconPath = new vscode12.ThemeIcon("git-branch");
+        if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode12.Uri.joinPath(this.extensionUri, "resources", "vcs", "branch.svg"),
+            dark: vscode12.Uri.joinPath(this.extensionUri, "resources", "vcs", "branch_dark.svg")
+          };
+        } else {
+          item.iconPath = new vscode12.ThemeIcon("git-branch");
+        }
         item.description = element.hash?.slice(0, 7);
-        item.contextValue = "branch-remote";
+        item.contextValue = element.type;
         break;
       case "tag":
-        item.iconPath = new vscode12.ThemeIcon("tag");
+        if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode12.Uri.joinPath(this.extensionUri, "resources", "icons", "branchLabel.svg"),
+            dark: vscode12.Uri.joinPath(this.extensionUri, "resources", "icons", "branchLabel_dark.svg")
+          };
+        } else {
+          item.iconPath = new vscode12.ThemeIcon("tag");
+        }
         item.description = element.hash?.slice(0, 7);
         item.contextValue = "tag";
         break;
@@ -6001,15 +6034,17 @@ var DEFAULT_DATA = {
   active: "Default"
 };
 var ChangelistTreeProvider = class {
-  constructor(gitService, workspaceRoot) {
+  constructor(gitService, workspaceRoot, extensionUri) {
     this.gitService = gitService;
     this.workspaceRoot = workspaceRoot;
+    this.extensionUri = extensionUri;
     const vscodePath = path11.join(workspaceRoot, ".vscode");
     this.dataPath = path11.join(vscodePath, "changelists.json");
     this.load();
   }
   gitService;
   workspaceRoot;
+  extensionUri;
   _onDidChangeTreeData = new vscode13.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   data = DEFAULT_DATA;
@@ -6041,9 +6076,16 @@ var ChangelistTreeProvider = class {
         vscode13.TreeItemCollapsibleState.Expanded
       );
       item.contextValue = element.active ? "changelist-active" : "changelist";
-      item.iconPath = new vscode13.ThemeIcon(
-        element.active ? "folder-active" : "folder"
-      );
+      if (this.extensionUri) {
+        item.iconPath = {
+          light: vscode13.Uri.joinPath(this.extensionUri, "resources", "vcs", "changelist.svg"),
+          dark: vscode13.Uri.joinPath(this.extensionUri, "resources", "vcs", "changelist_dark.svg")
+        };
+      } else {
+        item.iconPath = new vscode13.ThemeIcon(
+          element.active ? "folder-active" : "folder"
+        );
+      }
       if (element.active) {
         item.description = "(active)";
       }
@@ -6601,13 +6643,13 @@ function activate(context) {
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
-  const branchTree = new BranchTreeProvider(gitService);
+  const branchTree = new BranchTreeProvider(gitService, context.extensionUri);
   const branchTreeView = vscode16.window.createTreeView("intellij-git.branches", {
     treeDataProvider: branchTree,
     showCollapseAll: true
   });
   context.subscriptions.push(branchTreeView);
-  const changelistTree = new ChangelistTreeProvider(gitService, workspaceRoot);
+  const changelistTree = new ChangelistTreeProvider(gitService, workspaceRoot, context.extensionUri);
   const changelistTreeView = vscode16.window.createTreeView("intellij-git.changelists", {
     treeDataProvider: changelistTree,
     showCollapseAll: true

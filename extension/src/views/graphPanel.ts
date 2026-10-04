@@ -50,6 +50,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [
         vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview'),
+        vscode.Uri.joinPath(this.extensionUri, 'resources'),
       ],
     };
 

@@ -6543,6 +6543,12 @@ ${component_stack}
       if (ref.startsWith("tag: ")) return ref.slice(5);
       return ref;
     }
+    function labelIcon(ref) {
+      if (ref.startsWith("tag: ")) {
+        return '<span class="label-icon"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M5,6.50188798 C4.17160425,6.50188798 3.5,5.82986107 3.5,5.00094399 C3.5,4.17202691 4.17160425,3.5 5,3.5 C5.82839575,3.5 6.5,4.17202691 6.5,5.00094399 C6.5,5.82986107 5.82839575,6.50188798 5,6.50188798 L5,6.50188798 Z M7,2 L2,2 L2,7 L9,14 L14,9 L7,2 Z"/></svg></span>';
+      }
+      return '<span class="label-icon"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M12.1232 2.67714C11.7828 2.33692 11.3696 2.16676 10.8834 2.16676C10.3975 2.16676 9.98427 2.33682 9.64395 2.67714C9.30375 3.01737 9.13366 3.43051 9.13366 3.91672C9.13366 4.23268 9.21242 4.52588 9.37041 4.79626C9.52838 5.06666 9.74087 5.27787 10.0084 5.42971C10.0084 5.74567 9.98273 6.02377 9.93118 6.26375C9.87939 6.50373 9.79441 6.71478 9.67597 6.8972C9.55721 7.07953 9.43442 7.23436 9.30672 7.36203C9.17899 7.4897 8.99973 7.60961 8.76885 7.72208C8.538 7.83449 8.32366 7.92857 8.12624 8.00464C7.92881 8.08047 7.66288 8.17008 7.32869 8.27342C6.72097 8.46187 6.25317 8.63491 5.92501 8.793V4.26292C6.19238 4.11111 6.40507 3.89993 6.56303 3.62953C6.72097 3.35912 6.79995 3.06589 6.79995 2.74993C6.79995 2.26388 6.62988 1.85064 6.28956 1.51042C5.94937 1.17022 5.53623 1 5.05005 1C4.56383 1 4.15069 1.1701 3.81037 1.51042C3.47018 1.85064 3.29999 2.26388 3.29999 2.74993C3.29999 3.06589 3.37897 3.35912 3.5369 3.62953C3.69487 3.89993 3.90752 4.11111 4.17492 4.26292V11.7371C3.90752 11.8888 3.69487 12.1002 3.5369 12.3705C3.37897 12.641 3.29999 12.9343 3.29999 13.2501C3.29999 13.7362 3.47005 14.1494 3.81037 14.4896C4.15069 14.8298 4.56393 15 5.05005 15C5.53614 15 5.94937 14.8298 6.28956 14.4896C6.62979 14.1494 6.79995 13.7362 6.79995 13.2501C6.79995 12.9343 6.72097 12.641 6.56303 12.3705C6.40504 12.1002 6.19238 11.8888 5.92501 11.7371V11.5001C5.92501 11.0809 6.05109 10.7772 6.30323 10.5888C6.55537 10.4003 7.07035 10.1846 7.84823 9.94163C8.66867 9.68029 9.28553 9.43405 9.6987 9.20307C11.0598 8.43155 11.7464 7.17367 11.7585 5.42968C12.0261 5.27787 12.2386 5.06663 12.3965 4.79622C12.5544 4.52582 12.6335 4.23265 12.6335 3.91669C12.6336 3.4306 12.4634 3.01746 12.1232 2.67714Z"/></svg></span>';
+    }
     var span = root2();
     each(span, 21, () => $$props.refs, index, ($$anchor2, ref) => {
       var span_1 = root_1();
@@ -6551,7 +6557,7 @@ ${component_stack}
       template_effect(
         ($0, $1) => {
           set_class(span_1, 1, $0, "svelte-et0zx2");
-          span_1.innerHTML = '<span class="label-icon"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span> <span>' + $1 + '</span>';
+          span_1.innerHTML = labelIcon(get(ref)) + ' <span>' + $1 + '</span>';
         },
         [
           () => clsx2(labelClass(get(ref))),
@@ -6572,6 +6578,22 @@ ${component_stack}
     hash: "svelte-1rusxbg",
     code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:auto;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar {width:6px;height:6px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-track {background:transparent;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-corner {background:transparent;}.scroll-content {min-width:100%;width:max-content;}.visible-rows.svelte-1rusxbg {position:relative;display:block;min-width:100%;width:max-content;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg {box-sizing:border-box !important;height:25px !important;min-height:25px !important;max-height:25px !important;line-height:25px !important;display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;position:relative;border-bottom:none;min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg * {box-sizing:border-box;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:600;color:#ffffff;font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:#8c8c8c;font-size:0.88em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:0 0 auto;min-width:max-content;white-space:nowrap;color:#dfe1e5;font-size:0.92em;}.commit-row.is-merge.svelte-1rusxbg .subject {color:#8c8c8c !important;font-weight:400;}.commit-row.is-merge.svelte-1rusxbg .author {color:#9aa0a6 !important;font-weight:400;}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
   };
+  function showToast(text) {
+    const old = document.querySelector(".as-mini-toast");
+    if (old) old.remove();
+    const t = document.createElement("div");
+    t.className = "as-mini-toast";
+    t.innerText = text;
+    document.body.appendChild(t);
+    setTimeout(() => t.classList.add("visible"), 10);
+    setTimeout(() => {
+      t.classList.remove("visible");
+      setTimeout(() => t.remove(), 250);
+    }, 2000);
+  }
+  if (typeof window !== "undefined") {
+    window.showToast = showToast;
+  }
   function CommitList($$anchor, $$props) {
     push($$props, true);
     append_styles($$anchor, $$css3);
@@ -6640,24 +6662,11 @@ ${component_stack}
       return `${day}/${month}/${year}, ${timeStr}`;
     }
     const ICON_COPY = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>`;
-    const ICON_PLUS = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/></svg>`;
-    const ICON_CHERRY = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="4.5" cy="11.5" r="2.5"/><circle cx="11.5" cy="11.5" r="2.5"/><path d="M5.5 9.5C6.5 6 9 3 13 2c-1.5 3-1.5 6-1.5 7"/></svg>`;
-    const ICON_RESET = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`;
+    const ICON_PLUS = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.1232 2.67714C11.7828 2.33692 11.3696 2.16676 10.8834 2.16676C10.3975 2.16676 9.98427 2.33682 9.64395 2.67714C9.30375 3.01737 9.13366 3.43051 9.13366 3.91672C9.13366 4.23268 9.21242 4.52588 9.37041 4.79626C9.52838 5.06666 9.74087 5.27787 10.0084 5.42971C10.0084 5.74567 9.98273 6.02377 9.93118 6.26375C9.87939 6.50373 9.79441 6.71478 9.67597 6.8972C9.55721 7.07953 9.43442 7.23436 9.30672 7.36203C9.17899 7.4897 8.99973 7.60961 8.76885 7.72208C8.538 7.83449 8.32366 7.92857 8.12624 8.00464C7.92881 8.08047 7.66288 8.17008 7.32869 8.27342C6.72097 8.46187 6.25317 8.63491 5.92501 8.793V4.26292C6.19238 4.11111 6.40507 3.89993 6.56303 3.62953C6.72097 3.35912 6.79995 3.06589 6.79995 2.74993C6.79995 2.26388 6.62988 1.85064 6.28956 1.51042C5.94937 1.17022 5.53623 1 5.05005 1C4.56383 1 4.15069 1.1701 3.81037 1.51042C3.47018 1.85064 3.29999 2.26388 3.29999 2.74993C3.29999 3.06589 3.37897 3.35912 3.5369 3.62953C3.69487 3.89993 3.90752 4.11111 4.17492 4.26292V11.7371C3.90752 11.8888 3.69487 12.1002 3.5369 12.3705C3.37897 12.641 3.29999 12.9343 3.29999 13.2501C3.29999 13.7362 3.47005 14.1494 3.81037 14.4896C4.15069 14.8298 4.56393 15 5.05005 15C5.53614 15 5.94937 14.8298 6.28956 14.4896C6.62979 14.1494 6.79995 13.7362 6.79995 13.2501C6.79995 12.9343 6.72097 12.641 6.56303 12.3705C6.40504 12.1002 6.19238 11.8888 5.92501 11.7371V11.5001C5.92501 11.0809 6.05109 10.7772 6.30323 10.5888C6.55537 10.4003 7.07035 10.1846 7.84823 9.94163C8.66867 9.68029 9.28553 9.43405 9.6987 9.20307C11.0598 8.43155 11.7464 7.17367 11.7585 5.42968C12.0261 5.27787 12.2386 5.06663 12.3965 4.79622C12.5544 4.52582 12.6335 4.23265 12.6335 3.91669C12.6336 3.4306 12.4634 3.01746 12.1232 2.67714Z"/></svg>`;
+    const ICON_CHERRY = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><g fill-rule="evenodd"><circle cx="10.5" cy="11.5" r="3.5"/><path d="M8.3896146,7.52453512 C6.96794299,8.28080531 6,9.77736506 6,11.5 C6,11.9975882 6.08076132,12.4763136 6.229891,12.9237832 C5.99446926,12.9737252 5.75030304,13 5.5,13 C3.56700338,13 2,11.4329966 2,9.5 C2,7.56700338 3.56700338,6 5.5,6 C6.70006696,6 7.75906809,6.60397464 8.3896146,7.52453512 Z"/><path d="M5.12453459,7.60569924 C6.08941797,4.06318103 9.16510139,1.4730394 12.8101589,1.4730394 C13.1886965,1.4730394 13.5610935,1.50097337 13.9256235,1.55500703 C13.9584475,1.53868489 13.9914183,1.52249794 14.0245342,1.50644735 L14.0245342,2.6414425 C12.0593013,3.71905844 10.8073955,5.34675764 10.8073955,7.16801624 C10.8073955,7.59410638 10.8759177,8.00960219 11.0060655,8.40993826 L9.84334276,8.40993826 C9.75586976,8.03756883 9.71037584,7.65530103 9.71037584,7.26559527 C9.71037584,5.4850561 10.6600678,3.85978565 12.2242163,2.62444872 C9.19081178,2.89909099 6.71822556,5.28650836 6.08988039,8.40993826 L5.12453459,8.40993826 L5.12453459,7.60569924 Z"/></g></svg>`;
+    const ICON_RESET = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><g fill-rule="evenodd" transform="translate(2 1)"><polygon points="0 0 4 4 0 8" transform="matrix(-1 0 0 1 4 0)"/><path d="M4.15058343,11 L8.06891179,11 C9.72576604,11 11.0689118,9.65685425 11.0689118,8 C11.0689118,6.34314575 9.72576604,5 8.06891179,5 L4.03764586,5 L4,3 L8,3 C10.7614237,3 13,5.23857625 13,8 C13,10.7614237 10.7614237,13 8,13 L4.18822929,13 L4.15058343,11 Z"/></g></svg>`;
     const ICON_WEB = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>`;
 
-    function showToast(text) {
-      const old = document.querySelector(".as-mini-toast");
-      if (old) old.remove();
-      const t = document.createElement("div");
-      t.className = "as-mini-toast";
-      t.innerText = text;
-      document.body.appendChild(t);
-      setTimeout(() => t.classList.add("visible"), 10);
-      setTimeout(() => {
-        t.classList.remove("visible");
-        setTimeout(() => t.remove(), 250);
-      }, 2000);
-    }
 
     function closeCommitContextMenu() {
       const menus = document.querySelectorAll(".commit-context-menu");
@@ -7982,11 +7991,8 @@ ${component_stack}
     btnRefresh.className = "as-tool-icon";
     btnRefresh.title = "Refresh";
     btnRefresh.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-        <path d="M13.5 8a5.5 5.5 0 0 1-9.5 3.8L2.5 10.5"/>
-        <polyline points="2.5,14 2.5,10.5 6,10.5"/>
-        <path d="M2.5 8a5.5 5.5 0 0 1 9.5-3.8L13.5 5.5"/>
-        <polyline points="13.5 2 13.5 5.5 10 5.5"/>
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+        <path fill-rule="evenodd" d="M12.5747152,11.8852806 C11.4741474,13.1817355 9.83247882,14.0044386 7.99865879,14.0044386 C5.03907292,14.0044386 2.57997332,11.8615894 2.08820756,9.0427473 L3.94774327,9.10768372 C4.43372186,10.8898575 6.06393114,12.2000519 8.00015362,12.2000519 C9.30149237,12.2000519 10.4645985,11.6082097 11.2349873,10.6790094 L9.05000019,8.71167959 L14.0431479,8.44999981 L14.3048222,13.4430431 L12.5747152,11.8852806 Z M3.42785637,4.11741586 C4.52839138,2.82452748 6.16775464,2.00443857 7.99865879,2.00443857 C10.918604,2.00443857 13.3513802,4.09026967 13.8882946,6.8532307 L12.0226389,6.78808057 C11.5024872,5.05935553 9.89838095,3.8000774 8.00015362,3.8000774 C6.69867367,3.8000774 5.53545628,4.39204806 4.76506921,5.32142241 L6.95482203,7.29304326 L1.96167436,7.55472304 L1.70000005,2.56167973 L3.42785637,4.11741586 Z" transform="rotate(3 8.002 8.004)"/>
       </svg>
     `;
     btnRefresh.addEventListener("click", () => {
@@ -7999,12 +8005,12 @@ ${component_stack}
     btnCherry.className = "as-tool-icon";
     btnCherry.title = "Cherry-Pick Commit";
     btnCherry.innerHTML = `
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-        <circle cx="5" cy="11.8" r="2.5"/>
-        <circle cx="11" cy="11.8" r="2.5"/>
-        <path d="M5 9.3C5.2 6.5 7.5 4.2 9 2.5"/>
-        <path d="M11 9.3C10.8 6.5 9.8 4.2 9 2.5"/>
-        <path d="M9 2.5C10.5 1.8 12.5 2.2 13 3.8C11.5 4.2 9.8 3.6 9 2.5Z"/>
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+        <g fill-rule="evenodd">
+          <circle cx="10.5" cy="11.5" r="3.5"/>
+          <path d="M8.3896146,7.52453512 C6.96794299,8.28080531 6,9.77736506 6,11.5 C6,11.9975882 6.08076132,12.4763136 6.229891,12.9237832 C5.99446926,12.9737252 5.75030304,13 5.5,13 C3.56700338,13 2,11.4329966 2,9.5 C2,7.56700338 3.56700338,6 5.5,6 C6.70006696,6 7.75906809,6.60397464 8.3896146,7.52453512 Z"/>
+          <path d="M5.12453459,7.60569924 C6.08941797,4.06318103 9.16510139,1.4730394 12.8101589,1.4730394 C13.1886965,1.4730394 13.5610935,1.50097337 13.9256235,1.55500703 C13.9584475,1.53868489 13.9914183,1.52249794 14.0245342,1.50644735 L14.0245342,2.6414425 C12.0593013,3.71905844 10.8073955,5.34675764 10.8073955,7.16801624 C10.8073955,7.59410638 10.8759177,8.00960219 11.0060655,8.40993826 L9.84334276,8.40993826 C9.75586976,8.03756883 9.71037584,7.65530103 9.71037584,7.26559527 C9.71037584,5.4850561 10.6600678,3.85978565 12.2242163,2.62444872 C9.19081178,2.89909099 6.71822556,5.28650836 6.08988039,8.40993826 L5.12453459,8.40993826 L5.12453459,7.60569924 Z"/>
+        </g>
       </svg>
     `;
     btnCherry.addEventListener("click", () => {
@@ -8639,8 +8645,8 @@ ${component_stack}
 
       const svgArrowRight = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 3.5L10.5 8L6 12.5"/></svg>';
       const svgArrowDown = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3.5 6L8 10.5L12.5 6"/></svg>';
-      const svgTagIcon = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="display:block;"><path d="M1.5 7.5V2.5C1.5 1.95 1.95 1.5 2.5 1.5H7.5L14.5 8.5C15.1 9.1 15.1 10.1 14.5 10.7L10.7 14.5C10.1 15.1 9.1 15.1 8.5 14.5L1.5 7.5Z" stroke="#e5a50a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/><circle cx="5" cy="5" r="1.2" fill="#e5a50a"/></svg>';
-      const svgBranchWhite = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="display:block;color:#dfe1e5;"><path d="M11.75 2.5a1.75 1.75 0 1 0-2.45 1.6 4.75 4.75 0 0 0-4.05 4.65v.5a2.5 2.5 0 1 0 1.5 0v-.5c0-1.8 1.45-3.25 3.25-3.25h.25a1.75 1.75 0 0 0 1.5-3zM4 12.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm7-9a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>';
+      const svgTagIcon = '<svg width="13" height="13" viewBox="0 0 16 16" fill="#e5a50a" style="display:block;"><path fill-rule="evenodd" d="M5,6.50188798 C4.17160425,6.50188798 3.5,5.82986107 3.5,5.00094399 C3.5,4.17202691 4.17160425,3.5 5,3.5 C5.82839575,3.5 6.5,4.17202691 6.5,5.00094399 C6.5,5.82986107 5.82839575,6.50188798 5,6.50188798 L5,6.50188798 Z M7,2 L2,2 L2,7 L9,14 L14,9 L7,2 Z"/></svg>';
+      const svgBranchWhite = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="display:block;color:#dfe1e5;"><path d="M12.1232 2.67714C11.7828 2.33692 11.3696 2.16676 10.8834 2.16676C10.3975 2.16676 9.98427 2.33682 9.64395 2.67714C9.30375 3.01737 9.13366 3.43051 9.13366 3.91672C9.13366 4.23268 9.21242 4.52588 9.37041 4.79626C9.52838 5.06666 9.74087 5.27787 10.0084 5.42971C10.0084 5.74567 9.98273 6.02377 9.93118 6.26375C9.87939 6.50373 9.79441 6.71478 9.67597 6.8972C9.55721 7.07953 9.43442 7.23436 9.30672 7.36203C9.17899 7.4897 8.99973 7.60961 8.76885 7.72208C8.538 7.83449 8.32366 7.92857 8.12624 8.00464C7.92881 8.08047 7.66288 8.17008 7.32869 8.27342C6.72097 8.46187 6.25317 8.63491 5.92501 8.793V4.26292C6.19238 4.11111 6.40507 3.89993 6.56303 3.62953C6.72097 3.35912 6.79995 3.06589 6.79995 2.74993C6.79995 2.26388 6.62988 1.85064 6.28956 1.51042C5.94937 1.17022 5.53623 1 5.05005 1C4.56383 1 4.15069 1.1701 3.81037 1.51042C3.47018 1.85064 3.29999 2.26388 3.29999 2.74993C3.29999 3.06589 3.37897 3.35912 3.5369 3.62953C3.69487 3.89993 3.90752 4.11111 4.17492 4.26292V11.7371C3.90752 11.8888 3.69487 12.1002 3.5369 12.3705C3.37897 12.641 3.29999 12.9343 3.29999 13.2501C3.29999 13.7362 3.47005 14.1494 3.81037 14.4896C4.15069 14.8298 4.56393 15 5.05005 15C5.53614 15 5.94937 14.8298 6.28956 14.4896C6.62979 14.1494 6.79995 13.7362 6.79995 13.2501C6.79995 12.9343 6.72097 12.641 6.56303 12.3705C6.40504 12.1002 6.19238 11.8888 5.92501 11.7371V11.5001C5.92501 11.0809 6.05109 10.7772 6.30323 10.5888C6.55537 10.4003 7.07035 10.1846 7.84823 9.94163C8.66867 9.68029 9.28553 9.43405 9.6987 9.20307C11.0598 8.43155 11.7464 7.17367 11.7585 5.42968C12.0261 5.27787 12.2386 5.06663 12.3965 4.79622C12.5544 4.52582 12.6335 4.23265 12.6335 3.91669C12.6336 3.4306 12.4634 3.01746 12.1232 2.67714Z"/></svg>';
 
       function populateTree(searchQuery) {
         if (!treeContent) return;
@@ -8787,7 +8793,7 @@ ${component_stack}
 
             const fHdr = document.createElement("div");
             fHdr.className = "tree-folder-header";
-            const folderIconSvg = '<span class="tree-item-icon" style="color:#8c8c8c;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M1.5 3.5C1.5 2.67 2.17 2 3 2H6.2C6.6 2 6.98 2.16 7.26 2.44L8.56 3.74C8.84 4.02 9.22 4.18 9.62 4.18H13C13.83 4.18 14.5 4.85 14.5 5.68V12.5C14.5 13.33 13.83 14 13 14H3C2.17 14 1.5 13.33 1.5 12.5V3.5Z"/></svg></span>';
+            const folderIconSvg = '<span class="tree-item-icon" style="color:#8c8c8c;"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:block;"><path d="M7.75640322,7 L12,7 L12,13 L2,13 L2,7 L2,5 L6.60006714,5 L7.75640322,7 Z"/><path d="M13,11 L13,6 L8.75640322,6 L7.60006714,4 L4,4 L4,2 L8.60006714,2 L9.75640322,4 L14,4 L14,11 L13,11 Z"/></svg></span>';
 
             const isFolderCollapsed = folderCollapseState.has(subNode.fullPath)
               ? folderCollapseState.get(subNode.fullPath)
@@ -8850,7 +8856,7 @@ ${component_stack}
           for (const t of tags.filter((t) => filterFn(t.name))) {
             const item = document.createElement("div");
             item.className = "tree-item";
-            item.innerHTML = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span><span class="tree-item-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="#d29922" style="display:block;"><path d="M1 7.7V2a1 1 0 0 1 1-1h5.7a1 1 0 0 1 .7.3l7.3 7.3a1 1 0 0 1 0 1.4l-5.7 5.7a1 1 0 0 1-1.4 0L1.3 8.4a1 1 0 0 1-.3-.7zm2.5-3.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span><span>' + t.name + '</span>';
+            item.innerHTML = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span><span class="tree-item-icon">' + svgTagIcon + '</span><span>' + t.name + '</span>';
             item.addEventListener("click", () => handleBranchClick(t.name));
             tagSec.bdy.appendChild(item);
           }

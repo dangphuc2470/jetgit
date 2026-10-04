@@ -15,7 +15,10 @@ export class BranchTreeProvider implements vscode.TreeDataProvider<BranchNode> {
   private _onDidChangeTreeData = new vscode.EventEmitter<BranchNode | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  constructor(private gitService: GitService) {}
+  constructor(
+    private gitService: GitService,
+    private extensionUri?: vscode.Uri,
+  ) {}
 
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined);
@@ -30,30 +33,59 @@ export class BranchTreeProvider implements vscode.TreeDataProvider<BranchNode> {
 
     switch (element.type) {
       case 'category':
-        item.iconPath = new vscode.ThemeIcon(
-          element.label === 'Tags' ? 'tag' : 'git-branch',
-        );
+        if (element.label === 'Tags' && this.extensionUri) {
+          item.iconPath = {
+            light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'branchLabel.svg'),
+            dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'branchLabel_dark.svg'),
+          };
+        } else if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'vcs', 'branch.svg'),
+            dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'vcs', 'branch_dark.svg'),
+          };
+        } else {
+          item.iconPath = new vscode.ThemeIcon(
+            element.label === 'Tags' ? 'tag' : 'git-branch',
+          );
+        }
         break;
       case 'remote-group':
         item.iconPath = new vscode.ThemeIcon('cloud');
         break;
       case 'branch-current':
-        item.iconPath = new vscode.ThemeIcon('star-full');
+        if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'currentBranchFavoriteLabel.svg'),
+            dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'currentBranchFavoriteLabel.svg'),
+          };
+        } else {
+          item.iconPath = new vscode.ThemeIcon('star-full');
+        }
         item.description = element.hash?.slice(0, 7);
         item.contextValue = 'branch-current';
         break;
       case 'branch-local':
-        item.iconPath = new vscode.ThemeIcon('git-branch');
-        item.description = element.hash?.slice(0, 7);
-        item.contextValue = 'branch-local';
-        break;
       case 'branch-remote':
-        item.iconPath = new vscode.ThemeIcon('git-branch');
+        if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'vcs', 'branch.svg'),
+            dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'vcs', 'branch_dark.svg'),
+          };
+        } else {
+          item.iconPath = new vscode.ThemeIcon('git-branch');
+        }
         item.description = element.hash?.slice(0, 7);
-        item.contextValue = 'branch-remote';
+        item.contextValue = element.type;
         break;
       case 'tag':
-        item.iconPath = new vscode.ThemeIcon('tag');
+        if (this.extensionUri) {
+          item.iconPath = {
+            light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'branchLabel.svg'),
+            dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'branchLabel_dark.svg'),
+          };
+        } else {
+          item.iconPath = new vscode.ThemeIcon('tag');
+        }
         item.description = element.hash?.slice(0, 7);
         item.contextValue = 'tag';
         break;

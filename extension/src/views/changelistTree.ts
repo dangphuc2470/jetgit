@@ -33,6 +33,7 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
   constructor(
     private gitService: GitService,
     private workspaceRoot: string,
+    private extensionUri?: vscode.Uri,
   ) {
     const vscodePath = path.join(workspaceRoot, '.vscode');
     this.dataPath = path.join(vscodePath, 'changelists.json');
@@ -73,9 +74,16 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
         vscode.TreeItemCollapsibleState.Expanded,
       );
       item.contextValue = element.active ? 'changelist-active' : 'changelist';
-      item.iconPath = new vscode.ThemeIcon(
-        element.active ? 'folder-active' : 'folder',
-      );
+      if (this.extensionUri) {
+        item.iconPath = {
+          light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'vcs', 'changelist.svg'),
+          dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'vcs', 'changelist_dark.svg'),
+        };
+      } else {
+        item.iconPath = new vscode.ThemeIcon(
+          element.active ? 'folder-active' : 'folder',
+        );
+      }
       if (element.active) {
         item.description = '(active)';
       }

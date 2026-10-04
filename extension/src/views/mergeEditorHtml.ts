@@ -377,7 +377,7 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
     .syn-punct { color: var(--syn-punct, #948a8b) !important; }
   </style>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app">
     <!-- 1. Top Toolbar -->
     <div class="merge-toolbar">
@@ -848,6 +848,10 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
         render3Way();
       }
     });
+
+    window.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    }, true);
 
     vscode.postMessage({ type: 'ready' });
   </script>

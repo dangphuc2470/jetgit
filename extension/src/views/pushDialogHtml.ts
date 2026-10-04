@@ -160,7 +160,7 @@ export function getPushDialogHtml(rawPushInfo: string): string {
     }
   </style>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div class="as-push-card">
     <div class="as-body">
       <!-- Left Column: Commits -->
@@ -495,6 +495,10 @@ export function getPushDialogHtml(rawPushInfo: string): string {
         initUI();
       }
     });
+
+    window.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    }, true);
 
     initUI();
   </script>

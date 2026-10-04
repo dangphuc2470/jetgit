@@ -12,7 +12,18 @@ window.addEventListener('error', function(e) {
     e.stopImmediatePropagation();
     e.preventDefault();
   }
-});
+if (typeof document !== 'undefined') {
+  if (document.body) {
+    document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (document.body) document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+    });
+  }
+}
+window.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+}, true);
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -6762,6 +6773,11 @@ ${component_stack}
       const isHead = commits.length > 0 && commits[0].hash === commit.hash;
       const menu = document.createElement("div");
       menu.className = "commit-context-menu";
+      menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+      menu.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      });
 
       function addItem(label, shortcut, iconSvg, onClick, disabled = false) {
         const it = document.createElement("div");
@@ -8030,6 +8046,11 @@ ${component_stack}
         const isCurrent = (branchName === currentBranch);
         const menu = document.createElement("div");
         menu.className = "branch-context-menu";
+        menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+        menu.addEventListener("contextmenu", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+        });
 
         function addItem(label, shortcut, onClick) {
           const it = document.createElement("div");
@@ -8155,6 +8176,11 @@ ${component_stack}
 
         const menu = document.createElement("div");
         menu.className = "branch-context-menu";
+        menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+        menu.addEventListener("contextmenu", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+        });
 
         function addItem(label, shortcut, onClick) {
           const it = document.createElement("div");
@@ -8187,11 +8213,8 @@ ${component_stack}
 
       document.addEventListener("click", closeBranchContextMenu);
       window.addEventListener("contextmenu", (e) => {
-        const isInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable;
-        if (!isInput) {
-          e.preventDefault();
-        }
-      });
+        e.preventDefault();
+      }, true);
 
       // 1. Tooltip system attached to document.body
       let tooltipEl = document.querySelector(".app-tooltip");

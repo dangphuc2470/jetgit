@@ -1036,6 +1036,11 @@
 
     const menu = document.createElement('div');
     menu.className = 'as-context-menu';
+    menu.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+    menu.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
     activeContextMenu = menu;
 
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -1926,12 +1931,19 @@
     }
   });
 
-  window.addEventListener('contextmenu', (e) => {
-    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
-    if (!isInput) {
-      e.preventDefault();
+  if (typeof document !== 'undefined') {
+    if (document.body) {
+      document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        if (document.body) document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+      });
     }
-  });
+  }
+
+  window.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  }, true);
 
   // Ready message to request initial data
   vscode.postMessage({ type: 'ready' });

@@ -361,7 +361,7 @@ export class CommitReviewPanel {
   </style>
   <title>Code Review</title>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

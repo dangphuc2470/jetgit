@@ -5806,6 +5806,20 @@ ${component_stack}
   }
 
   // webview/rebase/main.ts
+  if (typeof document !== 'undefined') {
+    if (document.body) {
+      document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        if (document.body) document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+      });
+    }
+  }
+
+  window.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  }, true);
+
   var app = mount(App, { target: document.getElementById("app") });
   var main_default = app;
 })();

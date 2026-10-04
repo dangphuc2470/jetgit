@@ -420,7 +420,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Git Log</title>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app" style="height:100%;overflow:hidden;"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

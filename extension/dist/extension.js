@@ -1789,7 +1789,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
   </style>
   <title>Code Review</title>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
@@ -1964,7 +1964,7 @@ function getPushDialogHtml(rawPushInfo) {
     }
   </style>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div class="as-push-card">
     <div class="as-body">
       <!-- Left Column: Commits -->
@@ -2299,6 +2299,10 @@ function getPushDialogHtml(rawPushInfo) {
         initUI();
       }
     });
+
+    window.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    }, true);
 
     initUI();
   </script>
@@ -3314,7 +3318,7 @@ var GraphViewProvider = class {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Git Log</title>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app" style="height:100%;overflow:hidden;"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
@@ -3713,7 +3717,7 @@ function getMergeEditorHtml(cspSource, nonce, tokens) {
     .syn-punct { color: var(--syn-punct, #948a8b) !important; }
   </style>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app">
     <!-- 1. Top Toolbar -->
     <div class="merge-toolbar">
@@ -4185,6 +4189,10 @@ function getMergeEditorHtml(cspSource, nonce, tokens) {
       }
     });
 
+    window.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    }, true);
+
     vscode.postMessage({ type: 'ready' });
   </script>
 </body>
@@ -4589,7 +4597,7 @@ function getConflictsDialogHtml(rawConflictInfo) {
     }
   </style>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div class="as-dialog-container">
     <div class="as-banner">
       The following files have unresolved conflicts. You need to resolve them before continuing.
@@ -4800,6 +4808,10 @@ function getConflictsDialogHtml(rawConflictInfo) {
         renderTable();
       }
     });
+
+    window.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    }, true);
 
     renderTable();
   </script>
@@ -5681,7 +5693,7 @@ var CommitViewProvider = class _CommitViewProvider {
   <link rel="stylesheet" href="${styleUri}">
   <title>Commit</title>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
@@ -5818,7 +5830,7 @@ var RebasePanel = class _RebasePanel {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Interactive Rebase</title>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

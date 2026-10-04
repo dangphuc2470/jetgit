@@ -163,7 +163,7 @@ export function getConflictsDialogHtml(rawConflictInfo: string): string {
     }
   </style>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div class="as-dialog-container">
     <div class="as-banner">
       The following files have unresolved conflicts. You need to resolve them before continuing.
@@ -374,6 +374,10 @@ export function getConflictsDialogHtml(rawConflictInfo: string): string {
         renderTable();
       }
     });
+
+    window.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    }, true);
 
     renderTable();
   </script>

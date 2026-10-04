@@ -132,7 +132,7 @@ export class RebasePanel {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Interactive Rebase</title>
 </head>
-<body>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

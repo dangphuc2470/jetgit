@@ -99,6 +99,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      await this.gitService.unmaskAllAssumeUnchanged();
+
       const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff, conflictInfo] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
@@ -497,6 +499,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         } catch (err: any) {
           this.view?.webview.postMessage({ type: 'generateAiError' });
           vscode.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
+        } finally {
+          await this.refresh();
         }
         break;
       }

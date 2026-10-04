@@ -357,6 +357,22 @@ export class GitService {
     } catch {}
   }
 
+  async unmaskAllAssumeUnchanged(): Promise<void> {
+    try {
+      const out = await this.exec(['ls-files', '-v']);
+      const masked: string[] = [];
+      for (const line of out.split('\n')) {
+        if (/^[a-z]\s+/.test(line)) {
+          const p = line.replace(/^[a-z]\s+/, '').trim();
+          if (p) masked.push(p);
+        }
+      }
+      if (masked.length > 0) {
+        await this.exec(['update-index', '--no-assume-unchanged', '--', ...masked]);
+      }
+    } catch {}
+  }
+
   // --- Conflict Operations ---
 
   async getUnmergedFiles(): Promise<string[]> {

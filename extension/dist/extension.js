@@ -1063,6 +1063,22 @@ var GitService = class {
     } catch {
     }
   }
+  async unmaskAllAssumeUnchanged() {
+    try {
+      const out = await this.exec(["ls-files", "-v"]);
+      const masked = [];
+      for (const line of out.split("\n")) {
+        if (/^[a-z]\s+/.test(line)) {
+          const p = line.replace(/^[a-z]\s+/, "").trim();
+          if (p) masked.push(p);
+        }
+      }
+      if (masked.length > 0) {
+        await this.exec(["update-index", "--no-assume-unchanged", "--", ...masked]);
+      }
+    } catch {
+    }
+  }
   // --- Conflict Operations ---
   async getUnmergedFiles() {
     return getUnmergedFiles(this.asConflictContext());
@@ -4982,104 +4998,103 @@ function adaptCommitMessageStyle(raw, samples) {
     return `${type}: ${desc}`;
   }
 }
-async function generateAiCommitMessage(gitService, checkedFiles) {
-  const assumedFiles = [];
-  const temporarilyUnstaged = [];
-  try {
-    const allStatus = await gitService.getStatus();
-    const trackedToMask = [];
-    for (const s of allStatus) {
-      const isUntracked = s.x === "?" && s.y === "?";
-      const isChecked = checkedFiles.includes(s.path);
-      if (isChecked) {
-        if (s.y !== " " && s.x === " ") {
-          await gitService.stageFiles([s.path]);
-        } else if (isUntracked) {
-          await gitService.stageFiles([s.path]);
-        }
-        if (s.y !== " " && s.x !== " ") {
-          trackedToMask.push(s.path);
-        }
-      } else {
-        if (s.x !== " " && s.x !== "?") {
-          temporarilyUnstaged.push(s.path);
-          await gitService.unstageFile(s.path);
-        }
-        if (!isUntracked) {
-          trackedToMask.push(s.path);
-        }
-      }
-    }
-    if (trackedToMask.length > 0) {
-      await gitService.setAssumeUnchanged(trackedToMask, true);
-      assumedFiles.push(...trackedToMask);
-    }
-    const authorSamples = await gitService.getAuthorRecentCommitMessages(10);
-    const repoRoot = gitService.getCwd();
-    const gitExt = vscode9.extensions.getExtension("vscode.git");
-    let gitRepo;
-    if (gitExt) {
-      const gitApi = gitExt.exports.getAPI(1);
-      gitRepo = gitApi.repositories.find((r) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
-    }
-    const restoreFocus = () => {
-      vscode9.commands.executeCommand("workbench.view.extension.intellij-git-commit");
-      vscode9.commands.executeCommand("intellij-git.commitView.focus");
-    };
-    setTimeout(restoreFocus, 30);
-    setTimeout(restoreFocus, 80);
-    setTimeout(restoreFocus, 180);
-    setTimeout(restoreFocus, 350);
-    let aiMsg = "";
+async function getDiffForFiles(gitService, files) {
+  const allStatus = await gitService.getStatus().catch(() => []);
+  const untrackedSet = new Set(allStatus.filter((s) => s.x === "?" && s.y === "?").map((s) => s.path));
+  const targetFiles = files && files.length > 0 ? files : allStatus.map((s) => s.path);
+  const sortedFiles = [...targetFiles].sort((a, b) => {
+    const isLockA = /lock|\.json$|\.der$/i.test(a) ? 1 : 0;
+    const isLockB = /lock|\.json$|\.der$/i.test(b) ? 1 : 0;
+    return isLockA - isLockB;
+  });
+  let combinedDiff = "";
+  const perFileLimit = Math.max(1500, Math.floor(1e4 / (sortedFiles.length || 1)));
+  for (const f of sortedFiles) {
+    if (combinedDiff.length >= 1e4) break;
     try {
+      let diff = "";
+      if (untrackedSet.has(f)) {
+        diff = await gitService.getFileDiff(f);
+      } else {
+        diff = await gitService.exec(["diff", "HEAD", "--", f]).catch(async () => {
+          return await gitService.exec(["diff", "--", f]).catch(() => "");
+        });
+      }
+      if (diff && diff.trim()) {
+        const trimmedDiff = diff.length > perFileLimit ? diff.slice(0, perFileLimit) + "\n... (truncated)" : diff;
+        combinedDiff += (combinedDiff ? "\n" : "") + trimmedDiff;
+      }
+    } catch {
+    }
+  }
+  if (!combinedDiff.trim()) {
+    try {
+      combinedDiff = await gitService.getStagedDiff();
+    } catch {
+    }
+  }
+  return combinedDiff;
+}
+async function generateAiCommitMessage(gitService, checkedFiles) {
+  const authorSamples = await gitService.getAuthorRecentCommitMessages(10).catch(() => []);
+  const repoRoot = gitService.getCwd();
+  const gitExt = vscode9.extensions.getExtension("vscode.git");
+  let gitRepo;
+  if (gitExt) {
+    const gitApi = gitExt.exports.getAPI(1);
+    gitRepo = gitApi.repositories.find((r) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
+  }
+  const restoreFocus = () => {
+    vscode9.commands.executeCommand("workbench.view.extension.intellij-git-commit");
+    vscode9.commands.executeCommand("intellij-git.commitView.focus");
+  };
+  setTimeout(restoreFocus, 30);
+  setTimeout(restoreFocus, 80);
+  let aiMsg = "";
+  try {
+    const targetDiff = await getDiffForFiles(gitService, checkedFiles);
+    if (targetDiff && targetDiff.trim()) {
       if (vscode9.lm && typeof vscode9.lm.selectChatModels === "function") {
         const models = await vscode9.lm.selectChatModels({ family: "gemini-1.5-pro" }).catch(() => []);
         const model = models[0] || (await vscode9.lm.selectChatModels().catch(() => []))[0];
         if (model) {
-          const stagedDiff = await gitService.getStagedDiff();
-          if (stagedDiff && stagedDiff.trim()) {
-            const prompt = [
-              "You are an expert Git commit message generator.",
-              authorSamples.length > 0 ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:
+          const prompt = [
+            "You are an expert Git commit message generator.",
+            authorSamples.length > 0 ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:
 ${authorSamples.map((s) => `- ${s}`).join("\n")}` : "Write a concise, high quality commit message.",
-              "Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.",
-              `Git diff:
-${stagedDiff.slice(0, 8e3)}`
-            ].join("\n\n");
-            const response = await model.sendRequest([
-              vscode9.LanguageModelChatMessage.User(prompt)
-            ]);
-            let accumulated = "";
-            for await (const chunk of response.text) {
-              accumulated += chunk;
-            }
-            if (accumulated.trim()) {
-              aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, "");
-            }
+            "Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.",
+            `Git diff:
+${targetDiff.slice(0, 8e3)}`
+          ].join("\n\n");
+          const response = await model.sendRequest([
+            vscode9.LanguageModelChatMessage.User(prompt)
+          ]);
+          let accumulated = "";
+          for await (const chunk of response.text) {
+            accumulated += chunk;
+          }
+          if (accumulated.trim()) {
+            aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, "");
           }
         }
       }
+    }
+  } catch {
+  }
+  if (!aiMsg) {
+    try {
+      aiMsg = await vscode9.commands.executeCommand("antigravity.generateCommitMessage", repoRoot) || "";
     } catch {
     }
-    if (!aiMsg) {
-      aiMsg = await vscode9.commands.executeCommand("antigravity.generateCommitMessage", repoRoot) || "";
-    }
-    if (!aiMsg && gitRepo?.inputBox?.value) {
-      aiMsg = gitRepo.inputBox.value;
-    }
-    restoreFocus();
-    if (aiMsg && typeof aiMsg === "string") {
-      return adaptCommitMessageStyle(aiMsg, authorSamples).trim();
-    }
-    return "";
-  } finally {
-    if (assumedFiles.length > 0) {
-      await gitService.setAssumeUnchanged(assumedFiles, false);
-    }
-    if (temporarilyUnstaged.length > 0) {
-      await gitService.stageFiles(temporarilyUnstaged);
-    }
   }
+  if (!aiMsg && gitRepo?.inputBox?.value) {
+    aiMsg = gitRepo.inputBox.value;
+  }
+  restoreFocus();
+  if (aiMsg && typeof aiMsg === "string") {
+    return adaptCommitMessageStyle(aiMsg, authorSamples).trim();
+  }
+  return "";
 }
 
 // src/views/commitPanel.ts
@@ -5158,6 +5173,7 @@ var CommitViewProvider = class _CommitViewProvider {
         });
         return;
       }
+      await this.gitService.unmaskAllAssumeUnchanged();
       const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff, conflictInfo] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
@@ -5541,6 +5557,8 @@ var CommitViewProvider = class _CommitViewProvider {
         } catch (err) {
           this.view?.webview.postMessage({ type: "generateAiError" });
           vscode10.window.showErrorMessage(`Failed to generate commit message: ${err.message}`);
+        } finally {
+          await this.refresh();
         }
         break;
       }

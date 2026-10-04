@@ -76,117 +76,116 @@ export function adaptCommitMessageStyle(raw: string, samples: string[]): string 
   }
 }
 
+async function getDiffForFiles(gitService: GitService, files: string[]): Promise<string> {
+  const allStatus = await gitService.getStatus().catch(() => []);
+  const untrackedSet = new Set(allStatus.filter(s => s.x === '?' && s.y === '?').map(s => s.path));
+
+  const targetFiles = files && files.length > 0 ? files : allStatus.map(s => s.path);
+  
+  // Prioritize source files over lockfiles/data files so LLM prompt gets the most meaningful changes
+  const sortedFiles = [...targetFiles].sort((a, b) => {
+    const isLockA = /lock|\.json$|\.der$/i.test(a) ? 1 : 0;
+    const isLockB = /lock|\.json$|\.der$/i.test(b) ? 1 : 0;
+    return isLockA - isLockB;
+  });
+
+  let combinedDiff = '';
+  const perFileLimit = Math.max(1500, Math.floor(10000 / (sortedFiles.length || 1)));
+
+  for (const f of sortedFiles) {
+    if (combinedDiff.length >= 10000) break;
+    try {
+      let diff = '';
+      if (untrackedSet.has(f)) {
+        diff = await gitService.getFileDiff(f);
+      } else {
+        diff = await gitService.exec(['diff', 'HEAD', '--', f]).catch(async () => {
+          return await gitService.exec(['diff', '--', f]).catch(() => '');
+        });
+      }
+      if (diff && diff.trim()) {
+        const trimmedDiff = diff.length > perFileLimit ? diff.slice(0, perFileLimit) + '\n... (truncated)' : diff;
+        combinedDiff += (combinedDiff ? '\n' : '') + trimmedDiff;
+      }
+    } catch {}
+  }
+
+  if (!combinedDiff.trim()) {
+    try {
+      combinedDiff = await gitService.getStagedDiff();
+    } catch {}
+  }
+
+  return combinedDiff;
+}
+
 export async function generateAiCommitMessage(
   gitService: GitService,
   checkedFiles: string[]
 ): Promise<string> {
-  const assumedFiles: string[] = [];
-  const temporarilyUnstaged: string[] = [];
+  const authorSamples = await gitService.getAuthorRecentCommitMessages(10).catch(() => []);
+  const repoRoot = gitService.getCwd();
+  const gitExt = vscode.extensions.getExtension('vscode.git');
+  let gitRepo: any;
+  if (gitExt) {
+    const gitApi = gitExt.exports.getAPI(1);
+    gitRepo = gitApi.repositories.find((r: any) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
+  }
+
+  const restoreFocus = () => {
+    vscode.commands.executeCommand('workbench.view.extension.intellij-git-commit');
+    vscode.commands.executeCommand('intellij-git.commitView.focus');
+  };
+  setTimeout(restoreFocus, 30);
+  setTimeout(restoreFocus, 80);
+
+  let aiMsg = '';
 
   try {
-    const allStatus = await gitService.getStatus();
-    const trackedToMask: string[] = [];
-
-    for (const s of allStatus) {
-      const isUntracked = s.x === '?' && s.y === '?';
-      const isChecked = checkedFiles.includes(s.path);
-
-      if (isChecked) {
-        if (s.y !== ' ' && s.x === ' ') {
-          await gitService.stageFiles([s.path]);
-        } else if (isUntracked) {
-          await gitService.stageFiles([s.path]);
-        }
-        if (s.y !== ' ' && s.x !== ' ') {
-          trackedToMask.push(s.path);
-        }
-      } else {
-        if (s.x !== ' ' && s.x !== '?') {
-          temporarilyUnstaged.push(s.path);
-          await gitService.unstageFile(s.path);
-        }
-        if (!isUntracked) {
-          trackedToMask.push(s.path);
-        }
-      }
-    }
-
-    if (trackedToMask.length > 0) {
-      await gitService.setAssumeUnchanged(trackedToMask, true);
-      assumedFiles.push(...trackedToMask);
-    }
-
-    const authorSamples = await gitService.getAuthorRecentCommitMessages(10);
-    const repoRoot = gitService.getCwd();
-    const gitExt = vscode.extensions.getExtension('vscode.git');
-    let gitRepo: any;
-    if (gitExt) {
-      const gitApi = gitExt.exports.getAPI(1);
-      gitRepo = gitApi.repositories.find((r: any) => r.rootUri.fsPath === repoRoot || r.rootUri.path === repoRoot) || gitApi.repositories[0];
-    }
-
-    const restoreFocus = () => {
-      vscode.commands.executeCommand('workbench.view.extension.intellij-git-commit');
-      vscode.commands.executeCommand('intellij-git.commitView.focus');
-    };
-    setTimeout(restoreFocus, 30);
-    setTimeout(restoreFocus, 80);
-    setTimeout(restoreFocus, 180);
-    setTimeout(restoreFocus, 350);
-
-    let aiMsg = '';
-
-    try {
+    const targetDiff = await getDiffForFiles(gitService, checkedFiles);
+    if (targetDiff && targetDiff.trim()) {
       if ((vscode as any).lm && typeof (vscode as any).lm.selectChatModels === 'function') {
         const models = await (vscode as any).lm.selectChatModels({ family: 'gemini-1.5-pro' }).catch(() => []);
         const model = models[0] || (await (vscode as any).lm.selectChatModels().catch(() => []))[0];
         if (model) {
-          const stagedDiff = await gitService.getStagedDiff();
-          if (stagedDiff && stagedDiff.trim()) {
-            const prompt = [
-              'You are an expert Git commit message generator.',
-              authorSamples.length > 0
-                ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:\n${authorSamples.map(s => `- ${s}`).join('\n')}`
-                : 'Write a concise, high quality commit message.',
-              'Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.',
-              `Git diff:\n${stagedDiff.slice(0, 8000)}`
-            ].join('\n\n');
+          const prompt = [
+            'You are an expert Git commit message generator.',
+            authorSamples.length > 0
+              ? `Follow the exact style, tone, and conventions of the author's recent commit messages below:\n${authorSamples.map(s => `- ${s}`).join('\n')}`
+              : 'Write a concise, high quality commit message.',
+            'Generate ONLY a single-line commit summary with no markdown, quotes, backticks, or extra explanation.',
+            `Git diff:\n${targetDiff.slice(0, 8000)}`
+          ].join('\n\n');
 
-            const response = await model.sendRequest([
-              (vscode as any).LanguageModelChatMessage.User(prompt)
-            ]);
-            let accumulated = '';
-            for await (const chunk of response.text) {
-              accumulated += chunk;
-            }
-            if (accumulated.trim()) {
-              aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, '');
-            }
+          const response = await model.sendRequest([
+            (vscode as any).LanguageModelChatMessage.User(prompt)
+          ]);
+          let accumulated = '';
+          for await (const chunk of response.text) {
+            accumulated += chunk;
+          }
+          if (accumulated.trim()) {
+            aiMsg = accumulated.trim().replace(/^[`'"]+|[`'"]+$/g, '');
           }
         }
       }
-    } catch {}
+    }
+  } catch {}
 
-    if (!aiMsg) {
+  if (!aiMsg) {
+    try {
       aiMsg = (await vscode.commands.executeCommand<string>('antigravity.generateCommitMessage', repoRoot)) || '';
-    }
-
-    if (!aiMsg && gitRepo?.inputBox?.value) {
-      aiMsg = gitRepo.inputBox.value;
-    }
-
-    restoreFocus();
-
-    if (aiMsg && typeof aiMsg === 'string') {
-      return adaptCommitMessageStyle(aiMsg, authorSamples).trim();
-    }
-    return '';
-  } finally {
-    if (assumedFiles.length > 0) {
-      await gitService.setAssumeUnchanged(assumedFiles, false);
-    }
-    if (temporarilyUnstaged.length > 0) {
-      await gitService.stageFiles(temporarilyUnstaged);
-    }
+    } catch {}
   }
+
+  if (!aiMsg && gitRepo?.inputBox?.value) {
+    aiMsg = gitRepo.inputBox.value;
+  }
+
+  restoreFocus();
+
+  if (aiMsg && typeof aiMsg === 'string') {
+    return adaptCommitMessageStyle(aiMsg, authorSamples).trim();
+  }
+  return '';
 }

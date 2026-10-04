@@ -59,6 +59,10 @@ body, html {
   cursor: pointer;
   outline: none;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {
@@ -256,6 +260,9 @@ body, html {
   cursor: pointer;
   gap: 6px;
   user-select: none;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .group-header:hover {
@@ -269,6 +276,7 @@ body, html {
   transition: transform 0.12s;
   width: 10px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .group-arrow.expanded {
@@ -279,11 +287,17 @@ body, html {
   font-weight: 600;
   color: #dfe1e5;
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .group-count {
   color: #7f848e;
   font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .group-items {
@@ -299,6 +313,8 @@ body, html {
   gap: 6px;
   cursor: pointer;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .file-item:hover {
@@ -372,6 +388,11 @@ body, html {
 
 .file-name {
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .name-modified {
@@ -388,6 +409,9 @@ body, html {
   margin-left: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 2;
 }
 
 /* Horizontal Splitter */
@@ -439,6 +463,9 @@ body, html {
   color: #dfe1e5;
   font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .commit-icon-tools {
@@ -560,12 +587,18 @@ body, html {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
 }
 
 .action-buttons-group {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .btn-commit-primary {
@@ -578,6 +611,10 @@ body, html {
   font-size: 12px;
   cursor: pointer;
   transition: background 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .btn-commit-primary:hover {
@@ -593,6 +630,12 @@ body, html {
   font-size: 12px;
   cursor: pointer;
   transition: all 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+  text-align: center;
 }
 
 .btn-commit-secondary:hover {
@@ -602,6 +645,7 @@ body, html {
 
 .commit-gear-wrapper {
   position: relative;
+  flex-shrink: 0;
 }
 
 /* Dropdowns */
@@ -696,11 +740,19 @@ body, html {
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .diff-file-name {
   font-weight: 600;
   color: #dfe1e5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .diff-file-dir {
@@ -708,12 +760,17 @@ body, html {
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .diff-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .diff-tool-btn {
@@ -724,6 +781,8 @@ body, html {
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .diff-tool-btn:hover {
@@ -957,6 +1016,10 @@ body, html {
   border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Center Panel Code Reviewer */
@@ -1013,13 +1076,26 @@ body, html {
   justify-content: space-between;
   padding: 0 12px;
   z-index: 10;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.toolbar-left-group,
+.toolbar-left-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 1;
+}
+
 .toolbar-right-group {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .dropdown-pill {
@@ -1035,6 +1111,12 @@ body, html {
   cursor: pointer;
   user-select: none;
   transition: all 0.1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  max-width: 180px;
+  min-width: 0;
 }
 
 .dropdown-pill:hover {
@@ -1042,9 +1124,20 @@ body, html {
   border-color: var(--vscode-focusBorder, #3574f0);
 }
 
+.pill-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  display: inline-block;
+}
+
+.pill-icon,
 .pill-arrow {
   font-size: 9px;
   color: #8c8c8c;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .file-breadcrumb {
@@ -1052,17 +1145,30 @@ body, html {
   align-items: baseline;
   gap: 8px;
   margin-left: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .file-name-main {
   font-weight: 600;
   font-size: 13px;
   color: #dfe1e5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .file-dir-sub {
   font-size: 11px;
   color: #7f848e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 2;
 }
 
 .diff-counter-pill {
@@ -1075,6 +1181,14 @@ body, html {
   padding: 2px 6px;
   font-size: 11px;
   color: #bcbec4;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.counter-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .arrow-btn {
@@ -1085,6 +1199,7 @@ body, html {
   padding: 1px 3px;
   border-radius: 2px;
   font-size: 9px;
+  flex-shrink: 0;
 }
 
 .arrow-btn:hover {
@@ -1101,11 +1216,20 @@ body, html {
   cursor: pointer;
   margin: 0 4px;
   user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.current-version-label span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .current-version-label input {
   accent-color: #3574f0;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .icon-tool-btn {
@@ -1119,6 +1243,8 @@ body, html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .icon-tool-btn:hover:not(.disabled) {
@@ -1136,6 +1262,7 @@ body, html {
   height: 18px;
   background: #3e4147;
   margin: 0 2px;
+  flex-shrink: 0;
 }
 
 .studio-diff-columns-header {
@@ -1147,6 +1274,8 @@ body, html {
   font-weight: 600;
   color: var(--vscode-descriptionForeground, #7f848e);
   user-select: none;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .col-header-pane {
@@ -1154,6 +1283,16 @@ body, html {
   padding: 3px 16px;
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pane-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .col-header-gutter {
@@ -1521,6 +1660,8 @@ body, html {
   vertical-align: middle;
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .readonly-badge {
@@ -1535,6 +1676,8 @@ body, html {
   vertical-align: middle;
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Difference Navigation Hint Toast */

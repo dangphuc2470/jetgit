@@ -716,12 +716,12 @@
 
     toolbar.innerHTML = `
       <div class="toolbar-left-group">
-        <div class="dropdown-pill">
+        <div class="dropdown-pill" title="Side-by-side viewer">
           <span class="pill-icon">≡</span>
           <span class="pill-text">Side-by-side viewer</span>
           <span class="pill-arrow">▾</span>
         </div>
-        <div class="dropdown-pill" id="pill-highlight-words">
+        <div class="dropdown-pill" id="pill-highlight-words" title="${state.highlightWords ? 'Highlight words' : 'Do not highlight'}">
           <span class="pill-text">${state.highlightWords ? 'Highlight words' : 'Do not highlight'}</span>
           <span class="pill-arrow">▾</span>
         </div>

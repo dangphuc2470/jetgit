@@ -377,8 +377,8 @@
 
       <div class="commit-actions-bar">
         <div class="action-buttons-group">
-          <button class="btn-commit-primary" id="btn-commit">Commit</button>
-          <button class="btn-commit-secondary" id="btn-commit-push">Commit and Push...</button>
+          <button class="btn-commit-primary" id="btn-commit" title="Commit">Commit</button>
+          <button class="btn-commit-secondary" id="btn-commit-push" title="Commit and Push...">Commit and Push...</button>
         </div>
         <div class="commit-gear-wrapper">
           <button class="tool-btn-sm" id="btn-commit-gear" title="Before Commit Settings">⚙</button>

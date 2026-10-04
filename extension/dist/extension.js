@@ -1917,6 +1917,10 @@ function getPushDialogHtml(rawPushInfo) {
       font-size: 12.5px;
       cursor: pointer;
       transition: background 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
     }
     .as-btn:hover {
       background: var(--vscode-button-secondaryHoverBackground, #35373b);
@@ -1929,6 +1933,10 @@ function getPushDialogHtml(rawPushInfo) {
       font-size: 12.5px;
       font-weight: 600;
       cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
     }
     .as-btn-primary:hover {
       background: var(--vscode-button-hoverBackground, #3068d8);
@@ -3447,6 +3455,10 @@ function getMergeEditorHtml(cspSource, nonce, tokens) {
       cursor: pointer;
       transition: all 0.15s ease;
       outline: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
     }
     .action-btn.btn-apply {
       background: #3574f0;
@@ -4531,6 +4543,9 @@ function getConflictsDialogHtml(rawConflictInfo) {
       cursor: pointer;
       text-align: center;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
       transition: background 0.15s;
     }
     .as-btn:hover {
@@ -4551,6 +4566,9 @@ function getConflictsDialogHtml(rawConflictInfo) {
       cursor: pointer;
       text-align: center;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
       transition: background 0.15s;
     }
     .as-btn-primary:hover {

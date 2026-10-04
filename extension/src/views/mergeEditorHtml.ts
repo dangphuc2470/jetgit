@@ -119,6 +119,10 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       cursor: pointer;
       transition: all 0.15s ease;
       outline: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
     }
     .action-btn.btn-apply {
       background: #3574f0;

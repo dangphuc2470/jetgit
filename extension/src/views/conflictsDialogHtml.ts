@@ -117,6 +117,9 @@ export function getConflictsDialogHtml(rawConflictInfo: string): string {
       cursor: pointer;
       text-align: center;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
       transition: background 0.15s;
     }
     .as-btn:hover {
@@ -137,6 +140,9 @@ export function getConflictsDialogHtml(rawConflictInfo: string): string {
       cursor: pointer;
       text-align: center;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
       transition: background 0.15s;
     }
     .as-btn-primary:hover {

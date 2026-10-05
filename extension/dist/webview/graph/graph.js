@@ -7507,25 +7507,67 @@ ${component_stack}
             }
           }
           tooltipEl.innerHTML = currentText + (currentShortcut ? '<span class="tooltip-shortcut">' + currentShortcut + '</span>' : '');
-          const rect = el.getBoundingClientRect();
-          if (side === "bottom") {
-            tooltipEl.classList.remove("side-right");
-            tooltipEl.classList.add("side-bottom");
-            let left = rect.left + (rect.width / 2);
-            let top = rect.bottom + 6;
-            tooltipEl.style.left = left + "px";
-            tooltipEl.style.top = top + "px";
-            tooltipEl.style.transform = "translateX(-50%)";
-          } else {
-            tooltipEl.classList.remove("side-bottom");
-            tooltipEl.classList.add("side-right");
-            let left = rect.right + 7;
-            let top = rect.top + (rect.height / 2);
-            tooltipEl.style.left = left + "px";
-            tooltipEl.style.top = top + "px";
-            tooltipEl.style.transform = "translateY(-50%)";
-          }
+
+          tooltipEl.style.visibility = "hidden";
+          tooltipEl.style.display = "block";
+          tooltipEl.style.left = "-9999px";
+          tooltipEl.style.top = "-9999px";
+          tooltipEl.style.transform = "none";
           tooltipEl.classList.add("visible");
+
+          const tipWidth = tooltipEl.offsetWidth || 100;
+          const tipHeight = tooltipEl.offsetHeight || 24;
+          const rect = el.getBoundingClientRect();
+          const pad = 6;
+          const viewWidth = window.innerWidth || document.documentElement.clientWidth;
+          const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+
+          let tipLeft;
+          let tipTop;
+
+          if (side === "bottom") {
+            tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+            tipTop = rect.bottom + 6;
+            if (tipTop + tipHeight > viewHeight - pad && rect.top - tipHeight - 6 >= pad) {
+              tipTop = rect.top - tipHeight - 6;
+              tooltipEl.classList.remove("side-bottom");
+              tooltipEl.classList.add("side-top");
+            } else {
+              tooltipEl.classList.remove("side-top");
+              tooltipEl.classList.add("side-bottom");
+            }
+          } else if (side === "right") {
+            tipLeft = rect.right + 7;
+            tipTop = rect.top + (rect.height / 2) - (tipHeight / 2);
+            if (tipLeft + tipWidth > viewWidth - pad && rect.left - tipWidth - 7 >= pad) {
+              tipLeft = rect.left - tipWidth - 7;
+              tooltipEl.classList.remove("side-right");
+              tooltipEl.classList.add("side-left");
+            } else {
+              tooltipEl.classList.remove("side-left");
+              tooltipEl.classList.add("side-right");
+            }
+          } else {
+            tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+            tipTop = rect.bottom + 6;
+          }
+
+          if (tipLeft < pad) {
+            tipLeft = pad;
+          } else if (tipLeft + tipWidth > viewWidth - pad) {
+            tipLeft = Math.max(pad, viewWidth - tipWidth - pad);
+          }
+
+          if (tipTop < pad) {
+            tipTop = pad;
+          } else if (tipTop + tipHeight > viewHeight - pad) {
+            tipTop = Math.max(pad, viewHeight - tipHeight - pad);
+          }
+
+          tooltipEl.style.left = Math.round(tipLeft) + "px";
+          tooltipEl.style.top = Math.round(tipTop) + "px";
+          tooltipEl.style.transform = "none";
+          tooltipEl.style.visibility = "visible";
         }, 90);
       });
       el.addEventListener("mouseleave", () => {
@@ -8712,26 +8754,68 @@ ${component_stack}
           const currentShortcut = el.dataset.shortcut || "";
           if (!currentText) return;
           timer = setTimeout(() => {
-            const rect = el.getBoundingClientRect();
             tooltipEl.innerHTML = currentText + (currentShortcut ? '<span class="tooltip-shortcut">' + currentShortcut + '</span>' : '');
-            if (side === "bottom") {
-              tooltipEl.classList.remove("side-right");
-              tooltipEl.classList.add("side-bottom");
-              let left = rect.left + (rect.width / 2);
-              let top = rect.bottom + 6;
-              tooltipEl.style.left = left + "px";
-              tooltipEl.style.top = top + "px";
-              tooltipEl.style.transform = "translateX(-50%)";
-            } else {
-              tooltipEl.classList.remove("side-bottom");
-              tooltipEl.classList.add("side-right");
-              let left = rect.right + 7;
-              let top = rect.top + (rect.height / 2);
-              tooltipEl.style.left = left + "px";
-              tooltipEl.style.top = top + "px";
-              tooltipEl.style.transform = "translateY(-50%)";
-            }
+
+            tooltipEl.style.visibility = "hidden";
+            tooltipEl.style.display = "block";
+            tooltipEl.style.left = "-9999px";
+            tooltipEl.style.top = "-9999px";
+            tooltipEl.style.transform = "none";
             tooltipEl.classList.add("visible");
+
+            const tipWidth = tooltipEl.offsetWidth || 100;
+            const tipHeight = tooltipEl.offsetHeight || 24;
+            const rect = el.getBoundingClientRect();
+            const pad = 6;
+            const viewWidth = window.innerWidth || document.documentElement.clientWidth;
+            const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+
+            let tipLeft;
+            let tipTop;
+
+            if (side === "bottom") {
+              tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+              tipTop = rect.bottom + 6;
+              if (tipTop + tipHeight > viewHeight - pad && rect.top - tipHeight - 6 >= pad) {
+                tipTop = rect.top - tipHeight - 6;
+                tooltipEl.classList.remove("side-bottom");
+                tooltipEl.classList.add("side-top");
+              } else {
+                tooltipEl.classList.remove("side-top");
+                tooltipEl.classList.add("side-bottom");
+              }
+            } else if (side === "right") {
+              tipLeft = rect.right + 7;
+              tipTop = rect.top + (rect.height / 2) - (tipHeight / 2);
+              if (tipLeft + tipWidth > viewWidth - pad && rect.left - tipWidth - 7 >= pad) {
+                tipLeft = rect.left - tipWidth - 7;
+                tooltipEl.classList.remove("side-right");
+                tooltipEl.classList.add("side-left");
+              } else {
+                tooltipEl.classList.remove("side-left");
+                tooltipEl.classList.add("side-right");
+              }
+            } else {
+              tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+              tipTop = rect.bottom + 6;
+            }
+
+            if (tipLeft < pad) {
+              tipLeft = pad;
+            } else if (tipLeft + tipWidth > viewWidth - pad) {
+              tipLeft = Math.max(pad, viewWidth - tipWidth - pad);
+            }
+
+            if (tipTop < pad) {
+              tipTop = pad;
+            } else if (tipTop + tipHeight > viewHeight - pad) {
+              tipTop = Math.max(pad, viewHeight - tipHeight - pad);
+            }
+
+            tooltipEl.style.left = Math.round(tipLeft) + "px";
+            tooltipEl.style.top = Math.round(tipTop) + "px";
+            tooltipEl.style.transform = "none";
+            tooltipEl.style.visibility = "visible";
           }, 80);
         });
         el.addEventListener("mouseleave", () => {

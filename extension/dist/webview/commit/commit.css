@@ -455,9 +455,14 @@ body, html {
 .commit-options-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: 6px;
   height: 20px;
+}
+
+.amend-tools-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .amend-label {
@@ -1840,6 +1845,65 @@ body, html {
   padding: 1px 4px;
   border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* View Options Dropdown (Android Studio style) */
+.as-view-options-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100000;
+  background: var(--vscode-menu-background, #2b2d30);
+  border: 1px solid var(--vscode-menu-border, #3c3f41);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  min-width: 170px;
+  padding: 6px 4px;
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 12.5px;
+  color: var(--vscode-menu-foreground, #bcbec4);
+}
+
+.as-view-options-menu .as-menu-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7a7e85;
+  padding: 4px 10px 2px 10px;
+  user-select: none;
+}
+
+.as-view-options-menu .as-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  margin: 1px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--vscode-menu-foreground, #dfe1e5);
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.as-view-options-menu .as-menu-item:hover {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
+  color: #ffffff;
+}
+
+.as-view-options-menu .as-menu-item.selected {
+  background: var(--vscode-list-activeSelectionBackground, #3574f0);
+  color: #ffffff;
+}
+
+.as-view-options-menu .as-menu-item.selected .as-menu-shortcut {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.as-view-options-menu .as-menu-shortcut {
+  font-size: 11px;
+  color: #868a91;
+  margin-left: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 

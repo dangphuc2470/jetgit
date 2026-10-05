@@ -18,6 +18,9 @@
     expandChanges: true,
     expandUnversioned: true,
     showPaths: true,
+    viewOptionsOpen: false,
+    groupBy: 'directory',
+    showIgnoredFiles: true,
     commitOptionsOpen: false,
     recentOpen: false,
     isGeneratingAi: false,
@@ -46,6 +49,7 @@
       const currentText = el.dataset.tooltip || el.title;
       const currentShortcut = el.dataset.shortcut || '';
       if (!currentText) return;
+
       timer = setTimeout(() => {
         if (!tooltipEl) {
           tooltipEl = document.querySelector('.app-tooltip');
@@ -56,32 +60,91 @@
           }
         }
         tooltipEl.innerHTML = currentText + (currentShortcut ? `<span class="tooltip-shortcut">${currentShortcut}</span>` : '');
-        const rect = el.getBoundingClientRect();
-        if (side === 'bottom') {
-          let left = rect.left + (rect.width / 2);
-          let top = rect.bottom + 6;
-          tooltipEl.style.left = left + 'px';
-          tooltipEl.style.top = top + 'px';
-          tooltipEl.style.transform = 'translateX(-50%)';
-        } else {
-          let left = rect.right + 7;
-          let top = rect.top + (rect.height / 2);
-          tooltipEl.style.left = left + 'px';
-          tooltipEl.style.top = top + 'px';
-          tooltipEl.style.transform = 'translateY(-50%)';
-        }
+
+        // Temporarily display offscreen to measure dimensions
+        tooltipEl.style.visibility = 'hidden';
+        tooltipEl.style.display = 'block';
+        tooltipEl.style.left = '-9999px';
+        tooltipEl.style.top = '-9999px';
+        tooltipEl.style.transform = 'none';
         tooltipEl.classList.add('visible');
+
+        const tipWidth = tooltipEl.offsetWidth || 100;
+        const tipHeight = tooltipEl.offsetHeight || 24;
+        const rect = el.getBoundingClientRect();
+        const pad = 6;
+        const viewWidth = window.innerWidth || document.documentElement.clientWidth;
+        const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+
+        let tipLeft;
+        let tipTop;
+
+        if (side === 'bottom') {
+          tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+          tipTop = rect.bottom + 6;
+
+          // If overflowing bottom, flip to above the element
+          if (tipTop + tipHeight > viewHeight - pad && rect.top - tipHeight - 6 >= pad) {
+            tipTop = rect.top - tipHeight - 6;
+            tooltipEl.classList.remove('side-bottom');
+            tooltipEl.classList.add('side-top');
+          } else {
+            tooltipEl.classList.remove('side-top');
+            tooltipEl.classList.add('side-bottom');
+          }
+        } else if (side === 'right') {
+          tipLeft = rect.right + 7;
+          tipTop = rect.top + (rect.height / 2) - (tipHeight / 2);
+
+          // If overflowing right edge, flip to left of element
+          if (tipLeft + tipWidth > viewWidth - pad && rect.left - tipWidth - 7 >= pad) {
+            tipLeft = rect.left - tipWidth - 7;
+            tooltipEl.classList.remove('side-right');
+            tooltipEl.classList.add('side-left');
+          } else {
+            tooltipEl.classList.remove('side-left');
+            tooltipEl.classList.add('side-right');
+          }
+        } else {
+          tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+          tipTop = rect.bottom + 6;
+        }
+
+        // Clamp horizontally so it never overflows left or right boundaries
+        if (tipLeft < pad) {
+          tipLeft = pad;
+        } else if (tipLeft + tipWidth > viewWidth - pad) {
+          tipLeft = Math.max(pad, viewWidth - tipWidth - pad);
+        }
+
+        // Clamp vertically
+        if (tipTop < pad) {
+          tipTop = pad;
+        } else if (tipTop + tipHeight > viewHeight - pad) {
+          tipTop = Math.max(pad, viewHeight - tipHeight - pad);
+        }
+
+        tooltipEl.style.left = Math.round(tipLeft) + 'px';
+        tooltipEl.style.top = Math.round(tipTop) + 'px';
+        tooltipEl.style.transform = 'none';
+        tooltipEl.style.visibility = 'visible';
       }, 90);
     });
 
     el.addEventListener('mouseleave', () => {
       clearTimeout(timer);
-      if (tooltipEl) tooltipEl.classList.remove('visible');
+      if (tooltipEl) {
+        tooltipEl.classList.remove('visible');
+        tooltipEl.style.visibility = 'hidden';
+      }
     });
 
     el.addEventListener('click', () => {
       clearTimeout(timer);
-      if (tooltipEl) tooltipEl.classList.remove('visible');
+      if (tooltipEl) {
+        tooltipEl.classList.remove('visible');
+        tooltipEl.style.visibility = 'hidden';
+      }
     });
   }
 
@@ -349,22 +412,27 @@
             <path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z"/>
           </svg>
         </button>
-        <button class="tool-btn ${state.showPaths ? 'active' : ''}" id="btn-view-options" title="View Options (Toggle File Paths)" data-tooltip="View Options">
+        <div class="view-options-wrapper" id="view-options-wrapper" style="position:relative;display:inline-block;">
+          <button class="tool-btn ${state.viewOptionsOpen ? 'active' : ''}" id="btn-view-options" title="View Options" data-tooltip="View Options">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;">
+              <path d="M1.5 8C3 4.5 7 2.8 8 2.8C9 2.8 13 4.5 14.5 8C13 11.5 9 13.2 8 13.2C7 13.2 3 11.5 1.5 8Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/>
+              <polygon points="12,14.5 15,14.5 15,11.5" fill="currentColor"/>
+            </svg>
+          </button>
+          ${state.viewOptionsOpen ? renderViewOptionsDropdown() : ''}
+        </div>
+        <button class="tool-btn" id="btn-expand-all" title="Expand All" data-tooltip="Expand All">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-            <path d="M1.5 8C3 4.5 7 2.8 8 2.8C9 2.8 13 4.5 14.5 8C13 11.5 9 13.2 8 13.2C7 13.2 3 11.5 1.5 8Z"/>
-            <circle cx="8" cy="8" r="2.2"/>
+            <polyline points="4 5.5 8 1.5 12 5.5"/>
+            <polyline points="4 10.5 8 14.5 12 10.5"/>
           </svg>
         </button>
-        <button class="tool-btn" id="btn-toggle-expand" title="${(state.expandChanges || state.expandUnversioned) ? 'Collapse All' : 'Expand All'}" data-tooltip="${(state.expandChanges || state.expandUnversioned) ? 'Collapse All' : 'Expand All'}">
-          ${(state.expandChanges || state.expandUnversioned) ? `
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-              <path d="M3.5 3.5L8 7.5L12.5 3.5M3.5 12.5L8 8.5L12.5 12.5"/>
-            </svg>
-          ` : `
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-              <path d="M3.5 6.5L8 2L12.5 6.5M3.5 9.5L8 14L12.5 9.5"/>
-            </svg>
-          `}
+        <button class="tool-btn" id="btn-collapse-all" title="Collapse All" data-tooltip="Collapse All">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+            <polyline points="4 2.5 8 6.5 12 2.5"/>
+            <polyline points="4 13.5 8 9.5 12 13.5"/>
+          </svg>
         </button>
         <button class="tool-btn" id="btn-clear" title="Deselect All" data-tooltip="Deselect All">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
@@ -406,15 +474,17 @@
     );
     treeContainer.appendChild(changesGroup);
 
-    // Render Unversioned group
-    const unversionedGroup = renderFileGroup(
-      'Unversioned Files',
-      unversionedFiles,
-      state.expandUnversioned,
-      'toggleUnversioned',
-      'checkAllUnversioned'
-    );
-    treeContainer.appendChild(unversionedGroup);
+    // Render Unversioned group (guarded by showIgnoredFiles)
+    if (state.showIgnoredFiles !== false) {
+      const unversionedGroup = renderFileGroup(
+        'Unversioned Files',
+        unversionedFiles,
+        state.expandUnversioned,
+        'toggleUnversioned',
+        'checkAllUnversioned'
+      );
+      treeContainer.appendChild(unversionedGroup);
+    }
 
     leftPanel.appendChild(treeContainer);
 
@@ -432,11 +502,11 @@
 
     commitBox.innerHTML = `
       <div class="commit-options-bar">
-        <label class="checkbox-label amend-label" title="Amend previous commit" data-tooltip="Amend previous commit">
-          <input type="checkbox" id="chk-amend" class="amend-chk" ${state.isAmend ? 'checked' : ''}/>
-          <span>Amend</span>
-        </label>
-        <div class="commit-icon-tools">
+        <div class="amend-tools-group">
+          <label class="checkbox-label amend-label" title="Amend previous commit" data-tooltip="Amend previous commit">
+            <input type="checkbox" id="chk-amend" class="amend-chk" ${state.isAmend ? 'checked' : ''}/>
+            <span>Amend</span>
+          </label>
           <button class="tool-btn-sm" id="btn-recent-msgs" title="Recent Commit Messages (Cmd+M)" data-tooltip="Recent Commit Messages" data-shortcut="Cmd+M">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
               <circle cx="8" cy="8" r="6.5"/>
@@ -444,8 +514,9 @@
             </svg>
           </button>
           <button class="tool-btn-sm ${state.isGeneratingAi ? 'spinning' : ''}" id="btn-generate-ai" title="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" data-tooltip="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" ${state.isGeneratingAi ? 'disabled' : ''}>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-              <path d="M8 1.5L9.5 6.5L14.5 8L9.5 9.5L8 14.5L6.5 9.5L1.5 8L6.5 6.5L8 1.5Z"/>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
+              <path d="M11.5973 7.65471L13.6882 5.56049C14.1053 5.15406 14.1003 4.49602 13.6948 4.08627L12.0267 2.3136L12.0224 2.30932C11.6123 1.90004 10.942 1.89327 10.5331 2.31079L8.3867 4.44406M11.5973 7.65471L8.3867 4.44406M11.5973 7.65471L5.74041 13.5H2.50036L2.5 10.32L8.3867 4.44406" stroke="currentColor" stroke-miterlimit="10"/>
+              <path d="M13.3214 10.1903L13.8295 11.1171C14.0739 11.5622 14.4413 11.9297 14.8901 12.1742L15.8056 12.675C16.0648 12.817 16.0648 13.1845 15.8056 13.3265L14.8901 13.8272C14.4413 14.0717 14.0739 14.4392 13.8295 14.8843L13.3214 15.8111C13.1837 16.063 12.8163 16.063 12.6786 15.8111L12.1705 14.8829C11.9261 14.4378 11.5587 14.0703 11.1113 13.8258L10.1944 13.325C9.93519 13.183 9.93519 12.8155 10.1944 12.6735L11.1099 12.1728C11.5587 11.9283 11.9261 11.5608 12.1705 11.1157L12.6786 10.1889C12.8163 9.93704 13.1837 9.93704 13.3214 10.1889V10.1903Z" fill="#A571E6"/>
             </svg>
           </button>
         </div>
@@ -858,6 +929,26 @@
     `;
   }
 
+  // Render View Options dropdown
+  function renderViewOptionsDropdown() {
+    return `
+      <div class="as-view-options-menu" id="view-options-menu">
+        <div class="as-menu-section-header">Group By</div>
+        <div class="as-menu-item ${state.groupBy === 'directory' ? 'selected' : ''}" data-action="groupBy-directory">
+          <span class="as-menu-label">Directory</span>
+          <span class="as-menu-shortcut">^P</span>
+        </div>
+        <div class="as-menu-item ${state.groupBy === 'module' ? 'selected' : ''}" data-action="groupBy-module">
+          <span class="as-menu-label">Module</span>
+        </div>
+        <div class="as-menu-section-header" style="margin-top: 6px;">Show</div>
+        <div class="as-menu-item ${state.showIgnoredFiles !== false ? 'selected' : ''}" data-action="toggle-ignored">
+          <span class="as-menu-label">Ignored Files</span>
+        </div>
+      </div>
+    `;
+  }
+
   // Attach tab switching events
   function attachTabEvents(container) {
     container.querySelectorAll('.tab-btn').forEach(btn => {
@@ -907,17 +998,52 @@
       }
     });
 
-    toolbar.querySelector('#btn-view-options').addEventListener('click', () => {
-      state.showPaths = !state.showPaths;
-      render();
-    });
+    const btnViewOpt = toolbar.querySelector('#btn-view-options');
+    if (btnViewOpt) {
+      btnViewOpt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.viewOptionsOpen = !state.viewOptionsOpen;
+        render();
+      });
+    }
 
-    toolbar.querySelector('#btn-toggle-expand').addEventListener('click', () => {
-      const anyExpanded = state.expandChanges || state.expandUnversioned;
-      state.expandChanges = !anyExpanded;
-      state.expandUnversioned = !anyExpanded;
-      render();
-    });
+    const menuViewOpt = toolbar.querySelector('#view-options-menu');
+    if (menuViewOpt) {
+      menuViewOpt.querySelectorAll('.as-menu-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = item.dataset.action;
+          if (action === 'groupBy-directory') {
+            state.groupBy = (state.groupBy === 'directory' ? 'none' : 'directory');
+            state.showPaths = (state.groupBy === 'directory');
+          } else if (action === 'groupBy-module') {
+            state.groupBy = (state.groupBy === 'module' ? 'none' : 'module');
+          } else if (action === 'toggle-ignored') {
+            state.showIgnoredFiles = (state.showIgnoredFiles === false ? true : false);
+          }
+          state.viewOptionsOpen = false;
+          render();
+        });
+      });
+    }
+
+    const btnExpandAll = toolbar.querySelector('#btn-expand-all');
+    if (btnExpandAll) {
+      btnExpandAll.addEventListener('click', () => {
+        state.expandChanges = true;
+        state.expandUnversioned = true;
+        render();
+      });
+    }
+
+    const btnCollapseAll = toolbar.querySelector('#btn-collapse-all');
+    if (btnCollapseAll) {
+      btnCollapseAll.addEventListener('click', () => {
+        state.expandChanges = false;
+        state.expandUnversioned = false;
+        render();
+      });
+    }
 
     toolbar.querySelector('#btn-clear').addEventListener('click', () => {
       state.checkedFiles.clear();
@@ -1019,13 +1145,25 @@
 
     // Close dropdowns on outside click
     document.addEventListener('click', (e) => {
-      if (state.recentOpen || state.commitOptionsOpen) {
+      if (state.recentOpen || state.commitOptionsOpen || state.viewOptionsOpen) {
         if (!e.target.closest('#recent-dropdown') && !e.target.closest('#btn-recent-msgs') &&
-            !e.target.closest('#gear-dropdown') && !e.target.closest('#btn-commit-gear')) {
+            !e.target.closest('#gear-dropdown') && !e.target.closest('#btn-commit-gear') &&
+            !e.target.closest('#view-options-wrapper')) {
           state.recentOpen = false;
           state.commitOptionsOpen = false;
+          state.viewOptionsOpen = false;
           render();
         }
+      }
+    });
+
+    // Keyboard shortcut ^P (Control+P) for toggling Group By Directory
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || (e.metaKey && e.altKey)) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        state.groupBy = (state.groupBy === 'directory' ? 'none' : 'directory');
+        state.showPaths = (state.groupBy === 'directory');
+        render();
       }
     });
   }

@@ -480,7 +480,11 @@ body, html {
 .commit-icon-tools {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 1px;
+}
+
+.commit-icon-tools .tool-btn-sm {
+  padding: 2px 3px;
 }
 
 .tool-btn-sm {

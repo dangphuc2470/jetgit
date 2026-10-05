@@ -507,18 +507,20 @@
             <input type="checkbox" id="chk-amend" class="amend-chk" ${state.isAmend ? 'checked' : ''}/>
             <span>Amend</span>
           </label>
-          <button class="tool-btn-sm" id="btn-recent-msgs" title="Recent Commit Messages (Cmd+M)" data-tooltip="Recent Commit Messages" data-shortcut="Cmd+M">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-              <circle cx="8" cy="8" r="6.5"/>
-              <polyline points="8 4 8 8 10.5 9.5"/>
-            </svg>
-          </button>
-          <button class="tool-btn-sm ${state.isGeneratingAi ? 'spinning' : ''}" id="btn-generate-ai" title="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" data-tooltip="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" ${state.isGeneratingAi ? 'disabled' : ''}>
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
-              <path d="M11.5973 7.65471L13.6882 5.56049C14.1053 5.15406 14.1003 4.49602 13.6948 4.08627L12.0267 2.3136L12.0224 2.30932C11.6123 1.90004 10.942 1.89327 10.5331 2.31079L8.3867 4.44406M11.5973 7.65471L8.3867 4.44406M11.5973 7.65471L5.74041 13.5H2.50036L2.5 10.32L8.3867 4.44406" stroke="currentColor" stroke-miterlimit="10"/>
-              <path d="M13.3214 10.1903L13.8295 11.1171C14.0739 11.5622 14.4413 11.9297 14.8901 12.1742L15.8056 12.675C16.0648 12.817 16.0648 13.1845 15.8056 13.3265L14.8901 13.8272C14.4413 14.0717 14.0739 14.4392 13.8295 14.8843L13.3214 15.8111C13.1837 16.063 12.8163 16.063 12.6786 15.8111L12.1705 14.8829C11.9261 14.4378 11.5587 14.0703 11.1113 13.8258L10.1944 13.325C9.93519 13.183 9.93519 12.8155 10.1944 12.6735L11.1099 12.1728C11.5587 11.9283 11.9261 11.5608 12.1705 11.1157L12.6786 10.1889C12.8163 9.93704 13.1837 9.93704 13.3214 10.1889V10.1903Z" fill="#A571E6"/>
-            </svg>
-          </button>
+          <div class="commit-icon-tools">
+            <button class="tool-btn-sm" id="btn-recent-msgs" title="Recent Commit Messages (Cmd+M)" data-tooltip="Recent Commit Messages" data-shortcut="Cmd+M">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+                <circle cx="8" cy="8" r="6.5"/>
+                <polyline points="8 4 8 8 10.5 9.5"/>
+              </svg>
+            </button>
+            <button class="tool-btn-sm ${state.isGeneratingAi ? 'spinning' : ''}" id="btn-generate-ai" title="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" data-tooltip="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" ${state.isGeneratingAi ? 'disabled' : ''}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
+                <path d="M11.5973 7.65471L13.6882 5.56049C14.1053 5.15406 14.1003 4.49602 13.6948 4.08627L12.0267 2.3136L12.0224 2.30932C11.6123 1.90004 10.942 1.89327 10.5331 2.31079L8.3867 4.44406M11.5973 7.65471L8.3867 4.44406M11.5973 7.65471L5.74041 13.5H2.50036L2.5 10.32L8.3867 4.44406" stroke="currentColor" stroke-miterlimit="10"/>
+                <path d="M13.3214 10.1903L13.8295 11.1171C14.0739 11.5622 14.4413 11.9297 14.8901 12.1742L15.8056 12.675C16.0648 12.817 16.0648 13.1845 15.8056 13.3265L14.8901 13.8272C14.4413 14.0717 14.0739 14.4392 13.8295 14.8843L13.3214 15.8111C13.1837 16.063 12.8163 16.063 12.6786 15.8111L12.1705 14.8829C11.9261 14.4378 11.5587 14.0703 11.1113 13.8258L10.1944 13.325C9.93519 13.183 9.93519 12.8155 10.1944 12.6735L11.1099 12.1728C11.5587 11.9283 11.9261 11.5608 12.1705 11.1157L12.6786 10.1889C12.8163 9.93704 13.1837 9.93704 13.3214 10.1889V10.1903Z" fill="#A571E6"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 

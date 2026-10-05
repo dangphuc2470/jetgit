@@ -606,8 +606,7 @@ body, html {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  flex: 1;
-  overflow: hidden;
+  flex: 0 0 auto;
 }
 
 .btn-commit-primary {
@@ -621,8 +620,6 @@ body, html {
   cursor: pointer;
   transition: background 0.12s;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   flex-shrink: 0;
 }
 
@@ -640,10 +637,8 @@ body, html {
   cursor: pointer;
   transition: all 0.12s;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1;
+  flex-shrink: 0;
+  width: auto;
   text-align: center;
 }
 
@@ -655,6 +650,7 @@ body, html {
 .commit-gear-wrapper {
   position: relative;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Dropdowns */

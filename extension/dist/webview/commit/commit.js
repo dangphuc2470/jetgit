@@ -17,16 +17,16 @@
     stashes: [],
     expandChanges: true,
     expandUnversioned: true,
-    showPaths: false,
+    showPaths: true,
     viewOptionsOpen: false,
-    groupBy: 'directory',
-    groupByDirectory: true,
-    groupByModule: true,
+    groupBy: 'none',
+    groupByDirectory: false,
+    groupByModule: false,
     repoName: 'Project',
     expandedFolders: new Set(),
     collapsedFolders: new Set(),
     expandAllFolders: null,
-    showIgnoredFiles: true,
+    showIgnoredFiles: false,
     commitOptionsOpen: false,
     recentOpen: false,
     isGeneratingAi: false,
@@ -1325,7 +1325,6 @@
           } else if (action === 'toggle-ignored') {
             state.showIgnoredFiles = (state.showIgnoredFiles === false ? true : false);
           }
-          state.viewOptionsOpen = false;
           render();
         });
       });

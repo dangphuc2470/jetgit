@@ -2,7 +2,7 @@
   "name": "intellij-git-ext",
   "displayName": "IntelliJ Git",
   "description": "IntelliJ-style Git integration for VS Code — visual commit graph, colored branch lines, inline blame annotations, interactive rebase, changelists, and side-by-side diff viewer. Bring the best of JetBrains Git tooling to your editor.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "WMBGmbH",
   "icon": "icon.png",
   "license": "MIT",

@@ -27,6 +27,64 @@
 
   const app = document.getElementById('app');
 
+  // Tooltip system
+  let tooltipEl = document.querySelector('.app-tooltip');
+  if (!tooltipEl && typeof document !== 'undefined') {
+    tooltipEl = document.createElement('div');
+    tooltipEl.className = 'app-tooltip';
+    document.body.appendChild(tooltipEl);
+  }
+
+  function attachTooltip(el, text, shortcut = '', side = 'bottom') {
+    if (!el) return;
+    el.dataset.tooltip = text;
+    if (shortcut) el.dataset.shortcut = shortcut;
+    el.title = text + (shortcut ? ` (${shortcut})` : '');
+
+    let timer;
+    el.addEventListener('mouseenter', () => {
+      const currentText = el.dataset.tooltip || el.title;
+      const currentShortcut = el.dataset.shortcut || '';
+      if (!currentText) return;
+      timer = setTimeout(() => {
+        if (!tooltipEl) {
+          tooltipEl = document.querySelector('.app-tooltip');
+          if (!tooltipEl) {
+            tooltipEl = document.createElement('div');
+            tooltipEl.className = 'app-tooltip';
+            document.body.appendChild(tooltipEl);
+          }
+        }
+        tooltipEl.innerHTML = currentText + (currentShortcut ? `<span class="tooltip-shortcut">${currentShortcut}</span>` : '');
+        const rect = el.getBoundingClientRect();
+        if (side === 'bottom') {
+          let left = rect.left + (rect.width / 2);
+          let top = rect.bottom + 6;
+          tooltipEl.style.left = left + 'px';
+          tooltipEl.style.top = top + 'px';
+          tooltipEl.style.transform = 'translateX(-50%)';
+        } else {
+          let left = rect.right + 7;
+          let top = rect.top + (rect.height / 2);
+          tooltipEl.style.left = left + 'px';
+          tooltipEl.style.top = top + 'px';
+          tooltipEl.style.transform = 'translateY(-50%)';
+        }
+        tooltipEl.classList.add('visible');
+      }, 90);
+    });
+
+    el.addEventListener('mouseleave', () => {
+      clearTimeout(timer);
+      if (tooltipEl) tooltipEl.classList.remove('visible');
+    });
+
+    el.addEventListener('click', () => {
+      clearTimeout(timer);
+      if (tooltipEl) tooltipEl.classList.remove('visible');
+    });
+  }
+
   // File type icons
   function getFileIcon(filename) {
     const ext = filename.split('.').pop().toLowerCase();
@@ -272,23 +330,47 @@
 
     toolbar.innerHTML = `
       <div class="tool-left">
-        <button class="tool-btn" id="btn-refresh" title="Refresh (Cmd+R)">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.65 2.35A7.958 7.958 0 0 0 8 0a8 8 0 1 0 8 8h-2a6 6 0 1 1-1.76-4.24l-2.24 2.24H16V0l-2.35 2.35z"/></svg>
+        <button class="tool-btn" id="btn-refresh" title="Refresh (Cmd+R)" data-tooltip="Refresh" data-shortcut="Cmd+R">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+            <path fill-rule="evenodd" d="M12.5747152,11.8852806 C11.4741474,13.1817355 9.83247882,14.0044386 7.99865879,14.0044386 C5.03907292,14.0044386 2.57997332,11.8615894 2.08820756,9.0427473 L3.94774327,9.10768372 C4.43372186,10.8898575 6.06393114,12.2000519 8.00015362,12.2000519 C9.30149237,12.2000519 10.4645985,11.6082097 11.2349873,10.6790094 L9.05000019,8.71167959 L14.0431479,8.44999981 L14.3048222,13.4430431 L12.5747152,11.8852806 Z M3.42785637,4.11741586 C4.52839138,2.82452748 6.16775464,2.00443857 7.99865879,2.00443857 C10.918604,2.00443857 13.3513802,4.09026967 13.8882946,6.8532307 L12.0226389,6.78808057 C11.5024872,5.05935553 9.89838095,3.8000774 8.00015362,3.8000774 C6.69867367,3.8000774 5.53545628,4.39204806 4.76506921,5.32142241 L6.95482203,7.29304326 L1.96167436,7.55472304 L1.70000005,2.56167973 L3.42785637,4.11741586 Z" transform="rotate(3 8.002 8.004)"/>
+          </svg>
         </button>
-        <button class="tool-btn" id="btn-rollback" title="Rollback (Cmd+Alt+Z)">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 6.5A5.5 5.5 0 1 1 9 12h-1a4.5 4.5 0 1 0-4.5-4.5H6L2.5 3 0 6.5h3.5z"/></svg>
+        <button class="tool-btn" id="btn-rollback" title="Rollback (Cmd+Alt+Z)" data-tooltip="Rollback" data-shortcut="Cmd+Alt+Z">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+            <g fill-rule="evenodd" transform="translate(1 0)">
+              <polygon points="0 0 4 4 0 8" transform="matrix(-1 0 0 1 4 0)"/>
+              <path d="M4.15058343,11 L8.06891179,11 C9.72576604,11 11.0689118,9.65685425 11.0689118,8 C11.0689118,6.34314575 9.72576604,5 8.06891179,5 L4.03764586,5 L4,3 L8,3 C10.7614237,3 13,5.23857625 13,8 C13,10.7614237 10.7614237,13 8,13 L4.18822929,13 L4.15058343,11 Z"/>
+            </g>
+          </svg>
         </button>
-        <button class="tool-btn ${state.showDiff ? 'active' : ''}" id="btn-show-diff" title="Show Diff / Review (Cmd+D)">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1v14h8V1H4zm1 2h6v10H5V3zm2 2v2h2V5H7zm0 4v2h2V9H7z"/></svg>
+        <button class="tool-btn ${state.showDiff ? 'active' : ''}" id="btn-show-diff" title="Show Diff / Review (Cmd+D)" data-tooltip="Show Diff / Review" data-shortcut="Cmd+D">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M5.85355 8.14645C5.65829 7.95118 5.34171 7.95118 5.14645 8.14645C4.95118 8.34171 4.95118 8.65829 5.14645 8.85355L7.29289 11H0.5C0.223858 11 0 11.2239 0 11.5C0 11.7761 0.223858 12 0.5 12H7.29289L5.14645 14.1464C4.95118 14.3417 4.95118 14.6583 5.14645 14.8536C5.34171 15.0488 5.65829 15.0488 5.85355 14.8536L8.85355 11.8536L9.20711 11.5L8.85355 11.1464L5.85355 8.14645Z"/>
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z"/>
+          </svg>
         </button>
-        <button class="tool-btn" id="btn-view-options" title="View Options">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="3"/><path d="M8 2.5C4 2.5 1 8 1 8s3 5.5 7 5.5 7-5.5 7-5.5-3-5.5-7-5.5zm0 9C5.5 11.5 3 8 3 8s2.5-3.5 5-3.5 5 3.5 5 3.5-2.5 3.5-5 3.5z"/></svg>
+        <button class="tool-btn ${state.showPaths ? 'active' : ''}" id="btn-view-options" title="View Options (Toggle File Paths)" data-tooltip="View Options">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+            <path d="M1.5 8C3 4.5 7 2.8 8 2.8C9 2.8 13 4.5 14.5 8C13 11.5 9 13.2 8 13.2C7 13.2 3 11.5 1.5 8Z"/>
+            <circle cx="8" cy="8" r="2.2"/>
+          </svg>
         </button>
-        <button class="tool-btn" id="btn-toggle-expand" title="Expand / Collapse All">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1L4 5h8L8 1zM8 15l4-4H4l4 4z"/></svg>
+        <button class="tool-btn" id="btn-toggle-expand" title="${(state.expandChanges || state.expandUnversioned) ? 'Collapse All' : 'Expand All'}" data-tooltip="${(state.expandChanges || state.expandUnversioned) ? 'Collapse All' : 'Expand All'}">
+          ${(state.expandChanges || state.expandUnversioned) ? `
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+              <path d="M3.5 3.5L8 7.5L12.5 3.5M3.5 12.5L8 8.5L12.5 12.5"/>
+            </svg>
+          ` : `
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+              <path d="M3.5 6.5L8 2L12.5 6.5M3.5 9.5L8 14L12.5 9.5"/>
+            </svg>
+          `}
         </button>
-        <button class="tool-btn" id="btn-clear" title="Clear / Deselect All">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        <button class="tool-btn" id="btn-clear" title="Deselect All" data-tooltip="Deselect All">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+            <line x1="4" y1="4" x2="12" y2="12"/>
+            <line x1="12" y1="4" x2="4" y2="12"/>
+          </svg>
         </button>
       </div>
     `;
@@ -350,18 +432,18 @@
 
     commitBox.innerHTML = `
       <div class="commit-options-bar">
-        <label class="checkbox-label amend-label">
-          <input type="checkbox" id="chk-amend" ${state.isAmend ? 'checked' : ''}/>
+        <label class="checkbox-label amend-label" title="Amend previous commit" data-tooltip="Amend previous commit">
+          <input type="checkbox" id="chk-amend" class="amend-chk" ${state.isAmend ? 'checked' : ''}/>
           <span>Amend</span>
         </label>
         <div class="commit-icon-tools">
-          <button class="tool-btn-sm" id="btn-recent-msgs" title="Recent Commit Messages">
+          <button class="tool-btn-sm" id="btn-recent-msgs" title="Recent Commit Messages (Cmd+M)" data-tooltip="Recent Commit Messages" data-shortcut="Cmd+M">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
               <circle cx="8" cy="8" r="6.5"/>
               <polyline points="8 4 8 8 10.5 9.5"/>
             </svg>
           </button>
-          <button class="tool-btn-sm ${state.isGeneratingAi ? 'spinning' : ''}" id="btn-generate-ai" title="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" ${state.isGeneratingAi ? 'disabled' : ''}>
+          <button class="tool-btn-sm ${state.isGeneratingAi ? 'spinning' : ''}" id="btn-generate-ai" title="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" data-tooltip="${state.isGeneratingAi ? 'Generating commit message with AI... Please wait.' : 'Generate Commit Message with AI'}" ${state.isGeneratingAi ? 'disabled' : ''}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
               <path d="M8 1.5L9.5 6.5L14.5 8L9.5 9.5L8 14.5L6.5 9.5L1.5 8L6.5 6.5L8 1.5Z"/>
             </svg>
@@ -381,7 +463,12 @@
           <button class="btn-commit-secondary" id="btn-commit-push" title="Commit and Push...">Commit and Push...</button>
         </div>
         <div class="commit-gear-wrapper">
-          <button class="tool-btn-sm" id="btn-commit-gear" title="Before Commit Settings">⚙</button>
+          <button class="tool-btn-sm" id="btn-commit-gear" title="Before Commit Settings" data-tooltip="Before Commit Settings">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+              <circle cx="8" cy="8" r="2.5"/>
+              <path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M3.4 12.6l1.3-1.3M11.3 4.7l1.3-1.3"/>
+            </svg>
+          </button>
           ${state.commitOptionsOpen ? renderCommitGearDropdown() : ''}
         </div>
       </div>
@@ -405,6 +492,15 @@
     attachToolbarEvents(toolbar, container);
     attachTreeEvents(treeContainer);
     attachCommitBoxEvents(commitBox);
+
+    // Auto attach tooltips to all elements with data-tooltip or title
+    container.querySelectorAll('[data-tooltip], [title]').forEach(el => {
+      const tip = el.dataset.tooltip || el.getAttribute('title');
+      const sc = el.dataset.shortcut || '';
+      if (tip) {
+        attachTooltip(el, tip, sc, 'bottom');
+      }
+    });
   }
 
   // Render a group in the tree

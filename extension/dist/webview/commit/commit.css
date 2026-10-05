@@ -325,7 +325,7 @@ body, html {
   background: #2e436e !important;
 }
 
-.file-chk, .group-chk, .line-chk, .hunk-chk {
+.file-chk, .group-chk, .line-chk, .hunk-chk, .amend-chk, #chk-amend, .amend-label input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   width: 13px;
@@ -339,12 +339,12 @@ body, html {
   flex-shrink: 0;
 }
 
-.file-chk:checked, .group-chk:checked, .line-chk:checked, .hunk-chk:checked {
+.file-chk:checked, .group-chk:checked, .line-chk:checked, .hunk-chk:checked, .amend-chk:checked, #chk-amend:checked, .amend-label input[type="checkbox"]:checked {
   background: #3574f0;
   border-color: #3574f0;
 }
 
-.file-chk:checked::after, .group-chk:checked::after, .line-chk:checked::after, .hunk-chk:checked::after {
+.file-chk:checked::after, .group-chk:checked::after, .line-chk:checked::after, .hunk-chk:checked::after, .amend-chk:checked::after, #chk-amend:checked::after, .amend-label input[type="checkbox"]:checked::after {
   content: '';
   position: absolute;
   top: 1px;
@@ -354,6 +354,10 @@ body, html {
   border: solid #ffffff;
   border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg);
+}
+
+.file-chk:hover, .group-chk:hover, .line-chk:hover, .hunk-chk:hover, .amend-chk:hover, #chk-amend:hover, .amend-label input[type="checkbox"]:hover {
+  border-color: #797d86;
 }
 
 .group-chk:indeterminate, .file-chk:indeterminate {
@@ -1802,5 +1806,41 @@ body, html {
   background: var(--vscode-menu-separatorBackground, #3c3f41);
   margin: 4px 0;
 }
+
+/* Tooltip system */
+.app-tooltip {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  background: var(--vscode-editorHoverWidget-background, #252526);
+  color: var(--vscode-editorHoverWidget-foreground, #cccccc);
+  border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease, visibility 0.12s ease;
+}
+
+.app-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.app-tooltip .tooltip-shortcut {
+  margin-left: 6px;
+  opacity: 0.65;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 
 

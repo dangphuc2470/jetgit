@@ -17,9 +17,15 @@
     stashes: [],
     expandChanges: true,
     expandUnversioned: true,
-    showPaths: true,
+    showPaths: false,
     viewOptionsOpen: false,
     groupBy: 'directory',
+    groupByDirectory: true,
+    groupByModule: true,
+    repoName: 'Project',
+    expandedFolders: new Set(),
+    collapsedFolders: new Set(),
+    expandAllFolders: null,
     showIgnoredFiles: true,
     commitOptionsOpen: false,
     recentOpen: false,
@@ -567,6 +573,251 @@
     });
   }
 
+  // Folder expansion helpers
+  function isFolderExpanded(folderPath, isModule) {
+    if (state.expandAllFolders === true) {
+      return !state.collapsedFolders.has(folderPath);
+    }
+    if (state.expandAllFolders === false) {
+      return state.expandedFolders.has(folderPath);
+    }
+    if (state.collapsedFolders.has(folderPath)) return false;
+    if (state.expandedFolders.has(folderPath)) return true;
+    return true; // Default expanded so files are visible
+  }
+
+  function toggleFolder(folderPath, isModule) {
+    const currentlyExpanded = isFolderExpanded(folderPath, isModule);
+    if (currentlyExpanded) {
+      state.collapsedFolders.add(folderPath);
+      state.expandedFolders.delete(folderPath);
+    } else {
+      state.expandedFolders.add(folderPath);
+      state.collapsedFolders.delete(folderPath);
+    }
+    render();
+  }
+
+  // Hierarchical directory tree builder with middle folder compaction
+  function buildDirectoryTree(files) {
+    const root = {
+      name: '',
+      path: '',
+      isFolder: true,
+      children: new Map(),
+      files: [],
+      allFiles: []
+    };
+
+    for (const file of files) {
+      const normalized = (file.path || '').replace(/\\/g, '/');
+      const parts = normalized.split('/').filter(Boolean);
+      if (parts.length === 0) continue;
+      parts.pop(); // remove file name, keep directory parts
+      let curr = root;
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!curr.children.has(part)) {
+          curr.children.set(part, {
+            name: part,
+            path: parts.slice(0, i + 1).join('/'),
+            isFolder: true,
+            children: new Map(),
+            files: [],
+            allFiles: []
+          });
+        }
+        curr = curr.children.get(part);
+      }
+      curr.files.push(file);
+    }
+
+    function populateAllFiles(node) {
+      const list = [...node.files];
+      for (const child of node.children.values()) {
+        list.push(...populateAllFiles(child));
+      }
+      node.allFiles = list;
+      return list;
+    }
+    populateAllFiles(root);
+
+    // Compact single-child middle packages (e.g. lib/src/modules/capture_display/screen)
+    function compactMiddleNodes(node) {
+      const newChildren = new Map();
+      for (const [name, child] of node.children.entries()) {
+        let cur = child;
+        while (cur.files.length === 0 && cur.children.size === 1) {
+          const onlyChild = cur.children.values().next().value;
+          cur = {
+            name: cur.name + '/' + onlyChild.name,
+            path: onlyChild.path,
+            isFolder: true,
+            children: onlyChild.children,
+            files: onlyChild.files,
+            allFiles: onlyChild.allFiles
+          };
+        }
+        compactMiddleNodes(cur);
+        newChildren.set(cur.name, cur);
+      }
+      node.children = newChildren;
+    }
+    compactMiddleNodes(root);
+
+    return root;
+  }
+
+  // Render a folder node in tree view
+  function renderFolderNode(node, depth, groupTitle) {
+    const folderEl = document.createElement('div');
+    folderEl.className = 'tree-folder-node';
+
+    const folderPath = node.path || node.name;
+    const isExpanded = isFolderExpanded(folderPath, false);
+
+    const allFiles = node.allFiles || [];
+    const anyPartiallyStaged = allFiles.some(f => f.partiallyStaged || (f.totalChanges > 0 && f.stagedChanges > 0 && f.stagedChanges < f.totalChanges));
+    const allChecked = allFiles.length > 0 && allFiles.every(f => (state.checkedFiles.has(f.path) || (f.staged && !f.partiallyStaged)));
+    const someChecked = anyPartiallyStaged || (!allChecked && allFiles.some(f => state.checkedFiles.has(f.path) || f.staged || f.stagedChanges > 0));
+
+    const header = document.createElement('div');
+    header.className = 'tree-folder-header';
+    header.dataset.folderPath = folderPath;
+
+    const countText = `${allFiles.length} ${allFiles.length === 1 ? 'file' : 'files'}`;
+
+    header.innerHTML = `
+      <span class="tree-arrow ${isExpanded ? 'expanded' : ''}">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
+        </svg>
+      </span>
+      <input type="checkbox" class="file-chk tree-chk group-chk" ${allChecked ? 'checked' : ''}/>
+      <span class="tree-folder-icon">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M1.5 3.5C1.5 2.67157 2.17157 2 3 2H6.08579C6.48362 2 6.86514 2.15804 7.14645 2.43934L8.70711 4H13C13.8284 4 14.5 4.67157 14.5 5.5V12.5C14.5 13.3284 13.8284 14 13 14H3C2.17157 14 1.5 13.3284 1.5 12.5V3.5Z" stroke="#8C8C8C" stroke-width="1.2" fill="none"/>
+        </svg>
+      </span>
+      <span class="tree-folder-name">${escapeHtml(node.name)}</span>
+      <span class="tree-folder-count">${countText}</span>
+    `;
+
+    const chk = header.querySelector('.tree-chk');
+    if (chk) {
+      chk.indeterminate = someChecked && !allChecked;
+      chk.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const isChecked = chk.checked;
+        const paths = allFiles.map(f => f.path);
+        if (isChecked) {
+          paths.forEach(p => state.checkedFiles.add(p));
+          vscode.postMessage({ type: 'stageFiles', payload: paths });
+        } else {
+          paths.forEach(p => state.checkedFiles.delete(p));
+          vscode.postMessage({ type: 'unstageFiles', payload: paths });
+        }
+        render();
+      });
+    }
+
+    header.addEventListener('click', (e) => {
+      if (e.target === chk) return;
+      toggleFolder(folderPath, false);
+    });
+
+    folderEl.appendChild(header);
+
+    if (isExpanded) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'tree-folder-children';
+
+      const subfolders = Array.from(node.children.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+      subfolders.forEach(sub => {
+        childrenContainer.appendChild(renderFolderNode(sub, depth + 1, groupTitle));
+      });
+
+      const directFiles = [...node.files].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+      directFiles.forEach(file => {
+        childrenContainer.appendChild(renderTreeFileItem(file, true));
+      });
+
+      folderEl.appendChild(childrenContainer);
+    }
+
+    return folderEl;
+  }
+
+  // Render a file item
+  function renderTreeFileItem(file, inTreeMode) {
+    const itemEl = document.createElement('div');
+    const isSelected = state.selectedFile === file.path;
+    const isPartiallyStaged = file.partiallyStaged || (file.totalChanges > 0 && file.stagedChanges > 0 && file.stagedChanges < file.totalChanges);
+    const isChecked = !isPartiallyStaged && (state.checkedFiles.has(file.path) || (file.staged && !isPartiallyStaged));
+    itemEl.className = `file-item tree-file-item ${isSelected ? 'selected' : ''}`;
+    itemEl.dataset.path = file.path;
+
+    const isUnversioned = file.isUntracked;
+    const nameColorClass = isUnversioned ? 'name-unversioned' : 'name-modified';
+
+    let badgeHtml = '';
+    if (isPartiallyStaged) {
+      badgeHtml = `<span class="file-changes-badge">${file.stagedChanges} of ${file.totalChanges} changes</span>`;
+    }
+
+    itemEl.innerHTML = `
+      ${inTreeMode ? '<span class="tree-item-spacer"></span>' : ''}
+      <input type="checkbox" class="file-chk tree-chk" ${isChecked ? 'checked' : ''}/>
+      <span class="file-icon">${getFileIcon(file.name)}</span>
+      <span class="file-name ${nameColorClass}">${escapeHtml(file.name)}</span>
+      ${(!inTreeMode && state.showPaths && file.dir) ? `<span class="file-dir">${escapeHtml(file.dir)}</span>` : ''}
+      ${badgeHtml}
+    `;
+
+    const fileChk = itemEl.querySelector('.file-chk');
+    if (isPartiallyStaged) {
+      fileChk.indeterminate = true;
+    }
+    fileChk.addEventListener('change', (e) => {
+      e.stopPropagation();
+      if (fileChk.checked) {
+        state.checkedFiles.add(file.path);
+        vscode.postMessage({ type: 'stageFile', payload: file.path });
+      } else {
+        state.checkedFiles.delete(file.path);
+        vscode.postMessage({ type: 'unstageFile', payload: file.path });
+      }
+      render();
+    });
+
+    itemEl.addEventListener('click', (e) => {
+      if (e.target === fileChk) return;
+      state.selectedFile = file.path;
+      vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
+      if (state.showDiff) {
+        vscode.postMessage({ type: 'getFileDiff', payload: file.path });
+      }
+      render();
+    });
+
+    itemEl.addEventListener('dblclick', (e) => {
+      if (e.target === fileChk) return;
+      state.selectedFile = file.path;
+      vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
+    });
+
+    itemEl.addEventListener('contextmenu', (e) => {
+      showFileContextMenu(e, file);
+    });
+
+    return itemEl;
+  }
+
   // Render a group in the tree
   function renderFileGroup(title, files, expanded, toggleAction, checkAllAction) {
     const groupEl = document.createElement('div');
@@ -579,7 +830,11 @@
     const header = document.createElement('div');
     header.className = 'group-header';
     header.innerHTML = `
-      <span class="group-arrow ${expanded ? 'expanded' : ''}">▶</span>
+      <span class="group-arrow ${expanded ? 'expanded' : ''}">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
+        </svg>
+      </span>
       <input type="checkbox" class="group-chk" ${allChecked ? 'checked' : ''}/>
       <span class="group-title">${title}</span>
       <span class="group-count">${files.length} ${files.length === 1 ? 'file' : 'files'}</span>
@@ -614,68 +869,115 @@
 
     groupEl.appendChild(header);
 
-    if (expanded) {
+    if (expanded && files.length > 0) {
+      const isTreeMode = Boolean(state.groupByDirectory || state.groupByModule);
       const itemsContainer = document.createElement('div');
-      itemsContainer.className = 'group-items';
+      itemsContainer.className = `group-items ${isTreeMode ? 'group-tree-mode' : ''}`;
 
-      files.forEach(file => {
-        const itemEl = document.createElement('div');
-        const isSelected = state.selectedFile === file.path;
-        const isPartiallyStaged = file.partiallyStaged || (file.totalChanges > 0 && file.stagedChanges > 0 && file.stagedChanges < file.totalChanges);
-        const isChecked = !isPartiallyStaged && (state.checkedFiles.has(file.path) || (file.staged && !isPartiallyStaged));
-        itemEl.className = `file-item ${isSelected ? 'selected' : ''}`;
+      if (state.groupByModule) {
+        // Module Wrapper Node
+        const moduleName = state.repoName || 'Project';
+        const modulePath = `__module__:${title}:${moduleName}`;
+        const isModuleExpanded = isFolderExpanded(modulePath, true);
 
-        const isUnversioned = file.isUntracked;
-        const nameColorClass = isUnversioned ? 'name-unversioned' : 'name-modified';
+        const moduleNodeEl = document.createElement('div');
+        moduleNodeEl.className = 'tree-folder-node module-folder-node';
 
-        let badgeHtml = '';
-        if (isPartiallyStaged) {
-          badgeHtml = `<span class="file-changes-badge">${file.stagedChanges} of ${file.totalChanges} changes</span>`;
-        }
+        const moduleHeader = document.createElement('div');
+        moduleHeader.className = 'tree-folder-header module-header';
+        moduleHeader.dataset.folderPath = modulePath;
 
-        itemEl.innerHTML = `
-          <input type="checkbox" class="file-chk" ${isChecked ? 'checked' : ''}/>
-          <span class="file-icon">${getFileIcon(file.name)}</span>
-          <span class="file-name ${nameColorClass}">${escapeHtml(file.name)}</span>
-          ${state.showPaths && file.dir ? `<span class="file-dir">${escapeHtml(file.dir)}</span>` : ''}
-          ${badgeHtml}
+        moduleHeader.innerHTML = `
+          <span class="tree-arrow ${isModuleExpanded ? 'expanded' : ''}">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
+            </svg>
+          </span>
+          <input type="checkbox" class="file-chk tree-chk group-chk" ${allChecked ? 'checked' : ''}/>
+          <span class="tree-folder-icon">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M1.5 3.5C1.5 2.67157 2.17157 2 3 2H6.08579C6.48362 2 6.86514 2.15804 7.14645 2.43934L8.70711 4H13C13.8284 4 14.5 4.67157 14.5 5.5V12.5C14.5 13.3284 13.8284 14 13 14H3C2.17157 14 1.5 13.3284 1.5 12.5V3.5Z" stroke="#8C8C8C" stroke-width="1.2" fill="none"/>
+            </svg>
+          </span>
+          <span class="tree-folder-name">${escapeHtml(moduleName)}</span>
+          <span class="tree-folder-count">${files.length} ${files.length === 1 ? 'file' : 'files'}</span>
         `;
 
-        const fileChk = itemEl.querySelector('.file-chk');
-        if (isPartiallyStaged) {
-          fileChk.indeterminate = true;
+        const modChk = moduleHeader.querySelector('.tree-chk');
+        if (modChk) {
+          modChk.indeterminate = someChecked && !allChecked;
+          modChk.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const isChecked = modChk.checked;
+            const paths = files.map(f => f.path);
+            if (isChecked) {
+              paths.forEach(p => state.checkedFiles.add(p));
+              vscode.postMessage({ type: 'stageFiles', payload: paths });
+            } else {
+              paths.forEach(p => state.checkedFiles.delete(p));
+              vscode.postMessage({ type: 'unstageFiles', payload: paths });
+            }
+            render();
+          });
         }
-        fileChk.addEventListener('change', (e) => {
-          e.stopPropagation();
-          if (fileChk.checked) {
-            state.checkedFiles.add(file.path);
-            vscode.postMessage({ type: 'stageFile', payload: file.path });
+
+        moduleHeader.addEventListener('click', (e) => {
+          if (e.target === modChk) return;
+          toggleFolder(modulePath, true);
+        });
+
+        moduleNodeEl.appendChild(moduleHeader);
+
+        if (isModuleExpanded) {
+          const modChildrenContainer = document.createElement('div');
+          modChildrenContainer.className = 'tree-folder-children module-children';
+
+          if (state.groupByDirectory) {
+            const treeRoot = buildDirectoryTree(files);
+            const subfolders = Array.from(treeRoot.children.values()).sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+            );
+            subfolders.forEach(sub => {
+              modChildrenContainer.appendChild(renderFolderNode(sub, 1, title));
+            });
+            const directFiles = [...treeRoot.files].sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+            );
+            directFiles.forEach(file => {
+              modChildrenContainer.appendChild(renderTreeFileItem(file, true));
+            });
           } else {
-            state.checkedFiles.delete(file.path);
-            vscode.postMessage({ type: 'unstageFile', payload: file.path });
+            // Flat list inside module
+            files.forEach(file => {
+              modChildrenContainer.appendChild(renderTreeFileItem(file, false));
+            });
           }
-          render();
-        });
 
-        itemEl.addEventListener('click', (e) => {
-          if (e.target === fileChk) return;
-          state.selectedFile = file.path;
-          vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
-          render();
-        });
+          moduleNodeEl.appendChild(modChildrenContainer);
+        }
 
-        itemEl.addEventListener('dblclick', (e) => {
-          if (e.target === fileChk) return;
-          state.selectedFile = file.path;
-          vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
+        itemsContainer.appendChild(moduleNodeEl);
+      } else if (state.groupByDirectory) {
+        // Group by directory without module wrapper
+        const treeRoot = buildDirectoryTree(files);
+        const subfolders = Array.from(treeRoot.children.values()).sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
+        subfolders.forEach(sub => {
+          itemsContainer.appendChild(renderFolderNode(sub, 0, title));
         });
-
-        itemEl.addEventListener('contextmenu', (e) => {
-          showFileContextMenu(e, file);
+        const directFiles = [...treeRoot.files].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
+        directFiles.forEach(file => {
+          itemsContainer.appendChild(renderTreeFileItem(file, true));
         });
-
-        itemsContainer.appendChild(itemEl);
-      });
+      } else {
+        // Flat list
+        files.forEach(file => {
+          itemsContainer.appendChild(renderTreeFileItem(file, false));
+        });
+      }
 
       groupEl.appendChild(itemsContainer);
     }
@@ -927,16 +1229,25 @@
     return `
       <div class="as-view-options-menu" id="view-options-menu">
         <div class="as-menu-section-header">Group By</div>
-        <div class="as-menu-item ${state.groupBy === 'directory' ? 'selected' : ''}" data-action="groupBy-directory">
-          <span class="as-menu-label">Directory</span>
+        <div class="as-menu-item ${state.groupByDirectory ? 'active' : ''}" data-action="toggle-groupBy-directory">
+          <div class="as-menu-item-left">
+            <span class="as-menu-check">${state.groupByDirectory ? '✓' : ''}</span>
+            <span class="as-menu-label">Directory</span>
+          </div>
           <span class="as-menu-shortcut">^P</span>
         </div>
-        <div class="as-menu-item ${state.groupBy === 'module' ? 'selected' : ''}" data-action="groupBy-module">
-          <span class="as-menu-label">Module</span>
+        <div class="as-menu-item ${state.groupByModule ? 'active' : ''}" data-action="toggle-groupBy-module">
+          <div class="as-menu-item-left">
+            <span class="as-menu-check">${state.groupByModule ? '✓' : ''}</span>
+            <span class="as-menu-label">Module</span>
+          </div>
         </div>
         <div class="as-menu-section-header" style="margin-top: 6px;">Show</div>
-        <div class="as-menu-item ${state.showIgnoredFiles !== false ? 'selected' : ''}" data-action="toggle-ignored">
-          <span class="as-menu-label">Ignored Files</span>
+        <div class="as-menu-item ${state.showIgnoredFiles !== false ? 'active' : ''}" data-action="toggle-ignored">
+          <div class="as-menu-item-left">
+            <span class="as-menu-check">${state.showIgnoredFiles !== false ? '✓' : ''}</span>
+            <span class="as-menu-label">Ignored Files</span>
+          </div>
         </div>
       </div>
     `;
@@ -1006,11 +1317,11 @@
         item.addEventListener('click', (e) => {
           e.stopPropagation();
           const action = item.dataset.action;
-          if (action === 'groupBy-directory') {
-            state.groupBy = (state.groupBy === 'directory' ? 'none' : 'directory');
-            state.showPaths = (state.groupBy === 'directory');
-          } else if (action === 'groupBy-module') {
-            state.groupBy = (state.groupBy === 'module' ? 'none' : 'module');
+          if (action === 'toggle-groupBy-directory' || action === 'groupBy-directory') {
+            state.groupByDirectory = !state.groupByDirectory;
+            state.showPaths = !state.groupByDirectory;
+          } else if (action === 'toggle-groupBy-module' || action === 'groupBy-module') {
+            state.groupByModule = !state.groupByModule;
           } else if (action === 'toggle-ignored') {
             state.showIgnoredFiles = (state.showIgnoredFiles === false ? true : false);
           }
@@ -1025,6 +1336,9 @@
       btnExpandAll.addEventListener('click', () => {
         state.expandChanges = true;
         state.expandUnversioned = true;
+        state.expandAllFolders = true;
+        state.collapsedFolders.clear();
+        state.expandedFolders.clear();
         render();
       });
     }
@@ -1032,8 +1346,9 @@
     const btnCollapseAll = toolbar.querySelector('#btn-collapse-all');
     if (btnCollapseAll) {
       btnCollapseAll.addEventListener('click', () => {
-        state.expandChanges = false;
-        state.expandUnversioned = false;
+        state.expandAllFolders = false;
+        state.expandedFolders.clear();
+        state.collapsedFolders.clear();
         render();
       });
     }
@@ -1149,8 +1464,8 @@
     window.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || (e.metaKey && e.altKey)) && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
-        state.groupBy = (state.groupBy === 'directory' ? 'none' : 'directory');
-        state.showPaths = (state.groupBy === 'directory');
+        state.groupByDirectory = !state.groupByDirectory;
+        state.showPaths = !state.groupByDirectory;
         render();
       }
     });
@@ -2055,6 +2370,9 @@
       case 'init':
       case 'status': {
         const data = msg.payload;
+        if (data.repoName) {
+          state.repoName = data.repoName;
+        }
         state.files = data.files || [];
         state.changesCount = data.changesCount || 0;
         state.unversionedCount = data.unversionedCount || 0;

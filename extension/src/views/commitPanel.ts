@@ -86,6 +86,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
     try {
       const isRepo = await this.gitService.isGitRepo();
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      const repoName = workspaceFolder ? workspaceFolder.name : (path.basename(this.gitService.getCwd()) || 'Project');
       if (!isRepo) {
         this.view.webview.postMessage({
           type: 'status',
@@ -95,6 +97,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             unversionedCount: 0,
             recentMessages: [],
             stashes: [],
+            repoName,
           },
         });
         return;
@@ -171,6 +174,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           recentMessages,
           stashes,
           conflictInfo,
+          repoName,
         },
       });
     } catch (err: any) {

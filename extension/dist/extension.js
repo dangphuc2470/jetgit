@@ -5253,6 +5253,8 @@ var CommitViewProvider = class _CommitViewProvider {
     this.isRefreshing = true;
     try {
       const isRepo = await this.gitService.isGitRepo();
+      const workspaceFolder = vscode10.workspace.workspaceFolders?.[0];
+      const repoName = workspaceFolder ? workspaceFolder.name : path10.basename(this.gitService.getCwd()) || "Project";
       if (!isRepo) {
         this.view.webview.postMessage({
           type: "status",
@@ -5261,7 +5263,8 @@ var CommitViewProvider = class _CommitViewProvider {
             changesCount: 0,
             unversionedCount: 0,
             recentMessages: [],
-            stashes: []
+            stashes: [],
+            repoName
           }
         });
         return;
@@ -5324,7 +5327,8 @@ var CommitViewProvider = class _CommitViewProvider {
           defaultCommitMessage: mergeMsg || "",
           recentMessages,
           stashes,
-          conflictInfo
+          conflictInfo,
+          repoName
         }
       });
     } catch (err) {

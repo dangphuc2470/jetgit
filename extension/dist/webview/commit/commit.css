@@ -325,7 +325,7 @@ body, html {
   background: #2e436e !important;
 }
 
-.file-chk, .group-chk, .line-chk, .hunk-chk, .amend-chk, #chk-amend, .amend-label input[type="checkbox"] {
+.file-chk, .group-chk, .tree-chk, .line-chk, .hunk-chk, .amend-chk, #chk-amend, .amend-label input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   width: 13px;
@@ -339,12 +339,12 @@ body, html {
   flex-shrink: 0;
 }
 
-.file-chk:checked, .group-chk:checked, .line-chk:checked, .hunk-chk:checked, .amend-chk:checked, #chk-amend:checked, .amend-label input[type="checkbox"]:checked {
+.file-chk:checked, .group-chk:checked, .tree-chk:checked, .line-chk:checked, .hunk-chk:checked, .amend-chk:checked, #chk-amend:checked, .amend-label input[type="checkbox"]:checked {
   background: #3574f0;
   border-color: #3574f0;
 }
 
-.file-chk:checked::after, .group-chk:checked::after, .line-chk:checked::after, .hunk-chk:checked::after, .amend-chk:checked::after, #chk-amend:checked::after, .amend-label input[type="checkbox"]:checked::after {
+.file-chk:checked::after, .group-chk:checked::after, .tree-chk:checked::after, .line-chk:checked::after, .hunk-chk:checked::after, .amend-chk:checked::after, #chk-amend:checked::after, .amend-label input[type="checkbox"]:checked::after {
   content: '';
   position: absolute;
   top: 1px;
@@ -356,16 +356,16 @@ body, html {
   transform: rotate(45deg);
 }
 
-.file-chk:hover, .group-chk:hover, .line-chk:hover, .hunk-chk:hover, .amend-chk:hover, #chk-amend:hover, .amend-label input[type="checkbox"]:hover {
+.file-chk:hover, .group-chk:hover, .tree-chk:hover, .line-chk:hover, .hunk-chk:hover, .amend-chk:hover, #chk-amend:hover, .amend-label input[type="checkbox"]:hover {
   border-color: #797d86;
 }
 
-.group-chk:indeterminate, .file-chk:indeterminate {
+.group-chk:indeterminate, .file-chk:indeterminate, .tree-chk:indeterminate {
   background: #3574f0;
   border-color: #3574f0;
 }
 
-.group-chk:indeterminate::after, .file-chk:indeterminate::after {
+.group-chk:indeterminate::after, .file-chk:indeterminate::after, .tree-chk:indeterminate::after {
   content: '';
   position: absolute;
   top: 4px;
@@ -1886,13 +1886,21 @@ body, html {
   color: #ffffff;
 }
 
-.as-view-options-menu .as-menu-item.selected {
-  background: var(--vscode-list-activeSelectionBackground, #3574f0);
-  color: #ffffff;
+.as-view-options-menu .as-menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.as-view-options-menu .as-menu-item.selected .as-menu-shortcut {
-  color: rgba(255, 255, 255, 0.85);
+.as-view-options-menu .as-menu-check {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--vscode-foreground, #dfe1e5);
 }
 
 .as-view-options-menu .as-menu-shortcut {
@@ -1900,6 +1908,100 @@ body, html {
   color: #868a91;
   margin-left: 16px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Directory Tree & Module Grouping */
+.tree-folder-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-folder-header {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 2px;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  min-width: 0;
+  border-radius: 4px;
+  transition: background 0.08s ease;
+}
+
+.tree-folder-header:hover {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.05));
+}
+
+.tree-arrow {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8c8c8c;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.12s ease;
+}
+
+.tree-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-folder-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #8c8c8c;
+}
+
+.tree-folder-name {
+  font-size: 13px;
+  color: var(--vscode-foreground, #dfe1e5);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-folder-count {
+  font-size: 12px;
+  color: #808080;
+  font-weight: 400;
+  margin-left: 2px;
+  white-space: nowrap;
+}
+
+.tree-folder-children {
+  margin-left: 5px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.group-items.group-tree-mode {
+  margin-left: 12px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tree-file-item {
+  padding: 0 8px 0 2px !important;
+  border-radius: 4px;
+  transition: background 0.08s ease;
+}
+
+.tree-item-spacer {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  display: inline-block;
 }
 
 

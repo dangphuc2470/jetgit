@@ -536,7 +536,7 @@
         <div class="commit-gear-wrapper">
           <button class="tool-btn-sm" id="btn-commit-gear" title="Before Commit Settings" data-tooltip="Before Commit Settings">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
-              <path fill-rule="evenodd" d="M12.7078144,8.94092644 L14.1860171,10.0014962 C13.9015285,10.8814083 13.4345167,11.6792367 12.8296171,12.3503459 L11.1720587,11.6025852 C10.7002906,12.0182974 10.1462196,12.3427961 9.53742767,12.5484995 L9.35682478,14.3581758 C8.91920787,14.4511061 8.46531382,14.5 8,14.5 C7.53468618,14.5 7.08079213,14.4511061 6.64317522,14.3581758 L6.46257231,12.5484994 C5.85378047,12.3427959 5.29970962,12.0182972 4.82794166,11.6025851 L3.1703829,12.3503459 C2.5654833,11.6792367 2.0984715,10.8814083 1.8139829,10.0014962 L3.29218604,8.94092614 C3.23171292,8.63665953 3.20000005,8.32203335 3.20000005,8.00000024 C3.20000005,7.67796698 3.23171295,7.36334066 3.29218612,7.05907392 L1.8139829,5.99850385 C2.0984715,5.11859166 2.5654833,4.32076327 3.1703829,3.64965409 L4.82794202,4.39741509 C5.29970989,3.98170311 5.85378059,3.65720451 6.46257226,3.45150114 L6.64317522,1.64182422 C7.08079213,1.54889386 7.53468618,1.5 8,1.5 C8.46531382,1.5 8.91920787,1.54889386 9.35682478,1.64182422 L9.53742772,3.45150097 C10.1462195,3.65720431 10.7002903,3.98170292 11.1720583,4.39741495 L12.8296171,3.64965409 C13.4345167,4.32076327 13.9015285,5.11859166 14.1860171,5.99850385 L12.7078143,7.05907362 C12.7682875,7.36334046 12.8000004,7.67796687 12.8000004,8.00000024 C12.8000004,8.32203346 12.7682875,8.63665973 12.7078144,8.94092644 Z M7.99999976,10.3003956 C9.27025466,10.3003956 10.2999997,9.27056196 10.2999997,8.00019773 C10.2999997,6.72983349 9.27025466,5.69999981 7.99999976,5.69999981 C6.72974486,5.69999981 5.69999981,6.72983349 5.69999981,8.00019773 C5.69999981,9.27056196 6.72974486,10.3003956 7.99999976,10.3003956 Z"/>
+              <path d="M9.1 4.4L8.6 2H7.4l-.5 2.4-.7.3-2-1.3-.9.8 1.3 2-.2.7-2.4.5v1.2l2.4.5.3.8-1.3 2 .8.8 2-1.3.8.3.4 2.3h1.2l.5-2.4.8-.3 2 1.3.8-.8-1.3-2 .3-.8 2.3-.4V7.4l-2.4-.5-.3-.8 1.3-2-.8-.8-2 1.3-.7-.2zM9.4 1l.5 2.4L12 2.1l2 2-1.4 2.1 2.4.4v2.8l-2.4.5L14 12l-2 2-2.1-1.4-.5 2.4H6.6l-.5-2.4L4 13.9l-2-2 1.4-2.1L1 9.4V6.6l2.4-.5L2.1 4l2-2 2.1 1.4.4-2.4h2.8zm.6 7c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM8 9c.6 0 1-.4 1-1s-.4-1-1-1-1 .4-1 1 .4 1 1 1z"/>
             </svg>
           </button>
           ${state.commitOptionsOpen ? renderCommitGearDropdown() : ''}
@@ -1214,12 +1214,12 @@
     return `
       <div class="commit-gear-dropdown" id="gear-dropdown">
         <div class="gear-title">Before Commit</div>
-        <label class="gear-item"><input type="checkbox"/> Reformat code</label>
-        <label class="gear-item"><input type="checkbox"/> Rearrange code</label>
-        <label class="gear-item"><input type="checkbox"/> Optimize imports</label>
-        <label class="gear-item"><input type="checkbox"/> Clean up</label>
+        <label class="gear-item"><input type="checkbox" class="file-chk tree-chk"/> Reformat code</label>
+        <label class="gear-item"><input type="checkbox" class="file-chk tree-chk"/> Rearrange code</label>
+        <label class="gear-item"><input type="checkbox" class="file-chk tree-chk"/> Optimize imports</label>
+        <label class="gear-item"><input type="checkbox" class="file-chk tree-chk"/> Clean up</label>
         <div class="gear-divider"></div>
-        <label class="gear-item"><input type="checkbox"/> Check TODO (0)</label>
+        <label class="gear-item"><input type="checkbox" class="file-chk tree-chk"/> Check TODO (0)</label>
       </div>
     `;
   }

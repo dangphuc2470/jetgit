@@ -434,12 +434,6 @@
             <polyline points="4 13.5 8 9.5 12 13.5"/>
           </svg>
         </button>
-        <button class="tool-btn" id="btn-clear" title="Deselect All" data-tooltip="Deselect All">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-            <line x1="4" y1="4" x2="12" y2="12"/>
-            <line x1="12" y1="4" x2="4" y2="12"/>
-          </svg>
-        </button>
       </div>
     `;
     container.appendChild(toolbar);
@@ -1043,11 +1037,6 @@
         render();
       });
     }
-
-    toolbar.querySelector('#btn-clear').addEventListener('click', () => {
-      state.checkedFiles.clear();
-      render();
-    });
 
     const targetScope = container || document;
     const btnResolve = targetScope.querySelector('#btn-resolve-conflicts');

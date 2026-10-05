@@ -6576,7 +6576,7 @@ ${component_stack}
   var root3 = from_html(`<div class="commit-list-container svelte-1rusxbg"><div class="scroll-content"><div class="visible-rows svelte-1rusxbg"><div class="graph-column svelte-1rusxbg"><!></div> <div class="rows-column svelte-1rusxbg"></div></div></div></div> <!>`, 1);
   var $$css3 = {
     hash: "svelte-1rusxbg",
-    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:auto;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar {width:6px;height:6px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-track {background:transparent;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-corner {background:transparent;}.scroll-content {min-width:100%;width:max-content;}.visible-rows.svelte-1rusxbg {position:relative;display:block;min-width:100%;width:max-content;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg {box-sizing:border-box !important;height:25px !important;min-height:25px !important;max-height:25px !important;line-height:25px !important;display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;position:relative;border-bottom:none;min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg * {box-sizing:border-box;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:600;color:#ffffff;font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:#8c8c8c;font-size:0.88em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:0 0 auto;min-width:max-content;white-space:nowrap;color:#dfe1e5;font-size:0.92em;}.commit-row.is-merge.svelte-1rusxbg .subject {color:#8c8c8c !important;font-weight:400;}.commit-row.is-merge.svelte-1rusxbg .author {color:#9aa0a6 !important;font-weight:400;}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
+    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:auto;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar {width:6px;height:6px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-track {background:transparent;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-corner {background:transparent;}.scroll-content {min-width:100%;width:max-content;}.visible-rows.svelte-1rusxbg {position:relative;display:block;min-width:100%;width:max-content;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg {box-sizing:border-box !important;height:25px !important;min-height:25px !important;max-height:25px !important;line-height:25px !important;display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;position:relative;border-bottom:none;min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg * {box-sizing:border-box;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:400;color:#9aa0a6;font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:#8c8c8c;font-size:0.88em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:0 0 auto;min-width:max-content;white-space:nowrap;color:#dfe1e5;font-size:0.92em;}body.hl-my-commits .author.is-my-commit {font-weight:700 !important;color:#ffffff !important;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .subject {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .author {color:#8c8c8c !important;font-weight:400;}body.hl-current-branch .commit-row.is-current-branch:not(.selected) {background:var(--vscode-editor-lineHighlightBackground, rgba(255, 255, 255, 0.045));}body.hl-current-branch .commit-row.is-current-branch:not(.selected):hover {background:var(--vscode-list-hoverBackground);}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
   };
   function showToast(text) {
     const old = document.querySelector(".as-mini-toast");
@@ -7153,7 +7153,20 @@ ${component_stack}
       template_effect(
         ($0) => {
           const isMerge = (get(commit).parents && get(commit).parents.length > 1) || (get(commit).subject && get(commit).subject.startsWith("Merge "));
-          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg" + (isMerge ? " is-merge" : ""), null, classes, { selected: get(commit).hash === $$props.selectedHash });
+          const isCur = get(commit).isCurrentBranch !== false;
+          const cUser = (typeof window !== "undefined") ? window.__GIT_CURRENT_USER__ : null;
+          let isMy = false;
+          if (cUser) {
+            const ca = (get(commit).author || "").trim().toLowerCase();
+            const ce = (get(commit).authorEmail || "").trim().toLowerCase();
+            const un = (cUser.name || "").trim().toLowerCase();
+            const ue = (cUser.email || "").trim().toLowerCase();
+            if (un && ca && (ca === un || ca.includes(un) || un.includes(ca))) isMy = true;
+            else if (ue && ce && (ce === ue || ce.includes(ue) || ue.includes(ce))) isMy = true;
+            else if (ue && ca && ca === ue.split('@')[0]) isMy = true;
+          }
+          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg" + (isMerge ? " is-merge" : "") + (isCur ? " is-current-branch" : ""), null, classes, { selected: get(commit).hash === $$props.selectedHash });
+          span_2.className = "author svelte-1rusxbg" + (isMy ? " is-my-commit" : "");
           const g = get(commit).graph;
           let maxCol = g ? g.column : 0;
           if (g && g.lines) {
@@ -7452,6 +7465,17 @@ ${component_stack}
     let hlMergeCommits = true;
     let hlCurrentBranch = true;
     let hlNotCherryPicked = false;
+    try {
+      if (localStorage.getItem("intellij_git_hl_my_commits") !== null) {
+        hlMyCommits = localStorage.getItem("intellij_git_hl_my_commits") === "true";
+      }
+      if (localStorage.getItem("intellij_git_hl_merge_commits") !== null) {
+        hlMergeCommits = localStorage.getItem("intellij_git_hl_merge_commits") === "true";
+      }
+      if (localStorage.getItem("intellij_git_hl_current_branch") !== null) {
+        hlCurrentBranch = localStorage.getItem("intellij_git_hl_current_branch") === "true";
+      }
+    } catch {}
 
     let graphOptionPopup = null;
     let viewOptionPopup = null;
@@ -7463,6 +7487,9 @@ ${component_stack}
         document.body.classList.toggle("show-col-hash", colHash);
         document.body.classList.toggle("compact-refs", viewCompactRefs);
         document.body.classList.toggle("refs-on-left", viewRefsOnLeft);
+        document.body.classList.toggle("hl-my-commits", hlMyCommits);
+        document.body.classList.toggle("hl-merge-commits", hlMergeCommits);
+        document.body.classList.toggle("hl-current-branch", hlCurrentBranch);
       }
     }
     applyViewOptions();
@@ -8134,16 +8161,19 @@ ${component_stack}
       viewOptionPopup.appendChild(createSectionHeader("Highlight"));
       viewOptionPopup.appendChild(createMenuItem("My Commits", hlMyCommits, () => {
         hlMyCommits = !hlMyCommits;
+        try { localStorage.setItem("intellij_git_hl_my_commits", hlMyCommits ? "true" : "false"); } catch {}
         applyViewOptions();
         renderViewOptionMenu();
       }));
       viewOptionPopup.appendChild(createMenuItem("Merge Commits", hlMergeCommits, () => {
         hlMergeCommits = !hlMergeCommits;
+        try { localStorage.setItem("intellij_git_hl_merge_commits", hlMergeCommits ? "true" : "false"); } catch {}
         applyViewOptions();
         renderViewOptionMenu();
       }));
       viewOptionPopup.appendChild(createMenuItem("Current Branch", hlCurrentBranch, () => {
         hlCurrentBranch = !hlCurrentBranch;
+        try { localStorage.setItem("intellij_git_hl_current_branch", hlCurrentBranch ? "true" : "false"); } catch {}
         applyViewOptions();
         renderViewOptionMenu();
       }));
@@ -8316,6 +8346,12 @@ ${component_stack}
           }
           case "commits": {
             const p = msg.payload;
+            if (p.currentUser) {
+              window.__GIT_CURRENT_USER__ = p.currentUser;
+            }
+            if (p.currentBranch !== undefined) {
+              window.__GIT_CURRENT_BRANCH__ = p.currentBranch;
+            }
             document.querySelectorAll(".no-git-container").forEach(el => el.remove());
             const seen = new Set();
             const unique = [];
@@ -8341,6 +8377,12 @@ ${component_stack}
             break;
           }
           case "branches": {
+            if (msg.payload && msg.payload.currentUser) {
+              window.__GIT_CURRENT_USER__ = msg.payload.currentUser;
+            }
+            if (msg.payload && msg.payload.currentBranch !== undefined) {
+              window.__GIT_CURRENT_BRANCH__ = msg.payload.currentBranch;
+            }
             set(branchData, msg.payload, true);
             if (!hasInitializedActiveBranch) {
               hasInitializedActiveBranch = true;

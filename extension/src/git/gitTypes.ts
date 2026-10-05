@@ -8,6 +8,7 @@ export interface Commit {
   subject: string;
   body: string;
   refs: string[];
+  isCurrentBranch?: boolean;
 }
 
 export interface FileChange {

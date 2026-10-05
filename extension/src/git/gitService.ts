@@ -129,6 +129,18 @@ export class GitService {
     return out.trim();
   }
 
+  async getCurrentUser(): Promise<{ name: string; email: string }> {
+    let name = '';
+    let email = '';
+    try {
+      name = (await this.exec(['config', 'user.name'])).trim();
+    } catch {}
+    try {
+      email = (await this.exec(['config', 'user.email'])).trim();
+    } catch {}
+    return { name, email };
+  }
+
   // --- Log & Commit Operations ---
 
   async getLog(options: {

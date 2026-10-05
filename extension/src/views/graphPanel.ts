@@ -33,6 +33,32 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     all?: boolean;
   } = {};
 
+  private currentBranchCommits: Set<string> = new Set();
+  private currentUser: { name: string; email: string } = { name: '', email: '' };
+  private currentBranchName: string = '';
+
+  private async updateBranchAndUser(): Promise<void> {
+    try {
+      this.currentBranchName = await this.gitService.getCurrentBranch();
+    } catch {
+      this.currentBranchName = '';
+    }
+    try {
+      this.currentUser = await this.gitService.getCurrentUser();
+    } catch {
+      this.currentUser = { name: '', email: '' };
+    }
+    this.currentBranchCommits.clear();
+    try {
+      const target = this.currentFilter.branch || 'HEAD';
+      const output = await this.gitService.exec(['rev-list', '--max-count=3000', target]);
+      for (const line of output.split('\n')) {
+        const h = line.trim();
+        if (h) this.currentBranchCommits.add(h);
+      }
+    } catch {}
+  }
+
   constructor(
     private extensionUri: vscode.Uri,
     private gitService: GitService,
@@ -117,8 +143,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       this.lastTags = tags;
       this.log.appendLine(`Loaded ${this.allCommits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
+      await this.updateBranchAndUser();
       this.sendCommits();
-      this.sendBranches(branches, tags, currentBranch);
+      this.sendBranches(branches, tags, this.currentBranchName || currentBranch);
     } catch (err: any) {
       this.log.appendLine(`Git log failed: ${err.message}`);
       this.view?.webview.postMessage({
@@ -136,14 +163,18 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   private sendCommits(): void {
+    const isSingleBranch = !!this.currentFilter.branch;
     this.view?.webview.postMessage({
       type: 'commits',
       payload: {
         commits: this.allCommits.map((c, i) => ({
           ...c,
           graph: this.graphNodes[i],
+          isCurrentBranch: isSingleBranch || this.currentBranchCommits.has(c.hash),
         })),
         graphWidth: graphWidth(this.graphNodes),
+        currentUser: this.currentUser,
+        currentBranch: this.currentBranchName,
       },
     });
   }
@@ -162,7 +193,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       payload: {
         branches,
         tags,
-        currentBranch,
+        currentBranch: this.currentBranchName || currentBranch,
+        currentUser: this.currentUser,
         activeBranch: this.currentFilter.branch || '',
       },
     });
@@ -305,6 +337,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
             return true;
           });
           this.graphNodes = buildGraph(this.allCommits);
+          await this.updateBranchAndUser();
           this.sendCommits();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Filter failed: ${err.message}`);
@@ -333,6 +366,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           this.lastBranches = branches;
           this.lastTags = tags;
           this.graphNodes = buildGraph(this.allCommits);
+          await this.updateBranchAndUser();
           this.sendCommits();
           this.sendBranches(branches, tags);
         } catch (err: any) {
@@ -392,6 +426,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       this.lastBranches = branches;
       this.lastTags = tags;
       this.graphNodes = buildGraph(this.allCommits);
+      await this.updateBranchAndUser();
       this.sendCommits();
       this.sendBranches(branches, tags);
     } catch { /* ignore */ } finally {

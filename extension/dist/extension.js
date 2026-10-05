@@ -909,6 +909,19 @@ var GitService = class {
     const out = await this.exec(["rev-parse", "--show-toplevel"]);
     return out.trim();
   }
+  async getCurrentUser() {
+    let name = "";
+    let email = "";
+    try {
+      name = (await this.exec(["config", "user.name"])).trim();
+    } catch {
+    }
+    try {
+      email = (await this.exec(["config", "user.email"])).trim();
+    } catch {
+    }
+    return { name, email };
+  }
   // --- Log & Commit Operations ---
   async getLog(options = {}) {
     return getLog(this.asCommitContext(), options);
@@ -2976,6 +2989,31 @@ var GraphViewProvider = class {
   isRefreshing = false;
   queuedRefresh = false;
   currentFilter = {};
+  currentBranchCommits = /* @__PURE__ */ new Set();
+  currentUser = { name: "", email: "" };
+  currentBranchName = "";
+  async updateBranchAndUser() {
+    try {
+      this.currentBranchName = await this.gitService.getCurrentBranch();
+    } catch {
+      this.currentBranchName = "";
+    }
+    try {
+      this.currentUser = await this.gitService.getCurrentUser();
+    } catch {
+      this.currentUser = { name: "", email: "" };
+    }
+    this.currentBranchCommits.clear();
+    try {
+      const target = this.currentFilter.branch || "HEAD";
+      const output = await this.gitService.exec(["rev-list", "--max-count=3000", target]);
+      for (const line of output.split("\n")) {
+        const h = line.trim();
+        if (h) this.currentBranchCommits.add(h);
+      }
+    } catch {
+    }
+  }
   resolveWebviewView(webviewView, _context, _token) {
     this.view = webviewView;
     webviewView.webview.options = {
@@ -3039,8 +3077,9 @@ var GraphViewProvider = class {
       this.lastTags = tags;
       this.log.appendLine(`Loaded ${this.allCommits.length} commits, ${branches.length} branches, ${tags.length} tags`);
       this.graphNodes = buildGraph(this.allCommits);
+      await this.updateBranchAndUser();
       this.sendCommits();
-      this.sendBranches(branches, tags, currentBranch);
+      this.sendBranches(branches, tags, this.currentBranchName || currentBranch);
     } catch (err) {
       this.log.appendLine(`Git log failed: ${err.message}`);
       this.view?.webview.postMessage({
@@ -3057,14 +3096,18 @@ var GraphViewProvider = class {
     }
   }
   sendCommits() {
+    const isSingleBranch = !!this.currentFilter.branch;
     this.view?.webview.postMessage({
       type: "commits",
       payload: {
         commits: this.allCommits.map((c, i) => ({
           ...c,
-          graph: this.graphNodes[i]
+          graph: this.graphNodes[i],
+          isCurrentBranch: isSingleBranch || this.currentBranchCommits.has(c.hash)
         })),
-        graphWidth: graphWidth(this.graphNodes)
+        graphWidth: graphWidth(this.graphNodes),
+        currentUser: this.currentUser,
+        currentBranch: this.currentBranchName
       }
     });
   }
@@ -3081,7 +3124,8 @@ var GraphViewProvider = class {
       payload: {
         branches,
         tags,
-        currentBranch,
+        currentBranch: this.currentBranchName || currentBranch,
+        currentUser: this.currentUser,
         activeBranch: this.currentFilter.branch || ""
       }
     });
@@ -3215,6 +3259,7 @@ var GraphViewProvider = class {
             return true;
           });
           this.graphNodes = buildGraph(this.allCommits);
+          await this.updateBranchAndUser();
           this.sendCommits();
         } catch (err) {
           vscode6.window.showErrorMessage(`Filter failed: ${err.message}`);
@@ -3243,6 +3288,7 @@ var GraphViewProvider = class {
           this.lastBranches = branches;
           this.lastTags = tags;
           this.graphNodes = buildGraph(this.allCommits);
+          await this.updateBranchAndUser();
           this.sendCommits();
           this.sendBranches(branches, tags);
         } catch (err) {
@@ -3300,6 +3346,7 @@ var GraphViewProvider = class {
       this.lastBranches = branches;
       this.lastTags = tags;
       this.graphNodes = buildGraph(this.allCommits);
+      await this.updateBranchAndUser();
       this.sendCommits();
       this.sendBranches(branches, tags);
     } catch {

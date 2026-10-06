@@ -9110,11 +9110,6 @@ ${component_stack}
           addItem("Delete Remote Branch...", "", () => {
             postMessage("deleteBranch", branchName);
           });
-          addDivider();
-          addItem("Log In / Manage Credentials...", "", () => {
-            const rName = branchName.includes("/") ? branchName.split("/")[0] : "origin";
-            postMessage("openAuthDialog", { remote: rName });
-          });
         } else {
           addItem("Checkout", "", () => {
             postMessage("checkout", branchName);

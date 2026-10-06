@@ -1,3 +1,4 @@
+
 window.onerror = function(msg, url, line, col, error) {
   if (typeof msg === 'string' && msg.includes('ResizeObserver loop')) {
     return true;
@@ -10000,6 +10001,7 @@ ${component_stack}
 
     var branch_splitter = document.createElement("div");
     branch_splitter.className = "branch-splitter";
+    branch_splitter.style.cssText = "width:1px;cursor:col-resize;flex-shrink:0;background:transparent !important;z-index:10;user-select:none;position:relative;border:none !important;box-shadow:none !important;outline:none !important;";
     branch_sidebar.after(branch_splitter);
 
     try {

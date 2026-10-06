@@ -486,6 +486,16 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Git Log</title>
+  <style>
+    *::-webkit-scrollbar-track,
+    *::-webkit-scrollbar-track-piece,
+    *::-webkit-scrollbar-corner {
+      background: transparent !important;
+      background-color: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+  </style>
 </head>
 <body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div id="app" style="height:100%;overflow:hidden;"></div>

@@ -9411,8 +9411,7 @@ ${component_stack}
           const headBox = document.createElement("div");
           headBox.className = "head-branch-box" + (currentActive === "HEAD" ? " active" : "");
           const curInfo = branches.find((b) => b.name === currentBranch);
-          const trackHtml = getTrackingHtml(curInfo);
-          headBox.innerHTML = '<span class="head-title" style="display:inline-flex;align-items:center;gap:4px;">HEAD (Current Branch)</span>' + trackHtml;
+          headBox.innerHTML = '<span class="head-title" style="display:inline-flex;align-items:center;gap:4px;">HEAD (Current Branch)</span>';
           headBox.title = "HEAD (" + currentBranch + ")";
           headBox.addEventListener("click", () => selectBranch("HEAD"));
           headBox.addEventListener("dblclick", () => openBranchLog("HEAD"));

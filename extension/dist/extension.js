@@ -3491,7 +3491,8 @@ var GraphViewProvider = class {
         graphWidth: graphWidth(this.graphNodes),
         currentUser: this.currentUser,
         currentBranch: this.currentBranchName,
-        isSubRepo
+        isSubRepo,
+        repoPath: this.gitService.getCwd()
       }
     });
   }
@@ -3512,7 +3513,8 @@ var GraphViewProvider = class {
         currentBranch: this.currentBranchName || currentBranch,
         currentUser: this.currentUser,
         activeBranch: this.currentFilter.branch || "",
-        isSubRepo
+        isSubRepo,
+        repoPath: this.gitService.getCwd()
       }
     });
   }

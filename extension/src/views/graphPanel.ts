@@ -188,6 +188,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         currentUser: this.currentUser,
         currentBranch: this.currentBranchName,
         isSubRepo,
+        repoPath: this.gitService.getCwd(),
       },
     });
   }
@@ -212,6 +213,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         currentUser: this.currentUser,
         activeBranch: this.currentFilter.branch || '',
         isSubRepo,
+        repoPath: this.gitService.getCwd(),
       },
     });
   }

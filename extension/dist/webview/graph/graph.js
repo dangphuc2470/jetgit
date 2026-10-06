@@ -8907,6 +8907,9 @@ ${component_stack}
             if (p.isSubRepo !== undefined) {
               window.__IS_SUB_REPO__ = !!p.isSubRepo;
             }
+            if (p.repoPath) {
+              window.__GIT_REPO_PATH__ = p.repoPath;
+            }
             document.querySelectorAll(".no-git-container").forEach(el => el.remove());
             const seen = new Set();
             const unique = [];
@@ -8995,6 +8998,9 @@ ${component_stack}
             }
             if (msg.payload && msg.payload.isSubRepo !== undefined) {
               window.__IS_SUB_REPO__ = !!msg.payload.isSubRepo;
+            }
+            if (msg.payload && msg.payload.repoPath) {
+              window.__GIT_REPO_PATH__ = msg.payload.repoPath;
             }
             set(branchData, msg.payload, true);
             if (!hasInitializedActiveBranch) {
@@ -9385,13 +9391,12 @@ ${component_stack}
       let sInput = container.querySelector(".branch-search-input");
       let treeContent = container.querySelector(".branch-tree-content");
 
-      if (!container._folderCollapseState) {
-        container._folderCollapseState = new Map();
+      if (!container._repoFolderStates) {
+        container._repoFolderStates = new Map();
       }
       if (!container._sectionCollapseState) {
         container._sectionCollapseState = new Map();
       }
-      const folderCollapseState = container._folderCollapseState;
       const sectionCollapseState = container._sectionCollapseState;
 
       const svgArrowRight = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 3.5L10.5 8L6 12.5"/></svg>';
@@ -9408,6 +9413,20 @@ ${component_stack}
         const branches = latestData.branches || [];
         const tags = latestData.tags || [];
         const currentBranch = latestData.currentBranch || "";
+        const currentRepoKey = latestData.repoPath || window.__GIT_REPO_PATH__ || "default_repo";
+
+        if (!container._repoFolderStates.has(currentRepoKey)) {
+          const repoMap = new Map();
+          try {
+            const raw = localStorage.getItem("intellij_git_folders_" + currentRepoKey);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              Object.keys(parsed).forEach(k => repoMap.set(k, parsed[k]));
+            }
+          } catch {}
+          container._repoFolderStates.set(currentRepoKey, repoMap);
+        }
+        const folderCollapseState = container._repoFolderStates.get(currentRepoKey);
         const query = (searchQuery !== undefined ? searchQuery : (sInput ? sInput.value : "")).toLowerCase().trim();
         const filterFn = (name) => {
           if (query && !name.toLowerCase().includes(query)) return false;
@@ -9587,7 +9606,7 @@ ${component_stack}
 
             const isFolderCollapsed = query ? false : (folderCollapseState.has(subNode.fullPath)
               ? folderCollapseState.get(subNode.fullPath)
-              : true);
+              : !hasCurrentBranchInNode(subNode));
 
             fHdr.innerHTML = '<span class="arrow">' + (isFolderCollapsed ? svgArrowRight : svgArrowDown) + '</span>' + folderIconSvg + '<span class="folder-name" style="color:#ffffff;">' + fk + '</span>';
 
@@ -9602,6 +9621,11 @@ ${component_stack}
               const arrow = fHdr.querySelector(".arrow");
               if (arrow) arrow.innerHTML = isNowCollapsed ? svgArrowRight : svgArrowDown;
               folderCollapseState.set(subNode.fullPath, isNowCollapsed);
+              try {
+                const obj = {};
+                folderCollapseState.forEach((val, key) => { obj[key] = val; });
+                localStorage.setItem("intellij_git_folders_" + currentRepoKey, JSON.stringify(obj));
+              } catch {}
             });
 
             fDiv.appendChild(fHdr);

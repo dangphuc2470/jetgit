@@ -9004,16 +9004,14 @@ ${component_stack}
       function isBranchFavorite(name) {
         if (!name) return false;
         const favs = getFavorites();
-        return favs.has(name) || favs.has(name.replace(/^origin\//, ""));
+        return favs.has(name);
       }
 
       function toggleBranchFavorite(name) {
         if (!name) return;
         const favs = getFavorites();
-        const cleanName = name.replace(/^origin\//, "");
-        if (favs.has(name) || favs.has(cleanName)) {
+        if (favs.has(name)) {
           favs.delete(name);
-          favs.delete(cleanName);
         } else {
           favs.add(name);
         }

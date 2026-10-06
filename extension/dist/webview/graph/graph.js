@@ -6698,6 +6698,7 @@ ${component_stack}
       btnSubmit.disabled = true;
       btnSubmit.textContent = 'Pushing...';
       btnSubmit.style.opacity = '0.7';
+      showToast("Pushing '" + (pushInfo.currentBranch || 'branch') + "'...");
       postMessage('executePush', {
         branch: pushInfo.currentBranch,
         targetBranch: currentTargetBranch,
@@ -7307,6 +7308,7 @@ ${component_stack}
 
       // 15. Push All up to Here...
       addItem("Push All up to Here...", "", "", () => {
+        showToast("Pushing up to " + commit.hash.slice(0, 8) + "...");
         postMessage("pushUpToHere", { hash: commit.hash });
       });
 
@@ -7337,7 +7339,10 @@ ${component_stack}
 
         addSubItem("Checkout", () => postMessage("checkout", cleanBranch));
         addSubItem("Show Diff with Working Tree", () => postMessage("showDiff", { branch: cleanBranch }));
-        addSubItem("Update", () => postMessage("pull", cleanBranch));
+        addSubItem("Update", () => {
+          showToast("Updating '" + cleanBranch + "'...");
+          postMessage("pull", cleanBranch);
+        });
         addSubItem("Push...", () => postMessage("push", cleanBranch));
         addSubItem("Rename...", () => {
           openRenameBranchDialog(cleanBranch);
@@ -9134,6 +9139,7 @@ ${component_stack}
           });
           addDivider();
           addItem("Update", "", () => {
+            showToast("Updating '" + branchName + "'...");
             postMessage("pull", branchName);
           });
           addItem("Push...", "", () => {
@@ -9197,6 +9203,7 @@ ${component_stack}
           });
           addDivider();
           addItem("Update", "", () => {
+            showToast("Updating '" + branchName + "'...");
             postMessage("pull", branchName);
           });
           addItem("Push...", "", () => {
@@ -9742,6 +9749,7 @@ ${component_stack}
         addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch", () => {
           const target = container._selectedTreeBranch || get(activeBranch) || getCurrentBranchName();
           if (target) {
+            showToast("Updating '" + target + "'...");
             postMessage("pull", target);
           }
         }, "", "Fetch/Pull");

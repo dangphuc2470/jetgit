@@ -153,13 +153,22 @@ export async function handleGraphAction(
     }
     case 'pull': {
       const branch = payload as string;
-      try {
-        const out = await gitService.pull(branch);
-        vscode.window.showInformationMessage(`Updated ${branch}: ${out || 'Already up to date.'}`);
-        host.loadInitialData();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Update failed: ${err.message}`);
-      }
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Updating '${branch}'...`,
+          cancellable: false,
+        },
+        async () => {
+          try {
+            const out = await gitService.pull(branch);
+            vscode.window.showInformationMessage(`Updated ${branch}: ${out || 'Already up to date.'}`);
+            host.loadInitialData();
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`Update failed: ${err.message}`);
+          }
+        }
+      );
       return true;
     }
     case 'fetchAll': {
@@ -274,16 +283,25 @@ export async function handleGraphAction(
     }
     case 'executePush': {
       const { branch, targetBranch, force, setUpstream, remote, tags } = payload || {};
-      try {
-        await gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
-        vscode.window.showInformationMessage(`Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`);
-        host.loadInitialData();
-        vscode.commands.executeCommand('intellij-git.refreshBranches');
-        host.view?.webview.postMessage({ type: 'pushSuccess' });
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Push failed: ${err.message}`);
-        host.view?.webview.postMessage({ type: 'pushError', payload: { error: err.message } });
-      }
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Pushing '${branch || 'branch'}' to '${remote || 'remote'}'...`,
+          cancellable: false,
+        },
+        async () => {
+          try {
+            await gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
+            vscode.window.showInformationMessage(`Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`);
+            host.loadInitialData();
+            vscode.commands.executeCommand('intellij-git.refreshBranches');
+            host.view?.webview.postMessage({ type: 'pushSuccess' });
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`Push failed: ${err.message}`);
+            host.view?.webview.postMessage({ type: 'pushError', payload: { error: err.message } });
+          }
+        }
+      );
       return true;
     }
     case 'renameBranch': {
@@ -544,15 +562,25 @@ export async function handleGraphAction(
     }
     case 'pushUpToHere': {
       const { hash } = payload || {};
-      try {
-        const currentBranch = await gitService.getCurrentBranch();
-        const remote = await gitService.getDefaultRemote(currentBranch);
-        await gitService.exec(['push', remote, `${hash}:refs/heads/${currentBranch}`]);
-        vscode.window.showInformationMessage(`Pushed up to ${hash.slice(0, 8)} on ${currentBranch}`);
-        host.loadInitialData();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Push failed: ${err.message}`);
-      }
+      const shortHash = (hash || '').slice(0, 8);
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Pushing up to ${shortHash}...`,
+          cancellable: false,
+        },
+        async () => {
+          try {
+            const currentBranch = await gitService.getCurrentBranch();
+            const remote = await gitService.getDefaultRemote(currentBranch);
+            await gitService.exec(['push', remote, `${hash}:refs/heads/${currentBranch}`]);
+            vscode.window.showInformationMessage(`Pushed up to ${shortHash} on ${currentBranch}`);
+            host.loadInitialData();
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`Push failed: ${err.message}`);
+          }
+        }
+      );
       return true;
     }
     case 'showRepoAtRevision': {

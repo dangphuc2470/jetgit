@@ -7003,6 +7003,8 @@ ${component_stack}
     user_effect(() => {
       if (!get(containerEl))
         return;
+      window.__commitListContainer__ = get(containerEl);
+      window.__commitListSetScrollTop__ = (st) => set(scrollTop, st, true);
       const obs = new ResizeObserver((entries) => {
         if (!entries || !entries.length) return;
         window.requestAnimationFrame(() => {
@@ -7014,7 +7016,13 @@ ${component_stack}
         });
       });
       obs.observe(get(containerEl));
-      return () => obs.disconnect();
+      return () => {
+        obs.disconnect();
+        if (window.__commitListContainer__ === get(containerEl)) {
+          window.__commitListContainer__ = null;
+          window.__commitListSetScrollTop__ = null;
+        }
+      };
     });
     let isLoadingMore = false;
     let hasReachedEnd = false;
@@ -8905,10 +8913,63 @@ ${component_stack}
                 }
               }
             }
+            // Scroll Anchor: Lưu lại commit đang ở đỉnh viewport và commit đang chọn
+            const cEl = window.__commitListContainer__ || document.querySelector(".commit-list-container");
+            const oldCommits = get(commits) || [];
+            const ROW_HEIGHT = 25;
+            let anchorHash = null;
+            let anchorOffset = 0;
+            const curSelected = get(selectedHash);
+
+            if (cEl && oldCommits.length > 0) {
+              const curScrollTop = cEl.scrollTop;
+              const anchorRow = Math.max(0, Math.floor(curScrollTop / ROW_HEIGHT));
+              if (oldCommits[anchorRow]) {
+                anchorHash = oldCommits[anchorRow].hash;
+                anchorOffset = curScrollTop - (anchorRow * ROW_HEIGHT);
+              }
+            }
+
+            let newIndex = -1;
+            if (anchorHash) {
+              newIndex = unique.findIndex(c => c.hash === anchorHash);
+            }
+            if (newIndex === -1 && curSelected) {
+              newIndex = unique.findIndex(c => c.hash === curSelected);
+              anchorOffset = 0;
+            }
+
             set(noGitData, null, true);
             set(commits, unique, true);
             set(graphWidth, p.graphWidth, true);
             set(loading, false);
+
+            if (cEl && unique.length > 0) {
+              if (newIndex !== -1) {
+                // TÌM THẤY COMMIT CŨ: Giữ nguyên commit đó ngay vị trí mắt đang nhìn!
+                const targetScrollTop = (newIndex * ROW_HEIGHT) + anchorOffset;
+                cEl.scrollTop = targetScrollTop;
+                if (window.__commitListSetScrollTop__) {
+                  window.__commitListSetScrollTop__(targetScrollTop);
+                }
+                requestAnimationFrame(() => {
+                  if (cEl) cEl.scrollTop = targetScrollTop;
+                  if (window.__commitListSetScrollTop__) {
+                    window.__commitListSetScrollTop__(targetScrollTop);
+                  }
+                });
+              } else if (oldCommits.length > 0) {
+                // Nhánh mới hoàn toàn tách biệt: cuộn lên đầu nhánh mới
+                cEl.scrollTop = 0;
+                if (window.__commitListSetScrollTop__) {
+                  window.__commitListSetScrollTop__(0);
+                }
+                if (curSelected && !unique.some(c => c.hash === curSelected) && unique[0]) {
+                  onSelectCommit(unique[0].hash);
+                }
+              }
+            }
+
             const sideEl = document.querySelector(".branch-sidebar");
             if (sideEl && sideEl._updateExitBtn) sideEl._updateExitBtn();
             break;
@@ -9946,9 +10007,9 @@ ${component_stack}
         });
       };
       if_block(node_1, ($$render) => {
-        if (get(loading))
+        if (get(loading) && get(commits).length === 0)
           $$render(consequent);
-        else if (get(noGitData) || get(commits).length === 0)
+        else if (get(noGitData) || (get(commits).length === 0 && !get(loading)))
           $$render(consequent_1, 1);
         else
           $$render(alternate, false);

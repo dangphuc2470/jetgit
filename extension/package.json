@@ -72,7 +72,7 @@
       "activitybar": [
         {
           "id": "intellij-git-commit",
-          "title": "Commit",
+          "title": "Changes",
           "icon": "resources/commit.svg"
         }
       ]
@@ -195,7 +195,7 @@
         {
           "type": "webview",
           "id": "intellij-git.commitView",
-          "name": "Commit"
+          "name": "Changes"
         }
       ],
       "panel": [

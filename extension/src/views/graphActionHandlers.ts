@@ -164,12 +164,105 @@ export async function handleGraphAction(
     }
     case 'fetchAll': {
       try {
-        vscode.window.showInformationMessage('Fetching all remotes...');
-        await gitService.fetchAll();
-        vscode.window.showInformationMessage('Fetched all remotes successfully.');
-        host.loadInitialData();
+        vscode.window.showInformationMessage('Checking remotes connectivity and fetching...');
+        const result = await gitService.smartFetchAll((remote) => {
+          vscode.window.showInformationMessage(`Fetched '${remote}' successfully.`);
+          host.loadInitialData();
+        });
+        if (result.successful.length > 0) {
+          if (result.failed.length > 0 || result.skipped.length > 0) {
+            const missed = [...result.failed, ...result.skipped];
+            vscode.window.showInformationMessage(`Finished fetching. (Skipped offline: ${missed.join(', ')})`);
+          } else {
+            vscode.window.showInformationMessage(`Fetched all remotes successfully: ${result.successful.join(', ')}.`);
+          }
+        } else if (result.failed.length > 0 || result.skipped.length > 0) {
+          vscode.window.showWarningMessage(`Could not reach remotes: ${[...result.failed, ...result.skipped].join(', ')}.`);
+        } else {
+          vscode.window.showInformationMessage('No remotes configured.');
+        }
+
+        if (result.needsAuth && result.needsAuth.length > 0) {
+          const target = result.needsAuth[0];
+          let defaultUser = '';
+          try {
+            defaultUser = (await gitService.exec(['config', 'user.name'])).trim();
+          } catch {}
+          host.view?.webview.postMessage({
+            type: 'showAuthDialog',
+            payload: {
+              remote: target.remote,
+              url: target.url,
+              host: target.host,
+              defaultUsername: defaultUser,
+            },
+          });
+        }
       } catch (err: any) {
         vscode.window.showErrorMessage(`Fetch all failed: ${err.message}`);
+      } finally {
+        host.loadInitialData();
+      }
+      return true;
+    }
+    case 'openAuthDialog': {
+      const { remote } = (payload || {}) as { remote?: string };
+      const remotes = await gitService.getRemotes();
+      const targetRemote = remote || (remotes.includes('apistudio-os') ? 'apistudio-os' : (remotes[0] || 'origin'));
+      const url = await gitService.getRemoteUrl(targetRemote);
+      let hostName = targetRemote;
+      try {
+        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+          hostName = new URL(url).host;
+        }
+      } catch {}
+      let defaultUser = '';
+      try {
+        defaultUser = (await gitService.exec(['config', 'user.name'])).trim();
+      } catch {}
+      host.view?.webview.postMessage({
+        type: 'showAuthDialog',
+        payload: {
+          remote: targetRemote,
+          url,
+          host: hostName,
+          defaultUsername: defaultUser,
+        },
+      });
+      return true;
+    }
+    case 'saveGitCredentials': {
+      const { remote, url, authType, username, token, password, remember } = payload || {};
+      try {
+        const secret = authType === 'token' ? token : password;
+        if (!secret) {
+          throw new Error('Access token or password cannot be empty');
+        }
+        let targetUrl = url || await gitService.getRemoteUrl(remote);
+        if (!targetUrl) {
+          throw new Error(`Could not find URL for remote '${remote}'`);
+        }
+        if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+          const parsed = new URL(targetUrl);
+          if (username) {
+            parsed.username = encodeURIComponent(username);
+          }
+          parsed.password = encodeURIComponent(secret);
+          targetUrl = parsed.toString();
+        }
+        if (remember) {
+          await gitService.exec(['remote', 'set-url', remote, targetUrl]);
+        }
+        // Test fetch immediately
+        await gitService.exec(['-c', 'http.timeout=15', 'fetch', remote, '--prune']);
+        host.view?.webview.postMessage({ type: 'authSuccess', payload: { remote } });
+        vscode.window.showInformationMessage(`Authenticated and fetched '${remote}' successfully.`);
+        host.loadInitialData();
+      } catch (err: any) {
+        host.view?.webview.postMessage({
+          type: 'authError',
+          payload: { remote, error: err.message || 'Authentication failed' },
+        });
       }
       return true;
     }

@@ -88,6 +88,7 @@ export class GitService {
         const { stdout } = await execFileAsync('git', args, {
           cwd: this.cwd,
           maxBuffer,
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
         });
         return stdout;
       } catch (err: any) {
@@ -263,8 +264,160 @@ export class GitService {
     return branchOps.push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch);
   }
 
-  async fetchAll(): Promise<string> {
-    return this.exec(['fetch', '--all', '--prune']);
+  async getRemoteUrl(remoteName: string): Promise<string> {
+    try {
+      const url = await this.exec(['remote', 'get-url', remoteName]);
+      return url.trim();
+    } catch {
+      return '';
+    }
+  }
+
+  async isRemoteReachable(remoteName: string, timeoutMs = 2000): Promise<{ reachable: boolean; latency: number }> {
+    const start = Date.now();
+    try {
+      const remoteUrl = await this.getRemoteUrl(remoteName);
+      if (!remoteUrl) return { reachable: false, latency: 999999 };
+
+      if (remoteUrl.startsWith('http://') || remoteUrl.startsWith('https://')) {
+        try {
+          const parsed = new URL(remoteUrl);
+          const targetOrigin = `${parsed.protocol}//${parsed.host}`;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeoutMs);
+          try {
+            await fetch(targetOrigin, { method: 'HEAD', signal: controller.signal });
+            clearTimeout(timer);
+            return { reachable: true, latency: Date.now() - start };
+          } catch {
+            clearTimeout(timer);
+            try {
+              const c2 = new AbortController();
+              const t2 = setTimeout(() => c2.abort(), 1000);
+              await fetch(targetOrigin, { method: 'GET', signal: c2.signal });
+              clearTimeout(t2);
+              return { reachable: true, latency: Date.now() - start };
+            } catch {
+              return { reachable: false, latency: 999999 };
+            }
+          }
+        } catch {
+          return { reachable: false, latency: 999999 };
+        }
+      }
+
+      await execFileAsync('git', [
+        '-c', 'http.timeout=2',
+        '-c', 'ssh.connectTimeout=2',
+        'ls-remote', '--heads', remoteName, 'HEAD'
+      ], {
+        cwd: this.cwd,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+        timeout: timeoutMs,
+      });
+      return { reachable: true, latency: Date.now() - start };
+    } catch {
+      return { reachable: false, latency: 999999 };
+    }
+  }
+
+  async smartFetchAll(
+    onRemoteSuccess?: (remote: string) => void
+  ): Promise<{
+    successful: string[];
+    failed: string[];
+    skipped: string[];
+    needsAuth: { remote: string; url: string; host: string }[];
+  }> {
+    const remotes = await this.getRemotes();
+    if (!remotes || remotes.length === 0) {
+      return { successful: [], failed: [], skipped: [], needsAuth: [] };
+    }
+
+    const needsAuth: { remote: string; url: string; host: string }[] = [];
+    const isAuthError = (msg: string) =>
+      /terminal prompts disabled|could not read Username|Authentication failed|HTTP 401|Access denied|not authorized/i.test(msg);
+
+    if (remotes.length === 1) {
+      const r = remotes[0];
+      try {
+        await this.exec(['fetch', r, '--prune']);
+        onRemoteSuccess?.(r);
+        return { successful: [r], failed: [], skipped: [], needsAuth: [] };
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (isAuthError(msg)) {
+          const url = await this.getRemoteUrl(r);
+          let host = r;
+          try { if (url) host = new URL(url).host; } catch {}
+          needsAuth.push({ remote: r, url, host });
+        }
+        return { successful: [], failed: [r], skipped: [], needsAuth };
+      }
+    }
+
+    const checks = await Promise.allSettled(
+      remotes.map(async r => {
+        const res = await this.isRemoteReachable(r, 2000);
+        return { remote: r, reachable: res.reachable, latency: res.latency };
+      })
+    );
+
+    const probeResults: { remote: string; reachable: boolean; latency: number }[] = [];
+    for (let i = 0; i < remotes.length; i++) {
+      const c = checks[i];
+      if (c.status === 'fulfilled') {
+        probeResults.push(c.value);
+      } else {
+        probeResults.push({ remote: remotes[i], reachable: false, latency: 999999 });
+      }
+    }
+
+    // Sort: reachable first, then lowest latency first
+    probeResults.sort((a, b) => {
+      if (a.reachable && !b.reachable) return -1;
+      if (!a.reachable && b.reachable) return 1;
+      return a.latency - b.latency;
+    });
+
+    const successful: string[] = [];
+    const failed: string[] = [];
+    const skipped: string[] = [];
+
+    for (const item of probeResults) {
+      try {
+        await this.exec(['fetch', item.remote, '--prune']);
+        successful.push(item.remote);
+        // Notify immediately so UI reloads right after each remote succeeds
+        onRemoteSuccess?.(item.remote);
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (isAuthError(msg)) {
+          const url = await this.getRemoteUrl(item.remote);
+          let host = item.remote;
+          try { if (url) host = new URL(url).host; } catch {}
+          needsAuth.push({ remote: item.remote, url, host });
+        }
+        if (item.reachable) {
+          failed.push(item.remote);
+        } else {
+          skipped.push(item.remote);
+        }
+      }
+    }
+
+    return { successful, failed, skipped, needsAuth };
+  }
+
+  async fetchAll(
+    onRemoteSuccess?: (remote: string) => void
+  ): Promise<{
+    successful: string[];
+    failed: string[];
+    skipped: string[];
+    needsAuth: { remote: string; url: string; host: string }[];
+  }> {
+    return this.smartFetchAll(onRemoteSuccess);
   }
 
   async checkoutAndRebase(branch: string, onto: string): Promise<string> {

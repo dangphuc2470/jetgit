@@ -32,19 +32,39 @@ export function getPushDialogHtml(rawPushInfo: string): string {
     }
     .as-col-left {
       width: 45%;
+      min-width: 180px;
+      max-width: calc(100% - 180px);
       border-right: 1px solid var(--vscode-panel-border, #323438);
       display: flex;
       flex-direction: column;
       background: var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1f22));
-      overflow: visible;
+      overflow: hidden;
       position: relative;
     }
+    .as-splitter {
+      width: 6px;
+      margin-left: -3px;
+      margin-right: -3px;
+      cursor: col-resize;
+      background: transparent;
+      position: relative;
+      z-index: 50;
+      flex-shrink: 0;
+      transition: background-color 0.12s ease;
+    }
+    .as-splitter:hover,
+    .as-splitter.dragging {
+      background: var(--vscode-focusBorder, #3574f0);
+    }
     .as-col-right {
-      width: 55%;
+      flex: 1;
+      min-width: 180px;
       display: flex;
       flex-direction: column;
       background: var(--vscode-editor-background, #1e1f22);
       overflow: hidden;
+      position: relative;
+      z-index: 10;
     }
     .as-branch-header {
       display: flex;
@@ -58,8 +78,9 @@ export function getPushDialogHtml(rawPushInfo: string): string {
       gap: 4px;
       overflow: visible;
       position: relative;
-      z-index: 100;
+      z-index: 5;
       flex-shrink: 0;
+      white-space: nowrap;
     }
     .as-commit-item {
       display: flex;
@@ -158,13 +179,53 @@ export function getPushDialogHtml(rawPushInfo: string): string {
       background: var(--vscode-menu-selectionBackground, #3574f0);
       color: var(--vscode-menu-selectionForeground, #ffffff);
     }
+    input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--vscode-checkbox-border, #6C707E);
+      border-radius: 2.5px;
+      background: transparent !important;
+      background-color: transparent !important;
+      cursor: pointer;
+      position: relative;
+      outline: none;
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+      box-sizing: border-box;
+      transition: border-color 0.12s ease, background-color 0.12s ease;
+    }
+    input[type="checkbox"]:hover {
+      border-color: var(--vscode-focusBorder, #CED0D6);
+      background-color: rgba(255, 255, 255, 0.06) !important;
+    }
+    input[type="checkbox"]:checked {
+      background: transparent !important;
+      background-color: transparent !important;
+      border-color: var(--vscode-focusBorder, #CED0D6);
+    }
+    input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      top: 1px;
+      left: 4px;
+      width: 3.5px;
+      height: 7px;
+      border: solid var(--vscode-editor-foreground, #CED0D6);
+      border-width: 0 1.8px 1.8px 0;
+      transform: rotate(45deg);
+    }
   </style>
 </head>
 <body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div class="as-push-card">
-    <div class="as-body">
+    <div class="as-body" id="as-body-container">
       <!-- Left Column: Commits -->
-      <div class="as-col-left">
+      <div class="as-col-left" id="as-col-left">
         <div id="push-branch-header" class="as-branch-header">
           <span id="push-current-branch" style="font-weight:600;white-space:nowrap;"></span>
           <span style="opacity:0.7;margin:0 2px;">&rarr;</span>
@@ -180,9 +241,12 @@ export function getPushDialogHtml(rawPushInfo: string): string {
         <div id="push-commits-container" style="flex:1;min-height:0;overflow-y:auto;padding:4px 0;"></div>
       </div>
 
+      <!-- Splitter / Resizer -->
+      <div class="as-splitter" id="as-splitter" title="Drag to resize"></div>
+
       <!-- Right Column: Files -->
-      <div class="as-col-right">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--vscode-sideBarSectionHeader-background, var(--vscode-sideBar-background, #26282b));border-bottom:1px solid var(--vscode-panel-border, #323438);flex-shrink:0;">
+      <div class="as-col-right" id="as-col-right">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--vscode-sideBarSectionHeader-background, var(--vscode-sideBar-background, #26282b));border-bottom:1px solid var(--vscode-panel-border, #323438);flex-shrink:0;position:relative;z-index:10;">
           <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--vscode-editor-foreground, #dfe1e5);">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="#c49000"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A.5.5 0 0 0 8.92 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
             <span id="push-repo-name">Repository</span>
@@ -197,7 +261,7 @@ export function getPushDialogHtml(rawPushInfo: string): string {
     <div class="as-footer">
       <div style="display:flex;align-items:center;gap:12px;">
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--vscode-editor-foreground, #dfe1e5);cursor:pointer;">
-          <input type="checkbox" id="chk-push-tags" style="accent-color:var(--vscode-focusBorder, #3574f0);width:14px;height:14px;cursor:pointer;">
+          <input type="checkbox" id="chk-push-tags" style="width:14px;height:14px;cursor:pointer;">
           <span>Push tags:</span>
         </label>
         <select id="sel-push-tags" style="background:var(--vscode-dropdown-background, #1e1f22);color:var(--vscode-dropdown-foreground, #dfe1e5);border:1px solid var(--vscode-dropdown-border, #4e5157);border-radius:3px;padding:3px 6px;font-size:12px;outline:none;">
@@ -258,10 +322,13 @@ export function getPushDialogHtml(rawPushInfo: string): string {
     function initUI() {
       if (titleEl) titleEl.textContent = 'Push Commits to ' + currentRemote;
       currentBranchEl.textContent = pushInfo.currentBranch;
+      currentBranchEl.title = pushInfo.currentBranch;
       remoteLabel.textContent = currentRemote;
       branchDisplay.textContent = currentTargetBranch;
+      branchDisplay.title = 'Click to edit remote branch name: ' + currentTargetBranch;
       branchInput.value = currentTargetBranch;
       repoNameEl.textContent = pushInfo.repoName;
+      repoNameEl.title = pushInfo.repoName;
       newBadge.style.display = pushInfo.isNew ? 'inline-block' : 'none';
 
       // Setup remotes dropdown
@@ -373,7 +440,14 @@ export function getPushDialogHtml(rawPushInfo: string): string {
       filesContainer.innerHTML = html;
 
       filesContainer.querySelectorAll('.as-file-item').forEach(el => {
+        el.addEventListener('click', () => {
+          filesContainer.querySelectorAll('.as-file-item.selected').forEach(item => item.classList.remove('selected'));
+          el.classList.add('selected');
+        });
+
         el.addEventListener('dblclick', () => {
+          filesContainer.querySelectorAll('.as-file-item.selected').forEach(item => item.classList.remove('selected'));
+          el.classList.add('selected');
           const filePath = el.getAttribute('data-path');
           if (filePath) {
             vscode.postMessage({
@@ -404,7 +478,9 @@ export function getPushDialogHtml(rawPushInfo: string): string {
     // Remote dropdown trigger
     remoteLabel.addEventListener('click', (e) => {
       e.stopPropagation();
-      remoteDropdown.style.display = remoteDropdown.style.display === 'none' ? 'block' : 'none';
+      const isHidden = remoteDropdown.style.display === 'none';
+      remoteDropdown.style.display = isHidden ? 'block' : 'none';
+      branchHeader.style.zIndex = isHidden ? '100' : '5';
     });
 
     // Target branch editing
@@ -475,6 +551,7 @@ export function getPushDialogHtml(rawPushInfo: string): string {
       }
       if (!e.target.closest('#push-remote-dropdown') && e.target !== remoteLabel) {
         remoteDropdown.style.display = 'none';
+        branchHeader.style.zIndex = '5';
       }
     });
 
@@ -496,9 +573,47 @@ export function getPushDialogHtml(rawPushInfo: string): string {
       }
     });
 
-    window.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-    }, true);
+    // Resizable splitter logic
+    const splitter = document.getElementById('as-splitter');
+    const leftCol = document.getElementById('as-col-left');
+    const bodyContainer = document.getElementById('as-body-container');
+
+    if (splitter && leftCol && bodyContainer) {
+      let isDragging = false;
+      let startX = 0;
+      let startWidth = 0;
+
+      splitter.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startWidth = leftCol.getBoundingClientRect().width;
+        splitter.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const totalWidth = bodyContainer.getBoundingClientRect().width;
+        const deltaX = e.clientX - startX;
+        let newWidth = startWidth + deltaX;
+        const minW = 180;
+        const maxW = totalWidth - minW;
+        if (newWidth < minW) newWidth = minW;
+        if (newWidth > maxW) newWidth = maxW;
+        leftCol.style.width = newWidth + 'px';
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          splitter.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+      });
+    }
 
     initUI();
   </script>

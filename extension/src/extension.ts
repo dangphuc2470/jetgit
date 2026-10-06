@@ -418,6 +418,12 @@ export function activate(context: vscode.ExtensionContext): void {
         mergeProvider.refresh();
       }
     }),
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      graphViewProvider.view?.webview.postMessage({ type: 'closeAllMenus' });
+    }),
+    vscode.window.onDidChangeTextEditorSelection(() => {
+      graphViewProvider.view?.webview.postMessage({ type: 'closeAllMenus' });
+    }),
   );
 
   log.appendLine('IntelliJ Git extension activated.');

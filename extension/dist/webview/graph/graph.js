@@ -22,8 +22,41 @@ if (typeof document !== 'undefined') {
     });
   }
 }
+function removeAllContextMenus() {
+  document.querySelectorAll('.commit-context-menu, .branch-context-menu, .as-dropdown-menu, .filter-popup').forEach(m => m.remove());
+}
+window.addEventListener('blur', removeAllContextMenus);
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) removeAllContextMenus();
+});
+window.addEventListener('message', function(e) {
+  if (e.data && (e.data.type === 'closeAllMenus' || e.data.type === 'closeContextMenus')) {
+    removeAllContextMenus();
+  }
+});
+
+window.addEventListener('mousedown', function(e) {
+  const openMenu = document.querySelector('.commit-context-menu, .branch-context-menu');
+  if (!openMenu) return;
+  const target = e.target && e.target.nodeType === 1 ? e.target : e.target?.parentElement;
+  if (target && target.closest && target.closest('.commit-context-menu, .branch-context-menu')) {
+    return;
+  }
+  removeAllContextMenus();
+}, true);
+
 window.addEventListener('contextmenu', function(e) {
   e.preventDefault();
+  const openMenu = document.querySelector('.commit-context-menu, .branch-context-menu');
+  if (openMenu) {
+    const target = e.target && e.target.nodeType === 1 ? e.target : e.target?.parentElement;
+    if (target && target.closest && target.closest('.commit-context-menu, .branch-context-menu')) {
+      return;
+    }
+    removeAllContextMenus();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+  }
 }, true);
 "use strict";
 (() => {
@@ -5708,37 +5741,35 @@ ${component_stack}
 
     const card = document.createElement("div");
     card.className = "as-dialog-card";
-    card.style.cssText = "background:#1e1f22;border:1px solid #393b40;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;";
+    card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
 
     card.innerHTML = `
-      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #393b40;user-select:none;">
-        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
-          <span class="as-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
-        </div>
-        <div class="as-cb-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:13px;color:#dfe1e5;pointer-events:none;">
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
+        <span class="as-cb-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
+        </span>
+        <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
       </div>
       <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <label for="as-cb-name" style="font-size:13px;color:#dfe1e5;white-space:nowrap;font-weight:500;">Branch Name:</label>
-          <input type="text" id="as-cb-name" style="flex:1;background:#1e1f22;color:#dfe1e5;border:1.5px solid #3574f0;border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
+          <label for="as-cb-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Branch Name:</label>
+          <input type="text" id="as-cb-name" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
         </div>
         <div style="display:flex;align-items:center;gap:20px;padding-left:102px;">
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:#dfe1e5;user-select:none;">
-            <input type="checkbox" id="as-cb-checkout" checked style="accent-color:#3574f0;width:14px;height:14px;cursor:pointer;margin:0;">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
+            <input type="checkbox" id="as-cb-checkout" class="as-custom-chk" checked style="width:14px;height:14px;cursor:pointer;margin:0;">
             <span>Checkout branch</span>
           </label>
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:#dfe1e5;user-select:none;">
-            <input type="checkbox" id="as-cb-overwrite" style="accent-color:#3574f0;width:14px;height:14px;cursor:pointer;margin:0;">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
+            <input type="checkbox" id="as-cb-overwrite" class="as-custom-chk" style="width:14px;height:14px;cursor:pointer;margin:0;">
             <span>Overwrite existing branch</span>
           </label>
         </div>
       </div>
-      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#1e1f22;">
-        <button class="as-dialog-btn" id="as-cb-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-        <button class="as-dialog-btn" id="as-cb-create" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
+        <button class="as-dialog-btn" id="as-cb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+        <button class="as-dialog-btn" id="as-cb-create" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
       </div>
     `;
 
@@ -5755,10 +5786,21 @@ ${component_stack}
     const btnCreate = card.querySelector("#as-cb-create");
     const dotClose = card.querySelector(".as-dot-close");
 
-    btnCancel.onmouseenter = () => { btnCancel.style.background = "#35383d"; btnCancel.style.borderColor = "#60646c"; };
-    btnCancel.onmouseleave = () => { btnCancel.style.background = "#2b2d30"; btnCancel.style.borderColor = "#4e5157"; };
-    btnCreate.onmouseenter = () => { btnCreate.style.background = "#4682f7"; };
-    btnCreate.onmouseleave = () => { btnCreate.style.background = "#3574f0"; };
+    if (dotClose) {
+      dotClose.onmouseenter = () => {
+        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
+        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
+      };
+      dotClose.onmouseleave = () => {
+        dotClose.style.background = "none";
+        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
+      };
+    }
+
+    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
+    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
+    btnCreate.onmouseenter = () => { btnCreate.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
+    btnCreate.onmouseleave = () => { btnCreate.style.background = "var(--vscode-button-background, #3574f0)"; };
 
     const closeDialog = () => {
       overlay.remove();
@@ -5813,27 +5855,25 @@ ${component_stack}
 
     const card = document.createElement("div");
     card.className = "as-dialog-card";
-    card.style.cssText = "background:#1e1f22;border:1px solid #393b40;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;";
+    card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
 
     card.innerHTML = `
-      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #393b40;user-select:none;">
-        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
-          <span class="as-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
-        </div>
-        <div class="as-rb-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:13px;color:#dfe1e5;pointer-events:none;">
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
+        <span class="as-rb-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
+        </span>
+        <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
       </div>
       <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <label for="as-rb-name" style="font-size:13px;color:#dfe1e5;white-space:nowrap;font-weight:500;">Branch Name:</label>
-          <input type="text" id="as-rb-name" style="flex:1;background:#1e1f22;color:#dfe1e5;border:1.5px solid #3574f0;border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
+          <label for="as-rb-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Branch Name:</label>
+          <input type="text" id="as-rb-name" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
         </div>
       </div>
-      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#1e1f22;">
-        <button class="as-dialog-btn" id="as-rb-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-        <button class="as-dialog-btn" id="as-rb-ok" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Rename</button>
+      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
+        <button class="as-dialog-btn" id="as-rb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+        <button class="as-dialog-btn" id="as-rb-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Rename</button>
       </div>
     `;
 
@@ -5848,10 +5888,21 @@ ${component_stack}
     const btnOk = card.querySelector("#as-rb-ok");
     const dotClose = card.querySelector(".as-dot-close");
 
-    btnCancel.onmouseenter = () => { btnCancel.style.background = "#35383d"; btnCancel.style.borderColor = "#60646c"; };
-    btnCancel.onmouseleave = () => { btnCancel.style.background = "#2b2d30"; btnCancel.style.borderColor = "#4e5157"; };
-    btnOk.onmouseenter = () => { btnOk.style.background = "#4682f7"; };
-    btnOk.onmouseleave = () => { btnOk.style.background = "#3574f0"; };
+    if (dotClose) {
+      dotClose.onmouseenter = () => {
+        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
+        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
+      };
+      dotClose.onmouseleave = () => {
+        dotClose.style.background = "none";
+        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
+      };
+    }
+
+    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
+    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
+    btnOk.onmouseenter = () => { btnOk.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
+    btnOk.onmouseleave = () => { btnOk.style.background = "var(--vscode-button-background, #3574f0)"; };
 
     const closeDialog = () => {
       overlay.remove();
@@ -5908,27 +5959,25 @@ ${component_stack}
 
     const card = document.createElement("div");
     card.className = "as-dialog-card";
-    card.style.cssText = "background:#1e1f22;border:1px solid #393b40;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;";
+    card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
 
     card.innerHTML = `
-      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #393b40;user-select:none;">
-        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
-          <span class="as-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
-        </div>
-        <div class="as-tag-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:13px;color:#dfe1e5;pointer-events:none;">
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
+        <span class="as-tag-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
+        </span>
+        <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
       </div>
       <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <label for="as-tag-name" style="font-size:13px;color:#dfe1e5;white-space:nowrap;font-weight:500;">Tag Name:</label>
-          <input type="text" id="as-tag-name" placeholder="v1.0.0" style="flex:1;background:#1e1f22;color:#dfe1e5;border:1.5px solid #3574f0;border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
+          <label for="as-tag-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Tag Name:</label>
+          <input type="text" id="as-tag-name" placeholder="v1.0.0" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
         </div>
       </div>
-      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#1e1f22;">
-        <button class="as-dialog-btn" id="as-tag-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-        <button class="as-dialog-btn" id="as-tag-ok" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
+        <button class="as-dialog-btn" id="as-tag-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+        <button class="as-dialog-btn" id="as-tag-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
       </div>
     `;
 
@@ -5942,10 +5991,21 @@ ${component_stack}
     const btnOk = card.querySelector("#as-tag-ok");
     const dotClose = card.querySelector(".as-dot-close");
 
-    btnCancel.onmouseenter = () => { btnCancel.style.background = "#35383d"; btnCancel.style.borderColor = "#60646c"; };
-    btnCancel.onmouseleave = () => { btnCancel.style.background = "#2b2d30"; btnCancel.style.borderColor = "#4e5157"; };
-    btnOk.onmouseenter = () => { btnOk.style.background = "#4682f7"; };
-    btnOk.onmouseleave = () => { btnOk.style.background = "#3574f0"; };
+    if (dotClose) {
+      dotClose.onmouseenter = () => {
+        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
+        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
+      };
+      dotClose.onmouseleave = () => {
+        dotClose.style.background = "none";
+        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
+      };
+    }
+
+    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
+    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
+    btnOk.onmouseenter = () => { btnOk.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
+    btnOk.onmouseleave = () => { btnOk.style.background = "var(--vscode-button-background, #3574f0)"; };
 
     const closeDialog = () => {
       overlay.remove();
@@ -5991,6 +6051,332 @@ ${component_stack}
   window.openRenameBranchDialog = openRenameBranchDialog;
   window.openCreateTagDialog = openCreateTagDialog;
 
+  let activeAuthDialog = null;
+
+  function openGitAuthDialog(authInfo) {
+    if (activeAuthDialog) {
+      activeAuthDialog.remove();
+      activeAuthDialog = null;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "as-branch-dialog-overlay as-auth-dialog-overlay";
+    overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+
+    const remote = authInfo?.remote || "origin";
+    const rawUrl = authInfo?.url || "";
+    let hostName = authInfo?.host || remote;
+    if (!authInfo?.host && rawUrl) {
+      try { hostName = new URL(rawUrl).host; } catch {}
+    }
+    const defaultUsername = authInfo?.defaultUsername || "phucdnh";
+
+    const card = document.createElement("div");
+    card.className = "as-dialog-card";
+    card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:490px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
+
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
+        <span class="as-auth-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
+          Log In to ${escapePushHtml(hostName)}
+        </span>
+        <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
+      </div>
+      <div style="padding:16px 20px 12px 20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12.5px;color:var(--vscode-descriptionForeground,#9aa0a6);line-height:1.4;">
+          Authentication required for remote <strong style="color:var(--vscode-editor-foreground,#dfe1e5);">${escapePushHtml(remote)}</strong>:
+          <div style="color:var(--vscode-textLink-foreground,#56a8f5);font-family:monospace;font-size:11.5px;margin-top:3px;word-break:break-all;user-select:text;">${escapePushHtml(rawUrl)}</div>
+        </div>
+
+        <div style="display:flex;border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));gap:16px;margin-top:2px;">
+          <button id="as-auth-tab-token" type="button" style="background:none;border:none;border-bottom:2px solid var(--vscode-button-background,#3574f0);color:var(--vscode-editor-foreground,#dfe1e5);font-weight:600;font-size:13px;padding:6px 2px;cursor:pointer;outline:none;">
+            Token
+          </button>
+          <button id="as-auth-tab-password" type="button" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--vscode-descriptionForeground,#8c9199);font-weight:500;font-size:13px;padding:6px 2px;cursor:pointer;outline:none;">
+            Username / Password
+          </button>
+        </div>
+
+        <div id="as-auth-token-pane" style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label for="as-auth-token-input" style="font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);font-weight:500;">Personal Access Token:</label>
+              <span style="font-size:11.5px;color:var(--vscode-descriptionForeground,#8c9199);">(scope: read/write repository)</span>
+            </div>
+            <div style="position:relative;display:flex;align-items:center;">
+              <input type="password" id="as-auth-token-input" placeholder="e.g. glpat-... or ghp_..." style="width:100%;box-sizing:border-box;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-input-border,#4e5157);border-radius:4px;padding:6px 30px 6px 8px;font-size:13px;outline:none;font-family:monospace;">
+              <span id="as-auth-token-toggle" title="Show/Hide" style="position:absolute;right:8px;cursor:pointer;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));display:flex;align-items:center;">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3c-4 0-7 5-7 5s3 5 7 5 7-5 7-5-3-5-7-5zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+              </span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label for="as-auth-token-username" style="font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);font-weight:500;">Username:</label>
+            <input type="text" id="as-auth-token-username" value="${escapeAttr(defaultUsername)}" placeholder="e.g. phucdnh" style="background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-input-border,#4e5157);border-radius:4px;padding:6px 8px;font-size:13px;outline:none;font-family:inherit;">
+          </div>
+        </div>
+
+        <div id="as-auth-password-pane" style="display:none;flex-direction:column;gap:10px;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label for="as-auth-user-input" style="font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);font-weight:500;">Username:</label>
+            <input type="text" id="as-auth-user-input" value="${escapeAttr(defaultUsername)}" placeholder="Username" style="background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-input-border,#4e5157);border-radius:4px;padding:6px 8px;font-size:13px;outline:none;font-family:inherit;">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <label for="as-auth-pass-input" style="font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);font-weight:500;">Password:</label>
+            <div style="position:relative;display:flex;align-items:center;">
+              <input type="password" id="as-auth-pass-input" placeholder="Password" style="width:100%;box-sizing:border-box;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-input-border,#4e5157);border-radius:4px;padding:6px 30px 6px 8px;font-size:13px;outline:none;font-family:inherit;">
+              <span id="as-auth-pass-toggle" title="Show/Hide" style="position:absolute;right:8px;cursor:pointer;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));display:flex;align-items:center;">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3c-4 0-7 5-7 5s3 5 7 5 7-5 7-5-3-5-7-5zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;margin-top:2px;">
+          <label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
+            <input type="checkbox" id="as-auth-remember" class="as-custom-chk" checked style="width:14px;height:14px;cursor:pointer;margin:0;">
+            <span>Remember credentials (save into repository remote configuration)</span>
+          </label>
+        </div>
+
+        <div id="as-auth-error-msg" style="display:none;color:var(--vscode-inputValidation-errorForeground,#ff5252);font-size:12px;line-height:1.35;padding:6px 10px;background:var(--vscode-inputValidation-errorBackground,rgba(255,82,82,0.12));border-radius:4px;border-left:3px solid var(--vscode-inputValidation-errorBorder,#ff5252);"></div>
+      </div>
+      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
+        <button class="as-dialog-btn" id="as-auth-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+        <button class="as-dialog-btn" id="as-auth-submit" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 22px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <span id="as-auth-spinner" style="display:none;width:12px;height:12px;border:2px solid var(--vscode-button-foreground,#fff);border-top-color:transparent;border-radius:50%;animation:asAuthSpin 0.7s linear infinite;"></span>
+          <span id="as-auth-btn-text">Log In</span>
+        </button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    activeAuthDialog = overlay;
+
+    if (!document.getElementById("as-checkbox-transparent-style")) {
+      const cs = document.createElement("style");
+      cs.id = "as-checkbox-transparent-style";
+      cs.textContent = `
+        input[type="checkbox"],
+        .as-custom-chk {
+          appearance: none !important;
+          -webkit-appearance: none !important;
+          width: 14px !important;
+          height: 14px !important;
+          min-width: 14px !important;
+          min-height: 14px !important;
+          border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, #6C707E)) !important;
+          border-radius: 2.5px !important;
+          background: transparent !important;
+          background-color: transparent !important;
+          cursor: pointer !important;
+          position: relative !important;
+          outline: none !important;
+          margin: 0 !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          vertical-align: middle !important;
+          box-sizing: border-box !important;
+          transition: border-color 0.12s ease, background-color 0.12s ease !important;
+          flex-shrink: 0 !important;
+        }
+        input[type="checkbox"]:hover,
+        .as-custom-chk:hover {
+          border-color: var(--vscode-focusBorder, #CED0D6) !important;
+          background-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        input[type="checkbox"]:checked,
+        .as-custom-chk:checked {
+          background: transparent !important;
+          background-color: transparent !important;
+          border-color: var(--vscode-focusBorder, #CED0D6) !important;
+        }
+        input[type="checkbox"]:checked::after,
+        .as-custom-chk:checked::after {
+          content: '' !important;
+          position: absolute !important;
+          top: 1px !important;
+          left: 4px !important;
+          width: 3.5px !important;
+          height: 7px !important;
+          border: solid var(--vscode-editor-foreground, #CED0D6) !important;
+          border-width: 0 1.8px 1.8px 0 !important;
+          transform: rotate(45deg) !important;
+        }
+        input[type="checkbox"]:indeterminate,
+        .as-custom-chk:indeterminate {
+          background: transparent !important;
+          background-color: transparent !important;
+          border-color: var(--vscode-focusBorder, #CED0D6) !important;
+        }
+        input[type="checkbox"]:indeterminate::after,
+        .as-custom-chk:indeterminate::after {
+          content: '' !important;
+          position: absolute !important;
+          top: 5px !important;
+          left: 3px !important;
+          width: 6px !important;
+          height: 2px !important;
+          background: var(--vscode-editor-foreground, #CED0D6) !important;
+        }
+      `;
+      document.head.appendChild(cs);
+    }
+
+    if (!document.getElementById("as-auth-spin-style")) {
+      const s = document.createElement("style");
+      s.id = "as-auth-spin-style";
+      s.textContent = "@keyframes asAuthSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }";
+      document.head.appendChild(s);
+    }
+
+    let currentAuthMode = "token";
+    const tabToken = card.querySelector("#as-auth-tab-token");
+    const tabPassword = card.querySelector("#as-auth-tab-password");
+    const paneToken = card.querySelector("#as-auth-token-pane");
+    const panePassword = card.querySelector("#as-auth-password-pane");
+    const tokenInput = card.querySelector("#as-auth-token-input");
+    const tokenUserInput = card.querySelector("#as-auth-token-username");
+    const userInput = card.querySelector("#as-auth-user-input");
+    const passInput = card.querySelector("#as-auth-pass-input");
+    const rememberBox = card.querySelector("#as-auth-remember");
+    const errorMsg = card.querySelector("#as-auth-error-msg");
+    const btnCancel = card.querySelector("#as-auth-cancel");
+    const btnSubmit = card.querySelector("#as-auth-submit");
+    const btnText = card.querySelector("#as-auth-btn-text");
+    const spinner = card.querySelector("#as-auth-spinner");
+    const dotClose = card.querySelector(".as-dot-close");
+    const tokenToggle = card.querySelector("#as-auth-token-toggle");
+    const passToggle = card.querySelector("#as-auth-pass-toggle");
+
+    if (dotClose) {
+      dotClose.onmouseenter = () => {
+        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
+        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
+      };
+      dotClose.onmouseleave = () => {
+        dotClose.style.background = "none";
+        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
+      };
+    }
+
+    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
+    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
+    btnSubmit.onmouseenter = () => { btnSubmit.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
+    btnSubmit.onmouseleave = () => { btnSubmit.style.background = "var(--vscode-button-background, #3574f0)"; };
+
+    tabToken.onclick = () => {
+      currentAuthMode = "token";
+      tabToken.style.borderBottomColor = "var(--vscode-button-background, #3574f0)";
+      tabToken.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
+      tabToken.style.fontWeight = "600";
+      tabPassword.style.borderBottomColor = "transparent";
+      tabPassword.style.color = "var(--vscode-descriptionForeground, #8c9199)";
+      tabPassword.style.fontWeight = "500";
+      paneToken.style.display = "flex";
+      panePassword.style.display = "none";
+      tokenInput.focus();
+    };
+
+    tabPassword.onclick = () => {
+      currentAuthMode = "password";
+      tabPassword.style.borderBottomColor = "var(--vscode-button-background, #3574f0)";
+      tabPassword.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
+      tabPassword.style.fontWeight = "600";
+      tabToken.style.borderBottomColor = "transparent";
+      tabToken.style.color = "var(--vscode-descriptionForeground, #8c9199)";
+      tabToken.style.fontWeight = "500";
+      panePassword.style.display = "flex";
+      paneToken.style.display = "none";
+      userInput.focus();
+    };
+
+    tokenToggle.onclick = () => {
+      tokenInput.type = tokenInput.type === "password" ? "text" : "password";
+    };
+    passToggle.onclick = () => {
+      passInput.type = passInput.type === "password" ? "text" : "password";
+    };
+
+    const closeDialog = () => {
+      overlay.remove();
+      activeAuthDialog = null;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+
+    btnCancel.onclick = closeDialog;
+    if (dotClose) dotClose.onclick = closeDialog;
+    overlay.onclick = (e) => {
+      if (e.target === overlay) closeDialog();
+    };
+
+    const submit = () => {
+      errorMsg.style.display = "none";
+      let username = "";
+      let secret = "";
+
+      if (currentAuthMode === "token") {
+        secret = tokenInput.value.trim();
+        username = tokenUserInput.value.trim();
+        if (!secret) {
+          tokenInput.style.borderColor = "#ff5252";
+          tokenInput.focus();
+          return;
+        }
+      } else {
+        username = userInput.value.trim();
+        secret = passInput.value.trim();
+        if (!username) {
+          userInput.style.borderColor = "#ff5252";
+          userInput.focus();
+          return;
+        }
+        if (!secret) {
+          passInput.style.borderColor = "#ff5252";
+          passInput.focus();
+          return;
+        }
+      }
+
+      btnSubmit.disabled = true;
+      spinner.style.display = "inline-block";
+      btnText.textContent = "Verifying...";
+
+      postMessage("saveGitCredentials", {
+        remote,
+        url: rawUrl,
+        authType: currentAuthMode,
+        username,
+        token: currentAuthMode === "token" ? secret : undefined,
+        password: currentAuthMode === "password" ? secret : undefined,
+        remember: rememberBox.checked,
+      });
+    };
+
+    btnSubmit.onclick = submit;
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeDialog();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    setTimeout(() => {
+      tokenInput.focus();
+    }, 50);
+  }
+
+  window.openGitAuthDialog = openGitAuthDialog;
+
   function getPushFileIcon(filename) {
     const ext = filename.split('.').pop().toLowerCase();
     if (ext === 'dart') {
@@ -6031,7 +6417,7 @@ ${component_stack}
 
     const card = document.createElement('div');
     card.className = 'as-push-dialog-card';
-    card.style.cssText = 'background:#1e1f22;border:1px solid #43454a;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.85);width:760px;max-width:95vw;height:520px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;color:#dfe1e5;';
+    card.style.cssText = 'background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#43454a));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:760px;max-width:95vw;height:520px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);';
 
     const commits = pushInfo.commits || [];
     const totalFiles = pushInfo.totalFiles || [];
@@ -6041,29 +6427,27 @@ ${component_stack}
     const availableRemotes = (pushInfo.remotes && pushInfo.remotes.length > 0) ? pushInfo.remotes : [currentRemote];
 
     card.innerHTML = `
-      <div style="position:relative;display:flex;align-items:center;padding:10px 14px;background:#2b2d30;border-bottom:1px solid #323438;user-select:none;">
-        <div style="display:flex;gap:7px;align-items:center;z-index:2;">
-          <span class="as-push-dot-close" title="Close" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#4a4a4a;display:inline-block;"></span>
-          <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
-        </div>
-        <div id="push-dialog-title" style="position:absolute;left:0;right:0;text-align:center;font-weight:600;font-size:13px;color:#dfe1e5;pointer-events:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#323438));user-select:none;">
+        <span id="push-dialog-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
           Push Commits to ${escapePushHtml(currentRemote)}
-        </div>
+        </span>
+        <button class="as-dialog-close-btn as-push-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
       </div>
       <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
         <!-- Left Column: Branches & Commits -->
-        <div style="width:44%;border-right:1px solid #323438;display:flex;flex-direction:column;background:#1e1f22;overflow-y:auto;">
-          <div id="push-branch-header" style="display:flex;align-items:center;padding:7px 12px;background:#2675bf;color:#ffffff;font-size:12.5px;font-weight:500;cursor:pointer;user-select:none;gap:4px;overflow:hidden;position:relative;">
+        <div style="width:44%;border-right:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#323438));display:flex;flex-direction:column;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));overflow-y:auto;">
+          <div id="push-branch-header" style="display:flex;align-items:center;padding:7px 12px;background:var(--vscode-button-background,#2675bf);color:var(--vscode-button-foreground,#ffffff);font-size:12.5px;font-weight:500;cursor:pointer;user-select:none;gap:4px;overflow:hidden;position:relative;">
             <span style="font-weight:600;white-space:nowrap;">${escapePushHtml(pushInfo.currentBranch)}</span>
             <span style="opacity:0.7;margin:0 2px;">&rarr;</span>
             <div style="display:inline-flex;align-items:center;gap:2px;position:relative;">
-              <span id="push-remote-label" title="Click to change remote" style="color:#ffffff;font-weight:600;cursor:pointer;border-bottom:1px dashed rgba(255,255,255,0.6);">${escapePushHtml(currentRemote)}</span>
-              <div id="push-remote-dropdown" style="display:none;position:absolute;top:22px;left:0;background:#2b2d30;border:1px solid #43454a;border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.8);z-index:200;min-width:110px;padding:4px 0;"></div>
+              <span id="push-remote-label" title="Click to change remote" style="color:var(--vscode-button-foreground,#ffffff);font-weight:600;cursor:pointer;border-bottom:1px dashed rgba(255,255,255,0.6);">${escapePushHtml(currentRemote)}</span>
+              <div id="push-remote-dropdown" style="display:none;position:absolute;top:22px;left:0;background:var(--vscode-dropdown-background,var(--vscode-editorWidget-background,#2b2d30));border:1px solid var(--vscode-dropdown-border,var(--vscode-widget-border,#43454a));border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.8);z-index:200;min-width:110px;padding:4px 0;"></div>
             </div>
             <span style="opacity:0.7;margin:0 2px;">:</span>
-            <span id="push-target-branch-display" title="Click to edit remote branch name" style="color:#d0e3ff;text-decoration:underline;cursor:pointer;font-weight:500;white-space:nowrap;padding:1px 4px;border-radius:3px;">${escapePushHtml(currentTargetBranch)}</span>
-            <input id="push-target-branch-input" type="text" value="${escapeAttr(currentTargetBranch)}" style="display:none;background:#1e1f22;color:#ffffff;border:1.5px solid #3574f0;border-radius:3px;padding:2px 6px;font-size:12px;font-family:inherit;outline:none;width:150px;">
+            <span id="push-target-branch-display" title="Click to edit remote branch name" style="color:var(--vscode-textLink-activeForeground,#d0e3ff);text-decoration:underline;cursor:pointer;font-weight:500;white-space:nowrap;padding:1px 4px;border-radius:3px;">${escapePushHtml(currentTargetBranch)}</span>
+            <input id="push-target-branch-input" type="text" value="${escapeAttr(currentTargetBranch)}" style="display:none;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#ffffff);border:1.5px solid var(--vscode-focusBorder,#3574f0);border-radius:3px;padding:2px 6px;font-size:12px;font-family:inherit;outline:none;width:150px;">
             <span id="push-new-badge" style="background:rgba(255,255,255,0.22);color:#ffffff;font-size:10.5px;padding:1px 5px;border-radius:3px;margin-left:auto;white-space:nowrap;${pushInfo.isNew ? '' : 'display:none;'}">New</span>
           </div>
           <div id="push-commits-container" style="flex:1;overflow-y:auto;padding:4px 0;">
@@ -6071,14 +6455,14 @@ ${component_stack}
         </div>
 
         <!-- Right Column: Files Tree -->
-        <div style="width:56%;display:flex;flex-direction:column;background:#1e1f22;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#26282b;border-bottom:1px solid #323438;user-select:none;">
-            <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#dfe1e5;">
+        <div style="width:56%;display:flex;flex-direction:column;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#26282b));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#323438));user-select:none;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--vscode-editor-foreground,#dfe1e5);">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="#c49000"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A.5.5 0 0 0 8.92 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
               <span>${escapePushHtml(pushInfo.repoName)}</span>
-              <span id="push-files-count" style="color:#808080;font-size:11.5px;font-weight:normal;"></span>
+              <span id="push-files-count" style="color:var(--vscode-descriptionForeground,#808080);font-size:11.5px;font-weight:normal;"></span>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;color:#9aa0a6;">
+            <div style="display:flex;align-items:center;gap:6px;color:var(--vscode-icon-foreground,#9aa0a6);">
               <span title="View Options" style="cursor:pointer;font-size:12px;">👁</span>
             </div>
           </div>
@@ -6088,26 +6472,26 @@ ${component_stack}
       </div>
 
       <!-- Footer Bar -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#2b2d30;border-top:1px solid #323438;user-select:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#323438));user-select:none;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid #5c6164;color:#adb0b8;font-size:11.5px;cursor:pointer;" title="Help">?</span>
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#dfe1e5;cursor:pointer;">
-            <input type="checkbox" id="chk-push-tags" style="accent-color:#3574f0;width:14px;height:14px;cursor:pointer;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--vscode-widget-border,#5c6164);color:var(--vscode-descriptionForeground,#adb0b8);font-size:11.5px;cursor:pointer;" title="Help">?</span>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);cursor:pointer;">
+            <input type="checkbox" id="chk-push-tags" class="as-custom-chk" style="width:14px;height:14px;cursor:pointer;">
             <span>Push tags:</span>
           </label>
-          <select id="sel-push-tags" style="background:#1e1f22;color:#dfe1e5;border:1px solid #4e5157;border-radius:3px;padding:3px 6px;font-size:12px;outline:none;">
+          <select id="sel-push-tags" style="background:var(--vscode-dropdown-background,var(--vscode-input-background,#1e1f22));color:var(--vscode-dropdown-foreground,var(--vscode-input-foreground,#dfe1e5));border:1px solid var(--vscode-dropdown-border,var(--vscode-input-border,#4e5157));border-radius:3px;padding:3px 6px;font-size:12px;outline:none;">
             <option value="all">All</option>
             <option value="current">Current branch</option>
           </select>
         </div>
         <div style="display:flex;align-items:center;gap:10px;position:relative;">
-          <button id="btn-push-cancel" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+          <button id="btn-push-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
           <div style="display:inline-flex;border-radius:4px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.3);">
-            <button id="btn-push-submit" style="background:#3574f0;color:#ffffff;border:none;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Push</button>
-            <button id="btn-push-menu-trigger" style="background:#3574f0;color:#ffffff;border:none;border-left:1px solid rgba(255,255,255,0.25);padding:6px 8px;font-size:11px;cursor:pointer;" title="Push Options">▼</button>
+            <button id="btn-push-submit" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Push</button>
+            <button id="btn-push-menu-trigger" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-left:1px solid rgba(255,255,255,0.25);padding:6px 8px;font-size:11px;cursor:pointer;" title="Push Options">▼</button>
           </div>
-          <div id="push-dropdown-menu" style="display:none;position:absolute;bottom:36px;right:0;background:#2b2d30;border:1px solid #43454a;border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.7);padding:4px 0;z-index:100;min-width:180px;">
-            <div id="btn-force-push-opt" style="padding:6px 14px;font-size:12.5px;color:#dfe1e5;cursor:pointer;">Force Push (no-verify)...</div>
+          <div id="push-dropdown-menu" style="display:none;position:absolute;bottom:36px;right:0;background:var(--vscode-dropdown-background,var(--vscode-editorWidget-background,#2b2d30));border:1px solid var(--vscode-dropdown-border,var(--vscode-widget-border,#43454a));border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.7);padding:4px 0;z-index:100;min-width:180px;">
+            <div id="btn-force-push-opt" style="padding:6px 14px;font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);cursor:pointer;">Force Push (no-verify)...</div>
           </div>
         </div>
       </div>
@@ -6325,7 +6709,17 @@ ${component_stack}
 
     btnSubmit.addEventListener('click', () => doPush(false));
     btnCancel.addEventListener('click', close);
-    dotClose.addEventListener('click', close);
+    if (dotClose) {
+      dotClose.addEventListener('click', close);
+      dotClose.onmouseenter = () => {
+        dotClose.style.background = 'var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))';
+        dotClose.style.color = 'var(--vscode-editor-foreground, #dfe1e5)';
+      };
+      dotClose.onmouseleave = () => {
+        dotClose.style.background = 'none';
+        dotClose.style.color = 'var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))';
+      };
+    }
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
@@ -6576,7 +6970,7 @@ ${component_stack}
   var root3 = from_html(`<div class="commit-list-container svelte-1rusxbg"><div class="scroll-content"><div class="visible-rows svelte-1rusxbg"><div class="graph-column svelte-1rusxbg"><!></div> <div class="rows-column svelte-1rusxbg"></div></div></div></div> <!>`, 1);
   var $$css3 = {
     hash: "svelte-1rusxbg",
-    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:auto;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar {width:6px;height:6px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-track {background:transparent;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-corner {background:transparent;}.scroll-content {min-width:100%;width:max-content;}.visible-rows.svelte-1rusxbg {position:relative;display:block;min-width:100%;width:max-content;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg {box-sizing:border-box !important;height:25px !important;min-height:25px !important;max-height:25px !important;line-height:25px !important;display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;position:relative;border-bottom:none;min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg * {box-sizing:border-box;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground);}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:400;color:#9aa0a6;font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:#8c8c8c;font-size:0.88em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:0 0 auto;min-width:max-content;white-space:nowrap;color:#dfe1e5;font-size:0.92em;}body.hl-my-commits .author.is-my-commit {font-weight:700 !important;color:#ffffff !important;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .subject {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .author {color:#8c8c8c !important;font-weight:400;}body.hl-current-branch .commit-row.is-current-branch:not(.selected) {background:var(--vscode-editor-lineHighlightBackground, rgba(255, 255, 255, 0.045));}body.hl-current-branch .commit-row.is-current-branch:not(.selected):hover {background:var(--vscode-list-hoverBackground);}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
+    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:auto;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar {width:6px;height:6px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-track {background:transparent;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-corner {background:transparent;}.scroll-content {min-width:100%;width:max-content;}.visible-rows.svelte-1rusxbg {position:relative;display:block;min-width:100%;width:max-content;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg {box-sizing:border-box !important;height:25px !important;min-height:25px !important;max-height:25px !important;line-height:25px !important;display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;position:relative;border-bottom:none;min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg * {box-sizing:border-box;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground) !important;color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08) !important;}.commit-row.selected.svelte-1rusxbg:hover {background:var(--vscode-list-activeSelectionBackground) !important;filter:brightness(1.18);box-shadow:inset 0 0 0 999px rgba(255,255,255,0.14) !important;}.commit-row.selected.svelte-1rusxbg .author,.commit-row.selected.svelte-1rusxbg .date,.commit-row.selected.svelte-1rusxbg .subject,.commit-row.selected.svelte-1rusxbg .hash,.commit-row.selected.svelte-1rusxbg * {color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:400;color:#9aa0a6;font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:#8c8c8c;font-size:0.88em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:0 0 auto;min-width:max-content;white-space:nowrap;color:#dfe1e5;font-size:0.92em;}body.hl-my-commits .author.is-my-commit {font-weight:700 !important;color:#ffffff !important;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .subject {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .author {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.selected.svelte-1rusxbg .subject,body.hl-merge-commits .commit-row.selected.svelte-1rusxbg .author {color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;}body.hl-current-branch .commit-row.is-current-branch:not(.selected) {background:rgba(255,255,255,0.038) !important;box-shadow:inset 2px 0 0 0 var(--vscode-focusBorder, rgba(255,255,255,0.28)) !important;}body.hl-current-branch .commit-row.is-current-branch:not(.selected):hover {background:var(--vscode-list-hoverBackground) !important;box-shadow:inset 2px 0 0 0 var(--vscode-focusBorder, rgba(255,255,255,0.5)) !important;}body.hl-current-branch .commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground) !important;}body.hl-current-branch .commit-row.selected.svelte-1rusxbg:hover {background:var(--vscode-list-activeSelectionBackground) !important;filter:brightness(1.18);}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
   };
   function showToast(text) {
     const old = document.querySelector(".as-mini-toast");
@@ -6776,8 +7170,6 @@ ${component_stack}
       closeCommitContextMenu();
       const oldBranch = document.querySelector(".branch-context-menu");
       if (oldBranch) oldBranch.remove();
-
-      $$props.onSelectCommit(commit.hash);
 
       const commits = $$props.commits || [];
       const isHead = commits.length > 0 && commits[0].hash === commit.hash;
@@ -7009,13 +7401,23 @@ ${component_stack}
       let x = e.clientX;
       let y = e.clientY;
       const rect = menu.getBoundingClientRect();
-      if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
-      if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+      if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+      if (y + rect.height > window.innerHeight - 8) {
+        const yAbove = e.clientY - rect.height;
+        if (yAbove >= 8) {
+          y = yAbove;
+        } else {
+          y = Math.max(4, window.innerHeight - rect.height - 8);
+        }
+      }
       menu.style.left = Math.max(0, x) + "px";
       menu.style.top = Math.max(0, y) + "px";
     }
 
     function onContextMenu(e, commit) {
+      if (commit && commit.hash) {
+        $$props.onSelectCommit(commit.hash);
+      }
       showCommitContextMenu(e, commit);
     }
     function closeContextMenu() {
@@ -7187,6 +7589,8 @@ ${component_stack}
         },
         [() => formatDate(get(commit).authorDate)]
       );
+      div_5.addEventListener("click", () => $$props.onSelectCommit(get(commit).hash));
+      div_5.addEventListener("contextmenu", (e) => onContextMenu(e, get(commit)));
       delegated("click", div_5, () => $$props.onSelectCommit(get(commit).hash));
       delegated("contextmenu", div_5, (e) => onContextMenu(e, get(commit)));
       append($$anchor2, div_5);
@@ -7425,7 +7829,7 @@ ${component_stack}
   var root4 = from_html(`<div class="filter-bar svelte-51df0s"><input type="text" placeholder="Branch..." class="filter-input svelte-51df0s"/> <input type="text" placeholder="Author..." class="filter-input svelte-51df0s"/> <input type="date" placeholder="After..." class="filter-input date-input svelte-51df0s"/> <input type="date" placeholder="Before..." class="filter-input date-input svelte-51df0s"/> <input type="text" placeholder="File path..." class="filter-input svelte-51df0s"/> <button class="filter-btn svelte-51df0s">Filter</button> <button class="filter-btn clear svelte-51df0s">Clear</button></div>`);
   var $$css5 = {
     hash: "svelte-51df0s",
-    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;max-height:calc(100vh - 16px);overflow-y:auto;box-sizing:border-box;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.commit-context-menu::-webkit-scrollbar, .branch-context-menu::-webkit-scrollbar {width:5px;}.commit-context-menu::-webkit-scrollbar-thumb, .branch-context-menu::-webkit-scrollbar-thumb {background:rgba(255, 255, 255, 0.2);border-radius:3px;}.commit-context-menu::-webkit-scrollbar-thumb:hover, .branch-context-menu::-webkit-scrollbar-thumb:hover {background:rgba(255, 255, 255, 0.35);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.ccm-item.disabled {opacity:0.38;cursor:default;pointer-events:none;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff);opacity:0.9;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}.as-dialog-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1px);}.as-dialog-card {background:var(--vscode-editor-background, #1e1f22);border:1px solid var(--vscode-panel-border, #393b40);border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.75);width:560px;max-width:92vw;display:flex;flex-direction:column;color:var(--vscode-editor-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;overflow:hidden;box-sizing:border-box;}.as-dialog-header {padding:10px 16px;font-size:13px;font-weight:600;background:var(--vscode-titleBar-activeBackground, #2b2d30);border-bottom:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:space-between;user-select:none;}.as-dialog-close {cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.7;}.as-dialog-close:hover {opacity:1;background:rgba(255,255,255,0.1);}.as-dialog-body {padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}.as-dialog-field-label {font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #8c8c8c);text-transform:uppercase;letter-spacing:0.5px;}.as-dialog-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;}.as-dialog-input:focus, .as-dialog-textarea:focus {border-color:var(--vscode-focusBorder, #3574f0);}.as-dialog-textarea {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:8px 10px;font-size:12px;min-height:140px;max-height:320px;resize:vertical;outline:none;font-family:inherit;line-height:1.45;}.as-dialog-footer {padding:10px 16px;background:var(--vscode-editor-background, #1e1f22);border-top:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box;}.as-dialog-btn {padding:6px 16px;font-size:12px;border-radius:4px;cursor:pointer;border:none;font-weight:500;user-select:none;}.as-dialog-btn-primary {background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);}.as-dialog-btn-primary:hover {background:var(--vscode-button-hoverBackground, #355389);}.as-dialog-btn-secondary {background:transparent;color:var(--vscode-menu-foreground, #dfe1e5);border:1px solid var(--vscode-panel-border, #4e5157);}.as-dialog-btn-secondary:hover {background:rgba(255,255,255,0.08);}.as-dropdown-menu {position:absolute;top:calc(100% + 4px);background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;min-width:215px;z-index:2000;display:none;flex-direction:column;color:var(--vscode-menu-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;box-sizing:border-box;}.as-menu-section-header {padding:6px 10px 3px 10px;font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-align:left;}.as-menu-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.as-menu-item {display:flex;align-items:center;padding:3px 8px;border-radius:4px;cursor:pointer;height:24px;box-sizing:border-box;color:var(--vscode-menu-foreground, #dfe1e5);white-space:nowrap;position:relative;}.as-menu-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-item.selected {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-check {width:18px;min-width:18px;display:inline-flex;align-items:center;justify-content:flex-start;color:inherit;flex-shrink:0;}.as-menu-label {flex:1;text-align:left;}.as-menu-arrow {margin-left:auto;font-size:13px;opacity:0.7;}.as-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;min-width:140px;}.has-submenu:hover > .as-submenu {display:flex;}body.hide-col-author .author {display:none !important;}body.hide-col-date .date {display:none !important;}body.show-col-hash .hash {display:inline-block !important;color:#8c8c8c !important;font-family:var(--vscode-editor-font-family, monospace) !important;font-size:11px !important;user-select:text !important;width:68px !important;min-width:68px !important;}body.compact-refs .labels {gap:3px !important;}body.compact-refs .label {padding:0 3px !important;font-size:0.76em !important;}body.refs-on-left .labels {order:0 !important;margin-left:0 !important;margin-right:8px !important;}"
+    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;max-height:none;overflow:visible;box-sizing:border-box;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.commit-context-menu::-webkit-scrollbar, .branch-context-menu::-webkit-scrollbar {width:5px;}.commit-context-menu::-webkit-scrollbar-thumb, .branch-context-menu::-webkit-scrollbar-thumb {background:rgba(255, 255, 255, 0.2);border-radius:3px;}.commit-context-menu::-webkit-scrollbar-thumb:hover, .branch-context-menu::-webkit-scrollbar-thumb:hover {background:rgba(255, 255, 255, 0.35);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.ccm-item.disabled {opacity:0.38;cursor:default;pointer-events:none;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff);opacity:0.9;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}.as-dialog-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1px);}.as-dialog-card {background:var(--vscode-editor-background, #1e1f22);border:1px solid var(--vscode-panel-border, #393b40);border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.75);width:560px;max-width:92vw;display:flex;flex-direction:column;color:var(--vscode-editor-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;overflow:hidden;box-sizing:border-box;}.as-dialog-header {padding:10px 16px;font-size:13px;font-weight:600;background:var(--vscode-titleBar-activeBackground, #2b2d30);border-bottom:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:space-between;user-select:none;}.as-dialog-close {cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.7;}.as-dialog-close:hover {opacity:1;background:rgba(255,255,255,0.1);}.as-dialog-body {padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}.as-dialog-field-label {font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #8c8c8c);text-transform:uppercase;letter-spacing:0.5px;}.as-dialog-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;}.as-dialog-input:focus, .as-dialog-textarea:focus {border-color:var(--vscode-focusBorder, #3574f0);}.as-dialog-textarea {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:8px 10px;font-size:12px;min-height:140px;max-height:320px;resize:vertical;outline:none;font-family:inherit;line-height:1.45;}.as-dialog-footer {padding:10px 16px;background:var(--vscode-editor-background, #1e1f22);border-top:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box;}.as-dialog-btn {padding:6px 16px;font-size:12px;border-radius:4px;cursor:pointer;border:none;font-weight:500;user-select:none;}.as-dialog-btn-primary {background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);}.as-dialog-btn-primary:hover {background:var(--vscode-button-hoverBackground, #355389);}.as-dialog-btn-secondary {background:transparent;color:var(--vscode-menu-foreground, #dfe1e5);border:1px solid var(--vscode-panel-border, #4e5157);}.as-dialog-btn-secondary:hover {background:rgba(255,255,255,0.08);}.as-dropdown-menu {position:absolute;top:calc(100% + 4px);background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;min-width:215px;z-index:2000;display:none;flex-direction:column;color:var(--vscode-menu-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;box-sizing:border-box;}.as-menu-section-header {padding:6px 10px 3px 10px;font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-align:left;}.as-menu-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.as-menu-item {display:flex;align-items:center;padding:3px 8px;border-radius:4px;cursor:pointer;height:24px;box-sizing:border-box;color:var(--vscode-menu-foreground, #dfe1e5);white-space:nowrap;position:relative;}.as-menu-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-item.selected {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-check {width:18px;min-width:18px;display:inline-flex;align-items:center;justify-content:flex-start;color:inherit;flex-shrink:0;}.as-menu-label {flex:1;text-align:left;}.as-menu-arrow {margin-left:auto;font-size:13px;opacity:0.7;}.as-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;min-width:140px;}.has-submenu:hover > .as-submenu {display:flex;}body.hide-col-author .author {display:none !important;}body.hide-col-date .date {display:none !important;}body.show-col-hash .hash {display:inline-block !important;color:#8c8c8c !important;font-family:var(--vscode-editor-font-family, monospace) !important;font-size:11px !important;user-select:text !important;width:68px !important;min-width:68px !important;}body.compact-refs .labels {gap:3px !important;}body.compact-refs .label {padding:0 3px !important;font-size:0.76em !important;}body.refs-on-left .labels {order:0 !important;margin-left:0 !important;margin-right:8px !important;}"
   };
       function FilterBar($$anchor, $$props) {
     push($$props, true);
@@ -8405,7 +8809,7 @@ ${component_stack}
   var root5 = from_html(`<div class="app svelte-1lrl78g"><!> <div class="main-area svelte-1lrl78g"><div class="center-area svelte-1lrl78g"><!></div> <!></div></div>`);
   var $$css6 = {
     hash: "svelte-1lrl78g",
-    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:140px;background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:1em;transition:width 0.12s ease;}.branch-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.branch-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.branch-splitter:hover, .branch-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.branch-sidebar.collapsed + .branch-splitter {display:none !important;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.95em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.branch-tree-content::-webkit-scrollbar {width:6px;height:6px;}.branch-tree-content::-webkit-scrollbar-track {background:transparent;}.branch-tree-content::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.branch-tree-content::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.tree-section-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:1em;}.tree-section-header:hover {background:var(--vscode-list-hoverBackground);}.tree-folder-header {padding:3px 6px;font-weight:400;color:#ffffff;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:1em;border-radius:3px;margin:1px 4px;user-select:none;}.tree-folder-header:hover {background:var(--vscode-list-hoverBackground);color:#ffffff;}.tree-folder-header:hover .tree-item-icon {color:#dfe1e5 !important;}.tree-item-icon {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:4px;}.tree-item {display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:1em;user-select:none;}.tree-folder-body {padding-left:20px;}.tree-section-body {padding-left:8px;}.arrow.spacer {visibility:hidden !important;pointer-events:none;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.current-head:not(.active) {color:var(--vscode-foreground,#dfe1e5);font-weight:600;}.tree-item.active {background:var(--vscode-list-activeSelectionBackground) !important;color:var(--vscode-list-activeSelectionForeground) !important;font-weight:600;}.tree-item.active .branch-name {color:var(--vscode-list-activeSelectionForeground) !important;}.head-branch-box {display:flex;align-items:center;justify-content:space-between;padding:4px 8px;margin:2px 4px 4px 4px;background:transparent;border-radius:4px;cursor:pointer;user-select:none;font-size:1em;font-weight:600;color:var(--vscode-foreground,#dfe1e5);transition:background 0.12s ease;}.head-branch-box:hover {background:var(--vscode-list-hoverBackground, rgba(255,255,255,0.08));}.head-branch-box.active {background:var(--vscode-list-activeSelectionBackground,#04395e);color:var(--vscode-list-activeSelectionForeground,#ffffff);}.branch-icon {color:#dfe1e5;}.branch-icon.remote {color:#dfe1e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#8c8c8c;}.arrow {color:var(--vscode-descriptionForeground, #8c8c8c);width:16px;height:16px;min-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;opacity:0.85;transition:opacity 0.1s ease, color 0.1s ease;}.arrow:hover {opacity:1;color:var(--vscode-foreground, #dfe1e5);}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {position:relative;width:300px;min-width:180px;overflow-y:auto;flex-shrink:0;box-sizing:border-box;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar {width:6px;height:6px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-track {background:transparent;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.detail-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.detail-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.detail-splitter:hover, .detail-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.detail-close-btn {position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:4px;color:var(--vscode-foreground, #cccccc);opacity:0.7;cursor:pointer;z-index:10;transition:all 0.15s ease;padding:0;}.detail-close-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;}.app-tooltip {position:fixed;z-index:99999;pointer-events:none;background:var(--vscode-editorHoverWidget-background, #252526);color:var(--vscode-editorHoverWidget-foreground, #cccccc);border:1px solid var(--vscode-editorHoverWidget-border, #454545);box-shadow:0 4px 14px rgba(0,0,0,0.45);padding:4px 8px;border-radius:4px;font-size:11px;font-family:var(--vscode-font-family, system-ui, sans-serif);line-height:1.4;white-space:nowrap;opacity:0;visibility:hidden;transition:opacity 0.12s ease, visibility 0.12s ease;}.app-tooltip.visible {opacity:1;visibility:visible;}.app-tooltip .tooltip-shortcut {margin-left:6px;opacity:0.65;font-size:10px;background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);}.app-tooltip.side-right::before {content:\"\";position:absolute;top:50%;left:-5px;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--vscode-editorHoverWidget-border, #454545);}.app-tooltip.side-bottom::before {content:\"\";position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:5px solid var(--vscode-editorHoverWidget-border, #454545);}"
+    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:140px;background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:1em;transition:width 0.12s ease;}.branch-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.branch-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.branch-splitter:hover, .branch-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.branch-sidebar.collapsed + .branch-splitter {display:none !important;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.95em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:auto;padding:4px 0;}.branch-tree-content::-webkit-scrollbar {width:6px;height:6px;}.branch-tree-content::-webkit-scrollbar-track {background:transparent;}.branch-tree-content::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.branch-tree-content::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.tree-section-header {padding:4px 8px;font-weight:600;color:var(--vscode-sideBarTitle-foreground, #ccc);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:1em;}.tree-section-header:hover {background:var(--vscode-list-hoverBackground);}.tree-folder-header {padding:3px 6px;font-weight:400;color:#ffffff;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:1em;border-radius:3px;margin:1px 4px;user-select:none;}.tree-folder-header:hover {background:var(--vscode-list-hoverBackground);color:#ffffff;}.tree-folder-header:hover .tree-item-icon {color:#dfe1e5 !important;}.tree-item-icon {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:4px;}.tree-item {display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:1em;user-select:none;}.tree-folder-body {padding-left:20px;}.tree-section-body {padding-left:8px;}.arrow.spacer {visibility:hidden !important;pointer-events:none;}.tree-item-star-slot {display:none;}.tree-item-star-slot.is-fav {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;line-height:1;margin-right:2px;user-select:none;color:#e5a50a !important;visibility:visible !important;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.current-head:not(.active) {color:var(--vscode-foreground,#dfe1e5);font-weight:600;}.tree-item.active {background:var(--vscode-list-activeSelectionBackground) !important;color:var(--vscode-list-activeSelectionForeground) !important;font-weight:600;}.tree-item.active .branch-name {color:var(--vscode-list-activeSelectionForeground) !important;}.head-branch-box {display:flex;align-items:center;justify-content:space-between;padding:4px 8px;margin:2px 4px 4px 4px;background:transparent;border-radius:4px;cursor:pointer;user-select:none;font-size:1em;font-weight:600;color:var(--vscode-foreground,#dfe1e5);transition:background 0.12s ease;}.head-branch-box:hover {background:var(--vscode-list-hoverBackground, rgba(255,255,255,0.08));}.head-branch-box.active {background:var(--vscode-list-activeSelectionBackground,#04395e);color:var(--vscode-list-activeSelectionForeground,#ffffff);}.branch-icon {color:#dfe1e5;}.branch-icon.remote {color:#dfe1e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#8c8c8c;}.arrow {color:var(--vscode-descriptionForeground, #8c8c8c);width:16px;height:16px;min-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;opacity:0.85;transition:opacity 0.1s ease, color 0.1s ease;}.arrow:hover {opacity:1;color:var(--vscode-foreground, #dfe1e5);}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {position:relative;width:300px;min-width:180px;overflow-y:auto;flex-shrink:0;box-sizing:border-box;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar {width:6px;height:6px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-track {background:transparent;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.detail-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.detail-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.detail-splitter:hover, .detail-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.detail-close-btn {position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:4px;color:var(--vscode-foreground, #cccccc);opacity:0.7;cursor:pointer;z-index:10;transition:all 0.15s ease;padding:0;}.detail-close-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:320px;padding:32px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;}.app-tooltip {position:fixed;z-index:99999;pointer-events:none;background:var(--vscode-editorHoverWidget-background, #252526);color:var(--vscode-editorHoverWidget-foreground, #cccccc);border:1px solid var(--vscode-editorHoverWidget-border, #454545);box-shadow:0 4px 14px rgba(0,0,0,0.45);padding:4px 8px;border-radius:4px;font-size:11px;font-family:var(--vscode-font-family, system-ui, sans-serif);line-height:1.4;white-space:nowrap;opacity:0;visibility:hidden;transition:opacity 0.12s ease, visibility 0.12s ease;}.app-tooltip.visible {opacity:1;visibility:visible;}.app-tooltip .tooltip-shortcut {margin-left:6px;opacity:0.65;font-size:10px;background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);}.app-tooltip.side-right::before {content:\"\";position:absolute;top:50%;left:-5px;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--vscode-editorHoverWidget-border, #454545);}.app-tooltip.side-bottom::before {content:\"\";position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:5px solid var(--vscode-editorHoverWidget-border, #454545);}"
   };
   function App($$anchor, $$props) {
     push($$props, true);
@@ -8428,8 +8832,14 @@ ${component_stack}
       unsubscribe = onMessage((msg) => {
         switch (msg.type) {
           case "noGitRepo": {
+            window.__IS_SUB_REPO__ = false;
             hasInitializedActiveBranch = false;
             set(loading, false);
+            set(commits, [], true);
+            set(selectedHash, null, true);
+            set(selectedFiles, [], true);
+            set(activeBranch, "", true);
+            set(branchData, { branches: [], tags: [], currentBranch: "" }, true);
             set(noGitData, msg.payload, true);
             break;
           }
@@ -8444,14 +8854,30 @@ ${component_stack}
             }
             break;
           }
-          case "pushError": {
-            if (activePushDialog) {
-              const btn = activePushDialog.querySelector('#btn-push-submit');
-              if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Push';
-                btn.style.opacity = '1';
+          case "showAuthDialog": {
+            openGitAuthDialog(msg.payload);
+            break;
+          }
+          case "authSuccess": {
+            if (activeAuthDialog) {
+              activeAuthDialog.remove();
+              activeAuthDialog = null;
+            }
+            break;
+          }
+          case "authError": {
+            if (activeAuthDialog) {
+              const errEl = activeAuthDialog.querySelector('#as-auth-error-msg');
+              const submitBtn = activeAuthDialog.querySelector('#as-auth-submit');
+              const spinner = activeAuthDialog.querySelector('#as-auth-spinner');
+              const btnText = activeAuthDialog.querySelector('#as-auth-btn-text');
+              if (errEl) {
+                errEl.style.display = 'block';
+                errEl.textContent = msg.payload?.error || 'Authentication failed. Please verify credentials.';
               }
+              if (submitBtn) submitBtn.disabled = false;
+              if (spinner) spinner.style.display = 'none';
+              if (btnText) btnText.textContent = 'Log In';
             }
             break;
           }
@@ -8462,6 +8888,9 @@ ${component_stack}
             }
             if (p.currentBranch !== undefined) {
               window.__GIT_CURRENT_BRANCH__ = p.currentBranch;
+            }
+            if (p.isSubRepo !== undefined) {
+              window.__IS_SUB_REPO__ = !!p.isSubRepo;
             }
             document.querySelectorAll(".no-git-container").forEach(el => el.remove());
             const seen = new Set();
@@ -8478,6 +8907,8 @@ ${component_stack}
             set(commits, unique, true);
             set(graphWidth, p.graphWidth, true);
             set(loading, false);
+            const sideEl = document.querySelector(".branch-sidebar");
+            if (sideEl && sideEl._updateExitBtn) sideEl._updateExitBtn();
             break;
           }
           case "reachedEnd": {
@@ -8494,6 +8925,9 @@ ${component_stack}
             if (msg.payload && msg.payload.currentBranch !== undefined) {
               window.__GIT_CURRENT_BRANCH__ = msg.payload.currentBranch;
             }
+            if (msg.payload && msg.payload.isSubRepo !== undefined) {
+              window.__IS_SUB_REPO__ = !!msg.payload.isSubRepo;
+            }
             set(branchData, msg.payload, true);
             if (!hasInitializedActiveBranch) {
               hasInitializedActiveBranch = true;
@@ -8501,6 +8935,9 @@ ${component_stack}
                 set(activeBranch, msg.payload.activeBranch, true);
               }
             }
+            const sideEl = document.querySelector(".branch-sidebar");
+            if (sideEl && sideEl._updateExitBtn) sideEl._updateExitBtn();
+            if (sideEl && sideEl._updateStarBtn) sideEl._updateStarBtn();
             break;
           }
           case "commitFiles": {
@@ -8542,9 +8979,47 @@ ${component_stack}
     }
     function renderSidebarContent(container) {
       if (!container) return;
+      if (container._selectedTreeBranch === undefined) {
+        container._selectedTreeBranch = get(activeBranch) || "";
+      }
       const data = get(branchData);
       const currentActive = get(activeBranch);
       const { branches = [], tags = [], currentBranch = "" } = data;
+
+      function getFavorites() {
+        try {
+          const raw = localStorage.getItem("intellij_git_fav_branches");
+          if (raw) return new Set(JSON.parse(raw));
+        } catch {}
+        return new Set(["develop", "main", "master"]);
+      }
+
+      function saveFavorites(favSet) {
+        try {
+          localStorage.setItem("intellij_git_fav_branches", JSON.stringify(Array.from(favSet)));
+        } catch {}
+      }
+
+      function isBranchFavorite(name) {
+        if (!name) return false;
+        const favs = getFavorites();
+        return favs.has(name) || favs.has(name.replace(/^origin\//, ""));
+      }
+
+      function toggleBranchFavorite(name) {
+        if (!name) return;
+        const favs = getFavorites();
+        const cleanName = name.replace(/^origin\//, "");
+        if (favs.has(name) || favs.has(cleanName)) {
+          favs.delete(name);
+          favs.delete(cleanName);
+        } else {
+          favs.add(name);
+        }
+        saveFavorites(favs);
+      }
+
+      const getCurrentBranchName = () => (get(branchData) && get(branchData).currentBranch) || window.__GIT_CURRENT_BRANCH__ || "";
 
       // Close any open context menu
       function closeBranchContextMenu() {
@@ -8635,6 +9110,11 @@ ${component_stack}
           addItem("Delete Remote Branch...", "", () => {
             postMessage("deleteBranch", branchName);
           });
+          addDivider();
+          addItem("Log In / Manage Credentials...", "", () => {
+            const rName = branchName.includes("/") ? branchName.split("/")[0] : "origin";
+            postMessage("openAuthDialog", { remote: rName });
+          });
         } else {
           addItem("Checkout", "", () => {
             postMessage("checkout", branchName);
@@ -8679,8 +9159,15 @@ ${component_stack}
         let x = e.clientX;
         let y = e.clientY;
         const rect = menu.getBoundingClientRect();
-        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
-        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+        if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+        if (y + rect.height > window.innerHeight - 8) {
+          const yAbove = e.clientY - rect.height;
+          if (yAbove >= 8) {
+            y = yAbove;
+          } else {
+            y = Math.max(4, window.innerHeight - rect.height - 8);
+          }
+        }
         menu.style.left = Math.max(0, x) + "px";
         menu.style.top = Math.max(0, y) + "px";
       }
@@ -8721,16 +9208,18 @@ ${component_stack}
         let x = e.clientX;
         let y = e.clientY;
         const rect = menu.getBoundingClientRect();
-        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
-        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+        if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+        if (y + rect.height > window.innerHeight - 8) {
+          const yAbove = e.clientY - rect.height;
+          if (yAbove >= 8) {
+            y = yAbove;
+          } else {
+            y = Math.max(4, window.innerHeight - rect.height - 8);
+          }
+        }
         menu.style.left = Math.max(0, x) + "px";
         menu.style.top = Math.max(0, y) + "px";
       }
-
-      document.addEventListener("click", closeBranchContextMenu);
-      window.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-      }, true);
 
       // 1. Tooltip system attached to document.body
       let tooltipEl = document.querySelector(".app-tooltip");
@@ -8850,17 +9339,14 @@ ${component_stack}
       function populateTree(searchQuery) {
         if (!treeContent) return;
         treeContent.innerHTML = "";
+        const currentActive = (container._selectedTreeBranch !== undefined && container._selectedTreeBranch !== null) ? container._selectedTreeBranch : (get(activeBranch) || "");
         const latestData = get(branchData) || {};
         const branches = latestData.branches || [];
         const tags = latestData.tags || [];
         const currentBranch = latestData.currentBranch || "";
-        const currentActive = get(activeBranch);
-        const favOnly = container.dataset.favOnly === "true";
         const query = (searchQuery !== undefined ? searchQuery : (sInput ? sInput.value : "")).toLowerCase().trim();
-        const isFavoriteBranch = (name) => name === currentBranch || name === "develop" || name === "main" || name === "master" || name.endsWith("/develop") || name.endsWith("/main");
         const filterFn = (name) => {
           if (query && !name.toLowerCase().includes(query)) return false;
-          if (favOnly && !isFavoriteBranch(name)) return false;
           return true;
         };
 
@@ -8890,14 +9376,22 @@ ${component_stack}
           return { sec, bdy };
         }
 
-        function handleBranchClick(name) {
-          if (get(activeBranch) === name) {
-            set(activeBranch, "", true);
-            onFilter({});
-          } else {
-            set(activeBranch, name, true);
-            onFilter({ branch: name });
+        function selectBranch(name) {
+          container._selectedTreeBranch = name;
+          if (container._updateStarBtn) {
+            container._updateStarBtn();
           }
+          populateTree();
+        }
+
+        function openBranchLog(name) {
+          container._selectedTreeBranch = name;
+          set(activeBranch, name, true);
+          onFilter({ branch: name });
+          if (container._updateStarBtn) {
+            container._updateStarBtn();
+          }
+          populateTree();
         }
 
         function getTrackingHtml(b) {
@@ -8923,10 +9417,14 @@ ${component_stack}
           headBox.className = "head-branch-box" + (currentActive === "HEAD" ? " active" : "");
           const curInfo = branches.find((b) => b.name === currentBranch);
           const trackHtml = getTrackingHtml(curInfo);
-          headBox.innerHTML = '<span class="head-title">HEAD (Current Branch)</span>' + trackHtml;
+          headBox.innerHTML = '<span class="head-title" style="display:inline-flex;align-items:center;gap:4px;">HEAD (Current Branch)</span>' + trackHtml;
           headBox.title = "HEAD (" + currentBranch + ")";
-          headBox.addEventListener("click", () => handleBranchClick("HEAD"));
-          headBox.addEventListener("contextmenu", (e) => showBranchContextMenu(e, currentBranch));
+          headBox.addEventListener("click", () => selectBranch("HEAD"));
+          headBox.addEventListener("dblclick", () => openBranchLog("HEAD"));
+          headBox.addEventListener("contextmenu", (e) => {
+            selectBranch("HEAD");
+            showBranchContextMenu(e, currentBranch);
+          });
           treeContent.appendChild(headBox);
         }
 
@@ -8963,15 +9461,31 @@ ${component_stack}
             item.className = "tree-item" + (currentActive === b.name ? " active" : "") + (b.name === currentBranch ? " current-head" : "");
 
             const isCur = (b.name === currentBranch);
+            const isFav = isBranchFavorite(b.name);
             let icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
             if (isCur) icon = '<span class="tree-item-icon">' + svgTagIcon + '</span>';
 
+            const starSlot = isFav ? '<span class="tree-item-star-slot is-fav" title="Favorite">★</span>' : '';
+
             const trackHtml = getTrackingHtml(b);
-            const spacer = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span>';
-            item.innerHTML = spacer + icon + '<span class="branch-name" style="' + (isCur ? 'font-weight:600;' : '') + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
+            item.innerHTML = starSlot + icon + '<span class="branch-name" style="' + (isCur ? 'font-weight:600;' : '') + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
             item.title = b.name;
-            item.addEventListener("click", () => handleBranchClick(b.name));
-            item.addEventListener("contextmenu", (e) => showBranchContextMenu(e, b.name));
+            item.addEventListener("click", () => selectBranch(b.name));
+            item.addEventListener("dblclick", () => openBranchLog(b.name));
+            item.addEventListener("contextmenu", (e) => {
+              selectBranch(b.name);
+              showBranchContextMenu(e, b.name);
+            });
+
+            const starEl = item.querySelector(".tree-item-star-slot");
+            if (starEl) {
+              starEl.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleBranchFavorite(b.name);
+                if (container && container._updateStarBtn) container._updateStarBtn();
+                populateTree();
+              });
+            }
             lvlContainer.appendChild(item);
           }
 
@@ -9051,9 +9565,10 @@ ${component_stack}
           const tagSec = createSec("Tags", false);
           for (const t of tags.filter((t) => filterFn(t.name))) {
             const item = document.createElement("div");
-            item.className = "tree-item";
+            item.className = "tree-item" + (currentActive === t.name ? " active" : "");
             item.innerHTML = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span><span class="tree-item-icon">' + svgTagIcon + '</span><span>' + t.name + '</span>';
-            item.addEventListener("click", () => handleBranchClick(t.name));
+            item.addEventListener("click", () => selectBranch(t.name));
+            item.addEventListener("dblclick", () => openBranchLog(t.name));
             tagSec.bdy.appendChild(item);
           }
           treeContent.appendChild(tagSec.sec);
@@ -9069,6 +9584,8 @@ ${component_stack}
         treeContent.querySelectorAll(".track-badge").forEach((badge) => {
           attachTooltip(badge, badge.dataset.tooltip || badge.title || "", "", "bottom");
         });
+        if (container._updateStarBtn) container._updateStarBtn();
+        if (container._updateExitBtn) container._updateExitBtn();
         container._populateTree = populateTree;
       }
 
@@ -9103,13 +9620,13 @@ ${component_stack}
 
         // New branch (+)
         addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch...", () => {
-          const base = get(activeBranch) || currentBranch || "HEAD";
+          const base = container._selectedTreeBranch || get(activeBranch) || getCurrentBranchName() || "HEAD";
           openCreateBranchDialog(base);
         }, "", "+");
 
         // Fetch / Update Selected Branch (↙)
         addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch", () => {
-          const target = get(activeBranch) || currentBranch;
+          const target = container._selectedTreeBranch || get(activeBranch) || getCurrentBranchName();
           if (target) {
             postMessage("pull", target);
           }
@@ -9117,19 +9634,18 @@ ${component_stack}
 
         // Delete Selected Branch (🗑)
         addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch", () => {
-          const target = get(activeBranch);
-          if (target && target !== currentBranch) {
+          const target = container._selectedTreeBranch || get(activeBranch);
+          if (target && target !== getCurrentBranchName()) {
             postMessage("deleteBranch", target);
           }
         }, "", "Delete");
 
         // Compare with Current Branch (⇄)
         addStripBtn('<svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.85355 8.14645C5.65829 7.95118 5.34171 7.95118 5.14645 8.14645C4.95118 8.34171 4.95118 8.65829 5.14645 8.85355L7.29289 11H0.5C0.223858 11 0 11.2239 0 11.5C0 11.7761 0.223858 12 0.5 12H7.29289L5.14645 14.1464C4.95118 14.3417 4.95118 14.6583 5.14645 14.8536C5.34171 15.0488 5.65829 15.0488 5.85355 14.8536L8.85355 11.8536L9.20711 11.5L8.85355 11.1464L5.85355 8.14645Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z" fill="currentColor"/></svg>', "Compare with Current Branch", () => {
-          const target = get(activeBranch);
-          if (target && target !== currentBranch) {
-            postMessage("compareBranch", { branch: target, withBranch: currentBranch });
-          } else if (target) {
-            postMessage("compareBranch", { branch: target, withBranch: currentBranch });
+          const target = container._selectedTreeBranch || get(activeBranch);
+          const cur = getCurrentBranchName();
+          if (target) {
+            postMessage("compareBranch", { branch: target, withBranch: cur });
           }
         }, "", "Compare");
 
@@ -9163,23 +9679,56 @@ ${component_stack}
           sectionCollapseState.forEach((_, k) => sectionCollapseState.set(k, !shouldOpen));
         });
 
-        // Star / Favorites Filter
-        const favOnly = container.dataset.favOnly === "true";
-        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="' + (favOnly ? "#e5a50a" : "none") + '" stroke="' + (favOnly ? "#e5a50a" : "currentColor") + '" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>', favOnly ? "Show All Branches" : "Filter Favorite Branches (★)", (btn) => {
-          const nowFav = container.dataset.favOnly !== "true";
-          container.dataset.favOnly = nowFav ? "true" : "false";
-          btn.classList.toggle("active", nowFav);
-          btn.querySelector("svg").setAttribute("fill", nowFav ? "#e5a50a" : "none");
-          btn.querySelector("svg").setAttribute("stroke", nowFav ? "#e5a50a" : "currentColor");
-          populateTree();
-        }, favOnly ? "active" : "");
+        // Favorite / Unfavorite Selected Branch (★)
+        const starOutlineSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
+        const starFilledSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#e5a50a" stroke="#e5a50a" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
 
-        // Locate Current Branch (HEAD)
-        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>', "Locate Current Branch (HEAD)", () => {
-          if (currentBranch) {
-            handleBranchClick(currentBranch);
+        let starBtn = addStripBtn(starOutlineSvg, "Favorite / Unfavorite Selected Branch (★)", () => {
+          const sel = container._selectedTreeBranch || get(activeBranch);
+          const target = sel === "HEAD" ? getCurrentBranchName() : (sel || getCurrentBranchName());
+          if (!target) return;
+          toggleBranchFavorite(target);
+          updateStarBtn();
+          populateTree();
+        }, "", "Favorite");
+
+        function updateStarBtn() {
+          if (!starBtn) return;
+          const sel = container._selectedTreeBranch || get(activeBranch);
+          const target = sel === "HEAD" ? getCurrentBranchName() : (sel || getCurrentBranchName());
+          const fav = isBranchFavorite(target);
+          starBtn.innerHTML = fav ? starFilledSvg : starOutlineSvg;
+          starBtn.classList.toggle("active", fav);
+          if (target) {
+            updateTooltip(starBtn, fav ? ("Remove '" + target + "' from Favorites (★)") : ("Add '" + target + "' to Favorites (★)"));
+          } else {
+            updateTooltip(starBtn, "Favorite / Unfavorite Selected Branch (★)");
           }
-        });
+        }
+        container._updateStarBtn = updateStarBtn;
+        updateStarBtn();
+
+        // Git Remote Credentials / Log In (Outlined Key Icon - Placed at the end)
+        const keyOutlinedSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 2.5 2.5"></path><path d="m18.5 4.5 2.5 2.5"></path><circle cx="7.5" cy="15.5" r="1.5"></circle></svg>';
+        addStripBtn(keyOutlinedSvg, "Git Remote Logins & Credentials", () => {
+          postMessage("openAuthDialog");
+        }, "", "Git Log In");
+
+        // Exit Sub-repo (Door Icon)
+        const exitDoorSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>';
+        const exitRepoBtn = addStripBtn(exitDoorSvg, "Exit Repository (Choose Another Repo)", () => {
+          postMessage("exitSubRepo");
+        }, "exit-subrepo-btn", "Exit");
+        exitRepoBtn.style.marginTop = "auto";
+
+        function updateExitBtn() {
+          if (!exitRepoBtn) return;
+          const latestData = get(branchData) || {};
+          const isSub = !!(latestData.isSubRepo || window.__IS_SUB_REPO__);
+          exitRepoBtn.style.display = isSub ? "flex" : "none";
+        }
+        container._updateExitBtn = updateExitBtn;
+        updateExitBtn();
 
         container.appendChild(strip);
 
@@ -9292,6 +9841,7 @@ ${component_stack}
               btn.style.cssText = "display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;border-radius:4px;background:#2e436e;color:#ffffff;border:1px solid #3e5b94;font-size:12px;font-weight:500;cursor:pointer;width:100%;";
               btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> Open repository in \"' + r.name + '\"';
               btn.addEventListener("click", () => {
+                window.__IS_SUB_REPO__ = true;
                 div.remove();
                 document.querySelectorAll(".no-git-container").forEach(el => el.remove());
                 set(noGitData, null, true);
@@ -9345,7 +9895,7 @@ ${component_stack}
       if_block(node_1, ($$render) => {
         if (get(loading))
           $$render(consequent);
-        else if (get(commits).length === 0)
+        else if (get(noGitData) || get(commits).length === 0)
           $$render(consequent_1, 1);
         else
           $$render(alternate, false);

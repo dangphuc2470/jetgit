@@ -36,6 +36,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private currentBranchCommits: Set<string> = new Set();
   private currentUser: { name: string; email: string } = { name: '', email: '' };
   private currentBranchName: string = '';
+  private initialWorkspaceRoot: string = '';
 
   private async updateBranchAndUser(): Promise<void> {
     try {
@@ -95,11 +96,21 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   async loadInitialData(): Promise<void> {
+    if (!this.initialWorkspaceRoot) {
+      this.initialWorkspaceRoot = this.gitService.getCwd();
+    }
     const isRepo = await this.gitService.isGitRepo();
     if (!isRepo) {
       this.log.appendLine('Current directory is not a git repository. Searching subfolders...');
       const subRepos = await this.gitService.findSubRepos();
       this.log.appendLine(`Found ${subRepos.length} sub-repositories: ${subRepos.map(r => r.name).join(', ')}`);
+      this.allCommits = [];
+      this.graphNodes = [];
+      this.lastBranches = [];
+      this.lastTags = [];
+      this.currentBranchName = '';
+      this.currentBranchCommits.clear();
+      this.currentFilter = {};
       this.view?.webview.postMessage({
         type: 'noGitRepo',
         payload: {
@@ -164,6 +175,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
   private sendCommits(): void {
     const isSingleBranch = !!this.currentFilter.branch;
+    const isSubRepo = !!(this.initialWorkspaceRoot && this.gitService.getCwd() !== this.initialWorkspaceRoot);
     this.view?.webview.postMessage({
       type: 'commits',
       payload: {
@@ -175,6 +187,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         graphWidth: graphWidth(this.graphNodes),
         currentUser: this.currentUser,
         currentBranch: this.currentBranchName,
+        isSubRepo,
       },
     });
   }
@@ -188,6 +201,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    const isSubRepo = !!(this.initialWorkspaceRoot && this.gitService.getCwd() !== this.initialWorkspaceRoot);
+
     this.view?.webview.postMessage({
       type: 'branches',
       payload: {
@@ -196,6 +211,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         currentBranch: this.currentBranchName || currentBranch,
         currentUser: this.currentUser,
         activeBranch: this.currentFilter.branch || '',
+        isSubRepo,
       },
     });
   }
@@ -217,6 +233,15 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         } catch (err: any) {
           this.log.appendLine(`Failed to switch git repository: ${err.message}`);
           vscode.window.showErrorMessage(`Failed to switch repository: ${err.message}`);
+        }
+        break;
+      }
+      case 'exitSubRepo': {
+        this.log.appendLine('Exiting sub-repository back to workspace root...');
+        if (this.initialWorkspaceRoot) {
+          this.gitService.setCwd(this.initialWorkspaceRoot);
+          this.hasInitializedFilter = false;
+          await this.loadInitialData();
         }
         break;
       }

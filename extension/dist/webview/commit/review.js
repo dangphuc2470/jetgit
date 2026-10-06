@@ -716,14 +716,27 @@
 
     toolbar.innerHTML = `
       <div class="toolbar-left-group">
-        <div class="dropdown-pill" title="Side-by-side viewer">
-          <span class="pill-icon">≡</span>
+        <div class="dropdown-pill" data-tooltip="Side-by-side viewer">
+          <span class="pill-icon">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <rect x="1.5" y="2" width="4.5" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/>
+              <rect x="8" y="2" width="4.5" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+          </span>
           <span class="pill-text">Side-by-side viewer</span>
-          <span class="pill-arrow">▾</span>
+          <span class="pill-arrow">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d="M1.5 2.75L4 5.25L6.5 2.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
         </div>
-        <div class="dropdown-pill" id="pill-highlight-words" title="${state.highlightWords ? 'Highlight words' : 'Do not highlight'}">
+        <div class="dropdown-pill" id="pill-highlight-words" data-tooltip="${state.highlightWords ? 'Highlight words' : 'Do not highlight'}">
           <span class="pill-text">${state.highlightWords ? 'Highlight words' : 'Do not highlight'}</span>
-          <span class="pill-arrow">▾</span>
+          <span class="pill-arrow">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d="M1.5 2.75L4 5.25L6.5 2.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
         </div>
         <div class="file-breadcrumb">
           <span class="file-name-main">${escapeHtml(state.fileName || state.filePath)}</span>
@@ -734,22 +747,64 @@
       <div class="toolbar-right-group">
         <div class="diff-counter-pill">
           <span class="counter-text">${diffCount} ${diffCount === 1 ? 'difference' : 'differences'}</span>
-          <button class="arrow-btn" id="btn-prev-diff" title="Previous Difference (Shift+F7)">▲</button>
-          <button class="arrow-btn" id="btn-next-diff" title="Next Difference (F7)">▼</button>
+          <button class="arrow-btn" id="btn-prev-diff" data-tooltip="Previous Difference" data-shortcut="Shift+F7">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M2 6.5L5 3.5L8 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="arrow-btn" id="btn-next-diff" data-tooltip="Next Difference" data-shortcut="F7">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
         <div class="toolbar-divider"></div>
         ${!state.readOnly ? `
-        <label class="current-version-label" title="Stage / Unstage entire file">
-          <input type="checkbox" id="chk-master-version" checked/>
+        <label class="current-version-label" data-tooltip="Stage / Unstage entire file">
+          <span class="studio-chk-wrap">
+            <input type="checkbox" id="chk-master-version" checked/>
+            <span class="chk-custom">
+              <svg class="chk-mark" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.8 5.2L4 7.4L8.2 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <svg class="chk-indet" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+          </span>
           <span>Current version</span>
         </label>
         ` : ''}
-        <button class="icon-tool-btn" id="btn-open-file" title="Jump to Source / Open in Editor (F4)">↗</button>
-        ${!state.readOnly ? `<button class="icon-tool-btn" id="btn-rollback-all" title="Rollback All Changes in File">↶</button>` : ''}
+        <button class="icon-tool-btn" id="btn-open-file" data-tooltip="Jump to Source / Open in Editor" data-shortcut="F4">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3.5 10.5L10.5 3.5M10.5 3.5H5.5M10.5 3.5V8.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        ${!state.readOnly ? `
+        <button class="icon-tool-btn" id="btn-rollback-all" data-tooltip="Rollback All Changes in File" data-shortcut="Ctrl+Alt+Z">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M4 2.5L1.5 5L4 7.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 5H7.75C9.8 5 11.5 6.7 11.5 8.75C11.5 10.8 9.8 12.5 7.75 12.5H3.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+          </svg>
+        </button>` : ''}
         <div class="toolbar-divider"></div>
-        <button class="icon-tool-btn ${!hasPrev ? 'disabled' : ''}" id="btn-prev-file" title="Previous File (Alt+Left)">◀</button>
-        <button class="icon-tool-btn ${!hasNext ? 'disabled' : ''}" id="btn-next-file" title="Next File (Alt+Right)">▶</button>
-        <button class="icon-tool-btn" id="btn-refresh" title="Refresh (Cmd+R)">↻</button>
+        <button class="icon-tool-btn ${!hasPrev ? 'disabled' : ''}" id="btn-prev-file" data-tooltip="Previous File" data-shortcut="Alt+Left">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M8.5 3.5L5 7L8.5 10.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="icon-tool-btn ${!hasNext ? 'disabled' : ''}" id="btn-next-file" data-tooltip="Next File" data-shortcut="Alt+Right">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M5.5 3.5L9 7L5.5 10.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="icon-tool-btn" id="btn-refresh" data-tooltip="Refresh" data-shortcut="Cmd+R">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8C3 5.24 5.24 3 8 3C9.8 3 11.38 3.96 12.25 5.4M13 8C13 10.76 10.76 13 8 13C6.2 13 4.62 12.04 3.75 10.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M12.5 2.5V5.5H9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3.5 13.5V10.5H6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     `;
     root.appendChild(toolbar);
@@ -1101,15 +1156,27 @@
 
           if (revertY >= -15 && revertY <= viewH + 15) {
             ctrlHtml += `
-              <button class="block-revert-btn" style="top: ${revertY}px;" title="Revert change (Accept base revision)" data-block-id="${b.id}">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <button class="block-revert-btn" style="top: ${revertY}px;" data-tooltip="Revert change (Accept base revision)" data-block-id="${b.id}">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <path d="M7.5 11.5L12 7L7.5 2.5M2.5 11.5L7 7L2.5 2.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.3"/>
+                </svg>
               </button>
             `;
           }
           if (checkY >= -15 && checkY <= viewH + 15) {
             ctrlHtml += `
               <div class="gutter-block-control" style="top: ${checkY}px;" data-block-id="${b.id}">
-                <input type="checkbox" class="block-chk" title="Stage / Unstage block" ${b.staged ? 'checked' : ''} data-block-id="${b.id}"/>
+                <label class="studio-chk-wrap" data-tooltip="Stage / Unstage change">
+                  <input type="checkbox" class="block-chk" ${b.staged ? 'checked' : ''} data-block-id="${b.id}"/>
+                  <span class="chk-custom">
+                    <svg class="chk-mark" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M1.8 5.2L4 7.4L8.2 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <svg class="chk-indet" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                </label>
               </div>
             `;
           }
@@ -1744,6 +1811,109 @@
   window.addEventListener('contextmenu', (e) => {
     e.preventDefault();
   }, true);
+
+  // Floating Android Studio Tooltip Manager
+  function initTooltips() {
+    let tooltipEl = document.getElementById('studio-tooltip');
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div');
+      tooltipEl.id = 'studio-tooltip';
+      tooltipEl.className = 'studio-floating-tooltip';
+      document.body.appendChild(tooltipEl);
+    }
+
+    let hoverTimer = null;
+    let currentTarget = null;
+
+    document.addEventListener('mouseover', (e) => {
+      const target = e.target.closest('[data-tooltip], [title]');
+      if (!target) {
+        hideTooltip();
+        return;
+      }
+
+      // Convert any legacy title to data-tooltip to prevent native browser tooltip overlap
+      if (target.hasAttribute('title') && !target.hasAttribute('data-tooltip')) {
+        const titleText = target.getAttribute('title');
+        target.removeAttribute('title');
+        target.setAttribute('data-tooltip', titleText);
+      } else if (target.hasAttribute('title')) {
+        target.removeAttribute('title');
+      }
+
+      if (currentTarget === target) return;
+      currentTarget = target;
+
+      if (hoverTimer) clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => {
+        showTooltip(target);
+      }, 180);
+    }, true);
+
+    document.addEventListener('mouseout', (e) => {
+      const related = e.relatedTarget;
+      if (currentTarget && (!related || !currentTarget.contains(related))) {
+        hideTooltip();
+      }
+    }, true);
+
+    document.addEventListener('click', () => {
+      hideTooltip();
+    }, true);
+
+    window.addEventListener('scroll', () => {
+      hideTooltip();
+    }, true);
+
+    function showTooltip(target) {
+      const text = target.getAttribute('data-tooltip');
+      if (!text) return;
+      const shortcut = target.getAttribute('data-shortcut');
+
+      tooltipEl.innerHTML = `
+        <span class="tooltip-text">${escapeHtml(text)}</span>
+        ${shortcut ? `<span class="tooltip-shortcut">${escapeHtml(shortcut)}</span>` : ''}
+      `;
+      tooltipEl.style.display = 'flex';
+      tooltipEl.classList.remove('visible');
+
+      const rect = target.getBoundingClientRect();
+      const tipRect = tooltipEl.getBoundingClientRect();
+
+      let top = rect.bottom + 6;
+      let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+
+      // If overflows bottom edge, place above target
+      if (top + tipRect.height > window.innerHeight - 6) {
+        top = rect.top - tipRect.height - 6;
+      }
+      // Ensure within horizontal screen bounds
+      if (left < 6) left = 6;
+      if (left + tipRect.width > window.innerWidth - 6) {
+        left = window.innerWidth - tipRect.width - 6;
+      }
+
+      tooltipEl.style.top = `${Math.round(top)}px`;
+      tooltipEl.style.left = `${Math.round(left)}px`;
+      requestAnimationFrame(() => {
+        tooltipEl.classList.add('visible');
+      });
+    }
+
+    function hideTooltip() {
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+      }
+      currentTarget = null;
+      if (tooltipEl) {
+        tooltipEl.classList.remove('visible');
+        tooltipEl.style.display = 'none';
+      }
+    }
+  }
+
+  initTooltips();
 
   // Ready handshake
   vscode.postMessage({ type: 'ready' });

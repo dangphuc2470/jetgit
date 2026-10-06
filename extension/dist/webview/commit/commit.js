@@ -761,7 +761,7 @@
     const isSelected = state.selectedFile === file.path;
     const isPartiallyStaged = file.partiallyStaged || (file.totalChanges > 0 && file.stagedChanges > 0 && file.stagedChanges < file.totalChanges);
     const isChecked = !isPartiallyStaged && (state.checkedFiles.has(file.path) || (file.staged && !isPartiallyStaged));
-    itemEl.className = `file-item tree-file-item ${isSelected ? 'selected' : ''}`;
+    itemEl.className = `file-item tree-file-item ${inTreeMode ? 'in-tree' : 'in-flat'} ${isSelected ? 'selected' : ''}`;
     itemEl.dataset.path = file.path;
 
     const isUnversioned = file.isUntracked;
@@ -1801,7 +1801,7 @@
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px 14px;background:#2b2d30;border-top:1px solid #323438;">
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#dfe1e5;cursor:pointer;user-select:none;">
-          <input type="checkbox" id="chk-group-dir" style="accent-color:#3574f0;cursor:pointer;width:14px;height:14px;margin:0;">
+          <input type="checkbox" id="chk-group-dir" style="cursor:pointer;width:14px;height:14px;margin:0;">
           <span>Group files by directory</span>
         </label>
         <button id="btn-dialog-close" style="background:#2b2d30;color:#dfe1e5;border:1px solid #4e5157;border-radius:4px;padding:5px 18px;font-size:12.5px;cursor:pointer;">Close</button>
@@ -2078,7 +2078,7 @@
         <div style="display:flex;align-items:center;gap:12px;">
           <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid #5c6164;color:#adb0b8;font-size:11.5px;cursor:pointer;" title="Help">?</span>
           <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#dfe1e5;cursor:pointer;">
-            <input type="checkbox" id="chk-push-tags" style="accent-color:#3574f0;width:14px;height:14px;cursor:pointer;">
+            <input type="checkbox" id="chk-push-tags" style="width:14px;height:14px;cursor:pointer;">
             <span>Push tags:</span>
           </label>
           <select id="sel-push-tags" style="background:#1e1f22;color:#dfe1e5;border:1px solid #4e5157;border-radius:3px;padding:3px 6px;font-size:12px;outline:none;">

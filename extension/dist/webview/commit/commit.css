@@ -325,54 +325,67 @@ body, html {
   background: #2e436e !important;
 }
 
-.file-chk, .group-chk, .tree-chk, .line-chk, .hunk-chk, .amend-chk, #chk-amend, .amend-label input[type="checkbox"] {
+.file-chk, .group-chk, .tree-chk, .line-chk, .hunk-chk, .amend-chk, #chk-amend, .block-chk, #chk-master-version, #chk-group-dir, #chk-push-tags, .amend-label input[type="checkbox"], input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
-  border: 1px solid #5a5d63;
-  border-radius: 2px;
-  background: #1e1f22;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  border: 1px solid var(--vscode-checkbox-border, #6C707E);
+  border-radius: 2.5px;
+  background: transparent !important;
+  background-color: transparent !important;
   cursor: pointer;
   position: relative;
   outline: none;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
   flex-shrink: 0;
+  box-sizing: border-box;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 
-.file-chk:checked, .group-chk:checked, .tree-chk:checked, .line-chk:checked, .hunk-chk:checked, .amend-chk:checked, #chk-amend:checked, .amend-label input[type="checkbox"]:checked {
-  background: #3574f0;
-  border-color: #3574f0;
+.file-chk:hover, .group-chk:hover, .tree-chk:hover, .line-chk:hover, .hunk-chk:hover, .amend-chk:hover, #chk-amend:hover, .block-chk:hover, #chk-master-version:hover, #chk-group-dir:hover, #chk-push-tags:hover, .amend-label input[type="checkbox"]:hover, input[type="checkbox"]:hover {
+  border-color: var(--vscode-focusBorder, #CED0D6);
+  background-color: rgba(255, 255, 255, 0.06) !important;
 }
 
-.file-chk:checked::after, .group-chk:checked::after, .tree-chk:checked::after, .line-chk:checked::after, .hunk-chk:checked::after, .amend-chk:checked::after, #chk-amend:checked::after, .amend-label input[type="checkbox"]:checked::after {
+.file-chk:checked, .group-chk:checked, .tree-chk:checked, .line-chk:checked, .hunk-chk:checked, .amend-chk:checked, #chk-amend:checked, .block-chk:checked, #chk-master-version:checked, #chk-group-dir:checked, #chk-push-tags:checked, .amend-label input[type="checkbox"]:checked, input[type="checkbox"]:checked {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: var(--vscode-focusBorder, #CED0D6);
+}
+
+.file-chk:checked::after, .group-chk:checked::after, .tree-chk:checked::after, .line-chk:checked::after, .hunk-chk:checked::after, .amend-chk:checked::after, #chk-amend:checked::after, .block-chk:checked::after, #chk-master-version:checked::after, #chk-group-dir:checked::after, #chk-push-tags:checked::after, .amend-label input[type="checkbox"]:checked::after, input[type="checkbox"]:checked::after {
   content: '';
   position: absolute;
   top: 1px;
   left: 4px;
-  width: 3px;
+  width: 3.5px;
   height: 7px;
-  border: solid #ffffff;
-  border-width: 0 1.5px 1.5px 0;
+  border: solid var(--vscode-editor-foreground, #CED0D6);
+  border-width: 0 1.8px 1.8px 0;
   transform: rotate(45deg);
 }
 
-.file-chk:hover, .group-chk:hover, .tree-chk:hover, .line-chk:hover, .hunk-chk:hover, .amend-chk:hover, #chk-amend:hover, .amend-label input[type="checkbox"]:hover {
-  border-color: #797d86;
+.group-chk:indeterminate, .file-chk:indeterminate, .tree-chk:indeterminate, input[type="checkbox"]:indeterminate {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: var(--vscode-focusBorder, #CED0D6);
 }
 
-.group-chk:indeterminate, .file-chk:indeterminate, .tree-chk:indeterminate {
-  background: #3574f0;
-  border-color: #3574f0;
-}
-
-.group-chk:indeterminate::after, .file-chk:indeterminate::after, .tree-chk:indeterminate::after {
+.group-chk:indeterminate::after, .file-chk:indeterminate::after, .tree-chk:indeterminate::after, input[type="checkbox"]:indeterminate::after {
   content: '';
   position: absolute;
-  top: 4px;
-  left: 2px;
-  width: 7px;
+  top: 5px;
+  left: 3px;
+  width: 6px;
   height: 2px;
-  background: #ffffff;
+  background: var(--vscode-editor-foreground, #CED0D6);
 }
 
 .file-changes-badge {
@@ -1124,7 +1137,9 @@ body, html {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 9px;
+  height: 24px;
+  box-sizing: border-box;
+  padding: 0 8px;
   background: var(--vscode-input-background, #1e1f22);
   border: 1px solid var(--vscode-input-border, #4e5157);
   border-radius: 4px;
@@ -1132,7 +1147,7 @@ body, html {
   color: var(--vscode-input-foreground, #dfe1e5);
   cursor: pointer;
   user-select: none;
-  transition: all 0.1s;
+  transition: all 0.12s;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1156,10 +1171,11 @@ body, html {
 
 .pill-icon,
 .pill-arrow {
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #8c8c8c;
   flex-shrink: 0;
-  white-space: nowrap;
 }
 
 .file-breadcrumb {
@@ -1196,11 +1212,13 @@ body, html {
 .diff-counter-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: #1e1f22;
-  border: 1px solid #4e5157;
+  gap: 3px;
+  height: 24px;
+  box-sizing: border-box;
+  background: var(--vscode-input-background, #1e1f22);
+  border: 1px solid var(--vscode-input-border, #4e5157);
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 0 4px 0 8px;
   font-size: 11px;
   color: #bcbec4;
   white-space: nowrap;
@@ -1216,17 +1234,30 @@ body, html {
 .arrow-btn {
   background: none;
   border: none;
-  color: #8c8c8c;
+  color: #9aa0a6;
   cursor: pointer;
-  padding: 1px 3px;
-  border-radius: 2px;
-  font-size: 9px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  transition: all 0.12s ease;
 }
 
 .arrow-btn:hover {
-  background: #393b40;
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+}
+
+.arrow-btn:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.arrow-btn svg {
+  pointer-events: none;
 }
 
 .current-version-label {
@@ -1248,35 +1279,140 @@ body, html {
   text-overflow: ellipsis;
 }
 
-.current-version-label input {
-  accent-color: #3574f0;
+/* Outlined Checkboxes for Diff Viewer & Toolbar */
+.studio-chk-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
   cursor: pointer;
+  user-select: none;
   flex-shrink: 0;
+}
+
+.studio-chk-wrap input[type="checkbox"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.chk-custom {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  border: 1px solid #6C707E;
+  border-radius: 2.5px;
+  background-color: transparent !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.chk-custom .chk-mark,
+.chk-custom .chk-indet {
+  display: none;
+  color: #CED0D6;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* Hover */
+.studio-chk-wrap:hover .chk-custom {
+  border-color: #CED0D6;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Checked state: OUTLINED - viền sáng và hiện dấu tick chữ V */
+.studio-chk-wrap input:checked ~ .chk-custom {
+  border-color: #CED0D6;
+  background-color: transparent !important;
+}
+
+.studio-chk-wrap input:checked ~ .chk-custom .chk-mark {
+  display: block !important;
+}
+
+.studio-chk-wrap:hover input:checked ~ .chk-custom {
+  border-color: #FFFFFF;
+}
+
+.studio-chk-wrap:hover input:checked ~ .chk-custom .chk-mark {
+  color: #FFFFFF;
+}
+
+/* Indeterminate state: viền sáng và hiện dấu gạch ngang */
+.studio-chk-wrap input:indeterminate ~ .chk-custom {
+  border-color: #CED0D6;
+  background-color: transparent !important;
+}
+
+.studio-chk-wrap input:indeterminate ~ .chk-custom .chk-mark {
+  display: none !important;
+}
+
+.studio-chk-wrap input:indeterminate ~ .chk-custom .chk-indet {
+  display: block !important;
+}
+
+.studio-chk-wrap:hover input:indeterminate ~ .chk-custom {
+  border-color: #FFFFFF;
+}
+
+.studio-chk-wrap:hover input:indeterminate ~ .chk-custom .chk-indet {
+  color: #FFFFFF;
 }
 
 .icon-tool-btn {
   background: none;
-  border: none;
-  color: #8c8c8c;
+  border: 1px solid transparent;
+  color: #afb1b3;
   cursor: pointer;
-  font-size: 13px;
-  padding: 3px 6px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
   flex-shrink: 0;
+  transition: all 0.12s ease;
 }
 
 .icon-tool-btn:hover:not(.disabled) {
-  background: #393b40;
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
   color: #dfe1e5;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.icon-tool-btn:active:not(.disabled) {
+  background: var(--vscode-toolbar-activeBackground, rgba(255, 255, 255, 0.14));
 }
 
 .icon-tool-btn.disabled {
   opacity: 0.35;
   cursor: default;
+  pointer-events: none;
+}
+
+.icon-tool-btn svg {
+  pointer-events: none;
 }
 
 .toolbar-divider {
@@ -1489,12 +1625,7 @@ body, html {
 }
 
 .block-chk {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  padding: 0;
   cursor: pointer;
-  accent-color: #3574f0;
 }
 
 .block-revert-btn {
@@ -1507,10 +1638,10 @@ body, html {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--vscode-editor-background, #1e1e1e);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--vscode-editor-background, #1e1f22);
+  border: 1px solid #4E5157;
   border-radius: 3px;
-  color: var(--vscode-foreground, #ccc);
+  color: #CED0D6;
   cursor: pointer;
   padding: 0;
   box-sizing: border-box;
@@ -1518,10 +1649,9 @@ body, html {
 }
 
 .block-revert-btn:hover {
-  background: #3574f0;
-  border-color: #3574f0;
-  color: #ffffff;
-  transform: scale(1.15);
+  background: #3574F0;
+  border-color: #3574F0;
+  color: #FFFFFF;
 }
 
 .block-revert-btn svg {
@@ -2009,9 +2139,19 @@ body, html {
 }
 
 .tree-file-item {
-  padding: 0 8px 0 2px !important;
   border-radius: 4px;
   transition: background 0.08s ease;
+}
+
+.tree-file-item.in-flat,
+.group-items:not(.group-tree-mode) > .tree-file-item,
+.group-items:not(.group-tree-mode) > .file-item {
+  padding: 0 8px 0 24px !important;
+}
+
+.tree-file-item.in-tree,
+.group-items.group-tree-mode .tree-file-item {
+  padding: 0 8px 0 2px !important;
 }
 
 .tree-item-spacer {
@@ -2021,5 +2161,41 @@ body, html {
   display: inline-block;
 }
 
+/* Floating Android Studio Tooltip */
+.studio-floating-tooltip {
+  position: fixed;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: #25272a;
+  border: 1px solid #3c3f41;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  color: #dfe1e5;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100000;
+  opacity: 0;
+  transition: opacity 0.1s ease-in-out;
+}
 
+.studio-floating-tooltip.visible {
+  opacity: 1;
+}
 
+.tooltip-text {
+  font-weight: 500;
+  color: #dfe1e5;
+}
+
+.tooltip-shortcut {
+  font-size: 10px;
+  color: #8c8c8c;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 1px 4px;
+}

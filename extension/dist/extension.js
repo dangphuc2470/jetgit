@@ -871,7 +871,8 @@ var GitService = class {
       try {
         const { stdout } = await execFileAsync("git", args, {
           cwd: this.cwd,
-          maxBuffer
+          maxBuffer,
+          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
         });
         return stdout;
       } catch (err) {
@@ -999,8 +1000,141 @@ var GitService = class {
   async push(branch, force = false, setUpstream = false, remoteName, tags = false, targetBranch) {
     return push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch);
   }
-  async fetchAll() {
-    return this.exec(["fetch", "--all", "--prune"]);
+  async getRemoteUrl(remoteName) {
+    try {
+      const url = await this.exec(["remote", "get-url", remoteName]);
+      return url.trim();
+    } catch {
+      return "";
+    }
+  }
+  async isRemoteReachable(remoteName, timeoutMs = 2e3) {
+    const start = Date.now();
+    try {
+      const remoteUrl = await this.getRemoteUrl(remoteName);
+      if (!remoteUrl) return { reachable: false, latency: 999999 };
+      if (remoteUrl.startsWith("http://") || remoteUrl.startsWith("https://")) {
+        try {
+          const parsed = new URL(remoteUrl);
+          const targetOrigin = `${parsed.protocol}//${parsed.host}`;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeoutMs);
+          try {
+            await fetch(targetOrigin, { method: "HEAD", signal: controller.signal });
+            clearTimeout(timer);
+            return { reachable: true, latency: Date.now() - start };
+          } catch {
+            clearTimeout(timer);
+            try {
+              const c2 = new AbortController();
+              const t2 = setTimeout(() => c2.abort(), 1e3);
+              await fetch(targetOrigin, { method: "GET", signal: c2.signal });
+              clearTimeout(t2);
+              return { reachable: true, latency: Date.now() - start };
+            } catch {
+              return { reachable: false, latency: 999999 };
+            }
+          }
+        } catch {
+          return { reachable: false, latency: 999999 };
+        }
+      }
+      await execFileAsync("git", [
+        "-c",
+        "http.timeout=2",
+        "-c",
+        "ssh.connectTimeout=2",
+        "ls-remote",
+        "--heads",
+        remoteName,
+        "HEAD"
+      ], {
+        cwd: this.cwd,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        timeout: timeoutMs
+      });
+      return { reachable: true, latency: Date.now() - start };
+    } catch {
+      return { reachable: false, latency: 999999 };
+    }
+  }
+  async smartFetchAll(onRemoteSuccess) {
+    const remotes = await this.getRemotes();
+    if (!remotes || remotes.length === 0) {
+      return { successful: [], failed: [], skipped: [], needsAuth: [] };
+    }
+    const needsAuth = [];
+    const isAuthError = (msg) => /terminal prompts disabled|could not read Username|Authentication failed|HTTP 401|Access denied|not authorized/i.test(msg);
+    if (remotes.length === 1) {
+      const r = remotes[0];
+      try {
+        await this.exec(["fetch", r, "--prune"]);
+        onRemoteSuccess?.(r);
+        return { successful: [r], failed: [], skipped: [], needsAuth: [] };
+      } catch (err) {
+        const msg = err?.message || "";
+        if (isAuthError(msg)) {
+          const url = await this.getRemoteUrl(r);
+          let host = r;
+          try {
+            if (url) host = new URL(url).host;
+          } catch {
+          }
+          needsAuth.push({ remote: r, url, host });
+        }
+        return { successful: [], failed: [r], skipped: [], needsAuth };
+      }
+    }
+    const checks = await Promise.allSettled(
+      remotes.map(async (r) => {
+        const res = await this.isRemoteReachable(r, 2e3);
+        return { remote: r, reachable: res.reachable, latency: res.latency };
+      })
+    );
+    const probeResults = [];
+    for (let i = 0; i < remotes.length; i++) {
+      const c = checks[i];
+      if (c.status === "fulfilled") {
+        probeResults.push(c.value);
+      } else {
+        probeResults.push({ remote: remotes[i], reachable: false, latency: 999999 });
+      }
+    }
+    probeResults.sort((a, b) => {
+      if (a.reachable && !b.reachable) return -1;
+      if (!a.reachable && b.reachable) return 1;
+      return a.latency - b.latency;
+    });
+    const successful = [];
+    const failed = [];
+    const skipped = [];
+    for (const item of probeResults) {
+      try {
+        await this.exec(["fetch", item.remote, "--prune"]);
+        successful.push(item.remote);
+        onRemoteSuccess?.(item.remote);
+      } catch (err) {
+        const msg = err?.message || "";
+        if (isAuthError(msg)) {
+          const url = await this.getRemoteUrl(item.remote);
+          let host = item.remote;
+          try {
+            if (url) host = new URL(url).host;
+          } catch {
+          }
+          needsAuth.push({ remote: item.remote, url, host });
+        }
+        if (item.reachable) {
+          failed.push(item.remote);
+        } else {
+          skipped.push(item.remote);
+        }
+      }
+    }
+    return { successful, failed, skipped, needsAuth };
+  }
+  async fetchAll(onRemoteSuccess) {
+    return this.smartFetchAll(onRemoteSuccess);
   }
   async checkoutAndRebase(branch, onto) {
     await this.checkout(branch);
@@ -1794,7 +1928,7 @@ var CommitReviewPanel = class _CommitReviewPanel {
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}';">
+    content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}'; img-src 'self' data: https:;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="${styleUri}">
   <style id="dynamic-syntax-tokens">
@@ -1860,19 +1994,39 @@ function getPushDialogHtml(rawPushInfo) {
     }
     .as-col-left {
       width: 45%;
+      min-width: 180px;
+      max-width: calc(100% - 180px);
       border-right: 1px solid var(--vscode-panel-border, #323438);
       display: flex;
       flex-direction: column;
       background: var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1f22));
-      overflow: visible;
+      overflow: hidden;
       position: relative;
     }
+    .as-splitter {
+      width: 6px;
+      margin-left: -3px;
+      margin-right: -3px;
+      cursor: col-resize;
+      background: transparent;
+      position: relative;
+      z-index: 50;
+      flex-shrink: 0;
+      transition: background-color 0.12s ease;
+    }
+    .as-splitter:hover,
+    .as-splitter.dragging {
+      background: var(--vscode-focusBorder, #3574f0);
+    }
     .as-col-right {
-      width: 55%;
+      flex: 1;
+      min-width: 180px;
       display: flex;
       flex-direction: column;
       background: var(--vscode-editor-background, #1e1f22);
       overflow: hidden;
+      position: relative;
+      z-index: 10;
     }
     .as-branch-header {
       display: flex;
@@ -1886,8 +2040,9 @@ function getPushDialogHtml(rawPushInfo) {
       gap: 4px;
       overflow: visible;
       position: relative;
-      z-index: 100;
+      z-index: 5;
       flex-shrink: 0;
+      white-space: nowrap;
     }
     .as-commit-item {
       display: flex;
@@ -1986,13 +2141,53 @@ function getPushDialogHtml(rawPushInfo) {
       background: var(--vscode-menu-selectionBackground, #3574f0);
       color: var(--vscode-menu-selectionForeground, #ffffff);
     }
+    input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--vscode-checkbox-border, #6C707E);
+      border-radius: 2.5px;
+      background: transparent !important;
+      background-color: transparent !important;
+      cursor: pointer;
+      position: relative;
+      outline: none;
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+      box-sizing: border-box;
+      transition: border-color 0.12s ease, background-color 0.12s ease;
+    }
+    input[type="checkbox"]:hover {
+      border-color: var(--vscode-focusBorder, #CED0D6);
+      background-color: rgba(255, 255, 255, 0.06) !important;
+    }
+    input[type="checkbox"]:checked {
+      background: transparent !important;
+      background-color: transparent !important;
+      border-color: var(--vscode-focusBorder, #CED0D6);
+    }
+    input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      top: 1px;
+      left: 4px;
+      width: 3.5px;
+      height: 7px;
+      border: solid var(--vscode-editor-foreground, #CED0D6);
+      border-width: 0 1.8px 1.8px 0;
+      transform: rotate(45deg);
+    }
   </style>
 </head>
 <body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
   <div class="as-push-card">
-    <div class="as-body">
+    <div class="as-body" id="as-body-container">
       <!-- Left Column: Commits -->
-      <div class="as-col-left">
+      <div class="as-col-left" id="as-col-left">
         <div id="push-branch-header" class="as-branch-header">
           <span id="push-current-branch" style="font-weight:600;white-space:nowrap;"></span>
           <span style="opacity:0.7;margin:0 2px;">&rarr;</span>
@@ -2008,9 +2203,12 @@ function getPushDialogHtml(rawPushInfo) {
         <div id="push-commits-container" style="flex:1;min-height:0;overflow-y:auto;padding:4px 0;"></div>
       </div>
 
+      <!-- Splitter / Resizer -->
+      <div class="as-splitter" id="as-splitter" title="Drag to resize"></div>
+
       <!-- Right Column: Files -->
-      <div class="as-col-right">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--vscode-sideBarSectionHeader-background, var(--vscode-sideBar-background, #26282b));border-bottom:1px solid var(--vscode-panel-border, #323438);flex-shrink:0;">
+      <div class="as-col-right" id="as-col-right">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--vscode-sideBarSectionHeader-background, var(--vscode-sideBar-background, #26282b));border-bottom:1px solid var(--vscode-panel-border, #323438);flex-shrink:0;position:relative;z-index:10;">
           <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--vscode-editor-foreground, #dfe1e5);">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="#c49000"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A.5.5 0 0 0 8.92 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
             <span id="push-repo-name">Repository</span>
@@ -2025,7 +2223,7 @@ function getPushDialogHtml(rawPushInfo) {
     <div class="as-footer">
       <div style="display:flex;align-items:center;gap:12px;">
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--vscode-editor-foreground, #dfe1e5);cursor:pointer;">
-          <input type="checkbox" id="chk-push-tags" style="accent-color:var(--vscode-focusBorder, #3574f0);width:14px;height:14px;cursor:pointer;">
+          <input type="checkbox" id="chk-push-tags" style="width:14px;height:14px;cursor:pointer;">
           <span>Push tags:</span>
         </label>
         <select id="sel-push-tags" style="background:var(--vscode-dropdown-background, #1e1f22);color:var(--vscode-dropdown-foreground, #dfe1e5);border:1px solid var(--vscode-dropdown-border, #4e5157);border-radius:3px;padding:3px 6px;font-size:12px;outline:none;">
@@ -2086,10 +2284,13 @@ function getPushDialogHtml(rawPushInfo) {
     function initUI() {
       if (titleEl) titleEl.textContent = 'Push Commits to ' + currentRemote;
       currentBranchEl.textContent = pushInfo.currentBranch;
+      currentBranchEl.title = pushInfo.currentBranch;
       remoteLabel.textContent = currentRemote;
       branchDisplay.textContent = currentTargetBranch;
+      branchDisplay.title = 'Click to edit remote branch name: ' + currentTargetBranch;
       branchInput.value = currentTargetBranch;
       repoNameEl.textContent = pushInfo.repoName;
+      repoNameEl.title = pushInfo.repoName;
       newBadge.style.display = pushInfo.isNew ? 'inline-block' : 'none';
 
       // Setup remotes dropdown
@@ -2201,7 +2402,14 @@ function getPushDialogHtml(rawPushInfo) {
       filesContainer.innerHTML = html;
 
       filesContainer.querySelectorAll('.as-file-item').forEach(el => {
+        el.addEventListener('click', () => {
+          filesContainer.querySelectorAll('.as-file-item.selected').forEach(item => item.classList.remove('selected'));
+          el.classList.add('selected');
+        });
+
         el.addEventListener('dblclick', () => {
+          filesContainer.querySelectorAll('.as-file-item.selected').forEach(item => item.classList.remove('selected'));
+          el.classList.add('selected');
           const filePath = el.getAttribute('data-path');
           if (filePath) {
             vscode.postMessage({
@@ -2232,7 +2440,9 @@ function getPushDialogHtml(rawPushInfo) {
     // Remote dropdown trigger
     remoteLabel.addEventListener('click', (e) => {
       e.stopPropagation();
-      remoteDropdown.style.display = remoteDropdown.style.display === 'none' ? 'block' : 'none';
+      const isHidden = remoteDropdown.style.display === 'none';
+      remoteDropdown.style.display = isHidden ? 'block' : 'none';
+      branchHeader.style.zIndex = isHidden ? '100' : '5';
     });
 
     // Target branch editing
@@ -2303,6 +2513,7 @@ function getPushDialogHtml(rawPushInfo) {
       }
       if (!e.target.closest('#push-remote-dropdown') && e.target !== remoteLabel) {
         remoteDropdown.style.display = 'none';
+        branchHeader.style.zIndex = '5';
       }
     });
 
@@ -2324,9 +2535,47 @@ function getPushDialogHtml(rawPushInfo) {
       }
     });
 
-    window.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-    }, true);
+    // Resizable splitter logic
+    const splitter = document.getElementById('as-splitter');
+    const leftCol = document.getElementById('as-col-left');
+    const bodyContainer = document.getElementById('as-body-container');
+
+    if (splitter && leftCol && bodyContainer) {
+      let isDragging = false;
+      let startX = 0;
+      let startWidth = 0;
+
+      splitter.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startWidth = leftCol.getBoundingClientRect().width;
+        splitter.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const totalWidth = bodyContainer.getBoundingClientRect().width;
+        const deltaX = e.clientX - startX;
+        let newWidth = startWidth + deltaX;
+        const minW = 180;
+        const maxW = totalWidth - minW;
+        if (newWidth < minW) newWidth = minW;
+        if (newWidth > maxW) newWidth = maxW;
+        leftCol.style.width = newWidth + 'px';
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          splitter.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+      });
+    }
 
     initUI();
   </script>
@@ -2629,12 +2878,106 @@ async function handleGraphAction(type, payload, host) {
     }
     case "fetchAll": {
       try {
-        vscode5.window.showInformationMessage("Fetching all remotes...");
-        await gitService.fetchAll();
-        vscode5.window.showInformationMessage("Fetched all remotes successfully.");
-        host.loadInitialData();
+        vscode5.window.showInformationMessage("Checking remotes connectivity and fetching...");
+        const result = await gitService.smartFetchAll((remote) => {
+          vscode5.window.showInformationMessage(`Fetched '${remote}' successfully.`);
+          host.loadInitialData();
+        });
+        if (result.successful.length > 0) {
+          if (result.failed.length > 0 || result.skipped.length > 0) {
+            const missed = [...result.failed, ...result.skipped];
+            vscode5.window.showInformationMessage(`Finished fetching. (Skipped offline: ${missed.join(", ")})`);
+          } else {
+            vscode5.window.showInformationMessage(`Fetched all remotes successfully: ${result.successful.join(", ")}.`);
+          }
+        } else if (result.failed.length > 0 || result.skipped.length > 0) {
+          vscode5.window.showWarningMessage(`Could not reach remotes: ${[...result.failed, ...result.skipped].join(", ")}.`);
+        } else {
+          vscode5.window.showInformationMessage("No remotes configured.");
+        }
+        if (result.needsAuth && result.needsAuth.length > 0) {
+          const target = result.needsAuth[0];
+          let defaultUser = "";
+          try {
+            defaultUser = (await gitService.exec(["config", "user.name"])).trim();
+          } catch {
+          }
+          host.view?.webview.postMessage({
+            type: "showAuthDialog",
+            payload: {
+              remote: target.remote,
+              url: target.url,
+              host: target.host,
+              defaultUsername: defaultUser
+            }
+          });
+        }
       } catch (err) {
         vscode5.window.showErrorMessage(`Fetch all failed: ${err.message}`);
+      } finally {
+        host.loadInitialData();
+      }
+      return true;
+    }
+    case "openAuthDialog": {
+      const { remote } = payload || {};
+      const remotes = await gitService.getRemotes();
+      const targetRemote = remote || (remotes.includes("apistudio-os") ? "apistudio-os" : remotes[0] || "origin");
+      const url = await gitService.getRemoteUrl(targetRemote);
+      let hostName = targetRemote;
+      try {
+        if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+          hostName = new URL(url).host;
+        }
+      } catch {
+      }
+      let defaultUser = "";
+      try {
+        defaultUser = (await gitService.exec(["config", "user.name"])).trim();
+      } catch {
+      }
+      host.view?.webview.postMessage({
+        type: "showAuthDialog",
+        payload: {
+          remote: targetRemote,
+          url,
+          host: hostName,
+          defaultUsername: defaultUser
+        }
+      });
+      return true;
+    }
+    case "saveGitCredentials": {
+      const { remote, url, authType, username, token, password, remember } = payload || {};
+      try {
+        const secret = authType === "token" ? token : password;
+        if (!secret) {
+          throw new Error("Access token or password cannot be empty");
+        }
+        let targetUrl = url || await gitService.getRemoteUrl(remote);
+        if (!targetUrl) {
+          throw new Error(`Could not find URL for remote '${remote}'`);
+        }
+        if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+          const parsed = new URL(targetUrl);
+          if (username) {
+            parsed.username = encodeURIComponent(username);
+          }
+          parsed.password = encodeURIComponent(secret);
+          targetUrl = parsed.toString();
+        }
+        if (remember) {
+          await gitService.exec(["remote", "set-url", remote, targetUrl]);
+        }
+        await gitService.exec(["-c", "http.timeout=15", "fetch", remote, "--prune"]);
+        host.view?.webview.postMessage({ type: "authSuccess", payload: { remote } });
+        vscode5.window.showInformationMessage(`Authenticated and fetched '${remote}' successfully.`);
+        host.loadInitialData();
+      } catch (err) {
+        host.view?.webview.postMessage({
+          type: "authError",
+          payload: { remote, error: err.message || "Authentication failed" }
+        });
       }
       return true;
     }
@@ -2992,6 +3335,7 @@ var GraphViewProvider = class {
   currentBranchCommits = /* @__PURE__ */ new Set();
   currentUser = { name: "", email: "" };
   currentBranchName = "";
+  initialWorkspaceRoot = "";
   async updateBranchAndUser() {
     try {
       this.currentBranchName = await this.gitService.getCurrentBranch();
@@ -3033,11 +3377,21 @@ var GraphViewProvider = class {
     this.loadInitialData();
   }
   async loadInitialData() {
+    if (!this.initialWorkspaceRoot) {
+      this.initialWorkspaceRoot = this.gitService.getCwd();
+    }
     const isRepo = await this.gitService.isGitRepo();
     if (!isRepo) {
       this.log.appendLine("Current directory is not a git repository. Searching subfolders...");
       const subRepos = await this.gitService.findSubRepos();
       this.log.appendLine(`Found ${subRepos.length} sub-repositories: ${subRepos.map((r) => r.name).join(", ")}`);
+      this.allCommits = [];
+      this.graphNodes = [];
+      this.lastBranches = [];
+      this.lastTags = [];
+      this.currentBranchName = "";
+      this.currentBranchCommits.clear();
+      this.currentFilter = {};
       this.view?.webview.postMessage({
         type: "noGitRepo",
         payload: {
@@ -3097,6 +3451,7 @@ var GraphViewProvider = class {
   }
   sendCommits() {
     const isSingleBranch = !!this.currentFilter.branch;
+    const isSubRepo = !!(this.initialWorkspaceRoot && this.gitService.getCwd() !== this.initialWorkspaceRoot);
     this.view?.webview.postMessage({
       type: "commits",
       payload: {
@@ -3107,7 +3462,8 @@ var GraphViewProvider = class {
         })),
         graphWidth: graphWidth(this.graphNodes),
         currentUser: this.currentUser,
-        currentBranch: this.currentBranchName
+        currentBranch: this.currentBranchName,
+        isSubRepo
       }
     });
   }
@@ -3119,6 +3475,7 @@ var GraphViewProvider = class {
         currentBranch = "";
       }
     }
+    const isSubRepo = !!(this.initialWorkspaceRoot && this.gitService.getCwd() !== this.initialWorkspaceRoot);
     this.view?.webview.postMessage({
       type: "branches",
       payload: {
@@ -3126,7 +3483,8 @@ var GraphViewProvider = class {
         tags,
         currentBranch: this.currentBranchName || currentBranch,
         currentUser: this.currentUser,
-        activeBranch: this.currentFilter.branch || ""
+        activeBranch: this.currentFilter.branch || "",
+        isSubRepo
       }
     });
   }
@@ -3147,6 +3505,15 @@ var GraphViewProvider = class {
         } catch (err) {
           this.log.appendLine(`Failed to switch git repository: ${err.message}`);
           vscode6.window.showErrorMessage(`Failed to switch repository: ${err.message}`);
+        }
+        break;
+      }
+      case "exitSubRepo": {
+        this.log.appendLine("Exiting sub-repository back to workspace root...");
+        if (this.initialWorkspaceRoot) {
+          this.gitService.setCwd(this.initialWorkspaceRoot);
+          this.hasInitializedFilter = false;
+          await this.loadInitialData();
         }
         break;
       }
@@ -6976,6 +7343,12 @@ function activate(context) {
         branchTree.refresh();
         mergeProvider.refresh();
       }
+    }),
+    vscode16.window.onDidChangeActiveTextEditor(() => {
+      graphViewProvider.view?.webview.postMessage({ type: "closeAllMenus" });
+    }),
+    vscode16.window.onDidChangeTextEditorSelection(() => {
+      graphViewProvider.view?.webview.postMessage({ type: "closeAllMenus" });
     })
   );
   log.appendLine("IntelliJ Git extension activated.");

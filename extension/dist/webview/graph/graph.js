@@ -9329,6 +9329,7 @@ ${component_stack}
       const svgArrowRight = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 3.5L10.5 8L6 12.5"/></svg>';
       const svgArrowDown = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3.5 6L8 10.5L12.5 6"/></svg>';
       const svgTagIcon = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;color:#dfe1e5;"><path d="M7.707 2.293L1.295 8.705C0.904 9.096 0.904 9.729 1.295 10.119L5.881 14.705C6.271 15.096 6.904 15.096 7.295 14.705L13.707 8.293C13.895 8.105 14 7.851 14 7.586V3C14 2.448 13.552 2 13 2H8.414C8.149 2 7.895 2.105 7.707 2.293Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="10.2" cy="5.8" r="1.3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
+      const svgCheckoutYellow = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.70708 2.29289L1.29497 8.705C0.904444 9.09553 0.904444 9.72869 1.29497 10.1192L5.88075 14.705C6.27128 15.0955 6.90444 15.0955 7.29497 14.705L13.7071 8.29289C13.8946 8.10536 14 7.851 14 7.58579V3C14 2.44772 13.5523 2 13 2H8.41418C8.14897 2 7.89461 2.10536 7.70708 2.29289ZM10 8C11.1046 8 12 7.10457 12 6C12 4.89543 11.1046 4 10 4C8.89543 4 8 4.89543 8 6C8 7.10457 8.89543 8 10 8Z" fill="#F2C55C"/></svg>';
       const svgBranchWhite = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;color:#dfe1e5;"><circle cx="4.5" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="10.8" cy="6.2" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="4.5" y1="6.3" x2="4.5" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M4.5 9.8H9.3C10.13 9.8 10.8 9.13 10.8 8.3V8.0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
 
       function populateTree(searchQuery) {
@@ -9479,7 +9480,7 @@ ${component_stack}
             if (isFav) {
               icon = '<span class="tree-item-icon tree-item-star-slot is-fav" title="Favorite" style="cursor:pointer;color:#e5a50a;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;">★</span>';
             } else if (isCur) {
-              icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
+              icon = '<span class="tree-item-icon">' + svgCheckoutYellow + '</span>';
             } else {
               icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
             }

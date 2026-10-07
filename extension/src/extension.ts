@@ -13,6 +13,7 @@ import { ChangelistTreeProvider } from './views/changelistTree';
 import { BlameDecorationProvider } from './providers/blameDecorations';
 import { MergeProvider } from './providers/mergeProvider';
 import { GitContentProvider } from './providers/gitContentProvider';
+import { handleCheckoutWithConflictResolution } from './views/graphActionHandlers';
 
 let log: vscode.OutputChannel;
 
@@ -157,13 +158,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('intellij-git.checkoutBranch', async (node: any) => {
       const ref = node?.ref;
       if (!ref) return;
-      try {
-        await gitService.checkout(ref);
-        graphViewProvider.refresh();
-        vscode.window.showInformationMessage(`Checked out ${ref}`);
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Checkout failed: ${err.message}`);
-      }
+      await handleCheckoutWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
     }),
   );
 

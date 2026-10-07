@@ -2744,18 +2744,89 @@ var PushDialogPanel = class _PushDialogPanel {
 // src/views/graphActionHandlers.ts
 var vscode5 = __toESM(require("vscode"));
 var path8 = __toESM(require("path"));
+async function handleCheckoutWithConflictResolution(gitService, ref, onSuccess) {
+  try {
+    await gitService.checkout(ref);
+    vscode5.window.showInformationMessage(`Checked out ${ref}`);
+    onSuccess();
+  } catch (err) {
+    const rawError = err?.message || String(err);
+    const isConflict = /Your local changes to the following files would be overwritten by checkout/i.test(rawError) || /The following untracked working tree files would be overwritten by checkout/i.test(rawError);
+    if (!isConflict) {
+      vscode5.window.showErrorMessage(`Checkout failed: ${rawError}`);
+      return;
+    }
+    const isUntracked = /The following untracked working tree files would be overwritten/i.test(rawError);
+    const filesMatch = rawError.match(/overwritten by checkout:([\s\S]*?)(?:Please commit|Aborting|$)/i);
+    let filesText = "";
+    if (filesMatch) {
+      const list = filesMatch[1].split("\n").map((s) => s.trim()).filter((s) => s.length > 0 && !s.startsWith("error:"));
+      if (list.length > 0) {
+        filesText = "\n\nConflicting files:\n" + list.map((f) => `\u2022 ${f}`).join("\n");
+      }
+    }
+    const message = `Checkout Failed: Your local changes would be overwritten by switching to '${ref}'.${filesText}
+
+IntelliJ Git can stash your changes, switch branches, and optionally re-apply them.`;
+    const choice = await vscode5.window.showWarningMessage(
+      message,
+      { modal: true },
+      "Smart Checkout",
+      "Stash & Checkout"
+    );
+    if (!choice) return;
+    const stashName = `autostash-${ref.replace(/[^a-zA-Z0-9_-]/g, "_")}-${Date.now()}`;
+    const stashArgs = isUntracked ? ["stash", "push", "-u", "-m", stashName] : ["stash", "push", "-m", stashName];
+    let stashed = false;
+    try {
+      const stashOut = await gitService.exec(stashArgs);
+      if (!stashOut.includes("No local changes to save")) {
+        stashed = true;
+      }
+    } catch (stashErr) {
+      vscode5.window.showErrorMessage(`Failed to stash changes: ${stashErr.message}`);
+      return;
+    }
+    try {
+      await gitService.checkout(ref);
+    } catch (checkoutErr) {
+      if (stashed) {
+        try {
+          await gitService.exec(["stash", "pop"]);
+        } catch {
+        }
+      }
+      vscode5.window.showErrorMessage(`Checkout failed: ${checkoutErr.message}`);
+      return;
+    }
+    if (choice === "Smart Checkout" && stashed) {
+      try {
+        await gitService.exec(["stash", "pop"]);
+        vscode5.window.showInformationMessage(`Smart Checkout completed: Switched to '${ref}' and restored your changes.`);
+      } catch (popErr) {
+        vscode5.window.showWarningMessage(
+          `Switched to '${ref}', but applying stashed changes resulted in merge conflicts. Please resolve them.`,
+          "Resolve Conflicts"
+        ).then((res) => {
+          if (res === "Resolve Conflicts") {
+            vscode5.commands.executeCommand("intellij-git.resolveConflicts");
+          }
+        });
+      }
+    } else if (choice === "Stash & Checkout" && stashed) {
+      vscode5.window.showInformationMessage(`Switched to '${ref}'. Your changes were safely saved to Stash.`);
+    } else {
+      vscode5.window.showInformationMessage(`Checked out '${ref}'.`);
+    }
+    onSuccess();
+  }
+}
 async function handleGraphAction(type, payload, host) {
   const { gitService } = host;
   switch (type) {
     case "checkout": {
       const ref = payload;
-      try {
-        await gitService.checkout(ref);
-        vscode5.window.showInformationMessage(`Checked out ${ref}`);
-        host.loadInitialData();
-      } catch (err) {
-        vscode5.window.showErrorMessage(`Checkout failed: ${err.message}`);
-      }
+      await handleCheckoutWithConflictResolution(gitService, ref, () => host.loadInitialData());
       return true;
     }
     case "createBranch": {
@@ -7265,13 +7336,7 @@ function activate(context) {
     vscode16.commands.registerCommand("intellij-git.checkoutBranch", async (node) => {
       const ref = node?.ref;
       if (!ref) return;
-      try {
-        await gitService.checkout(ref);
-        graphViewProvider.refresh();
-        vscode16.window.showInformationMessage(`Checked out ${ref}`);
-      } catch (err) {
-        vscode16.window.showErrorMessage(`Checkout failed: ${err.message}`);
-      }
+      await handleCheckoutWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
     })
   );
   context.subscriptions.push(

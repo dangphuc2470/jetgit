@@ -13,6 +13,101 @@ export interface GraphActionHost {
   updateGraph(commits: Commit[]): void;
 }
 
+export async function handleCheckoutWithConflictResolution(
+  gitService: GitService,
+  ref: string,
+  onSuccess: () => void
+): Promise<void> {
+  try {
+    await gitService.checkout(ref);
+    vscode.window.showInformationMessage(`Checked out ${ref}`);
+    onSuccess();
+  } catch (err: any) {
+    const rawError = err?.message || String(err);
+    const isConflict =
+      /Your local changes to the following files would be overwritten by checkout/i.test(rawError) ||
+      /The following untracked working tree files would be overwritten by checkout/i.test(rawError);
+
+    if (!isConflict) {
+      vscode.window.showErrorMessage(`Checkout failed: ${rawError}`);
+      return;
+    }
+
+    const isUntracked = /The following untracked working tree files would be overwritten/i.test(rawError);
+    const filesMatch = rawError.match(/overwritten by checkout:([\s\S]*?)(?:Please commit|Aborting|$)/i);
+    let filesText = '';
+    if (filesMatch) {
+      const list = filesMatch[1]
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('error:'));
+      if (list.length > 0) {
+        filesText = '\n\nConflicting files:\n' + list.map(f => `• ${f}`).join('\n');
+      }
+    }
+
+    const message = `Checkout Failed: Your local changes would be overwritten by switching to '${ref}'.${filesText}\n\nIntelliJ Git can stash your changes, switch branches, and optionally re-apply them.`;
+    const choice = await vscode.window.showWarningMessage(
+      message,
+      { modal: true },
+      'Smart Checkout',
+      'Stash & Checkout'
+    );
+
+    if (!choice) return;
+
+    const stashName = `autostash-${ref.replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}`;
+    const stashArgs = isUntracked
+      ? ['stash', 'push', '-u', '-m', stashName]
+      : ['stash', 'push', '-m', stashName];
+
+    let stashed = false;
+    try {
+      const stashOut = await gitService.exec(stashArgs);
+      if (!stashOut.includes('No local changes to save')) {
+        stashed = true;
+      }
+    } catch (stashErr: any) {
+      vscode.window.showErrorMessage(`Failed to stash changes: ${stashErr.message}`);
+      return;
+    }
+
+    try {
+      await gitService.checkout(ref);
+    } catch (checkoutErr: any) {
+      if (stashed) {
+        try {
+          await gitService.exec(['stash', 'pop']);
+        } catch {}
+      }
+      vscode.window.showErrorMessage(`Checkout failed: ${checkoutErr.message}`);
+      return;
+    }
+
+    if (choice === 'Smart Checkout' && stashed) {
+      try {
+        await gitService.exec(['stash', 'pop']);
+        vscode.window.showInformationMessage(`Smart Checkout completed: Switched to '${ref}' and restored your changes.`);
+      } catch (popErr: any) {
+        vscode.window.showWarningMessage(
+          `Switched to '${ref}', but applying stashed changes resulted in merge conflicts. Please resolve them.`,
+          'Resolve Conflicts'
+        ).then(res => {
+          if (res === 'Resolve Conflicts') {
+            vscode.commands.executeCommand('intellij-git.resolveConflicts');
+          }
+        });
+      }
+    } else if (choice === 'Stash & Checkout' && stashed) {
+      vscode.window.showInformationMessage(`Switched to '${ref}'. Your changes were safely saved to Stash.`);
+    } else {
+      vscode.window.showInformationMessage(`Checked out '${ref}'.`);
+    }
+
+    onSuccess();
+  }
+}
+
 export async function handleGraphAction(
   type: string,
   payload: any,
@@ -23,13 +118,7 @@ export async function handleGraphAction(
   switch (type) {
     case 'checkout': {
       const ref = payload as string;
-      try {
-        await gitService.checkout(ref);
-        vscode.window.showInformationMessage(`Checked out ${ref}`);
-        host.loadInitialData();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Checkout failed: ${err.message}`);
-      }
+      await handleCheckoutWithConflictResolution(gitService, ref, () => host.loadInitialData());
       return true;
     }
     case 'createBranch': {

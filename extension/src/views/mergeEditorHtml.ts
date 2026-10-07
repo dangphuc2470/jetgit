@@ -199,6 +199,8 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       background: var(--vscode-editor-background, #1e1f22);
       min-width: 0;
       position: relative;
+      user-select: text !important;
+      -webkit-user-select: text !important;
     }
     .editor-pane::-webkit-scrollbar {
       width: 10px;
@@ -217,6 +219,8 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       min-width: 100%;
       width: max-content;
       position: relative;
+      user-select: text !important;
+      -webkit-user-select: text !important;
     }
     .editor-line {
       height: 20px;
@@ -231,6 +235,9 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       font-size: var(--vscode-editor-font-size, 12px);
       color: var(--vscode-editor-foreground, #bcbec4);
       white-space: pre;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      cursor: text;
     }
     .gutter-num {
       width: 44px;
@@ -240,13 +247,15 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       text-align: right;
       padding-right: 12px;
       color: var(--vscode-editorLineNumber-foreground, #5a5d63);
-      user-select: none;
+      user-select: none !important;
+      -webkit-user-select: none !important;
       font-size: 11px;
       font-family: "JetBrains Mono", "JetBrains Mono NL", monospace;
       position: sticky;
       left: 0;
       background: inherit;
       z-index: 2;
+      cursor: default;
     }
     .line-content {
       flex: 1;
@@ -256,7 +265,14 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       padding-right: 24px;
       white-space: pre;
       overflow: visible;
-      user-select: text;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      cursor: text !important;
+    }
+    .editor-line ::selection,
+    .editor-line::selection {
+      background: var(--vscode-editor-selectionBackground, #264f78) !important;
+      color: inherit !important;
     }
 
     /* Middle Gutters */
@@ -270,7 +286,12 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       background: var(--vscode-editorGutter-background, var(--vscode-editor-background, #1e1f22));
       border-left: 1px solid var(--vscode-panel-border, #2b2d30);
       border-right: 1px solid var(--vscode-panel-border, #2b2d30);
-      user-select: none;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
+    .merge-gutter * {
+      user-select: none !important;
+      -webkit-user-select: none !important;
     }
     .gutter-svg {
       position: absolute;

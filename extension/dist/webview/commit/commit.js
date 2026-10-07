@@ -999,12 +999,21 @@
     // Header bar
     const diffHeader = document.createElement('div');
     diffHeader.className = 'diff-header-bar';
+    const isFileInitiallyChecked = state.checkedFiles.has(selectedFile);
     diffHeader.innerHTML = `
       <div class="diff-title-info">
-        <span class="diff-file-name">${escapeHtml(fileName)}</span>
+        <label class="diff-master-chk-wrap" title="Stage / Unstage All Differences in File" data-tooltip="Tick All Differences in File">
+          <input type="checkbox" id="chk-diff-all" class="diff-master-chk" ${isFileInitiallyChecked ? 'checked' : ''}/>
+          <span class="diff-file-name">${escapeHtml(fileName)}</span>
+        </label>
         <span class="diff-file-dir">${escapeHtml(fileDir)}</span>
       </div>
       <div class="diff-actions">
+        <button class="diff-tool-btn" id="btn-tick-all" title="Tick All Differences in File" data-tooltip="Tick All Differences in File">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+          </svg>
+        </button>
         <button class="diff-tool-btn" id="btn-revert-hunk" title="Revert Hunk">↶</button>
         <button class="diff-tool-btn" id="btn-prev-diff" title="Previous Difference (Cmd+Shift+Up)">▲</button>
         <button class="diff-tool-btn" id="btn-next-diff" title="Next Difference (Cmd+Shift+Down)">▼</button>
@@ -1076,6 +1085,7 @@
         } else {
           vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: true } });
         }
+        updateMasterState();
       });
 
       diffContent.appendChild(hunkHeader);
@@ -1121,6 +1131,7 @@
             } else {
               vscode.postMessage({ type: 'applyHunkPatch', payload: { patch: patchContent, reverse: true } });
             }
+            updateMasterState();
           });
         }
 
@@ -1129,6 +1140,75 @@
     });
 
     diffContainer.appendChild(diffContent);
+
+    // Master / Tick All Logic
+    const masterChk = diffHeader.querySelector('#chk-diff-all');
+    const btnTickAll = diffHeader.querySelector('#btn-tick-all');
+
+    function updateMasterState() {
+      if (!masterChk) return;
+      const allCheckboxes = diffContent.querySelectorAll('.hunk-chk, .line-chk');
+      if (allCheckboxes.length === 0) {
+        masterChk.checked = state.checkedFiles.has(selectedFile);
+        masterChk.indeterminate = false;
+        return;
+      }
+      const allChecked = Array.from(allCheckboxes).every(c => c.checked);
+      const someChecked = Array.from(allCheckboxes).some(c => c.checked);
+      masterChk.checked = allChecked;
+      masterChk.indeterminate = !allChecked && someChecked;
+    }
+
+    function toggleAllDifferences(targetState) {
+      const allHunkChks = diffContent.querySelectorAll('.hunk-chk');
+      const allLineChks = diffContent.querySelectorAll('.line-chk');
+
+      allHunkChks.forEach(c => { c.checked = targetState; });
+      allLineChks.forEach(c => { c.checked = targetState; });
+
+      hunks.forEach(h => {
+        h.staged = targetState;
+        if (h.blocks) {
+          h.blocks.forEach(b => {
+            b.staged = targetState;
+            b.lines.forEach(bl => { bl.staged = targetState; });
+          });
+        }
+      });
+
+      if (masterChk) {
+        masterChk.checked = targetState;
+        masterChk.indeterminate = false;
+      }
+
+      if (targetState) {
+        state.checkedFiles.add(selectedFile);
+        vscode.postMessage({ type: 'stageFile', payload: selectedFile });
+      } else {
+        state.checkedFiles.delete(selectedFile);
+        vscode.postMessage({ type: 'unstageFile', payload: selectedFile });
+      }
+
+      const treeChk = document.getElementById(`chk-${selectedFile}`);
+      if (treeChk) treeChk.checked = targetState;
+    }
+
+    if (masterChk) {
+      masterChk.addEventListener('change', () => {
+        toggleAllDifferences(masterChk.checked);
+      });
+    }
+
+    if (btnTickAll) {
+      btnTickAll.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const allCheckboxes = diffContent.querySelectorAll('.hunk-chk, .line-chk');
+        const anyUnchecked = Array.from(allCheckboxes).some(c => !c.checked);
+        toggleAllDifferences(anyUnchecked);
+      });
+    }
+
+    updateMasterState();
 
     // Auto-scroll to first diff line
     requestAnimationFrame(() => {

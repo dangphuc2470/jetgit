@@ -760,6 +760,11 @@
         </div>
         <div class="toolbar-divider"></div>
         ${!state.readOnly ? `
+        <button class="icon-tool-btn" id="btn-tick-all" data-tooltip="Tick All Differences in File" title="Tick All Differences in File">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+          </svg>
+        </button>
         <label class="current-version-label" data-tooltip="Stage / Unstage entire file">
           <span class="studio-chk-wrap">
             <input type="checkbox" id="chk-master-version" checked/>
@@ -1617,6 +1622,32 @@
         document.querySelectorAll('.block-chk').forEach(c => { c.checked = check; });
         const newStagedCount = check ? state.blocks.length : 0;
         const stagedContent = check ? state.currentContent : state.baseContent;
+        vscode.postMessage({
+          type: 'updateBlockStage',
+          payload: {
+            filePath: state.filePath,
+            stagedContent,
+            stagedCount: newStagedCount,
+            totalCount: state.blocks.length
+          }
+        });
+      });
+    }
+
+    const btnTickAll = toolbar.querySelector('#btn-tick-all');
+    if (btnTickAll) {
+      btnTickAll.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const anyUnstaged = state.blocks.some(b => !b.staged);
+        const targetCheck = anyUnstaged;
+        if (masterChk) {
+          masterChk.checked = targetCheck;
+          masterChk.indeterminate = false;
+        }
+        state.blocks.forEach(b => { b.staged = targetCheck; });
+        document.querySelectorAll('.block-chk').forEach(c => { c.checked = targetCheck; });
+        const newStagedCount = targetCheck ? state.blocks.length : 0;
+        const stagedContent = targetCheck ? state.currentContent : state.baseContent;
         vscode.postMessage({
           type: 'updateBlockStage',
           payload: {

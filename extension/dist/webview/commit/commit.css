@@ -846,6 +846,8 @@ body, html {
   padding: 3px 8px;
   color: #7f848e;
   font-size: 11px;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 .hunk-chk-label {
@@ -855,6 +857,40 @@ body, html {
   cursor: pointer;
 }
 
+.diff-master-chk-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none !important;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.diff-master-chk {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #3574f0;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.diff-viewer-wrapper {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.diff-content-scroll {
+  flex: 1;
+  overflow: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "JetBrains Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: #1e1f22;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
 .diff-line {
   display: flex;
   line-height: 20px;
@@ -862,6 +898,8 @@ body, html {
   white-space: pre;
   min-width: 100%;
   width: max-content;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .diff-line:hover {
@@ -896,17 +934,26 @@ body, html {
   position: sticky;
   left: 0;
   z-index: 2;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.gutter * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 .line-num {
   width: 32px;
   text-align: right;
+  user-select: none !important;
 }
 
 .gutter-spacer {
   width: 13px;
   height: 13px;
   flex-shrink: 0;
+  user-select: none !important;
 }
 
 .line-prefix {
@@ -914,15 +961,24 @@ body, html {
   text-align: center;
   flex-shrink: 0;
   font-weight: bold;
+  user-select: none !important;
 }
 
 .line-text {
   flex: 1;
   padding-left: 4px;
   padding-right: 24px;
-  user-select: text;
+  user-select: text !important;
+  -webkit-user-select: text !important;
   white-space: pre;
   overflow: visible;
+  cursor: text !important;
+}
+
+.diff-line ::selection,
+.diff-line::selection {
+  background: var(--vscode-editor-selectionBackground, #264f78) !important;
+  color: inherit !important;
 }
 
 /* Stash and Shelf Views */
@@ -1477,6 +1533,8 @@ body, html {
   overflow-y: auto;
   background: var(--vscode-editor-background, #1e1f22);
   min-width: 0;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .editor-lines-container {
@@ -1485,6 +1543,8 @@ body, html {
   min-width: 100%;
   width: max-content;
   position: relative;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .editor-line {
@@ -1503,6 +1563,8 @@ body, html {
   margin: 0;
   padding: 0;
   border: none;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .editor-line .gutter-num {
@@ -1513,7 +1575,8 @@ body, html {
   text-align: right;
   padding-right: 12px;
   color: var(--vscode-editorLineNumber-foreground, #5a5d63);
-  user-select: none;
+  user-select: none !important;
+  -webkit-user-select: none !important;
   font-size: 11px;
   font-family: "JetBrains Mono", "JetBrains Mono NL", monospace;
   margin: 0;
@@ -1535,6 +1598,15 @@ body, html {
   font-family: "JetBrains Mono", "JetBrains Mono NL", JetBrainsMono, Consolas, Menlo, Monaco, monospace !important;
   margin: 0;
   border: none;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+}
+
+.editor-line ::selection,
+.editor-line::selection {
+  background: var(--vscode-editor-selectionBackground, #264f78) !important;
+  color: inherit !important;
 }
 
 /* Middle Gutter with Curved SVG Ribbons */
@@ -1548,7 +1620,13 @@ body, html {
   background: var(--vscode-editorGutter-background, var(--vscode-editor-background, #1e1f22));
   border-left: 1px solid var(--vscode-panel-border, #2b2d30);
   border-right: 1px solid var(--vscode-panel-border, #2b2d30);
-  user-select: none;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.middle-gutter * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 .gutter-ribbon-svg {

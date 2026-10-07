@@ -55,6 +55,9 @@ export async function getBranches(ctx: BranchExecContext): Promise<BranchInfo[]>
     if (line.includes(' -> ')) continue;
     const [name, hash] = line.split('\t');
     const trimmedName = name.trim();
+    if (!trimmedName.includes('/') || trimmedName.endsWith('/HEAD')) {
+      continue;
+    }
     const slashIdx = trimmedName.indexOf('/');
     const remoteName = slashIdx !== -1 ? trimmedName.slice(0, slashIdx) : 'origin';
     branches.push({

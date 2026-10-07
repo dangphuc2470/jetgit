@@ -283,6 +283,9 @@ async function getBranches(ctx) {
     if (line.includes(" -> ")) continue;
     const [name, hash] = line.split("	");
     const trimmedName = name.trim();
+    if (!trimmedName.includes("/") || trimmedName.endsWith("/HEAD")) {
+      continue;
+    }
     const slashIdx = trimmedName.indexOf("/");
     const remoteName = slashIdx !== -1 ? trimmedName.slice(0, slashIdx) : "origin";
     branches.push({

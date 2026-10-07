@@ -9694,7 +9694,7 @@ ${component_stack}
           treeContent.appendChild(localSec.sec);
         }
 
-        const remoteList = branches.filter((b) => b.remote || b.name.startsWith("origin/")).filter((b) => filterFn(b.name));
+        const remoteList = branches.filter((b) => (b.remote || b.name.startsWith("origin/")) && b.name.includes('/') && !b.name.endsWith('/HEAD')).filter((b) => filterFn(b.name));
         if (remoteList.length > 0) {
           const remoteSec = createSec("Remote", true);
           const remoteTree = createTreeNode();

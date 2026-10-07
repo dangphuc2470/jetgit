@@ -1046,7 +1046,7 @@ var GitService = class {
       "fetch",
       remote,
       `refs/heads/${branchName}:refs/remotes/${remote}/${branchName}`
-    ], 10 * 1024 * 1024, 1, 6e4);
+    ], 100 * 1024 * 1024, 1, 3e5);
   }
   async getTags() {
     return getTags(this.asBranchContext());

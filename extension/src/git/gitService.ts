@@ -265,7 +265,7 @@ export class GitService {
     return this.exec([
       'fetch', remote,
       `refs/heads/${branchName}:refs/remotes/${remote}/${branchName}`
-    ], 10 * 1024 * 1024, 1, 60000);
+    ], 100 * 1024 * 1024, 1, 300000);
   }
 
   async getTags(): Promise<TagInfo[]> {

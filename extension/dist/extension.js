@@ -2744,20 +2744,19 @@ var PushDialogPanel = class _PushDialogPanel {
 // src/views/graphActionHandlers.ts
 var vscode5 = __toESM(require("vscode"));
 var path8 = __toESM(require("path"));
-async function handleCheckoutWithConflictResolution(gitService, ref, onSuccess) {
+async function withSmartStashOnConflict(gitService, actionLabel, targetRef, runAction, onSuccess) {
   try {
-    await gitService.checkout(ref);
-    vscode5.window.showInformationMessage(`Checked out ${ref}`);
+    await runAction();
     onSuccess();
   } catch (err) {
     const rawError = err?.message || String(err);
-    const isConflict = /Your local changes to the following files would be overwritten by checkout/i.test(rawError) || /The following untracked working tree files would be overwritten by checkout/i.test(rawError);
+    const isConflict = /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) || /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError);
     if (!isConflict) {
-      vscode5.window.showErrorMessage(`Checkout failed: ${rawError}`);
+      vscode5.window.showErrorMessage(`${actionLabel} failed: ${rawError}`);
       return;
     }
     const isUntracked = /The following untracked working tree files would be overwritten/i.test(rawError);
-    const filesMatch = rawError.match(/overwritten by checkout:([\s\S]*?)(?:Please commit|Aborting|$)/i);
+    const filesMatch = rawError.match(/overwritten by (?:merge|checkout):([\s\S]*?)(?:Please commit|Aborting|$)/i);
     let filesText = "";
     if (filesMatch) {
       const list = filesMatch[1].split("\n").map((s) => s.trim()).filter((s) => s.length > 0 && !s.startsWith("error:"));
@@ -2765,17 +2764,21 @@ async function handleCheckoutWithConflictResolution(gitService, ref, onSuccess) 
         filesText = "\n\nConflicting files:\n" + list.map((f) => `\u2022 ${f}`).join("\n");
       }
     }
-    const message = `Checkout Failed: Your local changes would be overwritten by switching to '${ref}'.${filesText}
+    const smartLabel = `Smart ${actionLabel}`;
+    const stashLabel = `Stash & ${actionLabel}`;
+    const pastAction = actionLabel === "Checkout" ? `switching to '${targetRef}'` : "merging";
+    const message = `${actionLabel} Failed: Your local changes would be overwritten by ${pastAction}.${filesText}
 
-IntelliJ Git can stash your changes, switch branches, and optionally re-apply them.`;
+IntelliJ Git can stash your changes, perform the ${actionLabel.toLowerCase()}, and optionally re-apply them.`;
     const choice = await vscode5.window.showWarningMessage(
       message,
       { modal: true },
-      "Smart Checkout",
-      "Stash & Checkout"
+      smartLabel,
+      stashLabel
     );
     if (!choice) return;
-    const stashName = `autostash-${ref.replace(/[^a-zA-Z0-9_-]/g, "_")}-${Date.now()}`;
+    const stashPrefix = actionLabel.toLowerCase();
+    const stashName = `autostash-${stashPrefix}-${(targetRef || "HEAD").replace(/[^a-zA-Z0-9_-]/g, "_")}-${Date.now()}`;
     const stashArgs = isUntracked ? ["stash", "push", "-u", "-m", stashName] : ["stash", "push", "-m", stashName];
     let stashed = false;
     try {
@@ -2788,24 +2791,24 @@ IntelliJ Git can stash your changes, switch branches, and optionally re-apply th
       return;
     }
     try {
-      await gitService.checkout(ref);
-    } catch (checkoutErr) {
+      await runAction();
+    } catch (actionErr) {
       if (stashed) {
         try {
           await gitService.exec(["stash", "pop"]);
         } catch {
         }
       }
-      vscode5.window.showErrorMessage(`Checkout failed: ${checkoutErr.message}`);
+      vscode5.window.showErrorMessage(`${actionLabel} failed: ${actionErr.message}`);
       return;
     }
-    if (choice === "Smart Checkout" && stashed) {
+    if (choice === smartLabel && stashed) {
       try {
         await gitService.exec(["stash", "pop"]);
-        vscode5.window.showInformationMessage(`Smart Checkout completed: Switched to '${ref}' and restored your changes.`);
+        vscode5.window.showInformationMessage(`${smartLabel} completed: Restored your changes.`);
       } catch (popErr) {
         vscode5.window.showWarningMessage(
-          `Switched to '${ref}', but applying stashed changes resulted in merge conflicts. Please resolve them.`,
+          `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`,
           "Resolve Conflicts"
         ).then((res) => {
           if (res === "Resolve Conflicts") {
@@ -2813,13 +2816,23 @@ IntelliJ Git can stash your changes, switch branches, and optionally re-apply th
           }
         });
       }
-    } else if (choice === "Stash & Checkout" && stashed) {
-      vscode5.window.showInformationMessage(`Switched to '${ref}'. Your changes were safely saved to Stash.`);
-    } else {
-      vscode5.window.showInformationMessage(`Checked out '${ref}'.`);
+    } else if (choice === stashLabel && stashed) {
+      vscode5.window.showInformationMessage(`${actionLabel} succeeded. Your changes were safely saved to Stash.`);
     }
     onSuccess();
   }
+}
+async function handleCheckoutWithConflictResolution(gitService, ref, onSuccess) {
+  await withSmartStashOnConflict(
+    gitService,
+    "Checkout",
+    ref,
+    async () => {
+      await gitService.checkout(ref);
+      vscode5.window.showInformationMessage(`Checked out ${ref}`);
+    },
+    onSuccess
+  );
 }
 async function handlePullWithConflictResolution(gitService, branch, onSuccess) {
   await vscode5.window.withProgress(
@@ -2829,81 +2842,16 @@ async function handlePullWithConflictResolution(gitService, branch, onSuccess) {
       cancellable: false
     },
     async () => {
-      try {
-        const out = await gitService.pull(branch);
-        vscode5.window.showInformationMessage(`Updated ${branch}: ${out || "Already up to date."}`);
-        onSuccess();
-      } catch (err) {
-        const rawError = err?.message || String(err);
-        const isConflict = /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) || /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError);
-        if (!isConflict) {
-          vscode5.window.showErrorMessage(`Update failed: ${rawError}`);
-          return;
-        }
-        const isUntracked = /The following untracked working tree files would be overwritten/i.test(rawError);
-        const filesMatch = rawError.match(/overwritten by (?:merge|checkout):([\s\S]*?)(?:Please commit|Aborting|$)/i);
-        let filesText = "";
-        if (filesMatch) {
-          const list = filesMatch[1].split("\n").map((s) => s.trim()).filter((s) => s.length > 0 && !s.startsWith("error:"));
-          if (list.length > 0) {
-            filesText = "\n\nConflicting files:\n" + list.map((f) => `\u2022 ${f}`).join("\n");
-          }
-        }
-        const message = `Update Failed: Your local changes would be overwritten by merge.${filesText}
-
-IntelliJ Git can stash your changes, update the branch, and optionally re-apply them.`;
-        const choice = await vscode5.window.showWarningMessage(
-          message,
-          { modal: true },
-          "Smart Update",
-          "Stash & Update"
-        );
-        if (!choice) return;
-        const stashName = `autostash-update-${(branch || "HEAD").replace(/[^a-zA-Z0-9_-]/g, "_")}-${Date.now()}`;
-        const stashArgs = isUntracked ? ["stash", "push", "-u", "-m", stashName] : ["stash", "push", "-m", stashName];
-        let stashed = false;
-        try {
-          const stashOut = await gitService.exec(stashArgs);
-          if (!stashOut.includes("No local changes to save")) {
-            stashed = true;
-          }
-        } catch (stashErr) {
-          vscode5.window.showErrorMessage(`Failed to stash changes: ${stashErr.message}`);
-          return;
-        }
-        try {
-          await gitService.pull(branch);
-        } catch (pullErr) {
-          if (stashed) {
-            try {
-              await gitService.exec(["stash", "pop"]);
-            } catch {
-            }
-          }
-          vscode5.window.showErrorMessage(`Update failed: ${pullErr.message}`);
-          return;
-        }
-        if (choice === "Smart Update" && stashed) {
-          try {
-            await gitService.exec(["stash", "pop"]);
-            vscode5.window.showInformationMessage(`Smart Update completed: Updated '${branch}' and restored your changes.`);
-          } catch (popErr) {
-            vscode5.window.showWarningMessage(
-              `Updated '${branch}', but applying stashed changes resulted in merge conflicts. Please resolve them.`,
-              "Resolve Conflicts"
-            ).then((res) => {
-              if (res === "Resolve Conflicts") {
-                vscode5.commands.executeCommand("intellij-git.resolveConflicts");
-              }
-            });
-          }
-        } else if (choice === "Stash & Update" && stashed) {
-          vscode5.window.showInformationMessage(`Updated '${branch}'. Your changes were safely saved to Stash.`);
-        } else {
-          vscode5.window.showInformationMessage(`Updated '${branch}'.`);
-        }
-        onSuccess();
-      }
+      await withSmartStashOnConflict(
+        gitService,
+        "Update",
+        branch,
+        async () => {
+          const out = await gitService.pull(branch);
+          vscode5.window.showInformationMessage(`Updated ${branch}: ${out || "Already up to date."}`);
+        },
+        onSuccess
+      );
     }
   );
 }

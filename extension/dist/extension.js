@@ -3336,6 +3336,32 @@ async function handleGraphAction(type, payload, host) {
       }
       return true;
     }
+    case "setUpstream": {
+      const { branch, upstream } = payload || {};
+      if (!branch || !upstream) return true;
+      try {
+        await gitService.exec(["branch", "--set-upstream-to", upstream, branch]);
+        vscode5.window.showInformationMessage(`Branch '${branch}' is now tracking '${upstream}'.`);
+        host.loadInitialData();
+        vscode5.commands.executeCommand("intellij-git.refreshBranches");
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Set upstream failed: ${err.message}`);
+      }
+      return true;
+    }
+    case "unsetUpstream": {
+      const { branch } = payload || {};
+      if (!branch) return true;
+      try {
+        await gitService.exec(["branch", "--unset-upstream", branch]);
+        vscode5.window.showInformationMessage(`Unset tracked branch for '${branch}'.`);
+        host.loadInitialData();
+        vscode5.commands.executeCommand("intellij-git.refreshBranches");
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Unset upstream failed: ${err.message}`);
+      }
+      return true;
+    }
     default:
       return false;
   }

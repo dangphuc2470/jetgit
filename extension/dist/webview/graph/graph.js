@@ -9151,6 +9151,12 @@ ${component_stack}
           addItem("Push...", "", () => {
             postMessage("push", branchName);
           });
+          if (branchInfo && branchInfo.upstream) {
+            addItem("Unset Tracked Branch (" + branchInfo.upstream + ")", "", () => {
+              showToast("Unsetting tracked branch for '" + branchName + "'...");
+              postMessage("unsetUpstream", { branch: branchName });
+            });
+          }
           addDivider();
           addItem("Rename...", "F2", () => {
             openRenameBranchDialog(branchName);
@@ -9159,6 +9165,12 @@ ${component_stack}
           addItem("Checkout", "", () => {
             postMessage("checkout", branchName);
           });
+          if (currentBranch) {
+            addItem("Track into '" + currentBranch + "'", "", () => {
+              showToast("Tracking '" + currentBranch + "' -> '" + branchName + "'...");
+              postMessage("setUpstream", { branch: currentBranch, upstream: branchName });
+            });
+          }
           addItem("New Branch from '" + branchName + "'...", "", () => {
             openCreateBranchDialog(branchName);
           });
@@ -9215,6 +9227,12 @@ ${component_stack}
           addItem("Push...", "", () => {
             postMessage("push", branchName);
           });
+          if (branchInfo && branchInfo.upstream) {
+            addItem("Unset Tracked Branch (" + branchInfo.upstream + ")", "", () => {
+              showToast("Unsetting tracked branch for '" + branchName + "'...");
+              postMessage("unsetUpstream", { branch: branchName });
+            });
+          }
           addDivider();
           addItem("Rename...", "F2", () => {
             openRenameBranchDialog(branchName);
@@ -9553,7 +9571,7 @@ ${component_stack}
           return false;
         }
 
-        function renderTreeLevel(lvlContainer, node) {
+        function renderTreeLevel(lvlContainer, node, isRemoteTree = false) {
           const hasSiblingFolders = !!(node.folders && Object.keys(node.folders).length > 0);
 
           function renderBranchItem(b) {
@@ -9628,8 +9646,46 @@ ${component_stack}
               } catch {}
             });
 
+            if (isRemoteTree && currentBranch) {
+              fHdr.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeBranchContextMenu();
+                const menu = document.createElement("div");
+                menu.className = "branch-context-menu";
+                menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+                menu.addEventListener("contextmenu", (ev) => {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                });
+                const targetUpstream = subNode.fullPath + "/" + currentBranch;
+                const it = document.createElement("div");
+                it.className = "bcm-item";
+                it.innerHTML = '<span>Track \'' + targetUpstream + '\' for \'' + currentBranch + '\'</span>';
+                it.addEventListener("click", (ev) => {
+                  ev.stopPropagation();
+                  closeBranchContextMenu();
+                  showToast("Tracking '" + currentBranch + "' -> '" + targetUpstream + "'...");
+                  postMessage("setUpstream", { branch: currentBranch, upstream: targetUpstream });
+                });
+                menu.appendChild(it);
+                document.body.appendChild(menu);
+                let x = e.clientX;
+                let y = e.clientY;
+                const rect = menu.getBoundingClientRect();
+                if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+                if (y + rect.height > window.innerHeight - 8) {
+                  const yAbove = e.clientY - rect.height;
+                  if (yAbove >= 8) y = yAbove;
+                  else y = Math.max(4, window.innerHeight - rect.height - 8);
+                }
+                menu.style.left = Math.max(0, x) + "px";
+                menu.style.top = Math.max(0, y) + "px";
+              });
+            }
+
             fDiv.appendChild(fHdr);
-            renderTreeLevel(fBdy, subNode);
+            renderTreeLevel(fBdy, subNode, isRemoteTree);
             fDiv.appendChild(fBdy);
             lvlContainer.appendChild(fDiv);
           }
@@ -9702,7 +9758,7 @@ ${component_stack}
             const parts = b.name.split("/");
             insertBranchIntoTree(remoteTree, parts, { ...b, remote: true });
           }
-          renderTreeLevel(remoteSec.bdy, remoteTree);
+          renderTreeLevel(remoteSec.bdy, remoteTree, true);
           treeContent.appendChild(remoteSec.sec);
         }
 

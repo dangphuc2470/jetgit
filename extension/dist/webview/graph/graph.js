@@ -9165,7 +9165,9 @@ ${component_stack}
           addItem("Checkout", "", () => {
             postMessage("checkout", branchName);
           });
-          if (currentBranch) {
+          const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
+          const isAlreadyTrackingThis = curBranchInfo && curBranchInfo.upstream === branchName;
+          if (currentBranch && !isAlreadyTrackingThis) {
             addItem("Track into '" + currentBranch + "'", "", () => {
               showToast("Tracking '" + currentBranch + "' -> '" + branchName + "'...");
               postMessage("setUpstream", { branch: currentBranch, upstream: branchName });
@@ -9651,6 +9653,18 @@ ${component_stack}
                 e.preventDefault();
                 e.stopPropagation();
                 closeBranchContextMenu();
+
+                const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
+                const targetUpstream = subNode.fullPath + "/" + currentBranch;
+                const isAlreadyTrackingThisCurrent = curBranchInfo && curBranchInfo.upstream === targetUpstream;
+
+                const locals = branches.filter(b => !b.remote && !b.name.startsWith('('));
+                const allTrackThisRemote = locals.length > 0 && locals.every(b => b.upstream && (b.upstream === subNode.fullPath + '/' + b.name || b.upstream.startsWith(subNode.fullPath + '/')));
+
+                if (allTrackThisRemote && (!currentBranch || isAlreadyTrackingThisCurrent)) {
+                  return;
+                }
+
                 const menu = document.createElement("div");
                 menu.className = "branch-context-menu";
                 menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
@@ -9659,19 +9673,20 @@ ${component_stack}
                   ev.stopPropagation();
                 });
 
-                const itAll = document.createElement("div");
-                itAll.className = "bcm-item";
-                itAll.innerHTML = '<span>Track All Local Branches to \'' + subNode.fullPath + '\'</span>';
-                itAll.addEventListener("click", (ev) => {
-                  ev.stopPropagation();
-                  closeBranchContextMenu();
-                  showToast("Tracking all local branches to '" + subNode.fullPath + "'...");
-                  postMessage("trackAllBranchesToRemote", { remote: subNode.fullPath });
-                });
-                menu.appendChild(itAll);
+                if (!allTrackThisRemote) {
+                  const itAll = document.createElement("div");
+                  itAll.className = "bcm-item";
+                  itAll.innerHTML = '<span>Track All Local Branches to \'' + subNode.fullPath + '\'</span>';
+                  itAll.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    closeBranchContextMenu();
+                    showToast("Tracking all local branches to '" + subNode.fullPath + "'...");
+                    postMessage("trackAllBranchesToRemote", { remote: subNode.fullPath });
+                  });
+                  menu.appendChild(itAll);
+                }
 
-                if (currentBranch) {
-                  const targetUpstream = subNode.fullPath + "/" + currentBranch;
+                if (currentBranch && !isAlreadyTrackingThisCurrent) {
                   const it = document.createElement("div");
                   it.className = "bcm-item";
                   it.innerHTML = '<span>Track \'' + targetUpstream + '\' for \'' + currentBranch + '\'</span>';
@@ -9683,6 +9698,8 @@ ${component_stack}
                   });
                   menu.appendChild(it);
                 }
+
+                if (menu.children.length === 0) return;
                 document.body.appendChild(menu);
                 let x = e.clientX;
                 let y = e.clientY;

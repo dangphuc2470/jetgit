@@ -3340,7 +3340,20 @@ async function handleGraphAction(type, payload, host) {
       const { branch, upstream } = payload || {};
       if (!branch || !upstream) return true;
       try {
-        await gitService.exec(["branch", "--set-upstream-to", upstream, branch]);
+        const slashIdx = upstream.indexOf('/');
+        const remote = slashIdx !== -1 ? upstream.slice(0, slashIdx) : upstream;
+        const remoteBranch = slashIdx !== -1 ? upstream.slice(slashIdx + 1) : branch;
+
+        try {
+          await gitService.exec(["fetch", remote, remoteBranch]);
+        } catch {}
+
+        try {
+          await gitService.exec(["branch", "--set-upstream-to", upstream, branch]);
+        } catch {
+          await gitService.exec(["config", `branch.${branch}.remote`, remote]);
+          await gitService.exec(["config", `branch.${branch}.merge`, `refs/heads/${remoteBranch}`]);
+        }
         vscode5.window.showInformationMessage(`Branch '${branch}' is now tracking '${upstream}'.`);
         host.loadInitialData();
         vscode5.commands.executeCommand("intellij-git.refreshBranches");
@@ -3373,21 +3386,27 @@ async function handleGraphAction(type, payload, host) {
         },
         async () => {
           try {
+            try {
+              await gitService.exec(["fetch", remote]);
+            } catch {}
+
             const branches = await gitService.getBranches();
             const locals = branches.filter((b) => !b.remote && !b.name.startsWith("("));
-            const remotes = branches.filter((b) => b.remote === remote || b.name.startsWith(remote + "/"));
-            const remoteBranchNames = new Set(remotes.map((b) => b.name));
+
             let trackedCount = 0;
             const errors = [];
             for (const local of locals) {
               const targetRemoteBranch = `${remote}/${local.name}`;
-              if (remoteBranchNames.has(targetRemoteBranch)) {
+              try {
                 try {
                   await gitService.exec(["branch", "--set-upstream-to", targetRemoteBranch, local.name]);
-                  trackedCount++;
-                } catch (err) {
-                  errors.push(`${local.name}: ${err.message}`);
+                } catch {
+                  await gitService.exec(["config", `branch.${local.name}.remote`, remote]);
+                  await gitService.exec(["config", `branch.${local.name}.merge`, `refs/heads/${local.name}`]);
                 }
+                trackedCount++;
+              } catch (err) {
+                errors.push(`${local.name}: ${err.message}`);
               }
             }
             if (trackedCount > 0) {
@@ -3395,7 +3414,7 @@ async function handleGraphAction(type, payload, host) {
               host.loadInitialData();
               vscode5.commands.executeCommand("intellij-git.refreshBranches");
             } else {
-              vscode5.window.showInformationMessage(`No matching remote branches found on '${remote}' for local branches.`);
+              vscode5.window.showInformationMessage(`No local branches found to track to '${remote}'.`);
             }
             if (errors.length > 0) {
               vscode5.window.showWarningMessage(`Some branches could not be tracked:

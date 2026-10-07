@@ -147,7 +147,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Branch actions (kept for branch tree if re-added later)
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.refreshBranches', () => {
+    vscode.commands.registerCommand('intellij-git.refreshBranches', async () => {
+      try {
+        await gitService.refreshRemoteBranchNames();
+      } catch {}
       branchTree.refresh();
       graphViewProvider.refresh();
       vscode.window.showInformationMessage('Branches refreshed.');

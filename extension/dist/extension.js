@@ -333,6 +333,10 @@ async function checkout(ctx, ref) {
     for (const remote of remotes) {
       if (ref.startsWith(remote + "/")) {
         const localBranchName = ref.slice(remote.length + 1);
+        try {
+          await ctx.exec(["fetch", remote, `refs/heads/${localBranchName}:refs/remotes/${remote}/${localBranchName}`]);
+        } catch {
+        }
         const branchCheck = await ctx.exec(["branch", "--list", localBranchName]);
         if (branchCheck.trim()) {
           await ctx.exec(["checkout", localBranchName]);
@@ -689,7 +693,31 @@ async function getLog(ctx, options = {}) {
     args.push(`--grep=${options.query}`);
     args.push("-i");
   }
-  if (options.branch) args.push(options.branch);
+  if (options.branch) {
+    let branchExists = false;
+    try {
+      await ctx.exec(["rev-parse", "--verify", options.branch]);
+      branchExists = true;
+    } catch {
+      const slashIdx = options.branch.indexOf("/");
+      if (slashIdx !== -1) {
+        const remote = options.branch.slice(0, slashIdx);
+        const leafBranch = options.branch.slice(slashIdx + 1);
+        try {
+          await ctx.exec(["fetch", remote, `refs/heads/${leafBranch}:refs/remotes/${remote}/${leafBranch}`]);
+          await ctx.exec(["rev-parse", "--verify", options.branch]);
+          branchExists = true;
+        } catch {
+          branchExists = false;
+        }
+      }
+    }
+    if (branchExists) {
+      args.push(options.branch);
+    } else if (!args.includes("--all")) {
+      args.push("--all");
+    }
+  }
   if (options.path) {
     args.push("--");
     args.push(options.path);
@@ -830,6 +858,7 @@ async function commitFiles(ctx, message, filesToStage, amend = false) {
 var execFileAsync = (0, import_util.promisify)(import_child_process2.execFile);
 var GitService = class {
   commitCache = new LRUCache(5e3);
+  discoveredRemoteBranches = /* @__PURE__ */ new Map();
   cwd;
   constructor(workspaceRoot) {
     this.cwd = workspaceRoot;
@@ -840,6 +869,7 @@ var GitService = class {
   setCwd(newCwd) {
     this.cwd = newCwd;
     this.commitCache.clear();
+    this.discoveredRemoteBranches.clear();
   }
   async isGitRepo() {
     try {
@@ -966,7 +996,57 @@ var GitService = class {
   }
   // --- Branch & Remote Operations ---
   async getBranches() {
-    return getBranches(this.asBranchContext());
+    const localAndRemote = await getBranches(this.asBranchContext());
+    const existingNames = new Set(localAndRemote.map((b) => b.name));
+    const merged = [...localAndRemote];
+    for (const [_, branches] of this.discoveredRemoteBranches) {
+      for (const b of branches) {
+        if (!existingNames.has(b.name)) {
+          existingNames.add(b.name);
+          merged.push(b);
+        }
+      }
+    }
+    return merged;
+  }
+  async refreshRemoteBranchNames() {
+    const remotes = await this.getRemotes();
+    if (!remotes || remotes.length === 0) return [];
+    const results = [];
+    await Promise.allSettled(
+      remotes.map(async (r) => {
+        try {
+          const check = await this.isRemoteReachable(r, 2500);
+          if (!check.reachable) return;
+          const out = await this.exec(["ls-remote", "--heads", r], 2 * 1024 * 1024, 1, 1e4);
+          const list = [];
+          for (const line of out.split("\n")) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            const [hash, ref] = trimmed.split(/\s+/);
+            if (!ref || !ref.startsWith("refs/heads/")) continue;
+            const branchName = ref.replace(/^refs\/heads\//, "");
+            list.push({
+              name: `${r}/${branchName}`,
+              current: false,
+              remote: r,
+              hash: hash || ""
+            });
+          }
+          this.discoveredRemoteBranches.set(r, list);
+          results.push({ remote: r, count: list.length });
+        } catch {
+        }
+      })
+    );
+    return results;
+  }
+  async fetchSingleBranch(remote, branchName) {
+    return this.exec([
+      "fetch",
+      remote,
+      `refs/heads/${branchName}:refs/remotes/${remote}/${branchName}`
+    ], 10 * 1024 * 1024, 1, 6e4);
   }
   async getTags() {
     return getTags(this.asBranchContext());
@@ -2864,6 +2944,36 @@ async function handleGraphAction(type, payload, host) {
   switch (type) {
     case "checkout": {
       const ref = payload;
+      if (ref && ref.includes("/")) {
+        const slashIdx = ref.indexOf("/");
+        const remoteName = ref.slice(0, slashIdx);
+        const branchName = ref.slice(slashIdx + 1);
+        try {
+          const remotes = await gitService.getRemotes();
+          if (remotes.includes(remoteName)) {
+            let fetchOk = false;
+            await vscode5.window.withProgress(
+              {
+                location: vscode5.ProgressLocation.Notification,
+                title: `Fetching '${ref}' before checkout...`,
+                cancellable: false
+              },
+              async () => {
+                try {
+                  await gitService.fetchSingleBranch(remoteName, branchName);
+                  fetchOk = true;
+                } catch (fetchErr) {
+                  vscode5.window.showErrorMessage(`Failed to fetch '${ref}' from remote '${remoteName}': ${fetchErr.message}`);
+                }
+              }
+            );
+            if (!fetchOk) {
+              return true;
+            }
+          }
+        } catch {
+        }
+      }
       await handleCheckoutWithConflictResolution(gitService, ref, () => host.loadInitialData());
       return true;
     }
@@ -3056,6 +3166,32 @@ async function handleGraphAction(type, payload, host) {
         );
       } catch (err) {
         vscode5.window.showErrorMessage(`Failed to fetch '${remote}': ${err.message}`);
+      } finally {
+        host.loadInitialData();
+      }
+      return true;
+    }
+    case "fetchSingleBranch": {
+      const { branch } = payload || {};
+      if (!branch) return true;
+      const slashIdx = branch.indexOf("/");
+      if (slashIdx === -1) return true;
+      const remoteName = branch.slice(0, slashIdx);
+      const branchName = branch.slice(slashIdx + 1);
+      try {
+        await vscode5.window.withProgress(
+          {
+            location: vscode5.ProgressLocation.Notification,
+            title: `Fetching '${branch}'...`,
+            cancellable: false
+          },
+          async () => {
+            await gitService.fetchSingleBranch(remoteName, branchName);
+            vscode5.window.showInformationMessage(`Fetched branch '${branch}' successfully.`);
+          }
+        );
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Failed to fetch branch '${branch}': ${err.message}`);
       } finally {
         host.loadInitialData();
       }
@@ -3667,6 +3803,8 @@ var GraphViewProvider = class {
       if (!this.hasInitializedFilter) {
         this.hasInitializedFilter = true;
         this.currentFilter = currentBranch ? { branch: "HEAD", all: false } : { all: true };
+      } else if (this.currentFilter.branch && this.currentFilter.branch.includes("/")) {
+        this.currentFilter.branch = "HEAD";
       }
       const [commits, branches, tags] = await Promise.all([
         this.gitService.getLog({ maxCount: 300, ...this.currentFilter }),
@@ -3686,6 +3824,18 @@ var GraphViewProvider = class {
       await this.updateBranchAndUser();
       this.sendCommits();
       this.sendBranches(branches, tags, this.currentBranchName || currentBranch);
+      this.gitService.getRemotes().then((remotes) => {
+        const hasMissingRemotes = remotes.some((r) => !branches.some((b) => b.name.startsWith(r + "/")));
+        if (hasMissingRemotes) {
+          this.gitService.refreshRemoteBranchNames().then((res) => {
+            if (res.some((r) => r.count > 0)) {
+              this.refresh();
+            }
+          }).catch(() => {
+          });
+        }
+      }).catch(() => {
+      });
     } catch (err) {
       this.log.appendLine(`Git log failed: ${err.message}`);
       this.view?.webview.postMessage({
@@ -3890,11 +4040,32 @@ var GraphViewProvider = class {
           await this.updateBranchAndUser();
           this.sendCommits();
         } catch (err) {
-          vscode6.window.showErrorMessage(`Filter failed: ${err.message}`);
+          this.log.appendLine(`Filter failed: ${err.message}. Falling back to default log.`);
+          try {
+            this.currentFilter = { all: true };
+            const commits = await this.gitService.getLog({ maxCount: 300, all: true });
+            this.allCommits = commits;
+            this.graphNodes = buildGraph(this.allCommits);
+            await this.updateBranchAndUser();
+            this.sendCommits();
+          } catch {
+          }
+          vscode6.window.showWarningMessage(`Could not filter by '${branch}': ${err.message}`);
         }
         break;
       }
-      case "refreshBranches":
+      case "refreshBranches": {
+        this.hasReachedEnd = false;
+        this.isLoadingMore = false;
+        try {
+          await this.gitService.refreshRemoteBranchNames();
+          await this.refresh();
+          vscode6.window.showInformationMessage("Branches refreshed.");
+        } catch (err) {
+          vscode6.window.showErrorMessage(`Refresh failed: ${err.message}`);
+        }
+        break;
+      }
       case "refresh": {
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
@@ -3919,9 +4090,6 @@ var GraphViewProvider = class {
           await this.updateBranchAndUser();
           this.sendCommits();
           this.sendBranches(branches, tags);
-          if (msg.type === "refreshBranches") {
-            vscode6.window.showInformationMessage("Branches refreshed.");
-          }
         } catch (err) {
           vscode6.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }
@@ -7392,7 +7560,11 @@ function activate(context) {
     })
   );
   context.subscriptions.push(
-    vscode16.commands.registerCommand("intellij-git.refreshBranches", () => {
+    vscode16.commands.registerCommand("intellij-git.refreshBranches", async () => {
+      try {
+        await gitService.refreshRemoteBranchNames();
+      } catch {
+      }
       branchTree.refresh();
       graphViewProvider.refresh();
       vscode16.window.showInformationMessage("Branches refreshed.");

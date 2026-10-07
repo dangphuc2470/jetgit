@@ -37,6 +37,7 @@ const execFileAsync = promisify(execFile);
 
 export class GitService {
   private commitCache = new LRUCache<string, Commit>(5000);
+  private discoveredRemoteBranches = new Map<string, BranchInfo[]>();
   private cwd: string;
 
   constructor(workspaceRoot: string) {
@@ -50,6 +51,7 @@ export class GitService {
   setCwd(newCwd: string): void {
     this.cwd = newCwd;
     this.commitCache.clear();
+    this.discoveredRemoteBranches.clear();
   }
 
   async isGitRepo(): Promise<boolean> {
@@ -207,7 +209,63 @@ export class GitService {
   // --- Branch & Remote Operations ---
 
   async getBranches(): Promise<BranchInfo[]> {
-    return branchOps.getBranches(this.asBranchContext());
+    const localAndRemote = await branchOps.getBranches(this.asBranchContext());
+    const existingNames = new Set(localAndRemote.map(b => b.name));
+
+    const merged = [...localAndRemote];
+    for (const [_, branches] of this.discoveredRemoteBranches) {
+      for (const b of branches) {
+        if (!existingNames.has(b.name)) {
+          existingNames.add(b.name);
+          merged.push(b);
+        }
+      }
+    }
+    return merged;
+  }
+
+  async refreshRemoteBranchNames(): Promise<{ remote: string; count: number }[]> {
+    const remotes = await this.getRemotes();
+    if (!remotes || remotes.length === 0) return [];
+
+    const results: { remote: string; count: number }[] = [];
+
+    await Promise.allSettled(
+      remotes.map(async (r) => {
+        try {
+          const check = await this.isRemoteReachable(r, 2500);
+          if (!check.reachable) return;
+
+          // ls-remote --heads is ultra-fast (1-2s) and only fetches ref names
+          const out = await this.exec(['ls-remote', '--heads', r], 2 * 1024 * 1024, 1, 10000);
+          const list: BranchInfo[] = [];
+          for (const line of out.split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            const [hash, ref] = trimmed.split(/\s+/);
+            if (!ref || !ref.startsWith('refs/heads/')) continue;
+            const branchName = ref.replace(/^refs\/heads\//, '');
+            list.push({
+              name: `${r}/${branchName}`,
+              current: false,
+              remote: r,
+              hash: hash || '',
+            });
+          }
+          this.discoveredRemoteBranches.set(r, list);
+          results.push({ remote: r, count: list.length });
+        } catch {}
+      })
+    );
+
+    return results;
+  }
+
+  async fetchSingleBranch(remote: string, branchName: string): Promise<string> {
+    return this.exec([
+      'fetch', remote,
+      `refs/heads/${branchName}:refs/remotes/${remote}/${branchName}`
+    ], 10 * 1024 * 1024, 1, 60000);
   }
 
   async getTags(): Promise<TagInfo[]> {

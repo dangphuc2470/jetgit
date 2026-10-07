@@ -137,6 +137,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       if (!this.hasInitializedFilter) {
         this.hasInitializedFilter = true;
         this.currentFilter = currentBranch ? { branch: 'HEAD', all: false } : { all: true };
+      } else if (this.currentFilter.branch && this.currentFilter.branch.includes('/')) {
+        this.currentFilter.branch = 'HEAD';
       }
 
       const [commits, branches, tags] = await Promise.all([
@@ -157,6 +159,18 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       await this.updateBranchAndUser();
       this.sendCommits();
       this.sendBranches(branches, tags, this.currentBranchName || currentBranch);
+
+      // Asynchronously discover remote branch names in background if any remote is missing branches
+      this.gitService.getRemotes().then(remotes => {
+        const hasMissingRemotes = remotes.some(r => !branches.some(b => b.name.startsWith(r + '/')));
+        if (hasMissingRemotes) {
+          this.gitService.refreshRemoteBranchNames().then(res => {
+            if (res.some(r => r.count > 0)) {
+              this.refresh();
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
     } catch (err: any) {
       this.log.appendLine(`Git log failed: ${err.message}`);
       this.view?.webview.postMessage({
@@ -375,11 +389,31 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           await this.updateBranchAndUser();
           this.sendCommits();
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Filter failed: ${err.message}`);
+          this.log.appendLine(`Filter failed: ${err.message}. Falling back to default log.`);
+          try {
+            this.currentFilter = { all: true };
+            const commits = await this.gitService.getLog({ maxCount: 300, all: true });
+            this.allCommits = commits;
+            this.graphNodes = buildGraph(this.allCommits);
+            await this.updateBranchAndUser();
+            this.sendCommits();
+          } catch {}
+          vscode.window.showWarningMessage(`Could not filter by '${branch}': ${err.message}`);
         }
         break;
       }
-      case 'refreshBranches':
+      case 'refreshBranches': {
+        this.hasReachedEnd = false;
+        this.isLoadingMore = false;
+        try {
+          await this.gitService.refreshRemoteBranchNames();
+          await this.refresh();
+          vscode.window.showInformationMessage('Branches refreshed.');
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);
+        }
+        break;
+      }
       case 'refresh': {
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
@@ -404,9 +438,6 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           await this.updateBranchAndUser();
           this.sendCommits();
           this.sendBranches(branches, tags);
-          if (msg.type === 'refreshBranches') {
-            vscode.window.showInformationMessage('Branches refreshed.');
-          }
         } catch (err: any) {
           vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }

@@ -9189,6 +9189,10 @@ ${component_stack}
           addItem("Checkout", "", () => {
             postMessage("checkout", branchName);
           });
+          addItem("Fetch Branch", "", () => {
+            showToast("Fetching '" + branchName + "'...");
+            postMessage("fetchSingleBranch", { branch: branchName });
+          });
           const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
           const isAlreadyTrackingThis = curBranchInfo && curBranchInfo.upstream === branchName;
           if (currentBranch) {

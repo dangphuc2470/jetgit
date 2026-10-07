@@ -106,6 +106,9 @@ export async function checkout(ctx: BranchExecContext, ref: string): Promise<voi
     for (const remote of remotes) {
       if (ref.startsWith(remote + '/')) {
         const localBranchName = ref.slice(remote.length + 1);
+        try {
+          await ctx.exec(['fetch', remote, `refs/heads/${localBranchName}:refs/remotes/${remote}/${localBranchName}`]);
+        } catch {}
         const branchCheck = await ctx.exec(['branch', '--list', localBranchName]);
         if (branchCheck.trim()) {
           await ctx.exec(['checkout', localBranchName]);

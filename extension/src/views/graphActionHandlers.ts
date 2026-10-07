@@ -165,6 +165,35 @@ export async function handleGraphAction(
   switch (type) {
     case 'checkout': {
       const ref = payload as string;
+      if (ref && ref.includes('/')) {
+        const slashIdx = ref.indexOf('/');
+        const remoteName = ref.slice(0, slashIdx);
+        const branchName = ref.slice(slashIdx + 1);
+        try {
+          const remotes = await gitService.getRemotes();
+          if (remotes.includes(remoteName)) {
+            let fetchOk = false;
+            await vscode.window.withProgress(
+              {
+                location: vscode.ProgressLocation.Notification,
+                title: `Fetching '${ref}' before checkout...`,
+                cancellable: false,
+              },
+              async () => {
+                try {
+                  await gitService.fetchSingleBranch(remoteName, branchName);
+                  fetchOk = true;
+                } catch (fetchErr: any) {
+                  vscode.window.showErrorMessage(`Failed to fetch '${ref}' from remote '${remoteName}': ${fetchErr.message}`);
+                }
+              }
+            );
+            if (!fetchOk) {
+              return true;
+            }
+          }
+        } catch {}
+      }
       await handleCheckoutWithConflictResolution(gitService, ref, () => host.loadInitialData());
       return true;
     }
@@ -367,6 +396,32 @@ export async function handleGraphAction(
         );
       } catch (err: any) {
         vscode.window.showErrorMessage(`Failed to fetch '${remote}': ${err.message}`);
+      } finally {
+        host.loadInitialData();
+      }
+      return true;
+    }
+    case 'fetchSingleBranch': {
+      const { branch } = (payload || {}) as { branch?: string };
+      if (!branch) return true;
+      const slashIdx = branch.indexOf('/');
+      if (slashIdx === -1) return true;
+      const remoteName = branch.slice(0, slashIdx);
+      const branchName = branch.slice(slashIdx + 1);
+      try {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Fetching '${branch}'...`,
+            cancellable: false,
+          },
+          async () => {
+            await gitService.fetchSingleBranch(remoteName, branchName);
+            vscode.window.showInformationMessage(`Fetched branch '${branch}' successfully.`);
+          }
+        );
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to fetch branch '${branch}': ${err.message}`);
       } finally {
         host.loadInitialData();
       }

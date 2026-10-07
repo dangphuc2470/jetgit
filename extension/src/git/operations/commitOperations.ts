@@ -65,7 +65,31 @@ export async function getLog(
     args.push(`--grep=${options.query}`);
     args.push('-i');
   }
-  if (options.branch) args.push(options.branch);
+  if (options.branch) {
+    let branchExists = false;
+    try {
+      await ctx.exec(['rev-parse', '--verify', options.branch]);
+      branchExists = true;
+    } catch {
+      const slashIdx = options.branch.indexOf('/');
+      if (slashIdx !== -1) {
+        const remote = options.branch.slice(0, slashIdx);
+        const leafBranch = options.branch.slice(slashIdx + 1);
+        try {
+          await ctx.exec(['fetch', remote, `refs/heads/${leafBranch}:refs/remotes/${remote}/${leafBranch}`]);
+          await ctx.exec(['rev-parse', '--verify', options.branch]);
+          branchExists = true;
+        } catch {
+          branchExists = false;
+        }
+      }
+    }
+    if (branchExists) {
+      args.push(options.branch);
+    } else if (!args.includes('--all')) {
+      args.push('--all');
+    }
+  }
   if (options.path) {
     args.push('--');
     args.push(options.path);

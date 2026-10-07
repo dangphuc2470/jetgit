@@ -294,42 +294,79 @@ export async function handleGraphAction(
     }
     case 'fetchAll': {
       try {
-        vscode.window.showInformationMessage('Checking remotes connectivity and fetching...');
-        const result = await gitService.smartFetchAll((remote) => {
-          vscode.window.showInformationMessage(`Fetched '${remote}' successfully.`);
-          host.loadInitialData();
-        });
-        if (result.successful.length > 0) {
-          if (result.failed.length > 0 || result.skipped.length > 0) {
-            const missed = [...result.failed, ...result.skipped];
-            vscode.window.showInformationMessage(`Finished fetching. (Skipped offline: ${missed.join(', ')})`);
-          } else {
-            vscode.window.showInformationMessage(`Fetched all remotes successfully: ${result.successful.join(', ')}.`);
-          }
-        } else if (result.failed.length > 0 || result.skipped.length > 0) {
-          vscode.window.showWarningMessage(`Could not reach remotes: ${[...result.failed, ...result.skipped].join(', ')}.`);
-        } else {
-          vscode.window.showInformationMessage('No remotes configured.');
-        }
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Fetching remotes...',
+            cancellable: false,
+          },
+          async (progress) => {
+            progress.report({ message: 'Checking connectivity...' });
+            const result = await gitService.smartFetchAll(
+              (remote) => {
+                vscode.window.showInformationMessage(`Fetched '${remote}' successfully.`);
+                host.loadInitialData();
+              },
+              (status) => {
+                progress.report({ message: status });
+              }
+            );
 
-        if (result.needsAuth && result.needsAuth.length > 0) {
-          const target = result.needsAuth[0];
-          let defaultUser = '';
-          try {
-            defaultUser = (await gitService.exec(['config', 'user.name'])).trim();
-          } catch {}
-          host.view?.webview.postMessage({
-            type: 'showAuthDialog',
-            payload: {
-              remote: target.remote,
-              url: target.url,
-              host: target.host,
-              defaultUsername: defaultUser,
-            },
-          });
-        }
+            if (result.successful.length > 0) {
+              if (result.failed.length > 0 || result.skipped.length > 0) {
+                const missed = [...result.failed, ...result.skipped];
+                vscode.window.showInformationMessage(`Finished fetching. (Skipped offline: ${missed.join(', ')})`);
+              } else {
+                vscode.window.showInformationMessage(`Fetched all remotes successfully: ${result.successful.join(', ')}.`);
+              }
+            } else if (result.failed.length > 0 || result.skipped.length > 0) {
+              vscode.window.showWarningMessage(`Could not reach remotes: ${[...result.failed, ...result.skipped].join(', ')}.`);
+            } else {
+              vscode.window.showInformationMessage('No remotes configured.');
+            }
+
+            if (result.needsAuth && result.needsAuth.length > 0) {
+              const target = result.needsAuth[0];
+              let defaultUser = '';
+              try {
+                defaultUser = (await gitService.exec(['config', 'user.name'])).trim();
+              } catch {}
+              host.view?.webview.postMessage({
+                type: 'showAuthDialog',
+                payload: {
+                  remote: target.remote,
+                  url: target.url,
+                  host: target.host,
+                  defaultUsername: defaultUser,
+                },
+              });
+            }
+          }
+        );
       } catch (err: any) {
         vscode.window.showErrorMessage(`Fetch all failed: ${err.message}`);
+      } finally {
+        host.loadInitialData();
+      }
+      return true;
+    }
+    case 'fetchRemote': {
+      const { remote } = (payload || {}) as { remote?: string };
+      if (!remote) return true;
+      try {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Fetching '${remote}'...`,
+            cancellable: false,
+          },
+          async () => {
+            await gitService.exec(['fetch', remote, '--prune'], 10 * 1024 * 1024, 1, 90000);
+            vscode.window.showInformationMessage(`Fetched remote '${remote}' successfully.`);
+          }
+        );
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to fetch '${remote}': ${err.message}`);
       } finally {
         host.loadInitialData();
       }

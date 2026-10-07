@@ -9702,6 +9702,19 @@ ${component_stack}
                   ev.stopPropagation();
                 });
 
+                if (isRootRemote) {
+                  const itFetch = document.createElement("div");
+                  itFetch.className = "bcm-item";
+                  itFetch.innerHTML = '<span>Fetch \'' + remoteName + '\'</span>';
+                  itFetch.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    closeBranchContextMenu();
+                    showToast("Fetching remote '" + remoteName + "'...");
+                    postMessage("fetchRemote", { remote: remoteName });
+                  });
+                  menu.appendChild(itFetch);
+                }
+
                 const itAll = document.createElement("div");
                 itAll.className = "bcm-item" + (allTracked ? " disabled" : "");
                 if (allTracked) {
@@ -9802,7 +9815,8 @@ ${component_stack}
           treeContent.appendChild(localSec.sec);
         }
 
-        const remoteList = branches.filter((b) => (b.remote || b.name.startsWith("origin/")) && b.name.includes('/') && !b.name.endsWith('/HEAD')).filter((b) => filterFn(b.name));
+        const configuredRemotes = latestData.remotes || [];
+        const remoteList = branches.filter((b) => (b.remote || b.name.startsWith("origin/") || configuredRemotes.some(r => b.name.startsWith(r + '/'))) && b.name.includes('/') && !b.name.endsWith('/HEAD')).filter((b) => filterFn(b.name));
         if (remoteList.length > 0) {
           const remoteSec = createSec("Remote", true);
           const remoteTree = createTreeNode();

@@ -82,12 +82,13 @@ export class GitService {
     await execFileAsync('git', ['init'], { cwd: this.cwd });
   }
 
-  async exec(args: string[], maxBuffer = 10 * 1024 * 1024, retries = 5): Promise<string> {
+  async exec(args: string[], maxBuffer = 10 * 1024 * 1024, retries = 5, timeout = 0): Promise<string> {
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
         const { stdout } = await execFileAsync('git', args, {
           cwd: this.cwd,
           maxBuffer,
+          timeout: timeout > 0 ? timeout : undefined,
           env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
         });
         return stdout;
@@ -241,7 +242,15 @@ export class GitService {
     return branchOps.getDefaultRemote(this.asBranchContext(), branch);
   }
 
-  async getRemoteUrl(): Promise<string> {
+  async getRemoteUrl(remoteName?: string): Promise<string> {
+    if (remoteName) {
+      try {
+        const url = await this.exec(['remote', 'get-url', remoteName]);
+        return url.trim();
+      } catch {
+        return '';
+      }
+    }
     return branchOps.getRemoteUrl(this.asBranchContext());
   }
 
@@ -264,16 +273,7 @@ export class GitService {
     return branchOps.push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch);
   }
 
-  async getRemoteUrl(remoteName: string): Promise<string> {
-    try {
-      const url = await this.exec(['remote', 'get-url', remoteName]);
-      return url.trim();
-    } catch {
-      return '';
-    }
-  }
-
-  async isRemoteReachable(remoteName: string, timeoutMs = 2000): Promise<{ reachable: boolean; latency: number }> {
+  async isRemoteReachable(remoteName: string, timeoutMs = 3500): Promise<{ reachable: boolean; latency: number }> {
     const start = Date.now();
     try {
       const remoteUrl = await this.getRemoteUrl(remoteName);
@@ -293,7 +293,7 @@ export class GitService {
             clearTimeout(timer);
             try {
               const c2 = new AbortController();
-              const t2 = setTimeout(() => c2.abort(), 1000);
+              const t2 = setTimeout(() => c2.abort(), 1500);
               await fetch(targetOrigin, { method: 'GET', signal: c2.signal });
               clearTimeout(t2);
               return { reachable: true, latency: Date.now() - start };
@@ -307,8 +307,8 @@ export class GitService {
       }
 
       await execFileAsync('git', [
-        '-c', 'http.timeout=2',
-        '-c', 'ssh.connectTimeout=2',
+        '-c', 'http.timeout=3',
+        '-c', 'ssh.connectTimeout=3',
         'ls-remote', '--heads', remoteName, 'HEAD'
       ], {
         cwd: this.cwd,
@@ -322,7 +322,8 @@ export class GitService {
   }
 
   async smartFetchAll(
-    onRemoteSuccess?: (remote: string) => void
+    onRemoteSuccess?: (remote: string) => void,
+    onProgress?: (status: string) => void
   ): Promise<{
     successful: string[];
     failed: string[];
@@ -341,7 +342,8 @@ export class GitService {
     if (remotes.length === 1) {
       const r = remotes[0];
       try {
-        await this.exec(['fetch', r, '--prune']);
+        onProgress?.(`Fetching '${r}'...`);
+        await this.exec(['fetch', r, '--prune'], 10 * 1024 * 1024, 1, 90000);
         onRemoteSuccess?.(r);
         return { successful: [r], failed: [], skipped: [], needsAuth: [] };
       } catch (err: any) {
@@ -356,9 +358,10 @@ export class GitService {
       }
     }
 
+    onProgress?.('Checking remotes connectivity...');
     const checks = await Promise.allSettled(
       remotes.map(async r => {
-        const res = await this.isRemoteReachable(r, 2000);
+        const res = await this.isRemoteReachable(r, 2500);
         return { remote: r, reachable: res.reachable, latency: res.latency };
       })
     );
@@ -385,8 +388,13 @@ export class GitService {
     const skipped: string[] = [];
 
     for (const item of probeResults) {
+      if (!item.reachable) {
+        skipped.push(item.remote);
+        continue;
+      }
       try {
-        await this.exec(['fetch', item.remote, '--prune']);
+        onProgress?.(`Fetching '${item.remote}'...`);
+        await this.exec(['fetch', item.remote, '--prune'], 10 * 1024 * 1024, 1, 90000);
         successful.push(item.remote);
         // Notify immediately so UI reloads right after each remote succeeds
         onRemoteSuccess?.(item.remote);
@@ -398,11 +406,7 @@ export class GitService {
           try { if (url) host = new URL(url).host; } catch {}
           needsAuth.push({ remote: item.remote, url, host });
         }
-        if (item.reachable) {
-          failed.push(item.remote);
-        } else {
-          skipped.push(item.remote);
-        }
+        failed.push(item.remote);
       }
     }
 

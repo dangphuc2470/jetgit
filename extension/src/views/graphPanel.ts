@@ -202,6 +202,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    let remotes: string[] = [];
+    try {
+      remotes = await this.gitService.getRemotes();
+    } catch {
+      remotes = [];
+    }
+
     const isSubRepo = !!(this.initialWorkspaceRoot && this.gitService.getCwd() !== this.initialWorkspaceRoot);
 
     this.view?.webview.postMessage({
@@ -209,6 +216,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       payload: {
         branches,
         tags,
+        remotes,
         currentBranch: this.currentBranchName || currentBranch,
         currentUser: this.currentUser,
         activeBranch: this.currentFilter.branch || '',

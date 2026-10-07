@@ -869,12 +869,13 @@ var GitService = class {
   async initRepo() {
     await execFileAsync("git", ["init"], { cwd: this.cwd });
   }
-  async exec(args, maxBuffer = 10 * 1024 * 1024, retries = 5) {
+  async exec(args, maxBuffer = 10 * 1024 * 1024, retries = 5, timeout = 0) {
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
         const { stdout } = await execFileAsync("git", args, {
           cwd: this.cwd,
           maxBuffer,
+          timeout: timeout > 0 ? timeout : void 0,
           env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
         });
         return stdout;
@@ -991,7 +992,15 @@ var GitService = class {
   async getDefaultRemote(branch) {
     return getDefaultRemote(this.asBranchContext(), branch);
   }
-  async getRemoteUrl() {
+  async getRemoteUrl(remoteName) {
+    if (remoteName) {
+      try {
+        const url = await this.exec(["remote", "get-url", remoteName]);
+        return url.trim();
+      } catch {
+        return "";
+      }
+    }
     return getRemoteUrl(this.asBranchContext());
   }
   async pull(branch) {
@@ -1003,15 +1012,7 @@ var GitService = class {
   async push(branch, force = false, setUpstream = false, remoteName, tags = false, targetBranch) {
     return push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch);
   }
-  async getRemoteUrl(remoteName) {
-    try {
-      const url = await this.exec(["remote", "get-url", remoteName]);
-      return url.trim();
-    } catch {
-      return "";
-    }
-  }
-  async isRemoteReachable(remoteName, timeoutMs = 2e3) {
+  async isRemoteReachable(remoteName, timeoutMs = 3500) {
     const start = Date.now();
     try {
       const remoteUrl = await this.getRemoteUrl(remoteName);
@@ -1030,7 +1031,7 @@ var GitService = class {
             clearTimeout(timer);
             try {
               const c2 = new AbortController();
-              const t2 = setTimeout(() => c2.abort(), 1e3);
+              const t2 = setTimeout(() => c2.abort(), 1500);
               await fetch(targetOrigin, { method: "GET", signal: c2.signal });
               clearTimeout(t2);
               return { reachable: true, latency: Date.now() - start };
@@ -1044,9 +1045,9 @@ var GitService = class {
       }
       await execFileAsync("git", [
         "-c",
-        "http.timeout=2",
+        "http.timeout=3",
         "-c",
-        "ssh.connectTimeout=2",
+        "ssh.connectTimeout=3",
         "ls-remote",
         "--heads",
         remoteName,
@@ -1061,7 +1062,7 @@ var GitService = class {
       return { reachable: false, latency: 999999 };
     }
   }
-  async smartFetchAll(onRemoteSuccess) {
+  async smartFetchAll(onRemoteSuccess, onProgress) {
     const remotes = await this.getRemotes();
     if (!remotes || remotes.length === 0) {
       return { successful: [], failed: [], skipped: [], needsAuth: [] };
@@ -1071,7 +1072,8 @@ var GitService = class {
     if (remotes.length === 1) {
       const r = remotes[0];
       try {
-        await this.exec(["fetch", r, "--prune"]);
+        onProgress?.(`Fetching '${r}'...`);
+        await this.exec(["fetch", r, "--prune"], 10 * 1024 * 1024, 1, 9e4);
         onRemoteSuccess?.(r);
         return { successful: [r], failed: [], skipped: [], needsAuth: [] };
       } catch (err) {
@@ -1088,9 +1090,10 @@ var GitService = class {
         return { successful: [], failed: [r], skipped: [], needsAuth };
       }
     }
+    onProgress?.("Checking remotes connectivity...");
     const checks = await Promise.allSettled(
       remotes.map(async (r) => {
-        const res = await this.isRemoteReachable(r, 2e3);
+        const res = await this.isRemoteReachable(r, 2500);
         return { remote: r, reachable: res.reachable, latency: res.latency };
       })
     );
@@ -1112,8 +1115,13 @@ var GitService = class {
     const failed = [];
     const skipped = [];
     for (const item of probeResults) {
+      if (!item.reachable) {
+        skipped.push(item.remote);
+        continue;
+      }
       try {
-        await this.exec(["fetch", item.remote, "--prune"]);
+        onProgress?.(`Fetching '${item.remote}'...`);
+        await this.exec(["fetch", item.remote, "--prune"], 10 * 1024 * 1024, 1, 9e4);
         successful.push(item.remote);
         onRemoteSuccess?.(item.remote);
       } catch (err) {
@@ -1127,11 +1135,7 @@ var GitService = class {
           }
           needsAuth.push({ remote: item.remote, url, host });
         }
-        if (item.reachable) {
-          failed.push(item.remote);
-        } else {
-          skipped.push(item.remote);
-        }
+        failed.push(item.remote);
       }
     }
     return { successful, failed, skipped, needsAuth };
@@ -2980,42 +2984,78 @@ async function handleGraphAction(type, payload, host) {
     }
     case "fetchAll": {
       try {
-        vscode5.window.showInformationMessage("Checking remotes connectivity and fetching...");
-        const result = await gitService.smartFetchAll((remote) => {
-          vscode5.window.showInformationMessage(`Fetched '${remote}' successfully.`);
-          host.loadInitialData();
-        });
-        if (result.successful.length > 0) {
-          if (result.failed.length > 0 || result.skipped.length > 0) {
-            const missed = [...result.failed, ...result.skipped];
-            vscode5.window.showInformationMessage(`Finished fetching. (Skipped offline: ${missed.join(", ")})`);
-          } else {
-            vscode5.window.showInformationMessage(`Fetched all remotes successfully: ${result.successful.join(", ")}.`);
-          }
-        } else if (result.failed.length > 0 || result.skipped.length > 0) {
-          vscode5.window.showWarningMessage(`Could not reach remotes: ${[...result.failed, ...result.skipped].join(", ")}.`);
-        } else {
-          vscode5.window.showInformationMessage("No remotes configured.");
-        }
-        if (result.needsAuth && result.needsAuth.length > 0) {
-          const target = result.needsAuth[0];
-          let defaultUser = "";
-          try {
-            defaultUser = (await gitService.exec(["config", "user.name"])).trim();
-          } catch {
-          }
-          host.view?.webview.postMessage({
-            type: "showAuthDialog",
-            payload: {
-              remote: target.remote,
-              url: target.url,
-              host: target.host,
-              defaultUsername: defaultUser
+        await vscode5.window.withProgress(
+          {
+            location: vscode5.ProgressLocation.Notification,
+            title: "Fetching remotes...",
+            cancellable: false
+          },
+          async (progress) => {
+            progress.report({ message: "Checking connectivity..." });
+            const result = await gitService.smartFetchAll(
+              (remote) => {
+                vscode5.window.showInformationMessage(`Fetched '${remote}' successfully.`);
+                host.loadInitialData();
+              },
+              (status) => {
+                progress.report({ message: status });
+              }
+            );
+            if (result.successful.length > 0) {
+              if (result.failed.length > 0 || result.skipped.length > 0) {
+                const missed = [...result.failed, ...result.skipped];
+                vscode5.window.showInformationMessage(`Finished fetching. (Skipped offline: ${missed.join(", ")})`);
+              } else {
+                vscode5.window.showInformationMessage(`Fetched all remotes successfully: ${result.successful.join(", ")}.`);
+              }
+            } else if (result.failed.length > 0 || result.skipped.length > 0) {
+              vscode5.window.showWarningMessage(`Could not reach remotes: ${[...result.failed, ...result.skipped].join(", ")}.`);
+            } else {
+              vscode5.window.showInformationMessage("No remotes configured.");
             }
-          });
-        }
+            if (result.needsAuth && result.needsAuth.length > 0) {
+              const target = result.needsAuth[0];
+              let defaultUser = "";
+              try {
+                defaultUser = (await gitService.exec(["config", "user.name"])).trim();
+              } catch {
+              }
+              host.view?.webview.postMessage({
+                type: "showAuthDialog",
+                payload: {
+                  remote: target.remote,
+                  url: target.url,
+                  host: target.host,
+                  defaultUsername: defaultUser
+                }
+              });
+            }
+          }
+        );
       } catch (err) {
         vscode5.window.showErrorMessage(`Fetch all failed: ${err.message}`);
+      } finally {
+        host.loadInitialData();
+      }
+      return true;
+    }
+    case "fetchRemote": {
+      const { remote } = payload || {};
+      if (!remote) return true;
+      try {
+        await vscode5.window.withProgress(
+          {
+            location: vscode5.ProgressLocation.Notification,
+            title: `Fetching '${remote}'...`,
+            cancellable: false
+          },
+          async () => {
+            await gitService.exec(["fetch", remote, "--prune"], 10 * 1024 * 1024, 1, 9e4);
+            vscode5.window.showInformationMessage(`Fetched remote '${remote}' successfully.`);
+          }
+        );
+      } catch (err) {
+        vscode5.window.showErrorMessage(`Failed to fetch '${remote}': ${err.message}`);
       } finally {
         host.loadInitialData();
       }
@@ -3688,12 +3728,19 @@ var GraphViewProvider = class {
         currentBranch = "";
       }
     }
+    let remotes = [];
+    try {
+      remotes = await this.gitService.getRemotes();
+    } catch {
+      remotes = [];
+    }
     const isSubRepo = !!(this.initialWorkspaceRoot && this.gitService.getCwd() !== this.initialWorkspaceRoot);
     this.view?.webview.postMessage({
       type: "branches",
       payload: {
         branches,
         tags,
+        remotes,
         currentBranch: this.currentBranchName || currentBranch,
         currentUser: this.currentUser,
         activeBranch: this.currentFilter.branch || "",

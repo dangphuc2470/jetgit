@@ -32,29 +32,31 @@ body, html {
 
 /* 1. Tab Bar */
 .tab-bar {
-  height: 32px;
+  height: 25px;
   background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorGroupHeader-tabsBackground, #2b2d30));
   border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-sideBar-border, #1e1f22));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px;
+  padding: 0 6px;
   flex-shrink: 0;
 }
 
 .tab-items {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .tab-btn {
   background: transparent;
   border: 1px solid transparent;
   color: #9aa0a6;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
-  padding: 2px 10px;
+  padding: 1px 8px;
+  height: 20px;
+  line-height: 18px;
   border-radius: 4px;
   cursor: pointer;
   outline: none;
@@ -87,7 +89,8 @@ body, html {
   border: none;
   color: #8c8c8c;
   cursor: pointer;
-  padding: 3px 6px;
+  padding: 0 4px;
+  height: 20px;
   border-radius: 4px;
   font-size: 13px;
   display: flex;
@@ -174,12 +177,12 @@ body, html {
 
 /* 2. Toolbar */
 .commit-toolbar {
-  height: 28px;
+  height: 26px;
   background: var(--vscode-sideBarSectionHeader-background, var(--vscode-sideBar-background, #2b2d30));
   border-bottom: 1px solid var(--vscode-panel-border, #393b40);
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 6px;
   flex-shrink: 0;
 }
 
@@ -1964,47 +1967,55 @@ body, html {
 .as-context-menu {
   position: fixed;
   z-index: 100000;
-  background: var(--vscode-menu-background, #2b2d30);
-  border: 1px solid var(--vscode-menu-border, #3c3f41);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-  min-width: 230px;
-  padding: 4px 0;
+  background: #2b2d30;
+  border: 1px solid #3c3f41;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  min-width: 220px;
+  padding: 4px;
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-  font-size: 12.5px;
-  color: var(--vscode-menu-foreground, #bcbec4);
+  font-size: 12px;
+  color: #dfe1e5;
 }
 
 .as-menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 14px 5px 10px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border-radius: 4px;
   cursor: pointer;
   user-select: none;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition: background 0.08s ease, color 0.08s ease;
+  margin: 1px 0;
 }
 
 .as-menu-item:hover {
-  background: var(--vscode-menu-selectionBackground, #353b48);
-  color: var(--vscode-menu-selectionForeground, #ffffff);
+  background: #3574f0;
+  color: #ffffff;
 }
 
 .as-menu-item-left {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
 }
 
 .as-menu-icon {
   width: 16px;
   height: 16px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  color: #9aa0a6;
+  color: #ced0d6;
   flex-shrink: 0;
+}
+
+.as-menu-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .as-menu-item:hover .as-menu-icon {
@@ -2012,25 +2023,27 @@ body, html {
 }
 
 .as-menu-label {
+  font-size: 12px;
   font-weight: 400;
+  line-height: 26px;
 }
 
 .as-menu-shortcut {
   color: #868a91;
   font-size: 11px;
-  margin-left: 18px;
+  margin-left: 20px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   flex-shrink: 0;
 }
 
 .as-menu-item:hover .as-menu-shortcut {
-  color: #dfe1e5;
+  color: #ffffff;
 }
 
 .as-menu-separator {
   height: 1px;
-  background: var(--vscode-menu-separatorBackground, #3c3f41);
-  margin: 4px 0;
+  background: #393b40;
+  margin: 4px 6px;
 }
 
 /* Tooltip system */

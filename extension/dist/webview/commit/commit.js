@@ -1718,36 +1718,44 @@
     const isStaged = file.staged && !file.partiallyStaged;
     const vcsActionLabel = file.isUntracked ? 'Add to VCS' : (isStaged ? 'Unstage' : 'Add to VCS');
 
+    const svgRollback = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><g fill="currentColor" fill-rule="evenodd" transform="translate(2 1)"><polygon points="0 0 4 4 0 8" transform="matrix(-1 0 0 1 4 0)"/><path d="M4.15058343,11 L8.06891179,11 C9.72576604,11 11.0689118,9.65685425 11.0689118,8 C11.0689118,6.34314575 9.72576604,5 8.06891179,5 L4.03764586,5 L4,3 L8,3 C10.7614237,3 13,5.23857625 13,8 C13,10.7614237 10.7614237,13 8,13 L4.18822929,13 L4.15058343,11 Z"/></g></svg>`;
+    const svgDiff = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.85355 8.14645C5.65829 7.95118 5.34171 7.95118 5.14645 8.14645C4.95118 8.34171 4.95118 8.65829 5.14645 8.85355L7.29289 11H0.5C0.223858 11 0 11.2239 0 11.5C0 11.7761 0.223858 12 0.5 12H7.29289L5.14645 14.1464C4.95118 14.3417 4.95118 14.6583 5.14645 14.8536C5.34171 15.0488 5.65829 15.0488 5.85355 14.8536L8.85355 11.8536L9.20711 11.5L8.85355 11.1464L5.85355 8.14645Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z"/></svg>`;
+    const svgJumpToSource = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><g transform="translate(1 1)"><path d="M10.5680324,4.97553028 L8.07248899,2.47998684 L2,8.51847817 L2,11 L4.49554344,11 L10.5680324,4.97553028 Z M12.647652,2.89591075 C12.9147826,2.6287544 12.9147826,1.91529537 12.647652,1.64813903 L11.3998802,0.400367308 C11.1327496,0.133210961 10.4192392,0.133210961 10.1521085,0.400367308 L8.9043368,1.64813903 L11.3998802,4.14368247 L12.647652,2.89591075 Z"/><rect width="14" height="2" y="12"/></g></svg>`;
+    const svgDelete = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 2H9C9.55228 2 10 2.44772 10 3H6C6 2.44772 6.44772 2 7 2ZM5 3C5 1.89543 5.89543 1 7 1H9C10.1046 1 11 1.89543 11 3H13C13.5523 3 14 3.44772 14 4V5V6H13V13C13 14.1046 12.1046 15 11 15H5C3.89543 15 3 14.1046 3 13V6H2V5V4C2 3.44772 2.44772 3 3 3H5ZM11 4H10H6H5H3V5H4H12H13V4H11ZM4 6H12V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V6ZM6.5 7C6.22386 7 6 7.22386 6 7.5V11.5C6 11.7761 6.22386 12 6.5 12C6.77614 12 7 11.7761 7 11.5V7.5C7 7.22386 6.77614 7 6.5 7ZM9 7.5C9 7.22386 9.22386 7 9.5 7C9.77614 7 10 7.22386 10 7.5V11.5C10 11.7761 9.77614 12 9.5 12C9.22386 12 9 11.7761 9 11.5V7.5Z"/></svg>`;
+    const svgAddVcs = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.5 2C7.77614 2 8 2.22386 8 2.5V7.5H13C13.2761 7.5 13.5 7.72386 13.5 8C13.5 8.27614 13.2761 8.5 13 8.5H8V13.5C8 13.7761 7.77614 14 7.5 14C7.22386 14 7 13.7761 7 13.5V8.5H2C1.72386 8.5 1.5 8.27614 1.5 8C1.5 7.72386 1.72386 7.5 2 7.5H7V2.5C7 2.22386 7.22386 2 7.5 2Z"/></svg>`;
+    const svgUnstage = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M2 7.5C2 7.22386 2.22386 7 2.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H2.5C2.22386 8 2 7.77614 2 7.5Z"/></svg>`;
+    const svgRefresh = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M2.5 9V8C2.5 4.96243 4.96243 2.5 8 2.5C9.10679 2.5 10.1372 2.82692 11 3.38947" stroke-linecap="round"/><path d="M5 12.6105C5.86278 13.1731 6.89321 13.5 8 13.5C11.0376 13.5 13.5 11.0376 13.5 8V7" stroke-linecap="round"/><path d="M0.5 7.5L2.5 9.5L4.5 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.5 8.5L13.5 6.5L15.5 8.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
     const items = [
       {
         label: 'Rollback...',
         shortcut: `${optKey}${cmdKey}Z`,
-        icon: '↶',
+        icon: svgRollback,
         action: () => vscode.postMessage({ type: 'rollbackFiles', payload: [file.path] })
       },
       {
         label: 'Show Diff',
         shortcut: `${cmdKey}D`,
-        icon: '⇄',
+        icon: svgDiff,
         action: () => vscode.postMessage({ type: 'openReviewInCenter', payload: file.path })
       },
       {
         label: 'Jump to Source',
         shortcut: 'F4',
-        icon: '↗',
+        icon: svgJumpToSource,
         action: () => vscode.postMessage({ type: 'jumpToSource', payload: file.path })
       },
       { separator: true },
       {
         label: 'Delete...',
         shortcut: '⌫',
-        icon: '✕',
+        icon: svgDelete,
         action: () => vscode.postMessage({ type: 'deleteFile', payload: file.path })
       },
       {
         label: vcsActionLabel,
         shortcut: `${optKey}${cmdKey}A`,
-        icon: '+',
+        icon: isStaged ? svgUnstage : svgAddVcs,
         action: () => {
           if (isStaged) {
             vscode.postMessage({ type: 'unstageFile', payload: file.path });
@@ -1760,7 +1768,7 @@
       {
         label: 'Refresh',
         shortcut: `${cmdKey}R`,
-        icon: '↻',
+        icon: svgRefresh,
         action: () => vscode.postMessage({ type: 'refresh' })
       }
     ];

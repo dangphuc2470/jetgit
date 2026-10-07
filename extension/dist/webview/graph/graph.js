@@ -9646,7 +9646,7 @@ ${component_stack}
               } catch {}
             });
 
-            if (isRemoteTree && currentBranch) {
+            if (isRemoteTree) {
               fHdr.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -9658,17 +9658,31 @@ ${component_stack}
                   ev.preventDefault();
                   ev.stopPropagation();
                 });
-                const targetUpstream = subNode.fullPath + "/" + currentBranch;
-                const it = document.createElement("div");
-                it.className = "bcm-item";
-                it.innerHTML = '<span>Track \'' + targetUpstream + '\' for \'' + currentBranch + '\'</span>';
-                it.addEventListener("click", (ev) => {
+
+                const itAll = document.createElement("div");
+                itAll.className = "bcm-item";
+                itAll.innerHTML = '<span>Track All Local Branches to \'' + subNode.fullPath + '\'</span>';
+                itAll.addEventListener("click", (ev) => {
                   ev.stopPropagation();
                   closeBranchContextMenu();
-                  showToast("Tracking '" + currentBranch + "' -> '" + targetUpstream + "'...");
-                  postMessage("setUpstream", { branch: currentBranch, upstream: targetUpstream });
+                  showToast("Tracking all local branches to '" + subNode.fullPath + "'...");
+                  postMessage("trackAllBranchesToRemote", { remote: subNode.fullPath });
                 });
-                menu.appendChild(it);
+                menu.appendChild(itAll);
+
+                if (currentBranch) {
+                  const targetUpstream = subNode.fullPath + "/" + currentBranch;
+                  const it = document.createElement("div");
+                  it.className = "bcm-item";
+                  it.innerHTML = '<span>Track \'' + targetUpstream + '\' for \'' + currentBranch + '\'</span>';
+                  it.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    closeBranchContextMenu();
+                    showToast("Tracking '" + currentBranch + "' -> '" + targetUpstream + "'...");
+                    postMessage("setUpstream", { branch: currentBranch, upstream: targetUpstream });
+                  });
+                  menu.appendChild(it);
+                }
                 document.body.appendChild(menu);
                 let x = e.clientX;
                 let y = e.clientY;

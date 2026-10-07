@@ -24,7 +24,8 @@ if (typeof document !== 'undefined') {
   }
 }
 function removeAllContextMenus() {
-  document.querySelectorAll('.commit-context-menu, .branch-context-menu, .as-dropdown-menu, .filter-popup').forEach(m => m.remove());
+  document.querySelectorAll('.commit-context-menu, .branch-context-menu').forEach(m => m.remove());
+  document.querySelectorAll('.as-dropdown-menu, .filter-popup').forEach(m => { m.style.display = 'none'; });
 }
 window.addEventListener('blur', removeAllContextMenus);
 document.addEventListener('visibilitychange', function() {
@@ -8226,6 +8227,9 @@ ${component_stack}
 
     branchLabel.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (branchPopup && !branchContainer.contains(branchPopup)) {
+        branchContainer.appendChild(branchPopup);
+      }
       const open = branchPopup.style.display === "flex";
       closeAllPopups();
       if (!open) {
@@ -8304,6 +8308,9 @@ ${component_stack}
 
     userLabel.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (userPopup && !userContainer.contains(userPopup)) {
+        userContainer.appendChild(userPopup);
+      }
       const open = userPopup.style.display === "flex";
       closeAllPopups();
       if (!open) {
@@ -8395,6 +8402,9 @@ ${component_stack}
 
     dateLabel.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (datePopup && !dateContainer.contains(datePopup)) {
+        dateContainer.appendChild(datePopup);
+      }
       const open = datePopup.style.display === "flex";
       closeAllPopups();
       if (!open) {
@@ -8434,6 +8444,9 @@ ${component_stack}
 
     pathLabel.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (pathPopup && !pathContainer.contains(pathPopup)) {
+        pathContainer.appendChild(pathPopup);
+      }
       const open = pathPopup.style.display === "flex";
       closeAllPopups();
       if (!open) {
@@ -8517,6 +8530,9 @@ ${component_stack}
 
     graphOptionBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (graphOptionPopup && !graphOptionContainer.contains(graphOptionPopup)) {
+        graphOptionContainer.appendChild(graphOptionPopup);
+      }
       const open = graphOptionPopup.style.display === "flex";
       closeAllPopups();
       if (!open) {
@@ -8701,6 +8717,9 @@ ${component_stack}
 
     btnViewOption.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (viewOptionPopup && !viewOptionContainer.contains(viewOptionPopup)) {
+        viewOptionContainer.appendChild(viewOptionPopup);
+      }
       const open = viewOptionPopup.style.display === "flex";
       closeAllPopups();
       if (!open) {

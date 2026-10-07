@@ -2821,6 +2821,92 @@ IntelliJ Git can stash your changes, switch branches, and optionally re-apply th
     onSuccess();
   }
 }
+async function handlePullWithConflictResolution(gitService, branch, onSuccess) {
+  await vscode5.window.withProgress(
+    {
+      location: vscode5.ProgressLocation.Notification,
+      title: `Updating '${branch}'...`,
+      cancellable: false
+    },
+    async () => {
+      try {
+        const out = await gitService.pull(branch);
+        vscode5.window.showInformationMessage(`Updated ${branch}: ${out || "Already up to date."}`);
+        onSuccess();
+      } catch (err) {
+        const rawError = err?.message || String(err);
+        const isConflict = /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) || /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError);
+        if (!isConflict) {
+          vscode5.window.showErrorMessage(`Update failed: ${rawError}`);
+          return;
+        }
+        const isUntracked = /The following untracked working tree files would be overwritten/i.test(rawError);
+        const filesMatch = rawError.match(/overwritten by (?:merge|checkout):([\s\S]*?)(?:Please commit|Aborting|$)/i);
+        let filesText = "";
+        if (filesMatch) {
+          const list = filesMatch[1].split("\n").map((s) => s.trim()).filter((s) => s.length > 0 && !s.startsWith("error:"));
+          if (list.length > 0) {
+            filesText = "\n\nConflicting files:\n" + list.map((f) => `\u2022 ${f}`).join("\n");
+          }
+        }
+        const message = `Update Failed: Your local changes would be overwritten by merge.${filesText}
+
+IntelliJ Git can stash your changes, update the branch, and optionally re-apply them.`;
+        const choice = await vscode5.window.showWarningMessage(
+          message,
+          { modal: true },
+          "Smart Update",
+          "Stash & Update"
+        );
+        if (!choice) return;
+        const stashName = `autostash-update-${(branch || "HEAD").replace(/[^a-zA-Z0-9_-]/g, "_")}-${Date.now()}`;
+        const stashArgs = isUntracked ? ["stash", "push", "-u", "-m", stashName] : ["stash", "push", "-m", stashName];
+        let stashed = false;
+        try {
+          const stashOut = await gitService.exec(stashArgs);
+          if (!stashOut.includes("No local changes to save")) {
+            stashed = true;
+          }
+        } catch (stashErr) {
+          vscode5.window.showErrorMessage(`Failed to stash changes: ${stashErr.message}`);
+          return;
+        }
+        try {
+          await gitService.pull(branch);
+        } catch (pullErr) {
+          if (stashed) {
+            try {
+              await gitService.exec(["stash", "pop"]);
+            } catch {
+            }
+          }
+          vscode5.window.showErrorMessage(`Update failed: ${pullErr.message}`);
+          return;
+        }
+        if (choice === "Smart Update" && stashed) {
+          try {
+            await gitService.exec(["stash", "pop"]);
+            vscode5.window.showInformationMessage(`Smart Update completed: Updated '${branch}' and restored your changes.`);
+          } catch (popErr) {
+            vscode5.window.showWarningMessage(
+              `Updated '${branch}', but applying stashed changes resulted in merge conflicts. Please resolve them.`,
+              "Resolve Conflicts"
+            ).then((res) => {
+              if (res === "Resolve Conflicts") {
+                vscode5.commands.executeCommand("intellij-git.resolveConflicts");
+              }
+            });
+          }
+        } else if (choice === "Stash & Update" && stashed) {
+          vscode5.window.showInformationMessage(`Updated '${branch}'. Your changes were safely saved to Stash.`);
+        } else {
+          vscode5.window.showInformationMessage(`Updated '${branch}'.`);
+        }
+        onSuccess();
+      }
+    }
+  );
+}
 async function handleGraphAction(type, payload, host) {
   const { gitService } = host;
   switch (type) {
@@ -2941,22 +3027,7 @@ async function handleGraphAction(type, payload, host) {
     }
     case "pull": {
       const branch = payload;
-      await vscode5.window.withProgress(
-        {
-          location: vscode5.ProgressLocation.Notification,
-          title: `Updating '${branch}'...`,
-          cancellable: false
-        },
-        async () => {
-          try {
-            const out = await gitService.pull(branch);
-            vscode5.window.showInformationMessage(`Updated ${branch}: ${out || "Already up to date."}`);
-            host.loadInitialData();
-          } catch (err) {
-            vscode5.window.showErrorMessage(`Update failed: ${err.message}`);
-          }
-        }
-      );
+      await handlePullWithConflictResolution(gitService, branch, () => host.loadInitialData());
       return true;
     }
     case "fetchAll": {

@@ -750,6 +750,16 @@ export function getMergeEditorHtml(cspSource: string, nonce: string, tokens: The
       isSyncing = false;
     }
 
+    function handleWheel(pane: HTMLElement, e: WheelEvent) {
+      if (e.shiftKey && e.deltaY !== 0 && e.deltaX === 0) {
+        pane.scrollLeft += e.deltaY;
+        e.preventDefault();
+      }
+    }
+    leftEditor.addEventListener('wheel', (e) => handleWheel(leftEditor, e), { passive: false });
+    centerEditor.addEventListener('wheel', (e) => handleWheel(centerEditor, e), { passive: false });
+    rightEditor.addEventListener('wheel', (e) => handleWheel(rightEditor, e), { passive: false });
+
     leftEditor.addEventListener('scroll', () => syncScroll(leftEditor));
     centerEditor.addEventListener('scroll', () => syncScroll(centerEditor));
     rightEditor.addEventListener('scroll', () => syncScroll(rightEditor));

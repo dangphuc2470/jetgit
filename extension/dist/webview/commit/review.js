@@ -1245,8 +1245,16 @@
       }, 150);
     };
 
-    leftPane.addEventListener('wheel', () => setScroller('left'), { passive: true });
-    rightPane.addEventListener('wheel', () => setScroller('right'), { passive: true });
+    const handleWheel = (pane, side, e) => {
+      setScroller(side);
+      if (e.shiftKey && e.deltaY !== 0 && e.deltaX === 0) {
+        pane.scrollLeft += e.deltaY;
+        e.preventDefault();
+      }
+    };
+
+    leftPane.addEventListener('wheel', (e) => handleWheel(leftPane, 'left', e), { passive: false });
+    rightPane.addEventListener('wheel', (e) => handleWheel(rightPane, 'right', e), { passive: false });
     leftPane.addEventListener('pointerdown', () => setScroller('left'), { passive: true });
     rightPane.addEventListener('pointerdown', () => setScroller('right'), { passive: true });
     leftPane.addEventListener('touchstart', () => setScroller('left'), { passive: true });

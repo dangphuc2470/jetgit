@@ -1018,6 +1018,12 @@
     // Diff Content
     const diffContent = document.createElement('div');
     diffContent.className = 'diff-content-scroll';
+    diffContent.addEventListener('wheel', (e) => {
+      if (e.shiftKey && e.deltaY !== 0 && e.deltaX === 0) {
+        diffContent.scrollLeft += e.deltaY;
+        e.preventDefault();
+      }
+    }, { passive: false });
 
     if (!state.diffData || !state.diffData.diff) {
       diffContent.innerHTML = `

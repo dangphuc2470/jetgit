@@ -3340,14 +3340,13 @@ async function handleGraphAction(type, payload, host) {
       const { branch, upstream } = payload || {};
       if (!branch || !upstream) return true;
       try {
-        const slashIdx = upstream.indexOf('/');
+        const slashIdx = upstream.indexOf("/");
         const remote = slashIdx !== -1 ? upstream.slice(0, slashIdx) : upstream;
         const remoteBranch = slashIdx !== -1 ? upstream.slice(slashIdx + 1) : branch;
-
         try {
           await gitService.exec(["fetch", remote, remoteBranch]);
-        } catch {}
-
+        } catch {
+        }
         try {
           await gitService.exec(["branch", "--set-upstream-to", upstream, branch]);
         } catch {
@@ -3389,14 +3388,11 @@ async function handleGraphAction(type, payload, host) {
           try {
             try {
               await gitService.exec(["fetch", remote]);
-            } catch {}
-
+            } catch {
+            }
             const branches = await gitService.getBranches();
             const allLocals = branches.filter((b) => !b.remote && !b.name.startsWith("("));
-            const locals = prefix
-              ? allLocals.filter((b) => b.name === prefix || b.name.startsWith(prefix + "/"))
-              : allLocals;
-
+            const locals = prefix ? allLocals.filter((b) => b.name === prefix || b.name.startsWith(prefix + "/")) : allLocals;
             let trackedCount = 0;
             const errors = [];
             for (const local of locals) {
@@ -3786,6 +3782,9 @@ var GraphViewProvider = class {
           await this.updateBranchAndUser();
           this.sendCommits();
           this.sendBranches(branches, tags);
+          if (msg.type === "refreshBranches") {
+            vscode6.window.showInformationMessage("Branches refreshed.");
+          }
         } catch (err) {
           vscode6.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }
@@ -7259,6 +7258,7 @@ function activate(context) {
     vscode16.commands.registerCommand("intellij-git.refreshBranches", () => {
       branchTree.refresh();
       graphViewProvider.refresh();
+      vscode16.window.showInformationMessage("Branches refreshed.");
     })
   );
   context.subscriptions.push(

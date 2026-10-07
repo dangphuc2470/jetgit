@@ -396,6 +396,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           await this.updateBranchAndUser();
           this.sendCommits();
           this.sendBranches(branches, tags);
+          if (msg.type === 'refreshBranches') {
+            vscode.window.showInformationMessage('Branches refreshed.');
+          }
         } catch (err: any) {
           vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }

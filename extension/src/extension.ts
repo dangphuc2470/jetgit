@@ -149,6 +149,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('intellij-git.refreshBranches', () => {
       branchTree.refresh();
       graphViewProvider.refresh();
+      vscode.window.showInformationMessage('Branches refreshed.');
     }),
   );
 

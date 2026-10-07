@@ -9134,11 +9134,16 @@ ${component_stack}
           ev.stopPropagation();
         });
 
-        function addItem(label, shortcut, onClick) {
+        function addItem(label, shortcut, onClick, disabled = false) {
           const it = document.createElement("div");
-          it.className = "bcm-item";
+          it.className = "bcm-item" + (disabled ? " disabled" : "");
+          if (disabled) {
+            it.style.pointerEvents = "none";
+            it.style.opacity = "0.45";
+          }
           it.innerHTML = '<span>' + label + '</span>' + (shortcut ? '<span class="bcm-shortcut">' + shortcut + '</span>' : '');
           it.addEventListener("click", (ev) => {
+            if (disabled) return;
             ev.stopPropagation();
             closeBranchContextMenu();
             onClick();
@@ -9186,11 +9191,12 @@ ${component_stack}
           });
           const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
           const isAlreadyTrackingThis = curBranchInfo && curBranchInfo.upstream === branchName;
-          if (currentBranch && !isAlreadyTrackingThis) {
-            addItem("Track into '" + currentBranch + "'", "", () => {
+          if (currentBranch) {
+            const trackLabel = "Track into '" + currentBranch + "'" + (isAlreadyTrackingThis ? " (already tracked)" : "");
+            addItem(trackLabel, "", () => {
               showToast("Tracking '" + currentBranch + "' -> '" + branchName + "'...");
               postMessage("setUpstream", { branch: currentBranch, upstream: branchName });
-            });
+            }, isAlreadyTrackingThis);
           }
           addItem("New Branch from '" + branchName + "'...", "", () => {
             openCreateBranchDialog(branchName);
@@ -9673,16 +9679,20 @@ ${component_stack}
                 e.stopPropagation();
                 closeBranchContextMenu();
 
-                const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
-                const targetUpstream = subNode.fullPath + "/" + currentBranch;
-                const isAlreadyTrackingThisCurrent = curBranchInfo && curBranchInfo.upstream === targetUpstream;
-
                 const locals = branches.filter(b => !b.remote && !b.name.startsWith('('));
-                const allTrackThisRemote = locals.length > 0 && locals.every(b => b.upstream && (b.upstream === subNode.fullPath + '/' + b.name || b.upstream.startsWith(subNode.fullPath + '/')));
+                const slashIdx = subNode.fullPath.indexOf('/');
+                const isRootRemote = slashIdx === -1;
+                const remoteName = isRootRemote ? subNode.fullPath : subNode.fullPath.slice(0, slashIdx);
+                const folderSubPath = isRootRemote ? "" : subNode.fullPath.slice(slashIdx + 1);
 
-                if (allTrackThisRemote && (!currentBranch || isAlreadyTrackingThisCurrent)) {
-                  return;
-                }
+                const targetLocals = isRootRemote
+                  ? locals
+                  : locals.filter(b => b.name === folderSubPath || b.name.startsWith(folderSubPath + '/'));
+
+                const allTracked = targetLocals.length > 0 && targetLocals.every(b => {
+                  const expectedUpstream = remoteName + '/' + b.name;
+                  return b.upstream === expectedUpstream;
+                });
 
                 const menu = document.createElement("div");
                 menu.className = "branch-context-menu";
@@ -9692,33 +9702,25 @@ ${component_stack}
                   ev.stopPropagation();
                 });
 
-                if (!allTrackThisRemote) {
-                  const itAll = document.createElement("div");
-                  itAll.className = "bcm-item";
-                  itAll.innerHTML = '<span>Track All Local Branches to \'' + subNode.fullPath + '\'</span>';
-                  itAll.addEventListener("click", (ev) => {
-                    ev.stopPropagation();
-                    closeBranchContextMenu();
-                    showToast("Tracking all local branches to '" + subNode.fullPath + "'...");
-                    postMessage("trackAllBranchesToRemote", { remote: subNode.fullPath });
-                  });
-                  menu.appendChild(itAll);
+                const itAll = document.createElement("div");
+                itAll.className = "bcm-item" + (allTracked ? " disabled" : "");
+                if (allTracked) {
+                  itAll.style.pointerEvents = "none";
+                  itAll.style.opacity = "0.45";
                 }
+                const labelText = isRootRemote
+                  ? "Track All Local Branches to '" + remoteName + "'"
+                  : "Track '" + subNode.fullPath + "' for '" + folderSubPath + "'";
+                itAll.innerHTML = '<span>' + labelText + (allTracked ? ' (already tracked)' : '') + '</span>';
+                itAll.addEventListener("click", (ev) => {
+                  if (allTracked) return;
+                  ev.stopPropagation();
+                  closeBranchContextMenu();
+                  showToast("Tracking " + (isRootRemote ? "all local branches" : "'" + folderSubPath + "'") + " to '" + remoteName + "'...");
+                  postMessage("trackAllBranchesToRemote", { remote: remoteName, prefix: folderSubPath || undefined });
+                });
+                menu.appendChild(itAll);
 
-                if (currentBranch && !isAlreadyTrackingThisCurrent) {
-                  const it = document.createElement("div");
-                  it.className = "bcm-item";
-                  it.innerHTML = '<span>Track \'' + targetUpstream + '\' for \'' + currentBranch + '\'</span>';
-                  it.addEventListener("click", (ev) => {
-                    ev.stopPropagation();
-                    closeBranchContextMenu();
-                    showToast("Tracking '" + currentBranch + "' -> '" + targetUpstream + "'...");
-                    postMessage("setUpstream", { branch: currentBranch, upstream: targetUpstream });
-                  });
-                  menu.appendChild(it);
-                }
-
-                if (menu.children.length === 0) return;
                 document.body.appendChild(menu);
                 let x = e.clientX;
                 let y = e.clientY;

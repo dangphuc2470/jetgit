@@ -672,12 +672,13 @@ export async function handleGraphAction(
       return true;
     }
     case 'trackAllBranchesToRemote': {
-      const { remote } = payload || {};
+      const { remote, prefix } = payload || {};
       if (!remote) return true;
+      const displayTarget = prefix ? `${remote}/${prefix}` : remote;
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: `Tracking all local branches to '${remote}'...`,
+          title: `Tracking branches to '${displayTarget}'...`,
           cancellable: false,
         },
         async () => {
@@ -687,7 +688,10 @@ export async function handleGraphAction(
             } catch {}
 
             const branches = await gitService.getBranches();
-            const locals = branches.filter(b => !b.remote && !b.name.startsWith('('));
+            const allLocals = branches.filter(b => !b.remote && !b.name.startsWith('('));
+            const locals = prefix
+              ? allLocals.filter(b => b.name === prefix || b.name.startsWith(prefix + '/'))
+              : allLocals;
 
             let trackedCount = 0;
             const errors: string[] = [];
@@ -708,17 +712,17 @@ export async function handleGraphAction(
             }
 
             if (trackedCount > 0) {
-              vscode.window.showInformationMessage(`Successfully tracked ${trackedCount} local branch${trackedCount > 1 ? 'es' : ''} to '${remote}'.`);
+              vscode.window.showInformationMessage(`Successfully tracked ${trackedCount} local branch${trackedCount > 1 ? 'es' : ''} to '${displayTarget}'.`);
               host.loadInitialData();
               vscode.commands.executeCommand('intellij-git.refreshBranches');
             } else {
-              vscode.window.showInformationMessage(`No local branches found to track to '${remote}'.`);
+              vscode.window.showInformationMessage(`No matching local branches found to track to '${displayTarget}'.`);
             }
             if (errors.length > 0) {
               vscode.window.showWarningMessage(`Some branches could not be tracked:\n${errors.join('\n')}`);
             }
           } catch (err: any) {
-            vscode.window.showErrorMessage(`Track all branches failed: ${err.message}`);
+            vscode.window.showErrorMessage(`Track branches failed: ${err.message}`);
           }
         }
       );

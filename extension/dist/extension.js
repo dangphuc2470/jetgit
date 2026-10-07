@@ -3376,12 +3376,13 @@ async function handleGraphAction(type, payload, host) {
       return true;
     }
     case "trackAllBranchesToRemote": {
-      const { remote } = payload || {};
+      const { remote, prefix } = payload || {};
       if (!remote) return true;
+      const displayTarget = prefix ? `${remote}/${prefix}` : remote;
       await vscode5.window.withProgress(
         {
           location: vscode5.ProgressLocation.Notification,
-          title: `Tracking all local branches to '${remote}'...`,
+          title: `Tracking branches to '${displayTarget}'...`,
           cancellable: false
         },
         async () => {
@@ -3391,7 +3392,10 @@ async function handleGraphAction(type, payload, host) {
             } catch {}
 
             const branches = await gitService.getBranches();
-            const locals = branches.filter((b) => !b.remote && !b.name.startsWith("("));
+            const allLocals = branches.filter((b) => !b.remote && !b.name.startsWith("("));
+            const locals = prefix
+              ? allLocals.filter((b) => b.name === prefix || b.name.startsWith(prefix + "/"))
+              : allLocals;
 
             let trackedCount = 0;
             const errors = [];
@@ -3410,18 +3414,18 @@ async function handleGraphAction(type, payload, host) {
               }
             }
             if (trackedCount > 0) {
-              vscode5.window.showInformationMessage(`Successfully tracked ${trackedCount} local branch${trackedCount > 1 ? "es" : ""} to '${remote}'.`);
+              vscode5.window.showInformationMessage(`Successfully tracked ${trackedCount} local branch${trackedCount > 1 ? "es" : ""} to '${displayTarget}'.`);
               host.loadInitialData();
               vscode5.commands.executeCommand("intellij-git.refreshBranches");
             } else {
-              vscode5.window.showInformationMessage(`No local branches found to track to '${remote}'.`);
+              vscode5.window.showInformationMessage(`No matching local branches found to track to '${displayTarget}'.`);
             }
             if (errors.length > 0) {
               vscode5.window.showWarningMessage(`Some branches could not be tracked:
 ${errors.join("\n")}`);
             }
           } catch (err) {
-            vscode5.window.showErrorMessage(`Track all branches failed: ${err.message}`);
+            vscode5.window.showErrorMessage(`Track branches failed: ${err.message}`);
           }
         }
       );

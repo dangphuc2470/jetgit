@@ -36,6 +36,16 @@ for (const entry of entries) {
     alias: {
       '$shared': path.resolve(__dirname, 'webview/shared'),
     },
-    logLevel: 'info',
   });
+}
+
+const staticAssets = [
+  { from: 'webview/commit/commit.css', to: 'dist/webview/commit/commit.css' },
+];
+
+for (const asset of staticAssets) {
+  if (fs.existsSync(asset.from)) {
+    fs.mkdirSync(path.dirname(asset.to), { recursive: true });
+    fs.copyFileSync(asset.from, asset.to);
+  }
 }

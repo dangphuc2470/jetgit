@@ -298,7 +298,8 @@
     "watch": "concurrently \"npm run watch:ext\" \"npm run watch:webview\"",
     "watch:ext": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
     "watch:webview": "node build-webview.mjs",
-    "lint": "eslint src/ --ext .ts"
+    "lint": "eslint src/ --ext .ts",
+    "test": "node --experimental-strip-types --test test/*.test.mts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",

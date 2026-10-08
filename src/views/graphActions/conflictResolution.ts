@@ -1,7 +1,20 @@
 import * as vscode from 'vscode';
 import { GitService } from '../../git/gitService';
 
-export type SmartActionLabel = 'Checkout' | 'Update' | 'Merge' | 'Rebase' | 'Cherry-Pick' | 'Revert';
+export {
+  type SmartActionLabel,
+  isDirtyTreeConflict,
+  isThreeWayConflict,
+  extractOverwrittenFiles,
+  makeStashName,
+} from '../../git/conflictUtils';
+import {
+  type SmartActionLabel,
+  isDirtyTreeConflict,
+  isThreeWayConflict,
+  extractOverwrittenFiles,
+  makeStashName,
+} from '../../git/conflictUtils';
 
 export async function withSmartStashOnConflict(
   gitService: GitService,
@@ -18,23 +31,8 @@ export async function withSmartStashOnConflict(
     const conflictInfo = await gitService.getConflictInfo().catch(() => null);
     const hasActiveConflicts = Boolean(conflictInfo && conflictInfo.hasConflicts && conflictInfo.conflicts.length > 0);
 
-    const isConflict =
-      /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) ||
-      /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError) ||
-      /cannot rebase: (?:You have unstaged changes|Your index contains uncommitted changes)/i.test(rawError) ||
-      /cannot pull with rebase: (?:You have unstaged changes|Your index contains uncommitted changes)/i.test(rawError) ||
-      /error: (?:cannot rebase|cannot cherry-pick|cannot revert):/i.test(rawError) ||
-      /error: Your local changes to the following files would be overwritten/i.test(rawError) ||
-      /Please commit or stash them before you (?:merge|rebase|cherry-pick|revert)/i.test(rawError);
-
-    const is3WayConflict =
-      hasActiveConflicts ||
-      rawError.includes('CONFLICT') ||
-      rawError.includes('Automatic merge failed') ||
-      rawError.includes('fix conflicts') ||
-      rawError.includes('could not apply') ||
-      rawError.includes('could not revert') ||
-      rawError.includes('git rebase --continue');
+    const isConflict = isDirtyTreeConflict(rawError);
+    const is3WayConflict = isThreeWayConflict(rawError, hasActiveConflicts);
 
     let pastAction = `${actionLabel.toLowerCase()} '${targetRef}'`;
     if (actionLabel === 'Checkout') {
@@ -64,16 +62,10 @@ export async function withSmartStashOnConflict(
     }
 
     const isUntracked = /The following untracked working tree files would be overwritten/i.test(rawError);
-    const filesMatch = rawError.match(/overwritten by (?:merge|checkout):([\s\S]*?)(?:Please commit|Aborting|$)/i);
+    const overwrittenFiles = extractOverwrittenFiles(rawError);
     let filesText = '';
-    if (filesMatch) {
-      const list = filesMatch[1]
-        .split('\n')
-        .map(s => s.trim())
-        .filter(s => s.length > 0 && !s.startsWith('error:'));
-      if (list.length > 0) {
-        filesText = '\n\nConflicting files:\n' + list.map(f => `• ${f}`).join('\n');
-      }
+    if (overwrittenFiles.length > 0) {
+      filesText = '\n\nConflicting files:\n' + overwrittenFiles.map(f => `• ${f}`).join('\n');
     }
 
     const smartLabel = `Smart ${actionLabel}`;
@@ -89,8 +81,7 @@ export async function withSmartStashOnConflict(
 
     if (!choice) return;
 
-    const stashPrefix = actionLabel.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const stashName = `autostash-${stashPrefix}-${(targetRef || 'HEAD').replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}`;
+    const stashName = makeStashName(actionLabel, targetRef);
     const stashArgs = isUntracked
       ? ['stash', 'push', '-u', '-m', stashName]
       : ['stash', 'push', '-m', stashName];

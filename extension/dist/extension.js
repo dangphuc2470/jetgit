@@ -3940,9 +3940,14 @@ var GraphViewProvider = class {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
+      } else {
+        this.closeAllMenus();
       }
     });
     this.loadInitialData();
+  }
+  closeAllMenus() {
+    this.view?.webview.postMessage({ type: "closeAllMenus" });
   }
   async loadInitialData() {
     if (!this.initialWorkspaceRoot) {
@@ -6283,9 +6288,14 @@ var CommitViewProvider = class _CommitViewProvider {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
+      } else {
+        this.closeAllMenus();
       }
     });
     this.refresh();
+  }
+  closeAllMenus() {
+    this.view?.webview.postMessage({ type: "closeAllMenus" });
   }
   async refresh() {
     if (!this.view || !this.view.visible)
@@ -8046,13 +8056,18 @@ function activate(context) {
         commitViewProvider.refresh();
         branchTree.refresh();
         mergeProvider.refresh();
+      } else {
+        graphViewProvider.closeAllMenus();
+        commitViewProvider.closeAllMenus();
       }
     }),
     vscode19.window.onDidChangeActiveTextEditor(() => {
-      graphViewProvider.view?.webview.postMessage({ type: "closeAllMenus" });
+      graphViewProvider.closeAllMenus();
+      commitViewProvider.closeAllMenus();
     }),
     vscode19.window.onDidChangeTextEditorSelection(() => {
-      graphViewProvider.view?.webview.postMessage({ type: "closeAllMenus" });
+      graphViewProvider.closeAllMenus();
+      commitViewProvider.closeAllMenus();
     })
   );
   log.appendLine("IntelliJ Git extension activated.");

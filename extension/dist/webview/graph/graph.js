@@ -7428,7 +7428,7 @@ ${component_stack}
   var root = from_html(`<div class="filter-bar svelte-51df0s"></div>`);
   var $$css = {
     hash: "svelte-51df0s",
-    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}"
+    code: '.filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;flex-wrap:nowrap;overflow:hidden;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;transition:background 0.08s ease, color 0.08s ease;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e) !important;color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;max-height:none;overflow:visible;box-sizing:border-box;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.commit-context-menu::-webkit-scrollbar, .branch-context-menu::-webkit-scrollbar {width:5px;}.commit-context-menu::-webkit-scrollbar-thumb, .branch-context-menu::-webkit-scrollbar-thumb {background:rgba(255, 255, 255, 0.2);border-radius:3px;}.commit-context-menu::-webkit-scrollbar-thumb:hover, .branch-context-menu::-webkit-scrollbar-thumb:hover {background:rgba(255, 255, 255, 0.35);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;transition:background 0.08s ease, color 0.08s ease;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e) !important;color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff) !important;opacity:0.95 !important;}.bcm-item:hover .ccm-icon, .ccm-item:hover .ccm-icon {color:var(--vscode-menu-selectionForeground, #ffffff) !important;opacity:1 !important;}.bcm-item:hover span, .ccm-item:hover span, .bcm-item:hover .ccm-label, .ccm-item:hover .ccm-label {color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.ccm-item.disabled {opacity:0.38 !important;cursor:default !important;pointer-events:none !important;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;color:inherit;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", monospace;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.has-submenu:hover > .ccm-submenu {display:flex;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}.as-dialog-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1px);}.as-dialog-card {background:var(--vscode-editor-background, #1e1f22);border:1px solid var(--vscode-panel-border, #393b40);border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.75);width:560px;max-width:92vw;display:flex;flex-direction:column;color:var(--vscode-editor-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;overflow:hidden;box-sizing:border-box;}.as-dialog-header {padding:10px 16px;font-size:13px;font-weight:600;background:var(--vscode-titleBar-activeBackground, #2b2d30);border-bottom:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:space-between;user-select:none;}.as-dialog-close {cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.7;}.as-dialog-close:hover {opacity:1;background:rgba(255,255,255,0.1);}.as-dialog-body {padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}.as-dialog-field-label {font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #8c8c8c);text-transform:uppercase;letter-spacing:0.5px;}.as-dialog-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;}.as-dialog-input:focus, .as-dialog-textarea:focus {border-color:var(--vscode-focusBorder, #3574f0);}.as-dialog-textarea {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:8px 10px;font-size:12px;min-height:140px;max-height:320px;resize:vertical;outline:none;font-family:inherit;line-height:1.45;}.as-dialog-footer {padding:10px 16px;background:var(--vscode-editor-background, #1e1f22);border-top:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box;}.as-dialog-btn {padding:6px 16px;font-size:12px;border-radius:4px;cursor:pointer;border:none;font-weight:500;user-select:none;}.as-dialog-btn-primary {background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);}.as-dialog-btn-primary:hover {background:var(--vscode-button-hoverBackground, #355389);}.as-dialog-btn-secondary {background:transparent;color:var(--vscode-menu-foreground, #dfe1e5);border:1px solid var(--vscode-panel-border, #4e5157);}.as-dialog-btn-secondary:hover {background:rgba(255,255,255,0.08);}.as-dropdown-menu {position:absolute;top:calc(100% + 4px);background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;min-width:215px;z-index:2000;display:none;flex-direction:column;color:var(--vscode-menu-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;font-size:12px;user-select:none;box-sizing:border-box;}.as-menu-section-header {padding:6px 10px 3px 10px;font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-align:left;}.as-menu-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.as-menu-item {display:flex;align-items:center;padding:3px 8px;border-radius:4px;cursor:pointer;height:24px;box-sizing:border-box;color:var(--vscode-menu-foreground, #dfe1e5);white-space:nowrap;position:relative;transition:background 0.08s ease, color 0.08s ease;}.as-menu-item:hover, .as-menu-item.selected {background:var(--vscode-menu-selectionBackground, #2e436e) !important;color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.as-menu-item:hover .as-menu-label, .as-menu-item:hover .as-menu-check, .as-menu-item:hover .as-menu-arrow {color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.as-menu-check {width:18px;min-width:18px;display:inline-flex;align-items:center;justify-content:flex-start;color:inherit;flex-shrink:0;}.as-menu-label {flex:1;text-align:left;color:inherit;}.as-menu-arrow {margin-left:auto;font-size:13px;opacity:0.7;}.as-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;min-width:140px;}.has-submenu:hover > .as-submenu {display:flex;}body.hide-col-author .author {display:none !important;}body.hide-col-date .date {display:none !important;}body.show-col-hash .hash {display:inline-block !important;color:#8c8c8c !important;font-family:var(--vscode-editor-font-family, monospace) !important;font-size:11px !important;user-select:text !important;width:68px !important;min-width:68px !important;}body.compact-refs .labels {gap:3px !important;}body.compact-refs .label {padding:0 3px !important;font-size:0.76em !important;}body.refs-on-left .labels {order:0 !important;margin-left:0 !important;margin-right:8px !important;}'
   };
   function FilterBar($$anchor, $$props) {
     push($$props, true);
@@ -8273,7 +8273,7 @@ ${component_stack}
       attachTooltip(userLabel, "Filter by User", "", "bottom");
       attachTooltip(dateLabel, "Filter by Date", "", "bottom");
       attachTooltip(pathLabel, "Filter by Structure / Path", "", "bottom");
-      updateLabelsFn = function updateLabels2() {
+      function updateLabels() {
         if (curBranch) {
           branchLabel.className = "as-filter-label active";
           branchLabel.innerHTML = '<span class="lbl-prefix">Branch:</span> <span class="lbl-val">' + curBranch + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
@@ -8326,7 +8326,8 @@ ${component_stack}
           pathLabel.className = "as-filter-label";
           pathLabel.innerHTML = '<span class="lbl-prefix">Paths</span> <span class="lbl-arrow">&#9662;</span>';
         }
-      };
+      }
+      updateLabelsFn = updateLabels;
       updateLabels();
     });
     user_effect(() => {
@@ -9073,9 +9074,23 @@ ${component_stack}
       };
       document.addEventListener("mousedown", mousedownHandler);
       window.addEventListener("keydown", keydownHandler);
+      window.addEventListener("blur", closeAllMenus);
+      const visHandler = () => {
+        if (document.hidden)
+          closeAllMenus();
+      };
+      document.addEventListener("visibilitychange", visHandler);
+      const msgHandler = (ev) => {
+        if (ev.data?.type === "closeAllMenus")
+          closeAllMenus();
+      };
+      window.addEventListener("message", msgHandler);
       return () => {
         document.removeEventListener("mousedown", mousedownHandler);
         window.removeEventListener("keydown", keydownHandler);
+        window.removeEventListener("blur", closeAllMenus);
+        document.removeEventListener("visibilitychange", visHandler);
+        window.removeEventListener("message", msgHandler);
       };
     });
     function isMyCommit(commit) {
@@ -9457,6 +9472,15 @@ ${component_stack}
       const oldCommit = document.querySelectorAll(".commit-context-menu");
       oldCommit.forEach((m) => m.remove());
     }
+    window.addEventListener("blur", closeBranchContextMenu);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden)
+        closeBranchContextMenu();
+    });
+    window.addEventListener("message", (ev) => {
+      if (ev.data?.type === "closeAllMenus")
+        closeBranchContextMenu();
+    });
     function showBranchContextMenu(e, branchName) {
       e.preventDefault();
       e.stopPropagation();
@@ -10344,8 +10368,21 @@ ${component_stack}
     }
     onMount(() => {
       postMessage("ready");
+      const closeAllFloatingMenus = () => {
+        document.querySelectorAll(".commit-context-menu, .branch-context-menu, .filter-popup, .as-dropdown-menu").forEach((el) => el.remove());
+      };
+      window.addEventListener("blur", closeAllFloatingMenus);
+      const visChangeHandler = () => {
+        if (document.hidden)
+          closeAllFloatingMenus();
+      };
+      document.addEventListener("visibilitychange", visChangeHandler);
       unsubscribe = onMessage((msg) => {
         switch (msg.type) {
+          case "closeAllMenus": {
+            closeAllFloatingMenus();
+            break;
+          }
           case "noGitRepo": {
             window.__IS_SUB_REPO__ = false;
             hasInitializedActiveBranch = false;

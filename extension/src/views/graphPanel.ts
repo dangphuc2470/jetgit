@@ -88,11 +88,17 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
+      } else {
+        this.closeAllMenus();
       }
     });
 
     // Load data once the webview is ready
     this.loadInitialData();
+  }
+
+  closeAllMenus(): void {
+    this.view?.webview.postMessage({ type: 'closeAllMenus' });
   }
 
   async loadInitialData(): Promise<void> {

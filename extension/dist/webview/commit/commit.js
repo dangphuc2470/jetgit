@@ -341,6 +341,16 @@
   function registerGlobalContextMenuListeners(vscode2, onRender) {
     window.addEventListener("click", closeContextMenu);
     window.addEventListener("blur", closeContextMenu);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden)
+        closeContextMenu();
+    });
+    window.addEventListener("message", (e) => {
+      if (e.data?.type === "closeAllMenus") {
+        closeContextMenu();
+        document.querySelectorAll(".as-context-menu, .as-view-options-menu").forEach((el) => el.remove());
+      }
+    });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         closeContextMenu();

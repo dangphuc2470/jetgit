@@ -54,8 +54,21 @@
   onMount(() => {
     postMessage("ready");
 
+    const closeAllFloatingMenus = () => {
+      document.querySelectorAll('.commit-context-menu, .branch-context-menu, .filter-popup, .as-dropdown-menu').forEach(el => el.remove());
+    };
+    window.addEventListener("blur", closeAllFloatingMenus);
+    const visChangeHandler = () => {
+      if (document.hidden) closeAllFloatingMenus();
+    };
+    document.addEventListener("visibilitychange", visChangeHandler);
+
     unsubscribe = onMessage((msg: any) => {
       switch (msg.type) {
+        case "closeAllMenus": {
+          closeAllFloatingMenus();
+          break;
+        }
         case "noGitRepo": {
           (window as any).__IS_SUB_REPO__ = false;
           hasInitializedActiveBranch = false;

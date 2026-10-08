@@ -543,10 +543,22 @@
 
     document.addEventListener('mousedown', mousedownHandler);
     window.addEventListener('keydown', keydownHandler);
+    window.addEventListener('blur', closeAllMenus);
+    const visHandler = () => {
+      if (document.hidden) closeAllMenus();
+    };
+    document.addEventListener('visibilitychange', visHandler);
+    const msgHandler = (ev: MessageEvent) => {
+      if (ev.data?.type === 'closeAllMenus') closeAllMenus();
+    };
+    window.addEventListener('message', msgHandler);
 
     return () => {
       document.removeEventListener('mousedown', mousedownHandler);
       window.removeEventListener('keydown', keydownHandler);
+      window.removeEventListener('blur', closeAllMenus);
+      document.removeEventListener('visibilitychange', visHandler);
+      window.removeEventListener('message', msgHandler);
     };
   });
 

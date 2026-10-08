@@ -396,13 +396,18 @@ export function activate(context: vscode.ExtensionContext): void {
         commitViewProvider.refresh();
         branchTree.refresh();
         mergeProvider.refresh();
+      } else {
+        graphViewProvider.closeAllMenus();
+        commitViewProvider.closeAllMenus();
       }
     }),
     vscode.window.onDidChangeActiveTextEditor(() => {
-      graphViewProvider.view?.webview.postMessage({ type: 'closeAllMenus' });
+      graphViewProvider.closeAllMenus();
+      commitViewProvider.closeAllMenus();
     }),
     vscode.window.onDidChangeTextEditorSelection(() => {
-      graphViewProvider.view?.webview.postMessage({ type: 'closeAllMenus' });
+      graphViewProvider.closeAllMenus();
+      commitViewProvider.closeAllMenus();
     }),
   );
 

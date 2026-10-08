@@ -55,6 +55,14 @@ export     function renderSidebarContent(container: HTMLElement, getBranchData: 
         oldCommit.forEach(m => m.remove());
       }
 
+      window.addEventListener("blur", closeBranchContextMenu);
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) closeBranchContextMenu();
+      });
+      window.addEventListener("message", (ev) => {
+        if (ev.data?.type === "closeAllMenus") closeBranchContextMenu();
+      });
+
       function showBranchContextMenu(e, branchName) {
         e.preventDefault();
         e.stopPropagation();

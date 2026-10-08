@@ -70,10 +70,16 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         this.refresh();
+      } else {
+        this.closeAllMenus();
       }
     });
 
     this.refresh();
+  }
+
+  closeAllMenus(): void {
+    this.view?.webview.postMessage({ type: 'closeAllMenus' });
   }
 
   async refresh(): Promise<void> {

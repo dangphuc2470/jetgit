@@ -145,6 +145,15 @@ export function showFileContextMenu(e: MouseEvent, file: CommitFile, vscode: any
 export function registerGlobalContextMenuListeners(vscode: any, onRender?: () => void): void {
   window.addEventListener('click', closeContextMenu);
   window.addEventListener('blur', closeContextMenu);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) closeContextMenu();
+  });
+  window.addEventListener('message', (e) => {
+    if (e.data?.type === 'closeAllMenus') {
+      closeContextMenu();
+      document.querySelectorAll('.as-context-menu, .as-view-options-menu').forEach(el => el.remove());
+    }
+  });
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       closeContextMenu();

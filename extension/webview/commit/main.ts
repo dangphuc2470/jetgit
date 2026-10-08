@@ -409,7 +409,7 @@ function attachToolbarEvents(toolbar: HTMLElement, container: HTMLElement): void
 
   const targetScope = container || document;
   targetScope.querySelector('#btn-resolve-conflicts')?.addEventListener('click', () => {
-    openConflictsDialog(vscode);
+    vscode.postMessage({ type: 'openConflictsDialog' });
   });
 
   targetScope.querySelector('#btn-abort-merge')?.addEventListener('click', () => {
@@ -650,7 +650,7 @@ window.addEventListener('message', (event) => {
       break;
     }
     case 'showConflictsDialog': {
-      openConflictsDialog(vscode);
+      vscode.postMessage({ type: 'openConflictsDialog' });
       break;
     }
     case 'selectFile': {

@@ -7,8 +7,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const entries = [
-  // webview/graph is preserved as authentic production bundle to avoid Svelte 5 compilation regressions
-  // { input: 'webview/graph/main.ts', outfile: 'dist/webview/graph/graph.js' },
+  { input: 'webview/graph/main.ts', outfile: 'dist/webview/graph/graph.js' },
   { input: 'webview/rebase/main.ts', outfile: 'dist/webview/rebase/rebase.js' },
   { input: 'webview/commit/main.ts', outfile: 'dist/webview/commit/commit.js' },
   { input: 'webview/review/main.ts', outfile: 'dist/webview/commit/review.js' },

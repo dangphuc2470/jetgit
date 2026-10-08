@@ -1,66 +1,3 @@
-
-window.onerror = function(msg, url, line, col, error) {
-  if (typeof msg === 'string' && msg.includes('ResizeObserver loop')) {
-    return true;
-  }
-  var d = document.createElement('div');
-  d.style.cssText = 'color:#ff6b6b;background:#1e1e1e;padding:20px;font-family:monospace;white-space:pre-wrap;font-size:13px;position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;overflow:auto;border:2px solid #e51400;';
-  d.innerHTML = '<h3 style="color:#f48771;margin-top:0;">Git Log Webview Error</h3><p><b>' + msg + '</b></p><p>Line ' + line + ':' + col + '</p><pre style="background:#252526;padding:10px;border-radius:4px;">' + (error ? error.stack : '') + '</pre>';
-  document.body.appendChild(d);
-};
-window.addEventListener('error', function(e) {
-  if (e.message && e.message.includes('ResizeObserver loop')) {
-    e.stopImmediatePropagation();
-    e.preventDefault();
-  }
-});
-if (typeof document !== 'undefined') {
-  if (document.body) {
-    document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
-  } else {
-    document.addEventListener('DOMContentLoaded', () => {
-      if (document.body) document.body.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
-    });
-  }
-}
-function removeAllContextMenus() {
-  document.querySelectorAll('.commit-context-menu, .branch-context-menu').forEach(m => m.remove());
-  document.querySelectorAll('.as-dropdown-menu, .filter-popup').forEach(m => { m.style.display = 'none'; });
-}
-window.addEventListener('blur', removeAllContextMenus);
-document.addEventListener('visibilitychange', function() {
-  if (document.hidden) removeAllContextMenus();
-});
-window.addEventListener('message', function(e) {
-  if (e.data && (e.data.type === 'closeAllMenus' || e.data.type === 'closeContextMenus')) {
-    removeAllContextMenus();
-  }
-});
-
-window.addEventListener('mousedown', function(e) {
-  const openMenu = document.querySelector('.commit-context-menu, .branch-context-menu');
-  if (!openMenu) return;
-  const target = e.target && e.target.nodeType === 1 ? e.target : e.target?.parentElement;
-  if (target && target.closest && target.closest('.commit-context-menu, .branch-context-menu')) {
-    return;
-  }
-  removeAllContextMenus();
-}, true);
-
-window.addEventListener('contextmenu', function(e) {
-  e.preventDefault();
-  const openMenu = document.querySelector('.commit-context-menu, .branch-context-menu');
-  if (openMenu) {
-    const target = e.target && e.target.nodeType === 1 ? e.target : e.target?.parentElement;
-    if (target && target.closest && target.closest('.commit-context-menu, .branch-context-menu')) {
-      return;
-    }
-    removeAllContextMenus();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-  }
-}, true);
-"use strict";
 (() => {
   var __defProp = Object.defineProperty;
   var __defNormalProp = (obj, key2, value) => key2 in obj ? __defProp(obj, key2, { enumerable: true, configurable: true, writable: true, value }) : obj[key2] = value;
@@ -134,6 +71,7 @@ window.addEventListener('contextmenu', function(e) {
   var BRANCH_EFFECT = 1 << 5;
   var ROOT_EFFECT = 1 << 6;
   var BOUNDARY_EFFECT = 1 << 7;
+  var PAUSED = 1 << 8;
   var CONNECTED = 1 << 9;
   var CLEAN = 1 << 10;
   var DIRTY = 1 << 11;
@@ -141,20 +79,27 @@ window.addEventListener('contextmenu', function(e) {
   var INERT = 1 << 13;
   var DESTROYED = 1 << 14;
   var REACTION_RAN = 1 << 15;
+  var DESTROYING = 1 << 25;
   var EFFECT_TRANSPARENT = 1 << 16;
   var EAGER_EFFECT = 1 << 17;
   var HEAD_EFFECT = 1 << 18;
   var EFFECT_PRESERVED = 1 << 19;
   var USER_EFFECT = 1 << 20;
   var EFFECT_OFFSCREEN = 1 << 25;
-  var WAS_MARKED = 1 << 16;
   var REACTION_IS_UPDATING = 1 << 21;
   var ASYNC = 1 << 22;
   var ERROR_VALUE = 1 << 23;
   var STATE_SYMBOL = Symbol("$state");
+  var COMPONENT_SYMBOL = Symbol("component");
   var LEGACY_PROPS = Symbol("legacy props");
   var LOADING_ATTR_SYMBOL = Symbol("");
   var PROXY_PATH_SYMBOL = Symbol("proxy path");
+  var ATTRIBUTES_CACHE = Symbol("attributes");
+  var CLASS_CACHE = Symbol("class");
+  var STYLE_CACHE = Symbol("style");
+  var TEXT_CACHE = Symbol("text");
+  var FORM_RESET_HANDLER = Symbol("form reset");
+  var HMR_ANCHOR = Symbol("hmr anchor");
   var STALE_REACTION = new class StaleReactionError extends Error {
     constructor() {
       super(...arguments);
@@ -169,181 +114,13 @@ window.addEventListener('contextmenu', function(e) {
   var TEXT_NODE = 3;
   var COMMENT_NODE = 8;
 
-  // node_modules/svelte/src/internal/shared/errors.js
-  function lifecycle_outside_component(name) {
-    if (dev_fallback_default) {
-      const error = new Error(`lifecycle_outside_component
-\`${name}(...)\` can only be used during component initialisation
-https://svelte.dev/e/lifecycle_outside_component`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/lifecycle_outside_component`);
-    }
-  }
-
-  // node_modules/svelte/src/internal/client/errors.js
-  function async_derived_orphan() {
-    if (dev_fallback_default) {
-      const error = new Error(`async_derived_orphan
-Cannot create a \`$derived(...)\` with an \`await\` expression outside of an effect tree
-https://svelte.dev/e/async_derived_orphan`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/async_derived_orphan`);
-    }
-  }
-  function bind_invalid_checkbox_value() {
-    if (dev_fallback_default) {
-      const error = new Error(`bind_invalid_checkbox_value
-Using \`bind:value\` together with a checkbox input is not allowed. Use \`bind:checked\` instead
-https://svelte.dev/e/bind_invalid_checkbox_value`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/bind_invalid_checkbox_value`);
-    }
-  }
-  function derived_references_self() {
-    if (dev_fallback_default) {
-      const error = new Error(`derived_references_self
-A derived value cannot reference itself recursively
-https://svelte.dev/e/derived_references_self`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/derived_references_self`);
-    }
-  }
-  function each_key_duplicate(a, b, value) {
-    if (dev_fallback_default) {
-      const error = new Error(`each_key_duplicate
-${value ? `Keyed each block has duplicate key \`${value}\` at indexes ${a} and ${b}` : `Keyed each block has duplicate key at indexes ${a} and ${b}`}
-https://svelte.dev/e/each_key_duplicate`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/each_key_duplicate`);
-    }
-  }
-  function effect_in_teardown(rune) {
-    if (dev_fallback_default) {
-      const error = new Error(`effect_in_teardown
-\`${rune}\` cannot be used inside an effect cleanup function
-https://svelte.dev/e/effect_in_teardown`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/effect_in_teardown`);
-    }
-  }
-  function effect_in_unowned_derived() {
-    if (dev_fallback_default) {
-      const error = new Error(`effect_in_unowned_derived
-Effect cannot be created inside a \`$derived\` value that was not itself created inside an effect
-https://svelte.dev/e/effect_in_unowned_derived`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/effect_in_unowned_derived`);
-    }
-  }
-  function effect_orphan(rune) {
-    if (dev_fallback_default) {
-      const error = new Error(`effect_orphan
-\`${rune}\` can only be used inside an effect (e.g. during component initialisation)
-https://svelte.dev/e/effect_orphan`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/effect_orphan`);
-    }
-  }
-  function effect_update_depth_exceeded() {
-    if (dev_fallback_default) {
-      const error = new Error(`effect_update_depth_exceeded
-Maximum update depth exceeded. This typically indicates that an effect reads and writes the same piece of state
-https://svelte.dev/e/effect_update_depth_exceeded`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/effect_update_depth_exceeded`);
-    }
-  }
-  function hydration_failed() {
-    if (dev_fallback_default) {
-      const error = new Error(`hydration_failed
-Failed to hydrate the application
-https://svelte.dev/e/hydration_failed`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/hydration_failed`);
-    }
-  }
-  function rune_outside_svelte(rune) {
-    if (dev_fallback_default) {
-      const error = new Error(`rune_outside_svelte
-The \`${rune}\` rune is only available inside \`.svelte\` and \`.svelte.js/ts\` files
-https://svelte.dev/e/rune_outside_svelte`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/rune_outside_svelte`);
-    }
-  }
-  function state_descriptors_fixed() {
-    if (dev_fallback_default) {
-      const error = new Error(`state_descriptors_fixed
-Property descriptors defined on \`$state\` objects must contain \`value\` and always be \`enumerable\`, \`configurable\` and \`writable\`.
-https://svelte.dev/e/state_descriptors_fixed`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/state_descriptors_fixed`);
-    }
-  }
-  function state_prototype_fixed() {
-    if (dev_fallback_default) {
-      const error = new Error(`state_prototype_fixed
-Cannot set prototype of \`$state\` object
-https://svelte.dev/e/state_prototype_fixed`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/state_prototype_fixed`);
-    }
-  }
-  function state_unsafe_mutation() {
-    if (dev_fallback_default) {
-      const error = new Error(`state_unsafe_mutation
-Updating state inside \`$derived(...)\`, \`$inspect(...)\` or a template expression is forbidden. If the value should not be reactive, declare it without \`$state\`
-https://svelte.dev/e/state_unsafe_mutation`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/state_unsafe_mutation`);
-    }
-  }
-  function svelte_boundary_reset_onerror() {
-    if (dev_fallback_default) {
-      const error = new Error(`svelte_boundary_reset_onerror
-A \`<svelte:boundary>\` \`reset\` function cannot be called while an error is still being handled
-https://svelte.dev/e/svelte_boundary_reset_onerror`);
-      error.name = "Svelte error";
-      throw error;
-    } else {
-      throw new Error(`https://svelte.dev/e/svelte_boundary_reset_onerror`);
-    }
-  }
-
   // node_modules/svelte/src/constants.js
   var EACH_ITEM_REACTIVE = 1;
   var EACH_INDEX_REACTIVE = 1 << 1;
   var EACH_IS_CONTROLLED = 1 << 2;
   var EACH_IS_ANIMATED = 1 << 3;
   var EACH_ITEM_IMMUTABLE = 1 << 4;
+  var PROPS_IS_IMMUTABLE = 1;
   var PROPS_IS_RUNES = 1 << 1;
   var PROPS_IS_UPDATED = 1 << 2;
   var PROPS_IS_BINDABLE = 1 << 3;
@@ -356,18 +133,30 @@ https://svelte.dev/e/svelte_boundary_reset_onerror`);
   var TEMPLATE_USE_MATHML = 1 << 3;
   var HYDRATION_START = "[";
   var HYDRATION_START_ELSE = "[!";
+  var HYDRATION_START_FAILED = "[?";
   var HYDRATION_END = "]";
   var HYDRATION_ERROR = {};
   var ELEMENT_PRESERVE_ATTRIBUTE_CASE = 1 << 1;
   var ELEMENT_IS_INPUT = 1 << 2;
-  var UNINITIALIZED = Symbol();
+  var UNINITIALIZED = Symbol("uninitialized");
   var FILENAME = Symbol("filename");
   var HMR = Symbol("hmr");
   var NAMESPACE_HTML = "http://www.w3.org/1999/xhtml";
+  var NAMESPACE_SVG = "http://www.w3.org/2000/svg";
+  var NAMESPACE_MATHML = "http://www.w3.org/1998/Math/MathML";
 
   // node_modules/svelte/src/internal/client/warnings.js
   var bold = "font-weight: bold";
   var normal = "font-weight: normal";
+  function await_reactivity_loss(name) {
+    if (dev_fallback_default) {
+      console.warn(`%c[svelte] await_reactivity_loss
+%cDetected reactivity loss when reading \`${name}\`. This happens when state is read in an async function after an earlier \`await\`
+https://svelte.dev/e/await_reactivity_loss`, bold, normal);
+    } else {
+      console.warn(`https://svelte.dev/e/await_reactivity_loss`);
+    }
+  }
   function await_waterfall(name, location) {
     if (dev_fallback_default) {
       console.warn(`%c[svelte] await_waterfall
@@ -377,6 +166,15 @@ https://svelte.dev/e/await_waterfall`, bold, normal);
       console.warn(`https://svelte.dev/e/await_waterfall`);
     }
   }
+  function derived_inert() {
+    if (dev_fallback_default) {
+      console.warn(`%c[svelte] derived_inert
+%cReading a derived belonging to a now-destroyed effect may result in stale values
+https://svelte.dev/e/derived_inert`, bold, normal);
+    } else {
+      console.warn(`https://svelte.dev/e/derived_inert`);
+    }
+  }
   function hydration_attribute_changed(attribute, html2, value) {
     if (dev_fallback_default) {
       console.warn(`%c[svelte] hydration_attribute_changed
@@ -384,6 +182,19 @@ https://svelte.dev/e/await_waterfall`, bold, normal);
 https://svelte.dev/e/hydration_attribute_changed`, bold, normal);
     } else {
       console.warn(`https://svelte.dev/e/hydration_attribute_changed`);
+    }
+  }
+  function hydration_html_changed(location) {
+    if (dev_fallback_default) {
+      console.warn(
+        `%c[svelte] hydration_html_changed
+%c${location ? `The value of an \`{@html ...}\` block ${location} changed between server and client renders. The client value will be ignored in favour of the server value` : "The value of an `{@html ...}` block changed between server and client renders. The client value will be ignored in favour of the server value"}
+https://svelte.dev/e/hydration_html_changed`,
+        bold,
+        normal
+      );
+    } else {
+      console.warn(`https://svelte.dev/e/hydration_html_changed`);
     }
   }
   function hydration_mismatch(location) {
@@ -415,15 +226,6 @@ https://svelte.dev/e/lifecycle_double_unmount`, bold, normal);
 https://svelte.dev/e/state_proxy_equality_mismatch`, bold, normal);
     } else {
       console.warn(`https://svelte.dev/e/state_proxy_equality_mismatch`);
-    }
-  }
-  function state_proxy_unmount() {
-    if (dev_fallback_default) {
-      console.warn(`%c[svelte] state_proxy_unmount
-%cTried to unmount a state proxy, rather than a component
-https://svelte.dev/e/state_proxy_unmount`, bold, normal);
-    } else {
-      console.warn(`https://svelte.dev/e/state_proxy_unmount`);
     }
   }
   function svelte_boundary_reset_noop() {
@@ -521,6 +323,197 @@ https://svelte.dev/e/svelte_boundary_reset_noop`, bold, normal);
     return !safe_not_equal(value, this.v);
   }
 
+  // node_modules/svelte/src/internal/shared/errors.js
+  function invariant_violation(message) {
+    if (dev_fallback_default) {
+      const error = new Error(`invariant_violation
+An invariant violation occurred, meaning Svelte's internal assumptions were flawed. This is a bug in Svelte, not your app \u2014 please open an issue at https://github.com/sveltejs/svelte, citing the following message: "${message}"
+https://svelte.dev/e/invariant_violation`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/invariant_violation`);
+    }
+  }
+  function lifecycle_outside_component(name) {
+    if (dev_fallback_default) {
+      const error = new Error(`lifecycle_outside_component
+\`${name}(...)\` can only be used during component initialisation
+https://svelte.dev/e/lifecycle_outside_component`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/lifecycle_outside_component`);
+    }
+  }
+
+  // node_modules/svelte/src/internal/client/errors.js
+  function async_derived_orphan() {
+    if (dev_fallback_default) {
+      const error = new Error(`async_derived_orphan
+Cannot create a \`$derived(...)\` with an \`await\` expression outside of an effect tree
+https://svelte.dev/e/async_derived_orphan`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/async_derived_orphan`);
+    }
+  }
+  function derived_references_self() {
+    if (dev_fallback_default) {
+      const error = new Error(`derived_references_self
+A derived value cannot reference itself recursively
+https://svelte.dev/e/derived_references_self`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/derived_references_self`);
+    }
+  }
+  function each_key_duplicate(a, b, value) {
+    if (dev_fallback_default) {
+      const error = new Error(`each_key_duplicate
+${value ? `Keyed each block has duplicate key \`${value}\` at indexes ${a} and ${b}` : `Keyed each block has duplicate key at indexes ${a} and ${b}`}
+https://svelte.dev/e/each_key_duplicate`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/each_key_duplicate`);
+    }
+  }
+  function each_key_volatile(index2, a, b) {
+    if (dev_fallback_default) {
+      const error = new Error(`each_key_volatile
+Keyed each block has key that is not idempotent \u2014 the key for item at index ${index2} was \`${a}\` but is now \`${b}\`. Keys must be the same each time for a given item
+https://svelte.dev/e/each_key_volatile`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/each_key_volatile`);
+    }
+  }
+  function effect_in_teardown(rune) {
+    if (dev_fallback_default) {
+      const error = new Error(`effect_in_teardown
+\`${rune}\` cannot be used inside an effect cleanup function
+https://svelte.dev/e/effect_in_teardown`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/effect_in_teardown`);
+    }
+  }
+  function effect_in_unowned_derived() {
+    if (dev_fallback_default) {
+      const error = new Error(`effect_in_unowned_derived
+Effect cannot be created inside a \`$derived\` value that was not itself created inside an effect
+https://svelte.dev/e/effect_in_unowned_derived`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/effect_in_unowned_derived`);
+    }
+  }
+  function effect_orphan(rune) {
+    if (dev_fallback_default) {
+      const error = new Error(`effect_orphan
+\`${rune}\` can only be used inside an effect (e.g. during component initialisation)
+https://svelte.dev/e/effect_orphan`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/effect_orphan`);
+    }
+  }
+  function effect_update_depth_exceeded() {
+    if (dev_fallback_default) {
+      const error = new Error(`effect_update_depth_exceeded
+Maximum update depth exceeded. This typically indicates that an effect reads and writes the same piece of state
+https://svelte.dev/e/effect_update_depth_exceeded`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/effect_update_depth_exceeded`);
+    }
+  }
+  function hydration_failed() {
+    if (dev_fallback_default) {
+      const error = new Error(`hydration_failed
+Failed to hydrate the application
+https://svelte.dev/e/hydration_failed`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/hydration_failed`);
+    }
+  }
+  function props_invalid_value(key2) {
+    if (dev_fallback_default) {
+      const error = new Error(`props_invalid_value
+Cannot do \`bind:${key2}={undefined}\` when \`${key2}\` has a fallback value
+https://svelte.dev/e/props_invalid_value`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/props_invalid_value`);
+    }
+  }
+  function rune_outside_svelte(rune) {
+    if (dev_fallback_default) {
+      const error = new Error(`rune_outside_svelte
+The \`${rune}\` rune is only available inside \`.svelte\` and \`.svelte.js/ts\` files
+https://svelte.dev/e/rune_outside_svelte`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/rune_outside_svelte`);
+    }
+  }
+  function state_descriptors_fixed() {
+    if (dev_fallback_default) {
+      const error = new Error(`state_descriptors_fixed
+Property descriptors defined on \`$state\` objects must contain \`value\` and always be \`enumerable\`, \`configurable\` and \`writable\`.
+https://svelte.dev/e/state_descriptors_fixed`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/state_descriptors_fixed`);
+    }
+  }
+  function state_prototype_fixed() {
+    if (dev_fallback_default) {
+      const error = new Error(`state_prototype_fixed
+Cannot set prototype of \`$state\` object
+https://svelte.dev/e/state_prototype_fixed`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/state_prototype_fixed`);
+    }
+  }
+  function state_unsafe_mutation() {
+    if (dev_fallback_default) {
+      const error = new Error(`state_unsafe_mutation
+Updating state inside \`$derived(...)\`, \`$inspect(...)\` or a template expression is forbidden. If the value should not be reactive, declare it without \`$state\`
+https://svelte.dev/e/state_unsafe_mutation`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/state_unsafe_mutation`);
+    }
+  }
+  function svelte_boundary_reset_onerror() {
+    if (dev_fallback_default) {
+      const error = new Error(`svelte_boundary_reset_onerror
+A \`<svelte:boundary>\` \`reset\` function cannot be called while an error is still being handled
+https://svelte.dev/e/svelte_boundary_reset_onerror`);
+      error.name = "Svelte error";
+      throw error;
+    } else {
+      throw new Error(`https://svelte.dev/e/svelte_boundary_reset_onerror`);
+    }
+  }
+
   // node_modules/svelte/src/internal/flags/index.js
   var async_mode_flag = false;
   var legacy_mode_flag = false;
@@ -582,6 +575,13 @@ https://svelte.dev/e/svelte_boundary_reset_noop`, bold, normal);
     }
     return new_lines;
   }
+  function invariant(condition, message) {
+    if (!dev_fallback_default) {
+      throw new Error("invariant(...) was not guarded by if (DEV)");
+    }
+    if (!condition)
+      invariant_violation(message);
+  }
 
   // node_modules/svelte/src/internal/client/context.js
   var component_context = null;
@@ -604,6 +604,10 @@ https://svelte.dev/e/svelte_boundary_reset_noop`, bold, normal);
       e: null,
       s: props,
       x: null,
+      r: (
+        /** @type {Effect} */
+        active_effect
+      ),
       l: legacy_mode_flag && !runes ? { s: null, u: null, $: [] } : null
     };
     if (dev_fallback_default) {
@@ -631,8 +635,11 @@ https://svelte.dev/e/svelte_boundary_reset_noop`, bold, normal);
     if (dev_fallback_default) {
       dev_current_component_function = component_context?.function ?? null;
     }
-    return component2 ?? /** @type {T} */
-    {};
+    return mark_as_component(component2);
+  }
+  function mark_as_component(component2 = {}) {
+    define_property(component2, COMPONENT_SYMBOL, { value: true });
+    return component2;
   }
   function is_runes() {
     return !legacy_mode_flag || component_context !== null && component_context.l === null;
@@ -661,78 +668,6 @@ https://svelte.dev/e/svelte_boundary_reset_noop`, bold, normal);
     }
   }
 
-  // node_modules/svelte/src/internal/client/error-handling.js
-  var adjustments = /* @__PURE__ */ new WeakMap();
-  function handle_error(error) {
-    var effect2 = active_effect;
-    if (effect2 === null) {
-      active_reaction.f |= ERROR_VALUE;
-      return error;
-    }
-    if (dev_fallback_default && error instanceof Error && !adjustments.has(error)) {
-      adjustments.set(error, get_adjustments(error, effect2));
-    }
-    if ((effect2.f & REACTION_RAN) === 0 && (effect2.f & EFFECT) === 0) {
-      if (dev_fallback_default && !effect2.parent && error instanceof Error) {
-        apply_adjustments(error);
-      }
-      throw error;
-    }
-    invoke_error_boundary(error, effect2);
-  }
-  function invoke_error_boundary(error, effect2) {
-    while (effect2 !== null) {
-      if ((effect2.f & BOUNDARY_EFFECT) !== 0) {
-        if ((effect2.f & REACTION_RAN) === 0) {
-          throw error;
-        }
-        try {
-          effect2.b.error(error);
-          return;
-        } catch (e) {
-          error = e;
-        }
-      }
-      effect2 = effect2.parent;
-    }
-    if (dev_fallback_default && error instanceof Error) {
-      apply_adjustments(error);
-    }
-    console.error("EXACT ERROR STACK:", error && error.stack);
-    throw error;
-  }
-  function get_adjustments(error, effect2) {
-    const message_descriptor = get_descriptor(error, "message");
-    if (message_descriptor && !message_descriptor.configurable)
-      return;
-    var indent = is_firefox ? "  " : "	";
-    var component_stack = `
-${indent}in ${effect2.fn?.name || "<unknown>"}`;
-    var context = effect2.ctx;
-    while (context !== null) {
-      component_stack += `
-${indent}in ${context.function?.[FILENAME].split("/").pop()}`;
-      context = context.p;
-    }
-    return {
-      message: error.message + `
-${component_stack}
-`,
-      stack: error.stack?.split("\n").filter((line) => !line.includes("svelte/src/internal")).join("\n")
-    };
-  }
-  function apply_adjustments(error) {
-    const adjusted = adjustments.get(error);
-    if (adjusted) {
-      define_property(error, "message", {
-        value: adjusted.message
-      });
-      define_property(error, "stack", {
-        value: adjusted.stack
-      });
-    }
-  }
-
   // node_modules/svelte/src/internal/client/reactivity/status.js
   var STATUS_MASK = ~(DIRTY | MAYBE_DIRTY | CLEAN);
   function set_signal_status(signal, status) {
@@ -747,42 +682,459 @@ ${component_stack}
   }
 
   // node_modules/svelte/src/internal/client/reactivity/utils.js
-  function clear_marked(deps) {
-    if (deps === null)
-      return;
-    for (const dep of deps) {
-      if ((dep.f & DERIVED) === 0 || (dep.f & WAS_MARKED) === 0) {
-        continue;
-      }
-      dep.f ^= WAS_MARKED;
-      clear_marked(
-        /** @type {Derived} */
-        dep.deps
-      );
-    }
-  }
   function defer_effect(effect2, dirty_effects, maybe_dirty_effects) {
     if ((effect2.f & DIRTY) !== 0) {
       dirty_effects.add(effect2);
     } else if ((effect2.f & MAYBE_DIRTY) !== 0) {
       maybe_dirty_effects.add(effect2);
     }
-    clear_marked(effect2.deps);
     set_signal_status(effect2, CLEAN);
   }
 
+  // node_modules/svelte/src/internal/client/dom/elements/bindings/shared.js
+  function without_reactive_context(fn) {
+    var previous_reaction = active_reaction;
+    var previous_effect = active_effect;
+    set_active_reaction(null);
+    set_active_effect(null);
+    try {
+      return fn();
+    } finally {
+      set_active_reaction(previous_reaction);
+      set_active_effect(previous_effect);
+    }
+  }
+
+  // node_modules/svelte/src/internal/client/reactivity/async.js
+  function flatten(blockers, sync, async2, fn) {
+    const d = is_runes() ? derived : derived_safe_equal;
+    var pending2 = blockers.filter((b) => !b.settled);
+    var deriveds = sync.map(d);
+    if (dev_fallback_default) {
+      deriveds.forEach((d2, i) => {
+        d2.label = sync[i].toString().replace("() => ", "").replaceAll("$.eager(() => ", "$state.eager(").replace(/\$\.get\((.+?)\)/g, (_, id) => id);
+      });
+    }
+    if (async2.length === 0 && pending2.length === 0) {
+      fn(deriveds);
+      return;
+    }
+    var parent = (
+      /** @type {Effect} */
+      active_effect
+    );
+    var restore = capture();
+    var blocker_promise = pending2.length === 1 ? pending2[0].promise : pending2.length > 1 ? Promise.all(pending2.map((b) => b.promise)) : null;
+    function finish(async3) {
+      if ((parent.f & DESTROYED) !== 0) {
+        return;
+      }
+      restore();
+      try {
+        fn([...deriveds, ...async3]);
+      } catch (error) {
+        invoke_error_boundary(error, parent);
+      }
+      unset_context();
+    }
+    var decrement_pending = increment_pending();
+    if (async2.length === 0) {
+      blocker_promise.then(() => finish([])).finally(decrement_pending);
+      return;
+    }
+    function run3() {
+      Promise.all(async2.map((expression) => async_derived(expression))).then(finish).catch((error) => invoke_error_boundary(error, parent)).finally(decrement_pending);
+    }
+    if (blocker_promise) {
+      blocker_promise.then(() => {
+        if ((parent.f & DESTROYED) !== 0) {
+          decrement_pending();
+          return;
+        }
+        restore();
+        run3();
+        unset_context();
+      });
+    } else {
+      run3();
+    }
+  }
+  function capture() {
+    var previous_effect = (
+      /** @type {Effect} */
+      active_effect
+    );
+    var previous_reaction = active_reaction;
+    var previous_component_context = component_context;
+    var previous_batch2 = (
+      /** @type {Batch} */
+      current_batch
+    );
+    if (dev_fallback_default) {
+      var previous_dev_stack = dev_stack;
+    }
+    return function restore(activate_batch = true) {
+      set_active_effect(previous_effect);
+      set_active_reaction(previous_reaction);
+      set_component_context(previous_component_context);
+      if (activate_batch && (previous_effect.f & DESTROYED) === 0) {
+        previous_batch2?.activate();
+        previous_batch2?.apply();
+      }
+      if (dev_fallback_default) {
+        set_reactivity_loss_tracker(null);
+        set_dev_stack(previous_dev_stack);
+      }
+    };
+  }
+  var restored = false;
+  function unset_context(deactivate_batch = true) {
+    restored = false;
+    set_active_effect(null);
+    set_active_reaction(null);
+    set_component_context(null);
+    if (deactivate_batch)
+      current_batch?.deactivate();
+    if (dev_fallback_default) {
+      set_reactivity_loss_tracker(null);
+      set_dev_stack(null);
+    }
+  }
+  function increment_pending() {
+    var effect2 = (
+      /** @type {Effect} */
+      active_effect
+    );
+    var boundary2 = effect2.b;
+    var batch = (
+      /** @type {Batch} */
+      current_batch
+    );
+    var blocking = !!boundary2?.is_rendered();
+    boundary2?.update_pending_count(1, batch);
+    batch.increment(blocking, effect2);
+    return () => {
+      boundary2?.update_pending_count(-1, batch);
+      batch.decrement(blocking, effect2);
+    };
+  }
+
+  // node_modules/svelte/src/internal/client/reactivity/deriveds.js
+  var reactivity_loss_tracker = null;
+  function set_reactivity_loss_tracker(v) {
+    reactivity_loss_tracker = v;
+  }
+  var recent_async_deriveds = /* @__PURE__ */ new Set();
+  // @__NO_SIDE_EFFECTS__
+  function derived(fn) {
+    var flags2 = DERIVED | DIRTY;
+    if (active_effect !== null) {
+      active_effect.f |= EFFECT_PRESERVED;
+    }
+    const signal = {
+      ctx: component_context,
+      deps: null,
+      effects: null,
+      equals,
+      f: flags2,
+      fn,
+      reactions: null,
+      rv: 0,
+      v: (
+        /** @type {V} */
+        UNINITIALIZED
+      ),
+      wv: 0,
+      parent: active_effect,
+      ac: null
+    };
+    if (dev_fallback_default && tracing_mode_flag) {
+      signal.created = get_error("created at");
+    }
+    return signal;
+  }
+  var OBSOLETE = Symbol("obsolete");
+  // @__NO_SIDE_EFFECTS__
+  function async_derived(fn, label, location) {
+    let parent = (
+      /** @type {Effect | null} */
+      active_effect
+    );
+    if (parent === null) {
+      async_derived_orphan();
+    }
+    var promise = (
+      /** @type {Promise<V>} */
+      /** @type {unknown} */
+      void 0
+    );
+    var signal = source(
+      /** @type {V} */
+      UNINITIALIZED
+    );
+    if (dev_fallback_default)
+      signal.label = label ?? fn.toString();
+    var should_suspend = !active_reaction;
+    var deferreds = /* @__PURE__ */ new Set();
+    async_effect(() => {
+      var effect2 = (
+        /** @type {Effect} */
+        active_effect
+      );
+      if (dev_fallback_default) {
+        reactivity_loss_tracker = { effect: effect2, effect_deps: /* @__PURE__ */ new Set(), warned: false };
+      }
+      var d = deferred();
+      promise = d.promise;
+      try {
+        Promise.resolve(fn()).then(d.resolve, (e) => {
+          if (e !== STALE_REACTION)
+            d.reject(e);
+        }).finally(unset_context);
+      } catch (error) {
+        d.reject(error);
+        unset_context();
+      }
+      if (dev_fallback_default) {
+        if (reactivity_loss_tracker) {
+          if (effect2.deps !== null) {
+            for (let i = 0; i < skipped_deps; i += 1) {
+              reactivity_loss_tracker.effect_deps.add(effect2.deps[i]);
+            }
+          }
+          if (new_deps !== null) {
+            for (let i = 0; i < new_deps.length; i += 1) {
+              reactivity_loss_tracker.effect_deps.add(new_deps[i]);
+            }
+          }
+        }
+        reactivity_loss_tracker = null;
+      }
+      var batch = (
+        /** @type {Batch} */
+        current_batch
+      );
+      if (should_suspend) {
+        if ((effect2.f & REACTION_RAN) !== 0) {
+          var decrement_pending = increment_pending();
+        }
+        if (
+          // boundary can be null if the async derived is inside an $effect.root not connected to the component render tree
+          parent.b?.is_rendered()
+        ) {
+          batch.async_deriveds.get(effect2)?.reject(OBSOLETE);
+        } else {
+          for (const d2 of deferreds.values()) {
+            d2.reject(OBSOLETE);
+          }
+        }
+        deferreds.add(d);
+        batch.async_deriveds.set(effect2, d);
+      }
+      const handler = (value, error = void 0) => {
+        if (dev_fallback_default) {
+          reactivity_loss_tracker = null;
+        }
+        decrement_pending?.();
+        deferreds.delete(d);
+        if (error === OBSOLETE)
+          return;
+        batch.activate();
+        if (error) {
+          signal.f |= ERROR_VALUE;
+          internal_set(signal, error);
+        } else {
+          if ((signal.f & ERROR_VALUE) !== 0) {
+            signal.f ^= ERROR_VALUE;
+          }
+          if (dev_fallback_default && location !== void 0 && !signal.equals(value)) {
+            recent_async_deriveds.add(signal);
+            setTimeout(() => {
+              if (recent_async_deriveds.has(signal) && (effect2.f & DESTROYED) === 0) {
+                await_waterfall(
+                  /** @type {string} */
+                  signal.label,
+                  location
+                );
+                recent_async_deriveds.delete(signal);
+              }
+            });
+          }
+          internal_set(signal, value);
+        }
+        batch.deactivate();
+      };
+      d.promise.then(handler, (e) => handler(null, e || "unknown"));
+    });
+    teardown(() => {
+      for (const d of deferreds) {
+        d.reject(OBSOLETE);
+      }
+    });
+    if (dev_fallback_default) {
+      signal.f |= ASYNC;
+    }
+    return new Promise((fulfil) => {
+      function next2(p) {
+        function go() {
+          if (p === promise) {
+            fulfil(signal);
+          } else {
+            next2(promise);
+          }
+        }
+        p.then(go, go);
+      }
+      next2(promise);
+    });
+  }
+  // @__NO_SIDE_EFFECTS__
+  function user_derived(fn) {
+    const d = /* @__PURE__ */ derived(fn);
+    if (!async_mode_flag)
+      push_reaction_value(d);
+    return d;
+  }
+  // @__NO_SIDE_EFFECTS__
+  function derived_safe_equal(fn) {
+    const signal = /* @__PURE__ */ derived(fn);
+    signal.equals = safe_equals;
+    return signal;
+  }
+  function destroy_derived_effects(derived2) {
+    var effects = derived2.effects;
+    if (effects !== null) {
+      derived2.effects = null;
+      for (var i = 0; i < effects.length; i += 1) {
+        destroy_effect(
+          /** @type {Effect} */
+          effects[i]
+        );
+      }
+    }
+  }
+  var stack = [];
+  function execute_derived(derived2) {
+    var value;
+    var prev_active_effect = active_effect;
+    var parent = derived2.parent;
+    if (!is_destroying_effect && parent !== null && derived2.v !== UNINITIALIZED && // if it was never evaluated before, it's guaranteed to fail downstream, so we try to execute instead
+    (parent.f & (DESTROYED | INERT)) !== 0) {
+      derived_inert();
+      return derived2.v;
+    }
+    set_active_effect(parent);
+    if (dev_fallback_default) {
+      let prev_eager_effects = eager_effects;
+      set_eager_effects(/* @__PURE__ */ new Set());
+      try {
+        if (includes.call(stack, derived2)) {
+          derived_references_self();
+        }
+        stack.push(derived2);
+        destroy_derived_effects(derived2);
+        value = update_reaction(derived2);
+      } finally {
+        set_active_effect(prev_active_effect);
+        set_eager_effects(prev_eager_effects);
+        stack.pop();
+      }
+    } else {
+      try {
+        destroy_derived_effects(derived2);
+        value = update_reaction(derived2);
+      } finally {
+        set_active_effect(prev_active_effect);
+      }
+    }
+    return value;
+  }
+  function update_derived(derived2) {
+    var value = execute_derived(derived2);
+    if (!derived2.equals(value)) {
+      derived2.wv = increment_write_version();
+      if (!current_batch?.is_fork || derived2.deps === null) {
+        if (current_batch !== null) {
+          current_batch.capture(derived2, value, true);
+          previous_batch?.capture(derived2, value, true);
+        } else {
+          derived2.v = value;
+        }
+        if (derived2.deps === null) {
+          set_signal_status(derived2, CLEAN);
+          return;
+        }
+      }
+    }
+    if (is_destroying_effect) {
+      return;
+    }
+    if (batch_values !== null) {
+      if (effect_tracking() || current_batch?.is_fork) {
+        batch_values.set(derived2, value);
+      }
+    } else {
+      update_derived_status(derived2);
+    }
+  }
+  function freeze_derived_effects(derived2) {
+    if (derived2.effects === null)
+      return;
+    for (const e of derived2.effects) {
+      if (e.teardown || e.ac) {
+        e.teardown?.();
+        if (e.ac !== null) {
+          without_reactive_context(() => {
+            e.ac.abort(STALE_REACTION);
+            e.ac = null;
+          });
+        }
+        if (e.fn !== null)
+          e.teardown = noop;
+        remove_reactions(e, 0);
+        destroy_effect_children(e);
+      }
+    }
+  }
+  function unfreeze_derived_effects(derived2) {
+    if (derived2.effects === null)
+      return;
+    for (const e of derived2.effects) {
+      if (e.teardown && e.fn !== null) {
+        update_effect(e);
+      }
+    }
+  }
+
   // node_modules/svelte/src/internal/client/reactivity/batch.js
-  var batches = /* @__PURE__ */ new Set();
+  var first_batch = null;
+  var last_batch = null;
   var current_batch = null;
   var previous_batch = null;
   var batch_values = null;
-  var queued_root_effects = [];
   var last_scheduled_effect = null;
-  var is_flushing = false;
   var is_flushing_sync = false;
-  var _commit_callbacks, _discard_callbacks, _pending, _blocking_pending, _deferred, _dirty_effects, _maybe_dirty_effects, _skipped_branches, _decrement_queued, _traverse_effect_tree, traverse_effect_tree_fn, _defer_effects, defer_effects_fn, _commit, commit_fn;
+  var is_processing = false;
+  var collected_effects = null;
+  var legacy_updates = null;
+  var flush_count = 0;
+  var source_stacks = /* @__PURE__ */ new Set();
+  var uid = 1;
+  var _started, _prev, _next, _commit_callbacks, _discard_callbacks, _pending, _blocking_pending, _deferred, _scheduled, _new_effects, _dirty_effects, _maybe_dirty_effects, _skipped_branches, _unskipped_branches, _decrement_queued, _is_deferred, is_deferred_fn, _resolve, resolve_fn, _process, process_fn, _traverse, traverse_fn, _find_earlier_batch, find_earlier_batch_fn, _merge, merge_fn, _defer_effects, defer_effects_fn, _commit, commit_fn, _unlink, unlink_fn;
   var _Batch = class _Batch {
     constructor() {
+      __privateAdd(this, _is_deferred);
+      /**
+       * Convert the effects that were scheduled in this batch into the root effects
+       * that need to be traversed, marking the path to each effect (by clearing the
+       * `CLEAN` flag on ancestor branches) so that the traversal can find them.
+       * This happens right before traversal rather than at scheduling time, so that
+       * the markers left on the (shared) effect tree are created and consumed within
+       * a single traversal — scheduling into other batches can never observe them
+       * @returns {Effect[]}
+       */
+      __privateAdd(this, _resolve);
+      __privateAdd(this, _process);
       /**
        * Traverse the effect tree, executing effects or stashing
        * them for later execution as appropriate
@@ -790,29 +1142,45 @@ ${component_stack}
        * @param {Effect[]} effects
        * @param {Effect[]} render_effects
        */
-      __privateAdd(this, _traverse_effect_tree);
+      __privateAdd(this, _traverse);
+      __privateAdd(this, _find_earlier_batch);
+      /**
+       * @param {Batch} batch
+       */
+      __privateAdd(this, _merge);
       /**
        * @param {Effect[]} effects
        */
       __privateAdd(this, _defer_effects);
       __privateAdd(this, _commit);
-      __publicField(this, "committed", false);
+      __privateAdd(this, _unlink);
+      __publicField(this, "id", uid++);
+      /** True as soon as `#process` was called */
+      __privateAdd(this, _started, false);
+      __publicField(this, "linked", true);
+      /** @type {Batch | null} */
+      __privateAdd(this, _prev, null);
+      /** @type {Batch | null} */
+      __privateAdd(this, _next, null);
+      /** @type {Map<Effect, ReturnType<typeof deferred<any>>>} */
+      __publicField(this, "async_deriveds", /* @__PURE__ */ new Map());
       /**
-       * The current values of any sources that are updated in this batch
+       * The current values of any signals that are updated in this batch.
+       * Tuple format: [value, is_derived] (note: is_derived is false for deriveds, too, if they were overridden via assignment)
        * They keys of this map are identical to `this.#previous`
-       * @type {Map<Source, any>}
+       * @type {Map<Value, [any, boolean]>}
        */
       __publicField(this, "current", /* @__PURE__ */ new Map());
       /**
-       * The values of any sources that are updated in this batch _before_ those updates took place.
+       * The values of any signals (sources and deriveds) that are updated in this batch _before_ those updates took place.
        * They keys of this map are identical to `this.#current`
-       * @type {Map<Source, any>}
+       * @type {Map<Value, any>}
        */
       __publicField(this, "previous", /* @__PURE__ */ new Map());
       /**
        * When the batch is committed (and the DOM is updated), we need to remove old branches
        * and append new ones by calling the functions added inside (if/each/key/etc) blocks
-       * @type {Set<() => void>}
+       * @type {Set<(batch: Batch) => void>}
        */
       __privateAdd(this, _commit_callbacks, /* @__PURE__ */ new Set());
       /**
@@ -825,15 +1193,33 @@ ${component_stack}
        */
       __privateAdd(this, _pending, 0);
       /**
-       * The number of async effects that are currently in flight, _not_ inside a pending boundary
+       * Async effects that are currently in flight, _not_ inside a pending boundary
+       * @type {Map<Effect, number>}
        */
-      __privateAdd(this, _blocking_pending, 0);
+      __privateAdd(this, _blocking_pending, /* @__PURE__ */ new Map());
       /**
        * A deferred that resolves when the batch is committed, used with `settled()`
        * TODO replace with Promise.withResolvers once supported widely enough
        * @type {{ promise: Promise<void>, resolve: (value?: any) => void, reject: (reason: unknown) => void } | null}
        */
       __privateAdd(this, _deferred, null);
+      /**
+       * Effects that were scheduled in this batch but not yet 'resolved' into the
+       * root effects that need to be flushed. Resolving — the upwards traversal that
+       * marks the path to each effect on the shared effect tree (see #resolve) — is
+       * deferred until the batch is processed, so that the markers are created and
+       * consumed within a single traversal. Scheduling into other batches (which can
+       * happen concurrently, e.g. while a batch is committed) can therefore never
+       * observe (and be confused by) this batch's markers.
+       * May contain duplicates — deduplication happens during resolving
+       * @type {Effect[]}
+       */
+      __privateAdd(this, _scheduled, []);
+      /**
+       * Effects created while this batch was active.
+       * @type {Effect[]}
+       */
+      __privateAdd(this, _new_effects, []);
       /**
        * Deferred effects (which run after async work has completed) that are DIRTY
        * @type {Set<Effect>}
@@ -852,11 +1238,20 @@ ${component_stack}
        * @type {Map<Effect, { d: Effect[], m: Effect[] }>}
        */
       __privateAdd(this, _skipped_branches, /* @__PURE__ */ new Map());
+      /**
+       * Inverse of #skipped_branches which we need to tell prior batches to unskip them when committing
+       * @type {Set<Effect>}
+       */
+      __privateAdd(this, _unskipped_branches, /* @__PURE__ */ new Set());
       __publicField(this, "is_fork", false);
       __privateAdd(this, _decrement_queued, false);
-    }
-    is_deferred() {
-      return this.is_fork || __privateGet(this, _blocking_pending) > 0;
+      if (last_batch === null) {
+        first_batch = last_batch = this;
+      } else {
+        __privateSet(last_batch, _next, this);
+        __privateSet(this, _prev, last_batch);
+      }
+      last_batch = this;
     }
     /**
      * Add an effect to the #skipped_branches map and reset its children
@@ -866,144 +1261,145 @@ ${component_stack}
       if (!__privateGet(this, _skipped_branches).has(effect2)) {
         __privateGet(this, _skipped_branches).set(effect2, { d: [], m: [] });
       }
+      __privateGet(this, _unskipped_branches).delete(effect2);
     }
     /**
      * Remove an effect from the #skipped_branches map and reschedule
      * any tracked dirty/maybe_dirty child effects
      * @param {Effect} effect
+     * @param {(e: Effect) => void} callback
      */
-    unskip_effect(effect2) {
+    unskip_effect(effect2, callback = (e) => this.schedule(e)) {
       var tracked = __privateGet(this, _skipped_branches).get(effect2);
       if (tracked) {
         __privateGet(this, _skipped_branches).delete(effect2);
         for (var e of tracked.d) {
           set_signal_status(e, DIRTY);
-          schedule_effect(e);
+          callback(e);
         }
         for (e of tracked.m) {
           set_signal_status(e, MAYBE_DIRTY);
-          schedule_effect(e);
+          callback(e);
         }
       }
-    }
-    /**
-     *
-     * @param {Effect[]} root_effects
-     */
-    process(root_effects) {
-      queued_root_effects = [];
-      this.apply();
-      var effects = [];
-      var render_effects = [];
-      for (const root6 of root_effects) {
-        __privateMethod(this, _traverse_effect_tree, traverse_effect_tree_fn).call(this, root6, effects, render_effects);
-      }
-      if (this.is_deferred()) {
-        __privateMethod(this, _defer_effects, defer_effects_fn).call(this, render_effects);
-        __privateMethod(this, _defer_effects, defer_effects_fn).call(this, effects);
-        for (const [e, t] of __privateGet(this, _skipped_branches)) {
-          reset_branch(e, t);
-        }
-      } else {
-        for (const fn of __privateGet(this, _commit_callbacks))
-          fn();
-        __privateGet(this, _commit_callbacks).clear();
-        if (__privateGet(this, _pending) === 0) {
-          __privateMethod(this, _commit, commit_fn).call(this);
-        }
-        previous_batch = this;
-        current_batch = null;
-        flush_queued_effects(render_effects);
-        flush_queued_effects(effects);
-        previous_batch = null;
-        __privateGet(this, _deferred)?.resolve();
-      }
-      batch_values = null;
+      __privateGet(this, _unskipped_branches).add(effect2);
     }
     /**
      * Associate a change to a given source with the current
      * batch, noting its previous and current values
-     * @param {Source} source
+     * @param {Value} source
      * @param {any} value
+     * @param {boolean} [is_derived]
      */
-    capture(source2, value) {
-      if (value !== UNINITIALIZED && !this.previous.has(source2)) {
-        this.previous.set(source2, value);
+    capture(source2, value, is_derived = false) {
+      if (source2.v !== UNINITIALIZED && !this.previous.has(source2)) {
+        this.previous.set(source2, source2.v);
       }
       if ((source2.f & ERROR_VALUE) === 0) {
-        this.current.set(source2, source2.v);
-        batch_values?.set(source2, source2.v);
+        this.current.set(source2, [value, is_derived]);
+        batch_values?.set(source2, value);
+      }
+      if (!this.is_fork) {
+        source2.v = value;
       }
     }
     activate() {
       current_batch = this;
-      this.apply();
     }
     deactivate() {
-      if (current_batch !== this)
-        return;
       current_batch = null;
       batch_values = null;
     }
     flush() {
-      this.activate();
-      if (queued_root_effects.length > 0) {
-        flush_effects();
-        if (current_batch !== null && current_batch !== this) {
-          return;
+      try {
+        if (dev_fallback_default) {
+          source_stacks.clear();
         }
-      } else if (__privateGet(this, _pending) === 0) {
-        this.process([]);
+        is_processing = true;
+        current_batch = this;
+        __privateMethod(this, _process, process_fn).call(this);
+      } finally {
+        flush_count = 0;
+        last_scheduled_effect = null;
+        collected_effects = null;
+        legacy_updates = null;
+        is_processing = false;
+        current_batch = null;
+        batch_values = null;
+        old_values.clear();
+        if (dev_fallback_default) {
+          for (const source2 of source_stacks) {
+            source2.updated = null;
+          }
+        }
       }
-      this.deactivate();
     }
     discard() {
       for (const fn of __privateGet(this, _discard_callbacks))
         fn(this);
       __privateGet(this, _discard_callbacks).clear();
+      for (const deferred2 of this.async_deriveds.values()) {
+        deferred2.reject(OBSOLETE);
+      }
+      __privateMethod(this, _unlink, unlink_fn).call(this);
+      __privateGet(this, _deferred)?.resolve();
     }
     /**
-     *
-     * @param {boolean} blocking
+     * @param {Effect} effect
      */
-    increment(blocking) {
+    register_created_effect(effect2) {
+      __privateGet(this, _new_effects).push(effect2);
+    }
+    /**
+     * @param {boolean} blocking
+     * @param {Effect} effect
+     */
+    increment(blocking, effect2) {
       __privateSet(this, _pending, __privateGet(this, _pending) + 1);
-      if (blocking)
-        __privateSet(this, _blocking_pending, __privateGet(this, _blocking_pending) + 1);
+      if (blocking) {
+        let blocking_pending_count = __privateGet(this, _blocking_pending).get(effect2) ?? 0;
+        __privateGet(this, _blocking_pending).set(effect2, blocking_pending_count + 1);
+      }
     }
     /**
-     *
      * @param {boolean} blocking
+     * @param {Effect} effect
      */
-    decrement(blocking) {
+    decrement(blocking, effect2) {
       __privateSet(this, _pending, __privateGet(this, _pending) - 1);
-      if (blocking)
-        __privateSet(this, _blocking_pending, __privateGet(this, _blocking_pending) - 1);
+      if (blocking) {
+        let blocking_pending_count = __privateGet(this, _blocking_pending).get(effect2) ?? 0;
+        if (blocking_pending_count === 1) {
+          __privateGet(this, _blocking_pending).delete(effect2);
+        } else {
+          __privateGet(this, _blocking_pending).set(effect2, blocking_pending_count - 1);
+        }
+      }
       if (__privateGet(this, _decrement_queued))
         return;
       __privateSet(this, _decrement_queued, true);
       queue_micro_task(() => {
         __privateSet(this, _decrement_queued, false);
-        if (!this.is_deferred()) {
-          this.revive();
-        } else if (queued_root_effects.length > 0) {
+        if (this.linked) {
           this.flush();
         }
       });
     }
-    revive() {
-      for (const e of __privateGet(this, _dirty_effects)) {
-        __privateGet(this, _maybe_dirty_effects).delete(e);
-        set_signal_status(e, DIRTY);
-        schedule_effect(e);
+    /**
+     * @param {Set<Effect>} dirty_effects
+     * @param {Set<Effect>} maybe_dirty_effects
+     */
+    transfer_effects(dirty_effects, maybe_dirty_effects) {
+      for (const e of dirty_effects) {
+        __privateGet(this, _dirty_effects).add(e);
       }
-      for (const e of __privateGet(this, _maybe_dirty_effects)) {
-        set_signal_status(e, MAYBE_DIRTY);
-        schedule_effect(e);
+      for (const e of maybe_dirty_effects) {
+        __privateGet(this, _maybe_dirty_effects).add(e);
       }
-      this.flush();
+      dirty_effects.clear();
+      maybe_dirty_effects.clear();
     }
-    /** @param {() => void} fn */
+    /** @param {(batch: Batch) => void} fn */
     oncommit(fn) {
       __privateGet(this, _commit_callbacks).add(fn);
     }
@@ -1017,60 +1413,237 @@ ${component_stack}
     static ensure() {
       if (current_batch === null) {
         const batch = current_batch = new _Batch();
-        batches.add(current_batch);
-        if (!is_flushing_sync) {
+        if (!is_processing && !is_flushing_sync) {
           queue_micro_task(() => {
-            if (current_batch !== batch) {
-              return;
+            if (!__privateGet(batch, _started)) {
+              batch.flush();
             }
-            batch.flush();
           });
         }
       }
       return current_batch;
     }
     apply() {
-      if (!async_mode_flag || !this.is_fork && batches.size === 1)
+      if (!async_mode_flag || !this.is_fork && __privateGet(this, _prev) === null && __privateGet(this, _next) === null) {
+        batch_values = null;
         return;
-      batch_values = new Map(this.current);
-      for (const batch of batches) {
-        if (batch === this)
+      }
+      batch_values = /* @__PURE__ */ new Map();
+      for (const [source2, [value]] of this.current) {
+        batch_values.set(source2, value);
+      }
+      for (let batch = first_batch; batch !== null; batch = __privateGet(batch, _next)) {
+        if (batch === this || batch.is_fork)
           continue;
-        for (const [source2, previous] of batch.previous) {
-          if (!batch_values.has(source2)) {
-            batch_values.set(source2, previous);
+        var intersects = false;
+        if (batch.id < this.id) {
+          for (const [source2, [, is_derived]] of batch.current) {
+            if (is_derived)
+              continue;
+            if (this.current.has(source2)) {
+              intersects = true;
+              break;
+            }
+          }
+        }
+        if (!intersects) {
+          for (const [source2, previous] of batch.previous) {
+            if (!batch_values.has(source2)) {
+              batch_values.set(source2, previous);
+            }
           }
         }
       }
     }
+    /**
+     *
+     * @param {Effect} effect
+     */
+    schedule(effect2) {
+      last_scheduled_effect = effect2;
+      if (effect2.b?.is_pending && (effect2.f & (EFFECT | RENDER_EFFECT | MANAGED_EFFECT)) !== 0 && (effect2.f & REACTION_RAN) === 0) {
+        effect2.b.defer_effect(effect2);
+        return;
+      }
+      __privateGet(this, _scheduled).push(effect2);
+    }
   };
+  _started = new WeakMap();
+  _prev = new WeakMap();
+  _next = new WeakMap();
   _commit_callbacks = new WeakMap();
   _discard_callbacks = new WeakMap();
   _pending = new WeakMap();
   _blocking_pending = new WeakMap();
   _deferred = new WeakMap();
+  _scheduled = new WeakMap();
+  _new_effects = new WeakMap();
   _dirty_effects = new WeakMap();
   _maybe_dirty_effects = new WeakMap();
   _skipped_branches = new WeakMap();
+  _unskipped_branches = new WeakMap();
   _decrement_queued = new WeakMap();
-  _traverse_effect_tree = new WeakSet();
-  traverse_effect_tree_fn = function(root6, effects, render_effects) {
-    root6.f ^= CLEAN;
-    var effect2 = root6.first;
-    var pending_boundary = null;
+  _is_deferred = new WeakSet();
+  is_deferred_fn = function() {
+    if (this.is_fork)
+      return true;
+    for (const effect2 of __privateGet(this, _blocking_pending).keys()) {
+      var e = effect2;
+      var skipped = false;
+      while (e.parent !== null) {
+        if (__privateGet(this, _skipped_branches).has(e)) {
+          skipped = true;
+          break;
+        }
+        e = e.parent;
+      }
+      if (!skipped) {
+        return true;
+      }
+    }
+    return false;
+  };
+  _resolve = new WeakSet();
+  resolve_fn = function() {
+    var roots = [];
+    for (const effect2 of __privateGet(this, _scheduled)) {
+      if ((effect2.f & DESTROYED) !== 0 || (effect2.f & (DIRTY | MAYBE_DIRTY)) === 0)
+        continue;
+      var e = effect2;
+      var covered = false;
+      while (e.parent !== null) {
+        e = e.parent;
+        var flags2 = e.f;
+        if ((flags2 & (ROOT_EFFECT | BRANCH_EFFECT)) !== 0) {
+          if ((flags2 & CLEAN) === 0) {
+            covered = true;
+            break;
+          }
+          e.f ^= CLEAN;
+        }
+      }
+      if (!covered) {
+        roots.push(e);
+      }
+    }
+    __privateSet(this, _scheduled, []);
+    return roots;
+  };
+  _process = new WeakSet();
+  process_fn = function() {
+    var _a2, _b, _c;
+    __privateSet(this, _started, true);
+    if (dev_fallback_default) {
+      for (const value of this.current.keys()) {
+        source_stacks.add(value);
+      }
+    }
+    for (const e of __privateGet(this, _dirty_effects)) {
+      __privateGet(this, _maybe_dirty_effects).delete(e);
+      set_signal_status(e, DIRTY);
+      this.schedule(e);
+    }
+    for (const e of __privateGet(this, _maybe_dirty_effects)) {
+      set_signal_status(e, MAYBE_DIRTY);
+      this.schedule(e);
+    }
+    this.apply();
+    var effects = collected_effects = [];
+    var render_effects = [];
+    var updates = legacy_updates = [];
+    while (__privateGet(this, _scheduled).length > 0) {
+      if (flush_count++ > 1e3) {
+        __privateMethod(this, _unlink, unlink_fn).call(this);
+        infinite_loop_guard();
+      }
+      for (const root7 of __privateMethod(this, _resolve, resolve_fn).call(this)) {
+        try {
+          __privateMethod(this, _traverse, traverse_fn).call(this, root7, effects, render_effects);
+        } catch (e) {
+          reset_all(root7);
+          if (!__privateMethod(this, _is_deferred, is_deferred_fn).call(this))
+            this.discard();
+          throw e;
+        }
+      }
+    }
+    current_batch = null;
+    if (updates.length > 0) {
+      var batch = _Batch.ensure();
+      for (const e of updates) {
+        batch.schedule(e);
+      }
+    }
+    collected_effects = null;
+    legacy_updates = null;
+    if (__privateMethod(this, _is_deferred, is_deferred_fn).call(this)) {
+      __privateMethod(this, _defer_effects, defer_effects_fn).call(this, render_effects);
+      __privateMethod(this, _defer_effects, defer_effects_fn).call(this, effects);
+      for (const [e, t] of __privateGet(this, _skipped_branches)) {
+        reset_branch(e, t);
+      }
+      if (updates.length > 0) {
+        /** @type {unknown} */
+        __privateMethod(_a2 = current_batch, _process, process_fn).call(_a2);
+      }
+      return;
+    }
+    const earlier_batch = __privateMethod(this, _find_earlier_batch, find_earlier_batch_fn).call(this);
+    if (earlier_batch) {
+      __privateMethod(this, _defer_effects, defer_effects_fn).call(this, render_effects);
+      __privateMethod(this, _defer_effects, defer_effects_fn).call(this, effects);
+      __privateMethod(_b = earlier_batch, _merge, merge_fn).call(_b, this);
+      return;
+    }
+    __privateGet(this, _dirty_effects).clear();
+    __privateGet(this, _maybe_dirty_effects).clear();
+    for (const fn of __privateGet(this, _commit_callbacks))
+      fn(this);
+    __privateGet(this, _commit_callbacks).clear();
+    previous_batch = this;
+    flush_queued_effects(render_effects);
+    flush_queued_effects(effects);
+    previous_batch = null;
+    __privateGet(this, _deferred)?.resolve();
+    var next_batch = (
+      /** @type {Batch | null} */
+      /** @type {unknown} */
+      current_batch
+    );
+    if (__privateGet(this, _pending) === 0 && (__privateGet(this, _scheduled).length === 0 || next_batch !== null)) {
+      __privateMethod(this, _unlink, unlink_fn).call(this);
+      if (async_mode_flag) {
+        __privateMethod(this, _commit, commit_fn).call(this);
+        current_batch = next_batch;
+      }
+    }
+    if (__privateGet(this, _scheduled).length > 0) {
+      if (next_batch !== null) {
+        for (const e of __privateGet(this, _scheduled)) {
+          __privateGet(next_batch, _scheduled).push(e);
+        }
+        __privateSet(this, _scheduled, []);
+      } else {
+        next_batch = this;
+      }
+    }
+    if (next_batch !== null) {
+      old_values.clear();
+      __privateMethod(_c = next_batch, _process, process_fn).call(_c);
+    }
+  };
+  _traverse = new WeakSet();
+  traverse_fn = function(root7, effects, render_effects) {
+    root7.f ^= CLEAN;
+    var effect2 = root7.first;
     while (effect2 !== null) {
       var flags2 = effect2.f;
       var is_branch = (flags2 & (BRANCH_EFFECT | ROOT_EFFECT)) !== 0;
       var is_skippable_branch = is_branch && (flags2 & CLEAN) !== 0;
       var skip = is_skippable_branch || (flags2 & INERT) !== 0 || __privateGet(this, _skipped_branches).has(effect2);
-      if (async_mode_flag && pending_boundary === null && (flags2 & BOUNDARY_EFFECT) !== 0 && effect2.b?.is_pending) {
-        pending_boundary = effect2;
-      }
       if (!skip && effect2.fn !== null) {
         if (is_branch) {
           effect2.f ^= CLEAN;
-        } else if (pending_boundary !== null && (flags2 & (EFFECT | RENDER_EFFECT | MANAGED_EFFECT)) !== 0) {
-          pending_boundary.b.defer_effect(effect2);
         } else if ((flags2 & EFFECT) !== 0) {
           effects.push(effect2);
         } else if (async_mode_flag && (flags2 & (RENDER_EFFECT | MANAGED_EFFECT)) !== 0) {
@@ -1087,9 +1660,6 @@ ${component_stack}
         }
       }
       while (effect2 !== null) {
-        if (effect2 === pending_boundary) {
-          pending_boundary = null;
-        }
         var next2 = effect2.next;
         if (next2 !== null) {
           effect2 = next2;
@@ -1099,6 +1669,72 @@ ${component_stack}
       }
     }
   };
+  _find_earlier_batch = new WeakSet();
+  find_earlier_batch_fn = function() {
+    var batch = __privateGet(this, _prev);
+    while (batch !== null) {
+      if (!batch.is_fork) {
+        for (const [value, [, is_derived]] of this.current) {
+          if (batch.current.has(value) && !is_derived) {
+            return batch;
+          }
+        }
+      }
+      batch = __privateGet(batch, _prev);
+    }
+    return null;
+  };
+  _merge = new WeakSet();
+  merge_fn = function(batch) {
+    var _a2;
+    for (const [source2, value] of batch.current) {
+      if (!this.previous.has(source2) && batch.previous.has(source2)) {
+        this.previous.set(source2, batch.previous.get(source2));
+      }
+      this.current.set(source2, value);
+    }
+    for (const [effect2, deferred2] of batch.async_deriveds) {
+      const d = this.async_deriveds.get(effect2);
+      if (d)
+        deferred2.promise.then(d.resolve).catch(d.reject);
+    }
+    batch.async_deriveds.clear();
+    this.transfer_effects(__privateGet(batch, _dirty_effects), __privateGet(batch, _maybe_dirty_effects));
+    const mark = (value) => {
+      var reactions = value.reactions;
+      if (reactions === null)
+        return;
+      if ((value.f & DERIVED) !== 0 && (value.f & (DIRTY | MAYBE_DIRTY)) === 0) {
+        return;
+      }
+      for (const reaction of reactions) {
+        var flags2 = reaction.f;
+        if ((flags2 & DERIVED) !== 0) {
+          mark(
+            /** @type {Derived} */
+            reaction
+          );
+        } else {
+          var effect2 = (
+            /** @type {Effect} */
+            reaction
+          );
+          if (flags2 & (ASYNC | BLOCK_EFFECT) && !this.async_deriveds.has(effect2)) {
+            __privateGet(this, _maybe_dirty_effects).delete(effect2);
+            set_signal_status(effect2, DIRTY);
+            this.schedule(effect2);
+          }
+        }
+      }
+    };
+    for (const source2 of this.current.keys()) {
+      mark(source2);
+    }
+    this.oncommit(() => batch.discard());
+    __privateMethod(_a2 = batch, _unlink, unlink_fn).call(_a2);
+    current_batch = this;
+    __privateMethod(this, _process, process_fn).call(this);
+  };
   _defer_effects = new WeakSet();
   defer_effects_fn = function(effects) {
     for (var i = 0; i < effects.length; i += 1) {
@@ -1107,138 +1743,161 @@ ${component_stack}
   };
   _commit = new WeakSet();
   commit_fn = function() {
-    var _a2;
-    if (batches.size > 1) {
-      this.previous.clear();
-      var previous_batch_values = batch_values;
-      var is_earlier = true;
-      for (const batch of batches) {
-        if (batch === this) {
-          is_earlier = false;
-          continue;
-        }
-        const sources = [];
-        for (const [source2, value] of this.current) {
-          if (batch.current.has(source2)) {
-            if (is_earlier && value !== batch.current.get(source2)) {
-              batch.current.set(source2, value);
-            } else {
-              continue;
-            }
+    var _a2, _b;
+    for (let batch = first_batch; batch !== null; batch = __privateGet(batch, _next)) {
+      var is_earlier = batch.id < this.id;
+      var sources = [];
+      for (const [source3, [value, is_derived]] of this.current) {
+        if (batch.current.has(source3)) {
+          var batch_value = (
+            /** @type {[any, boolean]} */
+            batch.current.get(source3)[0]
+          );
+          if (is_earlier && value !== batch_value) {
+            batch.current.set(source3, [value, is_derived]);
+          } else {
+            continue;
           }
-          sources.push(source2);
         }
-        if (sources.length === 0) {
-          continue;
-        }
-        const others = [...batch.current.keys()].filter((s) => !this.current.has(s));
-        if (others.length > 0) {
-          var prev_queued_root_effects = queued_root_effects;
-          queued_root_effects = [];
-          const marked = /* @__PURE__ */ new Set();
-          const checked = /* @__PURE__ */ new Map();
-          for (const source2 of sources) {
-            mark_effects(source2, others, marked, checked);
-          }
-          if (queued_root_effects.length > 0) {
-            current_batch = batch;
-            batch.apply();
-            for (const root6 of queued_root_effects) {
-              __privateMethod(_a2 = batch, _traverse_effect_tree, traverse_effect_tree_fn).call(_a2, root6, [], []);
-            }
-            batch.deactivate();
-          }
-          queued_root_effects = prev_queued_root_effects;
+        sources.push(source3);
+      }
+      if (is_earlier) {
+        for (const [effect2, deferred2] of this.async_deriveds) {
+          const d = batch.async_deriveds.get(effect2);
+          if (d)
+            deferred2.promise.then(d.resolve).catch(d.reject);
         }
       }
-      current_batch = null;
-      batch_values = previous_batch_values;
+      var current = [...batch.current.keys()].filter(
+        (source3) => !/** @type {[any, boolean]} */
+        batch.current.get(source3)[1]
+      );
+      if (!__privateGet(batch, _started) || current.length === 0)
+        continue;
+      var others = current.filter((source3) => !this.current.has(source3));
+      if (others.length === 0) {
+        if (is_earlier) {
+          batch.discard();
+        }
+      } else if (sources.length > 0) {
+        if (dev_fallback_default && !__privateGet(batch, _decrement_queued)) {
+          invariant(__privateGet(batch, _scheduled).length === 0, "Batch has scheduled effects");
+        }
+        if (is_earlier) {
+          for (const unskipped of __privateGet(this, _unskipped_branches)) {
+            batch.unskip_effect(unskipped, (e) => {
+              var _a3;
+              if ((e.f & (BLOCK_EFFECT | ASYNC)) !== 0) {
+                batch.schedule(e);
+              } else {
+                __privateMethod(_a3 = batch, _defer_effects, defer_effects_fn).call(_a3, [e]);
+              }
+            });
+          }
+        }
+        batch.activate();
+        var marked = /* @__PURE__ */ new Set();
+        var checked = /* @__PURE__ */ new Map();
+        for (var source2 of sources) {
+          mark_effects(source2, others, marked, checked);
+        }
+        checked = /* @__PURE__ */ new Map();
+        var current_unequal = [...batch.current].filter(([c, v1]) => {
+          const v2 = this.current.get(c);
+          if (!v2)
+            return true;
+          return v2[0] !== v1[0] || v2[1] !== v1[1];
+        }).map(([c]) => c);
+        if (current_unequal.length > 0) {
+          for (const effect2 of __privateGet(this, _new_effects)) {
+            if ((effect2.f & (DESTROYED | INERT | EAGER_EFFECT)) === 0 && depends_on(effect2, current_unequal, checked)) {
+              if ((effect2.f & (ASYNC | BLOCK_EFFECT)) !== 0) {
+                set_signal_status(effect2, DIRTY);
+                batch.schedule(effect2);
+              } else {
+                __privateGet(batch, _dirty_effects).add(effect2);
+              }
+            }
+          }
+        }
+        if (__privateGet(batch, _scheduled).length > 0 && !__privateGet(batch, _decrement_queued)) {
+          batch.apply();
+          for (var root7 of __privateMethod(_a2 = batch, _resolve, resolve_fn).call(_a2)) {
+            __privateMethod(_b = batch, _traverse, traverse_fn).call(_b, root7, [], []);
+          }
+        }
+        batch.deactivate();
+      }
     }
-    this.committed = true;
-    batches.delete(this);
+  };
+  _unlink = new WeakSet();
+  unlink_fn = function() {
+    if (!this.linked)
+      return;
+    var prev = __privateGet(this, _prev);
+    var next2 = __privateGet(this, _next);
+    if (prev === null) {
+      first_batch = next2;
+    } else {
+      __privateSet(prev, _next, next2);
+    }
+    if (next2 === null) {
+      last_batch = prev;
+    } else {
+      __privateSet(next2, _prev, prev);
+    }
+    this.linked = false;
   };
   var Batch = _Batch;
   function flushSync(fn) {
     var was_flushing_sync = is_flushing_sync;
+    var prev_previous_batch = previous_batch;
+    previous_batch = null;
     is_flushing_sync = true;
     try {
       var result;
       if (fn) {
-        if (current_batch !== null) {
-          flush_effects();
-        }
+        flushSync();
         result = fn();
       }
       while (true) {
         flush_tasks();
-        if (queued_root_effects.length === 0) {
-          current_batch?.flush();
-          if (queued_root_effects.length === 0) {
-            last_scheduled_effect = null;
-            return (
-              /** @type {T} */
-              result
-            );
-          }
+        if (current_batch === null) {
+          return (
+            /** @type {T} */
+            result
+          );
         }
-        flush_effects();
+        current_batch.flush();
       }
     } finally {
       is_flushing_sync = was_flushing_sync;
-    }
-  }
-  function flush_effects() {
-    is_flushing = true;
-    var source_stacks = dev_fallback_default ? /* @__PURE__ */ new Set() : null;
-    try {
-      var flush_count = 0;
-      while (queued_root_effects.length > 0) {
-        var batch = Batch.ensure();
-        if (flush_count++ > 1e3) {
-          if (dev_fallback_default) {
-            var updates = /* @__PURE__ */ new Map();
-            for (const source2 of batch.current.keys()) {
-              for (const [stack2, update2] of source2.updated ?? []) {
-                var entry = updates.get(stack2);
-                if (!entry) {
-                  entry = { error: update2.error, count: 0 };
-                  updates.set(stack2, entry);
-                }
-                entry.count += update2.count;
-              }
-            }
-            for (const update2 of updates.values()) {
-              if (update2.error) {
-                console.error(update2.error);
-              }
-            }
-          }
-          infinite_loop_guard();
-        }
-        batch.process(queued_root_effects);
-        old_values.clear();
-        if (dev_fallback_default) {
-          for (const source2 of batch.current.keys()) {
-            source_stacks.add(source2);
-          }
-        }
-      }
-    } finally {
-      queued_root_effects = [];
-      is_flushing = false;
-      last_scheduled_effect = null;
-      if (dev_fallback_default) {
-        for (
-          const source2 of
-          /** @type {Set<Source>} */
-          source_stacks
-        ) {
-          source2.updated = null;
-        }
-      }
+      previous_batch = prev_previous_batch;
     }
   }
   function infinite_loop_guard() {
+    if (dev_fallback_default) {
+      var updates = /* @__PURE__ */ new Map();
+      for (
+        const source2 of
+        /** @type {Batch} */
+        current_batch.current.keys()
+      ) {
+        for (const [stack2, update2] of source2.updated ?? []) {
+          var entry = updates.get(stack2);
+          if (!entry) {
+            entry = { error: update2.error, count: 0 };
+            updates.set(stack2, entry);
+          }
+          entry.count += update2.count;
+        }
+      }
+      for (const update2 of updates.values()) {
+        if (update2.error) {
+          console.error(update2.error);
+        }
+      }
+    }
     try {
       effect_update_depth_exceeded();
     } catch (error) {
@@ -1341,21 +2000,8 @@ ${component_stack}
     checked.set(reaction, false);
     return false;
   }
-  function schedule_effect(signal) {
-    var effect2 = last_scheduled_effect = signal;
-    while (effect2.parent !== null) {
-      effect2 = effect2.parent;
-      var flags2 = effect2.f;
-      if (is_flushing && effect2 === active_effect && (flags2 & BLOCK_EFFECT) !== 0 && (flags2 & HEAD_EFFECT) === 0) {
-        return;
-      }
-      if ((flags2 & (ROOT_EFFECT | BRANCH_EFFECT)) !== 0) {
-        if ((flags2 & CLEAN) === 0)
-          return;
-        effect2.f ^= CLEAN;
-      }
-    }
-    queued_root_effects.push(effect2);
+  function schedule_effect(effect2) {
+    current_batch.schedule(effect2);
   }
   function reset_branch(effect2, tracked) {
     if ((effect2.f & BRANCH_EFFECT) !== 0 && (effect2.f & CLEAN) !== 0) {
@@ -1373,743 +2019,12 @@ ${component_stack}
       e = e.next;
     }
   }
-
-  // node_modules/svelte/src/reactivity/create-subscriber.js
-  function createSubscriber(start) {
-    let subscribers = 0;
-    let version = source(0);
-    let stop;
-    if (dev_fallback_default) {
-      tag(version, "createSubscriber version");
-    }
-    return () => {
-      if (effect_tracking()) {
-        get(version);
-        render_effect(() => {
-          if (subscribers === 0) {
-            stop = untrack(() => start(() => increment(version)));
-          }
-          subscribers += 1;
-          return () => {
-            queue_micro_task(() => {
-              subscribers -= 1;
-              if (subscribers === 0) {
-                stop?.();
-                stop = void 0;
-                increment(version);
-              }
-            });
-          };
-        });
-      }
-    };
-  }
-
-  // node_modules/svelte/src/internal/client/dom/blocks/boundary.js
-  var flags = EFFECT_TRANSPARENT | EFFECT_PRESERVED;
-  function boundary(node, props, children) {
-    new Boundary(node, props, children);
-  }
-  var _anchor, _hydrate_open, _props, _children, _effect, _main_effect, _pending_effect, _failed_effect, _offscreen_fragment, _local_pending_count, _pending_count, _pending_count_update_queued, _dirty_effects2, _maybe_dirty_effects2, _effect_pending, _effect_pending_subscriber, _hydrate_resolved_content, hydrate_resolved_content_fn, _hydrate_pending_content, hydrate_pending_content_fn, _render, render_fn, _run, run_fn, _update_pending_count, update_pending_count_fn;
-  var Boundary = class {
-    /**
-     * @param {TemplateNode} node
-     * @param {BoundaryProps} props
-     * @param {((anchor: Node) => void)} children
-     */
-    constructor(node, props, children) {
-      __privateAdd(this, _hydrate_resolved_content);
-      __privateAdd(this, _hydrate_pending_content);
-      __privateAdd(this, _render);
-      /**
-       * @template T
-       * @param {() => T} fn
-       */
-      __privateAdd(this, _run);
-      /**
-       * Updates the pending count associated with the currently visible pending snippet,
-       * if any, such that we can replace the snippet with content once work is done
-       * @param {1 | -1} d
-       */
-      __privateAdd(this, _update_pending_count);
-      /** @type {Boundary | null} */
-      __publicField(this, "parent");
-      __publicField(this, "is_pending", false);
-      /** @type {TemplateNode} */
-      __privateAdd(this, _anchor, void 0);
-      /** @type {TemplateNode | null} */
-      __privateAdd(this, _hydrate_open, hydrating ? hydrate_node : null);
-      /** @type {BoundaryProps} */
-      __privateAdd(this, _props, void 0);
-      /** @type {((anchor: Node) => void)} */
-      __privateAdd(this, _children, void 0);
-      /** @type {Effect} */
-      __privateAdd(this, _effect, void 0);
-      /** @type {Effect | null} */
-      __privateAdd(this, _main_effect, null);
-      /** @type {Effect | null} */
-      __privateAdd(this, _pending_effect, null);
-      /** @type {Effect | null} */
-      __privateAdd(this, _failed_effect, null);
-      /** @type {DocumentFragment | null} */
-      __privateAdd(this, _offscreen_fragment, null);
-      __privateAdd(this, _local_pending_count, 0);
-      __privateAdd(this, _pending_count, 0);
-      __privateAdd(this, _pending_count_update_queued, false);
-      /** @type {Set<Effect>} */
-      __privateAdd(this, _dirty_effects2, /* @__PURE__ */ new Set());
-      /** @type {Set<Effect>} */
-      __privateAdd(this, _maybe_dirty_effects2, /* @__PURE__ */ new Set());
-      /**
-       * A source containing the number of pending async deriveds/expressions.
-       * Only created if `$effect.pending()` is used inside the boundary,
-       * otherwise updating the source results in needless `Batch.ensure()`
-       * calls followed by no-op flushes
-       * @type {Source<number> | null}
-       */
-      __privateAdd(this, _effect_pending, null);
-      __privateAdd(this, _effect_pending_subscriber, createSubscriber(() => {
-        __privateSet(this, _effect_pending, source(__privateGet(this, _local_pending_count)));
-        if (dev_fallback_default) {
-          tag(__privateGet(this, _effect_pending), "$effect.pending()");
-        }
-        return () => {
-          __privateSet(this, _effect_pending, null);
-        };
-      }));
-      __privateSet(this, _anchor, node);
-      __privateSet(this, _props, props);
-      __privateSet(this, _children, (anchor) => {
-        var effect2 = (
-          /** @type {Effect} */
-          active_effect
-        );
-        effect2.b = this;
-        effect2.f |= BOUNDARY_EFFECT;
-        children(anchor);
-      });
-      this.parent = /** @type {Effect} */
-      active_effect.b;
-      __privateSet(this, _effect, block(() => {
-        if (hydrating) {
-          const comment2 = (
-            /** @type {Comment} */
-            __privateGet(this, _hydrate_open)
-          );
-          hydrate_next();
-          if (comment2.data === HYDRATION_START_ELSE) {
-            __privateMethod(this, _hydrate_pending_content, hydrate_pending_content_fn).call(this);
-          } else {
-            __privateMethod(this, _hydrate_resolved_content, hydrate_resolved_content_fn).call(this);
-          }
-        } else {
-          __privateMethod(this, _render, render_fn).call(this);
-        }
-      }, flags));
-      if (hydrating) {
-        __privateSet(this, _anchor, hydrate_node);
-      }
-    }
-    /**
-     * Defer an effect inside a pending boundary until the boundary resolves
-     * @param {Effect} effect
-     */
-    defer_effect(effect2) {
-      defer_effect(effect2, __privateGet(this, _dirty_effects2), __privateGet(this, _maybe_dirty_effects2));
-    }
-    /**
-     * Returns `false` if the effect exists inside a boundary whose pending snippet is shown
-     * @returns {boolean}
-     */
-    is_rendered() {
-      return !this.is_pending && (!this.parent || this.parent.is_rendered());
-    }
-    has_pending_snippet() {
-      return !!__privateGet(this, _props).pending;
-    }
-    /**
-     * Update the source that powers `$effect.pending()` inside this boundary,
-     * and controls when the current `pending` snippet (if any) is removed.
-     * Do not call from inside the class
-     * @param {1 | -1} d
-     */
-    update_pending_count(d) {
-      __privateMethod(this, _update_pending_count, update_pending_count_fn).call(this, d);
-      __privateSet(this, _local_pending_count, __privateGet(this, _local_pending_count) + d);
-      if (!__privateGet(this, _effect_pending) || __privateGet(this, _pending_count_update_queued))
-        return;
-      __privateSet(this, _pending_count_update_queued, true);
-      queue_micro_task(() => {
-        __privateSet(this, _pending_count_update_queued, false);
-        if (__privateGet(this, _effect_pending)) {
-          internal_set(__privateGet(this, _effect_pending), __privateGet(this, _local_pending_count));
-        }
-      });
-    }
-    get_effect_pending() {
-      __privateGet(this, _effect_pending_subscriber).call(this);
-      return get(
-        /** @type {Source<number>} */
-        __privateGet(this, _effect_pending)
-      );
-    }
-    /** @param {unknown} error */
-    error(error) {
-      var onerror = __privateGet(this, _props).onerror;
-      let failed = __privateGet(this, _props).failed;
-      if (!onerror && !failed) {
-        throw error;
-      }
-      if (__privateGet(this, _main_effect)) {
-        destroy_effect(__privateGet(this, _main_effect));
-        __privateSet(this, _main_effect, null);
-      }
-      if (__privateGet(this, _pending_effect)) {
-        destroy_effect(__privateGet(this, _pending_effect));
-        __privateSet(this, _pending_effect, null);
-      }
-      if (__privateGet(this, _failed_effect)) {
-        destroy_effect(__privateGet(this, _failed_effect));
-        __privateSet(this, _failed_effect, null);
-      }
-      if (hydrating) {
-        set_hydrate_node(
-          /** @type {TemplateNode} */
-          __privateGet(this, _hydrate_open)
-        );
-        next();
-        set_hydrate_node(skip_nodes());
-      }
-      var did_reset = false;
-      var calling_on_error = false;
-      const reset2 = () => {
-        if (did_reset) {
-          svelte_boundary_reset_noop();
-          return;
-        }
-        did_reset = true;
-        if (calling_on_error) {
-          svelte_boundary_reset_onerror();
-        }
-        if (__privateGet(this, _failed_effect) !== null) {
-          pause_effect(__privateGet(this, _failed_effect), () => {
-            __privateSet(this, _failed_effect, null);
-          });
-        }
-        __privateMethod(this, _run, run_fn).call(this, () => {
-          Batch.ensure();
-          __privateMethod(this, _render, render_fn).call(this);
-        });
-      };
-      queue_micro_task(() => {
-        try {
-          calling_on_error = true;
-          onerror?.(error, reset2);
-          calling_on_error = false;
-        } catch (error2) {
-          invoke_error_boundary(error2, __privateGet(this, _effect) && __privateGet(this, _effect).parent);
-        }
-        if (failed) {
-          __privateSet(this, _failed_effect, __privateMethod(this, _run, run_fn).call(this, () => {
-            Batch.ensure();
-            try {
-              return branch(() => {
-                var effect2 = (
-                  /** @type {Effect} */
-                  active_effect
-                );
-                effect2.b = this;
-                effect2.f |= BOUNDARY_EFFECT;
-                failed(
-                  __privateGet(this, _anchor),
-                  () => error,
-                  () => reset2
-                );
-              });
-            } catch (error2) {
-              invoke_error_boundary(
-                error2,
-                /** @type {Effect} */
-                __privateGet(this, _effect).parent
-              );
-              return null;
-            }
-          }));
-        }
-      });
-    }
-  };
-  _anchor = new WeakMap();
-  _hydrate_open = new WeakMap();
-  _props = new WeakMap();
-  _children = new WeakMap();
-  _effect = new WeakMap();
-  _main_effect = new WeakMap();
-  _pending_effect = new WeakMap();
-  _failed_effect = new WeakMap();
-  _offscreen_fragment = new WeakMap();
-  _local_pending_count = new WeakMap();
-  _pending_count = new WeakMap();
-  _pending_count_update_queued = new WeakMap();
-  _dirty_effects2 = new WeakMap();
-  _maybe_dirty_effects2 = new WeakMap();
-  _effect_pending = new WeakMap();
-  _effect_pending_subscriber = new WeakMap();
-  _hydrate_resolved_content = new WeakSet();
-  hydrate_resolved_content_fn = function() {
-    try {
-      __privateSet(this, _main_effect, branch(() => __privateGet(this, _children).call(this, __privateGet(this, _anchor))));
-    } catch (error) {
-      this.error(error);
-    }
-  };
-  _hydrate_pending_content = new WeakSet();
-  hydrate_pending_content_fn = function() {
-    const pending2 = __privateGet(this, _props).pending;
-    if (!pending2)
-      return;
-    this.is_pending = true;
-    __privateSet(this, _pending_effect, branch(() => pending2(__privateGet(this, _anchor))));
-    queue_micro_task(() => {
-      var fragment = __privateSet(this, _offscreen_fragment, document.createDocumentFragment());
-      var anchor = create_text();
-      fragment.append(anchor);
-      __privateSet(this, _main_effect, __privateMethod(this, _run, run_fn).call(this, () => {
-        Batch.ensure();
-        return branch(() => __privateGet(this, _children).call(this, anchor));
-      }));
-      if (__privateGet(this, _pending_count) === 0) {
-        __privateGet(this, _anchor).before(fragment);
-        __privateSet(this, _offscreen_fragment, null);
-        pause_effect(
-          /** @type {Effect} */
-          __privateGet(this, _pending_effect),
-          () => {
-            __privateSet(this, _pending_effect, null);
-          }
-        );
-        this.is_pending = false;
-      }
-    });
-  };
-  _render = new WeakSet();
-  render_fn = function() {
-    try {
-      this.is_pending = this.has_pending_snippet();
-      __privateSet(this, _pending_count, 0);
-      __privateSet(this, _local_pending_count, 0);
-      __privateSet(this, _main_effect, branch(() => {
-        __privateGet(this, _children).call(this, __privateGet(this, _anchor));
-      }));
-      if (__privateGet(this, _pending_count) > 0) {
-        var fragment = __privateSet(this, _offscreen_fragment, document.createDocumentFragment());
-        move_effect(__privateGet(this, _main_effect), fragment);
-        const pending2 = (
-          /** @type {(anchor: Node) => void} */
-          __privateGet(this, _props).pending
-        );
-        __privateSet(this, _pending_effect, branch(() => pending2(__privateGet(this, _anchor))));
-      } else {
-        this.is_pending = false;
-      }
-    } catch (error) {
-      this.error(error);
-    }
-  };
-  _run = new WeakSet();
-  run_fn = function(fn) {
-    var previous_effect = active_effect;
-    var previous_reaction = active_reaction;
-    var previous_ctx = component_context;
-    set_active_effect(__privateGet(this, _effect));
-    set_active_reaction(__privateGet(this, _effect));
-    set_component_context(__privateGet(this, _effect).ctx);
-    try {
-      return fn();
-    } catch (e) {
-      handle_error(e);
-      return null;
-    } finally {
-      set_active_effect(previous_effect);
-      set_active_reaction(previous_reaction);
-      set_component_context(previous_ctx);
-    }
-  };
-  _update_pending_count = new WeakSet();
-  update_pending_count_fn = function(d) {
-    var _a2;
-    if (!this.has_pending_snippet()) {
-      if (this.parent) {
-        __privateMethod(_a2 = this.parent, _update_pending_count, update_pending_count_fn).call(_a2, d);
-      }
-      return;
-    }
-    __privateSet(this, _pending_count, __privateGet(this, _pending_count) + d);
-    if (__privateGet(this, _pending_count) === 0) {
-      this.is_pending = false;
-      for (const e of __privateGet(this, _dirty_effects2)) {
-        set_signal_status(e, DIRTY);
-        schedule_effect(e);
-      }
-      for (const e of __privateGet(this, _maybe_dirty_effects2)) {
-        set_signal_status(e, MAYBE_DIRTY);
-        schedule_effect(e);
-      }
-      __privateGet(this, _dirty_effects2).clear();
-      __privateGet(this, _maybe_dirty_effects2).clear();
-      if (__privateGet(this, _pending_effect)) {
-        pause_effect(__privateGet(this, _pending_effect), () => {
-          __privateSet(this, _pending_effect, null);
-        });
-      }
-      if (__privateGet(this, _offscreen_fragment)) {
-        __privateGet(this, _anchor).before(__privateGet(this, _offscreen_fragment));
-        __privateSet(this, _offscreen_fragment, null);
-      }
-    }
-  };
-
-  // node_modules/svelte/src/internal/client/reactivity/async.js
-  function flatten(blockers, sync, async2, fn) {
-    const d = is_runes() ? derived : derived_safe_equal;
-    var pending2 = blockers.filter((b) => !b.settled);
-    if (async2.length === 0 && pending2.length === 0) {
-      fn(sync.map(d));
-      return;
-    }
-    var batch = current_batch;
-    var parent = (
-      /** @type {Effect} */
-      active_effect
-    );
-    var restore = capture();
-    var blocker_promise = pending2.length === 1 ? pending2[0].promise : pending2.length > 1 ? Promise.all(pending2.map((b) => b.promise)) : null;
-    function finish(values) {
-      restore();
-      try {
-        fn(values);
-      } catch (error) {
-        if ((parent.f & DESTROYED) === 0) {
-          invoke_error_boundary(error, parent);
-        }
-      }
-      batch?.deactivate();
-      unset_context();
-    }
-    if (async2.length === 0) {
-      blocker_promise.then(() => finish(sync.map(d)));
-      return;
-    }
-    function run3() {
-      restore();
-      Promise.all(async2.map((expression) => async_derived(expression))).then((result) => finish([...sync.map(d), ...result])).catch((error) => invoke_error_boundary(error, parent));
-    }
-    if (blocker_promise) {
-      blocker_promise.then(run3);
-    } else {
-      run3();
-    }
-  }
-  function capture() {
-    var previous_effect = active_effect;
-    var previous_reaction = active_reaction;
-    var previous_component_context = component_context;
-    var previous_batch2 = current_batch;
-    if (dev_fallback_default) {
-      var previous_dev_stack = dev_stack;
-    }
-    return function restore(activate_batch = true) {
-      set_active_effect(previous_effect);
-      set_active_reaction(previous_reaction);
-      set_component_context(previous_component_context);
-      if (activate_batch)
-        previous_batch2?.activate();
-      if (dev_fallback_default) {
-        set_from_async_derived(null);
-        set_dev_stack(previous_dev_stack);
-      }
-    };
-  }
-  function unset_context() {
-    set_active_effect(null);
-    set_active_reaction(null);
-    set_component_context(null);
-    if (dev_fallback_default) {
-      set_from_async_derived(null);
-      set_dev_stack(null);
-    }
-  }
-
-  // node_modules/svelte/src/internal/client/reactivity/deriveds.js
-  var current_async_effect = null;
-  function set_from_async_derived(v) {
-    current_async_effect = v;
-  }
-  var recent_async_deriveds = /* @__PURE__ */ new Set();
-  // @__NO_SIDE_EFFECTS__
-  function derived(fn) {
-    var flags2 = DERIVED | DIRTY;
-    var parent_derived = active_reaction !== null && (active_reaction.f & DERIVED) !== 0 ? (
-      /** @type {Derived} */
-      active_reaction
-    ) : null;
-    if (active_effect !== null) {
-      active_effect.f |= EFFECT_PRESERVED;
-    }
-    const signal = {
-      ctx: component_context,
-      deps: null,
-      effects: null,
-      equals,
-      f: flags2,
-      fn,
-      reactions: null,
-      rv: 0,
-      v: (
-        /** @type {V} */
-        UNINITIALIZED
-      ),
-      wv: 0,
-      parent: parent_derived ?? active_effect,
-      ac: null
-    };
-    if (dev_fallback_default && tracing_mode_flag) {
-      signal.created = get_error("created at");
-    }
-    return signal;
-  }
-  // @__NO_SIDE_EFFECTS__
-  function async_derived(fn, label, location) {
-    let parent = (
-      /** @type {Effect | null} */
-      active_effect
-    );
-    if (parent === null) {
-      async_derived_orphan();
-    }
-    var boundary2 = (
-      /** @type {Boundary} */
-      parent.b
-    );
-    var promise = (
-      /** @type {Promise<V>} */
-      /** @type {unknown} */
-      void 0
-    );
-    var signal = source(
-      /** @type {V} */
-      UNINITIALIZED
-    );
-    if (dev_fallback_default)
-      signal.label = label;
-    var should_suspend = !active_reaction;
-    var deferreds = /* @__PURE__ */ new Map();
-    async_effect(() => {
-      if (dev_fallback_default)
-        current_async_effect = active_effect;
-      var d = deferred();
-      promise = d.promise;
-      try {
-        Promise.resolve(fn()).then(d.resolve, d.reject).then(() => {
-          if (batch === current_batch && batch.committed) {
-            batch.deactivate();
-          }
-          unset_context();
-        });
-      } catch (error) {
-        d.reject(error);
-        unset_context();
-      }
-      if (dev_fallback_default)
-        current_async_effect = null;
-      var batch = (
-        /** @type {Batch} */
-        current_batch
-      );
-      if (should_suspend) {
-        var blocking = boundary2.is_rendered();
-        boundary2.update_pending_count(1);
-        batch.increment(blocking);
-        deferreds.get(batch)?.reject(STALE_REACTION);
-        deferreds.delete(batch);
-        deferreds.set(batch, d);
-      }
-      const handler = (value, error = void 0) => {
-        current_async_effect = null;
-        batch.activate();
-        if (error) {
-          if (error !== STALE_REACTION) {
-            signal.f |= ERROR_VALUE;
-            internal_set(signal, error);
-          }
-        } else {
-          if ((signal.f & ERROR_VALUE) !== 0) {
-            signal.f ^= ERROR_VALUE;
-          }
-          internal_set(signal, value);
-          for (const [b, d2] of deferreds) {
-            deferreds.delete(b);
-            if (b === batch)
-              break;
-            d2.reject(STALE_REACTION);
-          }
-          if (dev_fallback_default && location !== void 0) {
-            recent_async_deriveds.add(signal);
-            setTimeout(() => {
-              if (recent_async_deriveds.has(signal)) {
-                await_waterfall(
-                  /** @type {string} */
-                  signal.label,
-                  location
-                );
-                recent_async_deriveds.delete(signal);
-              }
-            });
-          }
-        }
-        if (should_suspend) {
-          boundary2.update_pending_count(-1);
-          batch.decrement(blocking);
-        }
-      };
-      d.promise.then(handler, (e) => handler(null, e || "unknown"));
-    });
-    teardown(() => {
-      for (const d of deferreds.values()) {
-        d.reject(STALE_REACTION);
-      }
-    });
-    if (dev_fallback_default) {
-      signal.f |= ASYNC;
-    }
-    return new Promise((fulfil) => {
-      function next2(p) {
-        function go() {
-          if (p === promise) {
-            fulfil(signal);
-          } else {
-            next2(promise);
-          }
-        }
-        p.then(go, go);
-      }
-      next2(promise);
-    });
-  }
-  // @__NO_SIDE_EFFECTS__
-  function user_derived(fn) {
-    const d = /* @__PURE__ */ derived(fn);
-    if (!async_mode_flag)
-      push_reaction_value(d);
-    return d;
-  }
-  // @__NO_SIDE_EFFECTS__
-  function derived_safe_equal(fn) {
-    const signal = /* @__PURE__ */ derived(fn);
-    signal.equals = safe_equals;
-    return signal;
-  }
-  function destroy_derived_effects(derived2) {
-    var effects = derived2.effects;
-    if (effects !== null) {
-      derived2.effects = null;
-      for (var i = 0; i < effects.length; i += 1) {
-        destroy_effect(
-          /** @type {Effect} */
-          effects[i]
-        );
-      }
-    }
-  }
-  var stack = [];
-  function get_derived_parent_effect(derived2) {
-    var parent = derived2.parent;
-    while (parent !== null) {
-      if ((parent.f & DERIVED) === 0) {
-        return (parent.f & DESTROYED) === 0 ? (
-          /** @type {Effect} */
-          parent
-        ) : null;
-      }
-      parent = parent.parent;
-    }
-    return null;
-  }
-  function execute_derived(derived2) {
-    var value;
-    var prev_active_effect = active_effect;
-    set_active_effect(get_derived_parent_effect(derived2));
-    if (dev_fallback_default) {
-      let prev_eager_effects = eager_effects;
-      set_eager_effects(/* @__PURE__ */ new Set());
-      try {
-        if (includes.call(stack, derived2)) {
-          derived_references_self();
-        }
-        stack.push(derived2);
-        derived2.f &= ~WAS_MARKED;
-        destroy_derived_effects(derived2);
-        value = update_reaction(derived2);
-      } finally {
-        set_active_effect(prev_active_effect);
-        set_eager_effects(prev_eager_effects);
-        stack.pop();
-      }
-    } else {
-      try {
-        derived2.f &= ~WAS_MARKED;
-        destroy_derived_effects(derived2);
-        value = update_reaction(derived2);
-      } finally {
-        set_active_effect(prev_active_effect);
-      }
-    }
-    return value;
-  }
-  function update_derived(derived2) {
-    var value = execute_derived(derived2);
-    if (!derived2.equals(value)) {
-      derived2.wv = increment_write_version();
-      if (!current_batch?.is_fork || derived2.deps === null) {
-        derived2.v = value;
-        if (derived2.deps === null) {
-          set_signal_status(derived2, CLEAN);
-          return;
-        }
-      }
-    }
-    if (is_destroying_effect) {
-      return;
-    }
-    if (batch_values !== null) {
-      if (effect_tracking() || current_batch?.is_fork) {
-        batch_values.set(derived2, value);
-      }
-    } else {
-      update_derived_status(derived2);
-    }
-  }
-  function freeze_derived_effects(derived2) {
-    if (derived2.effects === null)
-      return;
-    for (const e of derived2.effects) {
-      if (e.teardown || e.ac) {
-        e.teardown?.();
-        e.ac?.abort(STALE_REACTION);
-        e.teardown = noop;
-        e.ac = null;
-        remove_reactions(e, 0);
-        destroy_effect_children(e);
-      }
-    }
-  }
-  function unfreeze_derived_effects(derived2) {
-    if (derived2.effects === null)
-      return;
-    for (const e of derived2.effects) {
-      if (e.teardown) {
-        update_effect(e);
-      }
+  function reset_all(effect2) {
+    set_signal_status(effect2, CLEAN);
+    var e = effect2.first;
+    while (e !== null) {
+      reset_all(e);
+      e = e.next;
     }
   }
 
@@ -2162,7 +2077,7 @@ ${component_stack}
   function set(source2, value, should_proxy = false) {
     if (active_reaction !== null && // since we are untracking the function inside `$inspect.with` we need to add this check
     // to ensure we error if state is set inside an inspect effect
-    (!untracking || (active_reaction.f & EAGER_EFFECT) !== 0) && is_runes() && (active_reaction.f & (DERIVED | BLOCK_EFFECT | ASYNC | EAGER_EFFECT)) !== 0 && (current_sources === null || !includes.call(current_sources, source2))) {
+    (!untracking || (active_reaction.f & EAGER_EFFECT) !== 0) && is_runes() && (active_reaction.f & (DERIVED | BLOCK_EFFECT | ASYNC | EAGER_EFFECT)) !== 0 && (current_sources === null || !current_sources.has(source2))) {
       state_unsafe_mutation();
     }
     let new_value = should_proxy ? proxy(value) : value;
@@ -2173,19 +2088,19 @@ ${component_stack}
         source2.label
       );
     }
-    return internal_set(source2, new_value);
+    return internal_set(source2, new_value, legacy_updates);
   }
-  function internal_set(source2, value) {
+  var seen = null;
+  var count_deps = 0;
+  function internal_set(source2, value, updated_during_traversal = null) {
     if (!source2.equals(value)) {
-      var old_value = source2.v;
       if (is_destroying_effect) {
         old_values.set(source2, value);
-      } else {
-        old_values.set(source2, old_value);
+      } else if (!old_values.has(source2)) {
+        old_values.set(source2, source2.v);
       }
-      source2.v = value;
       var batch = Batch.ensure();
-      batch.capture(source2, old_value);
+      batch.capture(source2, value);
       if (dev_fallback_default) {
         if (tracing_mode_flag || active_effect !== null) {
           source2.updated ?? (source2.updated = /* @__PURE__ */ new Map());
@@ -2218,10 +2133,15 @@ ${component_stack}
         if ((source2.f & DIRTY) !== 0) {
           execute_derived(derived2);
         }
-        update_derived_status(derived2);
+        if (batch_values === null) {
+          update_derived_status(derived2);
+        }
       }
       source2.wv = increment_write_version();
-      mark_reactions(source2, DIRTY);
+      seen = null;
+      count_deps = 0;
+      mark_reactions(source2, DIRTY, updated_during_traversal);
+      seen = null;
       if (is_runes() && active_effect !== null && (active_effect.f & CLEAN) !== 0 && (active_effect.f & (BRANCH_EFFECT | ROOT_EFFECT)) === 0) {
         if (untracked_writes === null) {
           set_untracked_writes([source2]);
@@ -2241,7 +2161,13 @@ ${component_stack}
       if ((effect2.f & CLEAN) !== 0) {
         set_signal_status(effect2, MAYBE_DIRTY);
       }
-      if (is_dirty(effect2)) {
+      let dirty;
+      try {
+        dirty = is_dirty(effect2);
+      } catch {
+        dirty = true;
+      }
+      if (dirty) {
         update_effect(effect2);
       }
     }
@@ -2250,48 +2176,54 @@ ${component_stack}
   function increment(source2) {
     set(source2, source2.v + 1);
   }
-  function mark_reactions(signal, status) {
+  function mark_reactions(signal, status, updated_during_traversal) {
     var reactions = signal.reactions;
     if (reactions === null)
       return;
     var runes = is_runes();
     var length = reactions.length;
+    count_deps += length;
+    if (count_deps > 1e5 && seen === null)
+      seen = /* @__PURE__ */ new Set();
+    if (seen !== null) {
+      if (seen.has(signal))
+        return;
+      seen.add(signal);
+    }
     for (var i = 0; i < length; i++) {
       var reaction = reactions[i];
       var flags2 = reaction.f;
       if (!runes && reaction === active_effect)
         continue;
-      if (dev_fallback_default && (flags2 & EAGER_EFFECT) !== 0) {
-        eager_effects.add(reaction);
-        continue;
-      }
       var not_dirty = (flags2 & DIRTY) === 0;
       if (not_dirty) {
         set_signal_status(reaction, status);
       }
-      if ((flags2 & DERIVED) !== 0) {
+      if ((flags2 & EAGER_EFFECT) !== 0) {
+        eager_effects.add(
+          /** @type {Effect} */
+          reaction
+        );
+      } else if ((flags2 & DERIVED) !== 0) {
         var derived2 = (
           /** @type {Derived} */
           reaction
         );
         batch_values?.delete(derived2);
-        if ((flags2 & WAS_MARKED) === 0) {
-          if (flags2 & CONNECTED) {
-            reaction.f |= WAS_MARKED;
-          }
-          mark_reactions(derived2, MAYBE_DIRTY);
-        }
+        mark_reactions(derived2, MAYBE_DIRTY, updated_during_traversal);
       } else if (not_dirty) {
-        if ((flags2 & BLOCK_EFFECT) !== 0 && eager_block_effects !== null) {
-          eager_block_effects.add(
-            /** @type {Effect} */
-            reaction
-          );
-        }
-        schedule_effect(
+        var effect2 = (
           /** @type {Effect} */
           reaction
         );
+        if ((flags2 & BLOCK_EFFECT) !== 0 && eager_block_effects !== null) {
+          eager_block_effects.add(effect2);
+        }
+        if (updated_during_traversal !== null) {
+          updated_during_traversal.push(effect2);
+        } else {
+          schedule_effect(effect2);
+        }
       }
     }
   }
@@ -2299,7 +2231,7 @@ ${component_stack}
   // node_modules/svelte/src/internal/client/proxy.js
   var regex_is_valid_identifier = /^[a-zA-Z_$][a-zA-Z_$0-9]*$/;
   function proxy(value) {
-    if (typeof value !== "object" || value === null || STATE_SYMBOL in value) {
+    if (typeof value !== "object" || value === null || STATE_SYMBOL in value || COMPONENT_SYMBOL in value) {
       return value;
     }
     const prototype = get_prototype_of(value);
@@ -2418,15 +2350,17 @@ ${component_stack}
           return Reflect.get(target, prop2, receiver);
         },
         getOwnPropertyDescriptor(target, prop2) {
+          this.has?.(target, prop2);
           var descriptor = Reflect.getOwnPropertyDescriptor(target, prop2);
-          if (descriptor && "value" in descriptor) {
-            var s = sources.get(prop2);
-            if (s)
-              descriptor.value = get(s);
-          } else if (descriptor === void 0) {
-            var source2 = sources.get(prop2);
-            var value2 = source2?.v;
-            if (source2 !== void 0 && value2 !== UNINITIALIZED) {
+          var s = sources.get(prop2);
+          if (s !== void 0) {
+            var value2 = get(s);
+            if (value2 === UNINITIALIZED) {
+              return void 0;
+            }
+            if (descriptor && "value" in descriptor) {
+              descriptor.value = value2;
+            } else {
               return {
                 enumerable: true,
                 configurable: true,
@@ -2649,14 +2583,13 @@ ${component_stack}
     first_child_getter = get_descriptor(node_prototype, "firstChild").get;
     next_sibling_getter = get_descriptor(node_prototype, "nextSibling").get;
     if (is_extensible(element_prototype)) {
-      element_prototype.__click = void 0;
-      element_prototype.__className = void 0;
-      element_prototype.__attributes = null;
-      element_prototype.__style = void 0;
+      element_prototype[CLASS_CACHE] = void 0;
+      element_prototype[ATTRIBUTES_CACHE] = null;
+      element_prototype[STYLE_CACHE] = void 0;
       element_prototype.__e = void 0;
     }
     if (is_extensible(text_prototype)) {
-      text_prototype.__t = void 0;
+      text_prototype[TEXT_CACHE] = void 0;
     }
     if (dev_fallback_default) {
       element_prototype.__svelte_meta = null;
@@ -2723,6 +2656,14 @@ ${component_stack}
     }
     return hydrate_node;
   }
+  function only_child(node, is_text = false) {
+    if (!hydrating) {
+      return /* @__PURE__ */ get_first_child(node);
+    }
+    var first = child(node, is_text);
+    reset(node);
+    return first;
+  }
   function sibling(node, count = 1, is_text = false) {
     let next_sibling = hydrating ? hydrate_node : node;
     var last_sibling;
@@ -2768,10 +2709,15 @@ ${component_stack}
     return (flags2 & REACTION_RAN) !== 0;
   }
   function create_element(tag2, namespace, is2) {
-    let options = is2 ? { is: is2 } : void 0;
+    if (namespace == null || namespace === NAMESPACE_HTML) {
+      return (
+        /** @type {T extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[T] : Element} */
+        is2 ? document.createElement(tag2, { is: is2 }) : document.createElement(tag2)
+      );
+    }
     return (
       /** @type {T extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[T] : Element} */
-      document.createElementNS(namespace ?? NAMESPACE_HTML, tag2, options)
+      is2 ? document.createElementNS(namespace, tag2, { is: is2 }) : document.createElementNS(namespace, tag2)
     );
   }
   function merge_text_nodes(text2) {
@@ -2790,57 +2736,81 @@ ${component_stack}
     }
   }
 
-  // node_modules/svelte/src/internal/client/dom/elements/misc.js
-  var listening_to_form_reset = false;
-  function add_form_reset_listener() {
-    if (!listening_to_form_reset) {
-      listening_to_form_reset = true;
-      document.addEventListener(
-        "reset",
-        (evt) => {
-          Promise.resolve().then(() => {
-            if (!evt.defaultPrevented) {
-              for (
-                const e of
-                /**@type {HTMLFormElement} */
-                evt.target.elements
-              ) {
-                e.__on_r?.();
-              }
-            }
-          });
-        },
-        // In the capture phase to guarantee we get noticed of it (no possibility of stopPropagation)
-        { capture: true }
-      );
+  // node_modules/svelte/src/internal/client/error-handling.js
+  var adjustments = /* @__PURE__ */ new WeakMap();
+  function handle_error(error) {
+    var effect2 = active_effect;
+    if (effect2 === null) {
+      active_reaction.f |= ERROR_VALUE;
+      return error;
     }
+    if (dev_fallback_default && error instanceof Error && !adjustments.has(error)) {
+      adjustments.set(error, get_adjustments(error, effect2));
+    }
+    if ((effect2.f & REACTION_RAN) === 0 && (effect2.f & EFFECT) === 0) {
+      if (dev_fallback_default && !effect2.parent && error instanceof Error) {
+        apply_adjustments(error);
+      }
+      throw error;
+    }
+    invoke_error_boundary(error, effect2);
   }
-
-  // node_modules/svelte/src/internal/client/dom/elements/bindings/shared.js
-  function without_reactive_context(fn) {
-    var previous_reaction = active_reaction;
-    var previous_effect = active_effect;
-    set_active_reaction(null);
-    set_active_effect(null);
-    try {
-      return fn();
-    } finally {
-      set_active_reaction(previous_reaction);
-      set_active_effect(previous_effect);
+  function invoke_error_boundary(error, effect2) {
+    if (error === HYDRATION_ERROR) {
+      throw error;
     }
+    if (effect2 !== null && (effect2.f & DESTROYED) !== 0) {
+      return;
+    }
+    while (effect2 !== null) {
+      if ((effect2.f & BOUNDARY_EFFECT) !== 0 && (effect2.f & (DESTROYED | DESTROYING)) === 0) {
+        if ((effect2.f & REACTION_RAN) === 0) {
+          throw error;
+        }
+        try {
+          effect2.b.error(error);
+          return;
+        } catch (e) {
+          error = e;
+        }
+      }
+      effect2 = effect2.parent;
+    }
+    if (dev_fallback_default && error instanceof Error) {
+      apply_adjustments(error);
+    }
+    throw error;
   }
-  function listen_to_event_and_reset_event(element2, event2, handler, on_reset = handler) {
-    element2.addEventListener(event2, () => without_reactive_context(handler));
-    const prev = element2.__on_r;
-    if (prev) {
-      element2.__on_r = () => {
-        prev();
-        on_reset(true);
-      };
-    } else {
-      element2.__on_r = () => on_reset(true);
+  function get_adjustments(error, effect2) {
+    const message_descriptor = get_descriptor(error, "message");
+    if (message_descriptor && !message_descriptor.configurable)
+      return;
+    var indent = is_firefox ? "  " : "	";
+    var component_stack = `
+${indent}in ${effect2.fn?.name || "<unknown>"}`;
+    var context = effect2.ctx;
+    while (context !== null) {
+      component_stack += `
+${indent}in ${context.function?.[FILENAME].split("/").pop()}`;
+      context = context.p;
     }
-    add_form_reset_listener();
+    return {
+      message: error.message + `
+${component_stack}
+`,
+      stack: error.stack?.split("\n").filter((line) => !line.includes("svelte/src/internal")).join("\n")
+    };
+  }
+  function apply_adjustments(error) {
+    const adjusted = adjustments.get(error);
+    if (adjusted) {
+      define_property(error, "message", {
+        value: adjusted.message
+      });
+      define_property(error, "stack", {
+        value: adjusted.stack
+      });
+    }
   }
 
   // node_modules/svelte/src/internal/client/reactivity/effects.js
@@ -2865,7 +2835,7 @@ ${component_stack}
       parent_effect.last = effect2;
     }
   }
-  function create_effect(type, fn, sync) {
+  function create_effect(type, fn) {
     var parent = active_effect;
     if (dev_fallback_default) {
       while (parent !== null && (parent.f & EAGER_EFFECT) !== 0) {
@@ -2894,22 +2864,27 @@ ${component_stack}
     if (dev_fallback_default) {
       effect2.component_function = dev_current_component_function;
     }
-    if (sync) {
+    current_batch?.register_created_effect(effect2);
+    var e = effect2;
+    if ((type & EFFECT) !== 0) {
+      if (collected_effects !== null) {
+        collected_effects.push(effect2);
+      } else {
+        Batch.ensure().schedule(effect2);
+      }
+    } else if (fn !== null) {
       try {
         update_effect(effect2);
       } catch (e2) {
         destroy_effect(effect2);
         throw e2;
       }
-    } else if (fn !== null) {
-      schedule_effect(effect2);
-    }
-    var e = effect2;
-    if (sync && e.deps === null && e.teardown === null && e.nodes === null && e.first === e.last && // either `null`, or a singular child
-    (e.f & EFFECT_PRESERVED) === 0) {
-      e = e.first;
-      if ((type & BLOCK_EFFECT) !== 0 && (type & EFFECT_TRANSPARENT) !== 0 && e !== null) {
-        e.f |= EFFECT_TRANSPARENT;
+      if (e.deps === null && e.teardown === null && e.nodes === null && e.first === e.last && // either `null`, or a singular child
+      (e.f & EFFECT_PRESERVED) === 0) {
+        e = e.first;
+        if ((type & BLOCK_EFFECT) !== 0 && (type & EFFECT_TRANSPARENT) !== 0 && e !== null) {
+          e.f |= EFFECT_TRANSPARENT;
+        }
       }
     }
     if (e !== null) {
@@ -2931,7 +2906,7 @@ ${component_stack}
     return active_reaction !== null && !untracking;
   }
   function teardown(fn) {
-    const effect2 = create_effect(RENDER_EFFECT, null, false);
+    const effect2 = create_effect(RENDER_EFFECT, null);
     set_signal_status(effect2, CLEAN);
     effect2.teardown = fn;
     return effect2;
@@ -2947,7 +2922,7 @@ ${component_stack}
       /** @type {Effect} */
       active_effect.f
     );
-    var defer = !active_reaction && (flags2 & BRANCH_EFFECT) !== 0 && (flags2 & REACTION_RAN) === 0;
+    var defer = !active_reaction && (flags2 & BRANCH_EFFECT) !== 0 && component_context !== null && !component_context.i;
     if (defer) {
       var context = (
         /** @type {ComponentContext} */
@@ -2959,18 +2934,18 @@ ${component_stack}
     }
   }
   function create_user_effect(fn) {
-    return create_effect(EFFECT | USER_EFFECT, fn, false);
+    return create_effect(EFFECT | USER_EFFECT, fn);
   }
   function effect_root(fn) {
     Batch.ensure();
-    const effect2 = create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn, true);
+    const effect2 = create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn);
     return () => {
       destroy_effect(effect2);
     };
   }
   function component_root(fn) {
     Batch.ensure();
-    const effect2 = create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn, true);
+    const effect2 = create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn);
     return (options = {}) => {
       return new Promise((fulfil) => {
         if (options.outro) {
@@ -2986,28 +2961,30 @@ ${component_stack}
     };
   }
   function effect(fn) {
-    return create_effect(EFFECT, fn, false);
+    return create_effect(EFFECT, fn);
   }
   function async_effect(fn) {
-    return create_effect(ASYNC | EFFECT_PRESERVED, fn, true);
+    return create_effect(ASYNC | EFFECT_PRESERVED, fn);
   }
   function render_effect(fn, flags2 = 0) {
-    return create_effect(RENDER_EFFECT | flags2, fn, true);
+    return create_effect(RENDER_EFFECT | flags2, fn);
   }
   function template_effect(fn, sync = [], async2 = [], blockers = []) {
     flatten(blockers, sync, async2, (values) => {
-      create_effect(RENDER_EFFECT, () => fn(...values.map(get)), true);
+      create_effect(RENDER_EFFECT, () => {
+        fn(...values.map(get));
+      });
     });
   }
   function block(fn, flags2 = 0) {
-    var effect2 = create_effect(BLOCK_EFFECT | flags2, fn, true);
+    var effect2 = create_effect(BLOCK_EFFECT | flags2, fn);
     if (dev_fallback_default) {
       effect2.dev_stack = dev_stack;
     }
     return effect2;
   }
   function branch(fn) {
-    return create_effect(BRANCH_EFFECT | EFFECT_PRESERVED, fn, true);
+    return create_effect(BRANCH_EFFECT | EFFECT_PRESERVED, fn);
   }
   function execute_effect_teardown(effect2) {
     var teardown2 = effect2.teardown;
@@ -3018,6 +2995,8 @@ ${component_stack}
       set_active_reaction(null);
       try {
         teardown2.call(null);
+      } catch (error) {
+        invoke_error_boundary(error, effect2.parent);
       } finally {
         set_is_destroying_effect(previously_destroying_effect);
         set_active_reaction(previous_reaction);
@@ -3063,9 +3042,9 @@ ${component_stack}
       );
       removed = true;
     }
+    effect2.f |= DESTROYING;
     destroy_effect_children(effect2, remove_dom && !removed);
     remove_reactions(effect2, 0);
-    set_signal_status(effect2, DESTROYED);
     var transitions = effect2.nodes && effect2.nodes.t;
     if (transitions !== null) {
       for (const transition2 of transitions) {
@@ -3073,6 +3052,8 @@ ${component_stack}
       }
     }
     execute_effect_teardown(effect2);
+    effect2.f ^= DESTROYING;
+    effect2.f |= DESTROYED;
     var parent = effect2.parent;
     if (parent !== null && parent.first !== null) {
       unlink_effect(effect2);
@@ -3080,7 +3061,7 @@ ${component_stack}
     if (dev_fallback_default) {
       effect2.component_function = null;
     }
-    effect2.next = effect2.prev = effect2.teardown = effect2.ctx = effect2.deps = effect2.fn = effect2.nodes = effect2.ac = null;
+    effect2.next = effect2.prev = effect2.teardown = effect2.ctx = effect2.deps = effect2.fn = effect2.nodes = effect2.ac = effect2.b = null;
   }
   function remove_effect_dom(node, end) {
     while (node !== null) {
@@ -3106,6 +3087,7 @@ ${component_stack}
   }
   function pause_effect(effect2, callback, destroy = true) {
     var transitions = [];
+    effect2.f |= PAUSED;
     pause_children(effect2, transitions, true);
     var fn = () => {
       if (destroy)
@@ -3138,24 +3120,29 @@ ${component_stack}
     var child2 = effect2.first;
     while (child2 !== null) {
       var sibling2 = child2.next;
-      var transparent = (child2.f & EFFECT_TRANSPARENT) !== 0 || // If this is a branch effect without a block effect parent,
-      // it means the parent block effect was pruned. In that case,
-      // transparency information was transferred to the branch effect.
-      (child2.f & BRANCH_EFFECT) !== 0 && (effect2.f & BLOCK_EFFECT) !== 0;
-      pause_children(child2, transitions, transparent ? local : false);
+      if ((child2.f & ROOT_EFFECT) === 0) {
+        var transparent = (child2.f & EFFECT_TRANSPARENT) !== 0 || // If this is a branch effect without a block effect parent,
+        // it means the parent block effect was pruned. In that case,
+        // transparency information was transferred to the branch effect.
+        (child2.f & BRANCH_EFFECT) !== 0 && (effect2.f & BLOCK_EFFECT) !== 0;
+        pause_children(child2, transitions, transparent ? local : false);
+      }
       child2 = sibling2;
     }
   }
   function resume_effect(effect2) {
+    effect2.f &= ~PAUSED;
     resume_children(effect2, true);
   }
   function resume_children(effect2, local) {
+    if ((effect2.f & PAUSED) !== 0)
+      return;
     if ((effect2.f & INERT) === 0)
       return;
     effect2.f ^= INERT;
     if ((effect2.f & CLEAN) === 0) {
       set_signal_status(effect2, DIRTY);
-      schedule_effect(effect2);
+      Batch.ensure().schedule(effect2);
     }
     var child2 = effect2.first;
     while (child2 !== null) {
@@ -3189,7 +3176,6 @@ ${component_stack}
   var captured_signals = null;
 
   // node_modules/svelte/src/internal/client/runtime.js
-  var is_updating_effect = false;
   var is_destroying_effect = false;
   function set_is_destroying_effect(value) {
     is_destroying_effect = value;
@@ -3205,12 +3191,8 @@ ${component_stack}
   }
   var current_sources = null;
   function push_reaction_value(value) {
-    if (active_reaction !== null && (!async_mode_flag || (active_reaction.f & DERIVED) !== 0)) {
-      if (current_sources === null) {
-        current_sources = [value];
-      } else {
-        current_sources.push(value);
-      }
+    if (active_reaction !== null && (!async_mode_flag && (active_reaction.f & REACTION_IS_UPDATING) !== 0 || (active_reaction.f & DERIVED) !== 0)) {
+      (current_sources ?? (current_sources = /* @__PURE__ */ new Set())).add(value);
     }
   }
   var new_deps = null;
@@ -3232,9 +3214,6 @@ ${component_stack}
     var flags2 = reaction.f;
     if ((flags2 & DIRTY) !== 0) {
       return true;
-    }
-    if (flags2 & DERIVED) {
-      reaction.f &= ~WAS_MARKED;
     }
     if ((flags2 & MAYBE_DIRTY) !== 0) {
       var dependencies = (
@@ -3265,11 +3244,11 @@ ${component_stack}
     }
     return false;
   }
-  function schedule_possible_effect_self_invalidation(signal, effect2, root6 = true) {
+  function schedule_possible_effect_self_invalidation(signal, effect2, root7 = true) {
     var reactions = signal.reactions;
     if (reactions === null)
       return;
-    if (!async_mode_flag && current_sources !== null && includes.call(current_sources, signal)) {
+    if (!async_mode_flag && current_sources !== null && current_sources.has(signal)) {
       return;
     }
     for (var i = 0; i < reactions.length; i++) {
@@ -3282,7 +3261,7 @@ ${component_stack}
           false
         );
       } else if (effect2 === reaction) {
-        if (root6) {
+        if (root7) {
           set_signal_status(reaction, DIRTY);
         } else if ((reaction.f & CLEAN) !== 0) {
           set_signal_status(reaction, MAYBE_DIRTY);
@@ -3295,7 +3274,6 @@ ${component_stack}
     }
   }
   function update_reaction(reaction) {
-    var _a2;
     var previous_deps = new_deps;
     var previous_skipped_deps = skipped_deps;
     var previous_untracked_writes = untracked_writes;
@@ -3328,32 +3306,9 @@ ${component_stack}
       );
       var result = fn();
       reaction.f |= REACTION_RAN;
-      var deps = reaction.deps;
-      var is_fork = current_batch?.is_fork;
-      if (new_deps !== null) {
-        var i;
-        if (!is_fork) {
-          remove_reactions(reaction, skipped_deps);
-        }
-        if (deps !== null && skipped_deps > 0) {
-          deps.length = skipped_deps + new_deps.length;
-          for (i = 0; i < new_deps.length; i++) {
-            deps[skipped_deps + i] = new_deps[i];
-          }
-        } else {
-          reaction.deps = deps = new_deps;
-        }
-        if (effect_tracking() && (reaction.f & CONNECTED) !== 0) {
-          for (i = skipped_deps; i < deps.length; i++) {
-            ((_a2 = deps[i]).reactions ?? (_a2.reactions = [])).push(reaction);
-          }
-        }
-      } else if (!is_fork && deps !== null && skipped_deps < deps.length) {
-        remove_reactions(reaction, skipped_deps);
-        deps.length = skipped_deps;
-      }
+      var deps = update_dependencies(reaction);
       if (is_runes() && untracked_writes !== null && !untracking && deps !== null && (reaction.f & (DERIVED | MAYBE_DIRTY | DIRTY)) === 0) {
-        for (i = 0; i < /** @type {Source[]} */
+        for (var i = 0; i < /** @type {Source[]} */
         untracked_writes.length; i++) {
           schedule_possible_effect_self_invalidation(
             untracked_writes[i],
@@ -3388,6 +3343,7 @@ ${component_stack}
       }
       return result;
     } catch (error) {
+      update_dependencies(reaction);
       return handle_error(error);
     } finally {
       reaction.f ^= REACTION_IS_UPDATING;
@@ -3400,6 +3356,34 @@ ${component_stack}
       untracking = previous_untracking;
       update_version = previous_update_version;
     }
+  }
+  function update_dependencies(reaction) {
+    var _a2;
+    var deps = reaction.deps;
+    var is_fork = current_batch?.is_fork;
+    if (new_deps !== null) {
+      var i;
+      if (!is_fork) {
+        remove_reactions(reaction, skipped_deps);
+      }
+      if (deps !== null && skipped_deps > 0) {
+        deps.length = skipped_deps + new_deps.length;
+        for (i = 0; i < new_deps.length; i++) {
+          deps[skipped_deps + i] = new_deps[i];
+        }
+      } else {
+        reaction.deps = deps = new_deps;
+      }
+      if (effect_tracking() && (reaction.f & CONNECTED) !== 0) {
+        for (i = skipped_deps; i < deps.length; i++) {
+          ((_a2 = deps[i]).reactions ?? (_a2.reactions = [])).push(reaction);
+        }
+      }
+    } else if (!is_fork && deps !== null && skipped_deps < deps.length) {
+      remove_reactions(reaction, skipped_deps);
+      deps.length = skipped_deps;
+    }
+    return deps;
   }
   function remove_reaction(signal, dependency) {
     let reactions = dependency.reactions;
@@ -3425,9 +3409,17 @@ ${component_stack}
       );
       if ((derived2.f & CONNECTED) !== 0) {
         derived2.f ^= CONNECTED;
-        derived2.f &= ~WAS_MARKED;
       }
-      update_derived_status(derived2);
+      if (derived2.v !== UNINITIALIZED) {
+        update_derived_status(derived2);
+      }
+      if (derived2.ac !== null) {
+        without_reactive_context(() => {
+          derived2.ac.abort(STALE_REACTION);
+          derived2.ac = null;
+          set_signal_status(derived2, DIRTY);
+        });
+      }
       freeze_derived_effects(derived2);
       remove_reactions(derived2, 0);
     }
@@ -3447,9 +3439,7 @@ ${component_stack}
     }
     set_signal_status(effect2, CLEAN);
     var previous_effect = active_effect;
-    var was_updating_effect = is_updating_effect;
     active_effect = effect2;
-    is_updating_effect = true;
     if (dev_fallback_default) {
       var previous_component_fn = dev_current_component_function;
       set_dev_current_component_function(effect2.component_function);
@@ -3478,7 +3468,6 @@ ${component_stack}
         }
       }
     } finally {
-      is_updating_effect = was_updating_effect;
       active_effect = previous_effect;
       if (dev_fallback_default) {
         set_dev_current_component_function(previous_component_fn);
@@ -3486,23 +3475,13 @@ ${component_stack}
       }
     }
   }
-  async function tick() {
-    if (async_mode_flag) {
-      return new Promise((f) => {
-        requestAnimationFrame(() => f());
-        setTimeout(() => f());
-      });
-    }
-    await Promise.resolve();
-    flushSync();
-  }
   function get(signal) {
     var flags2 = signal.f;
     var is_derived = (flags2 & DERIVED) !== 0;
     captured_signals?.add(signal);
     if (active_reaction !== null && !untracking) {
       var destroyed = active_effect !== null && (active_effect.f & DESTROYED) !== 0;
-      if (!destroyed && (current_sources === null || !includes.call(current_sources, signal))) {
+      if (!destroyed && (current_sources === null || !current_sources.has(signal))) {
         var deps = active_reaction.deps;
         if ((active_reaction.f & REACTION_IS_UPDATING) !== 0) {
           if (signal.rv < read_version) {
@@ -3516,7 +3495,10 @@ ${component_stack}
             }
           }
         } else {
-          (active_reaction.deps ?? (active_reaction.deps = [])).push(signal);
+          active_reaction.deps ?? (active_reaction.deps = []);
+          if (!includes.call(active_reaction.deps, signal)) {
+            active_reaction.deps.push(signal);
+          }
           var reactions = signal.reactions;
           if (reactions === null) {
             signal.reactions = [active_reaction];
@@ -3527,12 +3509,25 @@ ${component_stack}
       }
     }
     if (dev_fallback_default) {
+      if (!untracking && reactivity_loss_tracker && // By checking that current/previous batch are null we filter out false positives.
+      // reactivity_loss_tracker is only reset after a microtask, so if a flush happens
+      // before that, we get warnings for things we shouldn't warn on.
+      current_batch === null && previous_batch === null && !reactivity_loss_tracker.warned && (reactivity_loss_tracker.effect.f & REACTION_IS_UPDATING) === 0 && !reactivity_loss_tracker.effect_deps.has(signal)) {
+        reactivity_loss_tracker.warned = true;
+        await_reactivity_loss(
+          /** @type {string} */
+          signal.label
+        );
+        var trace2 = get_error("traced at");
+        if (trace2)
+          console.warn(trace2);
+      }
       recent_async_deriveds.delete(signal);
       if (tracing_mode_flag && !untracking && tracing_expressions !== null && active_reaction !== null && tracing_expressions.reaction === active_reaction) {
         if (signal.trace) {
           signal.trace();
         } else {
-          var trace2 = get_error("traced at");
+          trace2 = get_error("traced at");
           if (trace2) {
             var entry = tracing_expressions.entries.get(signal);
             if (entry === void 0) {
@@ -3563,7 +3558,7 @@ ${component_stack}
         old_values.set(derived2, value);
         return value;
       }
-      var should_connect = (derived2.f & CONNECTED) === 0 && !untracking && active_reaction !== null && (is_updating_effect || (active_reaction.f & CONNECTED) !== 0);
+      var should_connect = (derived2.f & CONNECTED) === 0 && !untracking && active_reaction !== null && (active_reaction.f & CONNECTED) !== 0;
       var is_new = (derived2.f & REACTION_RAN) === 0;
       if (is_dirty(derived2)) {
         if (should_connect) {
@@ -3589,7 +3584,12 @@ ${component_stack}
     if (derived2.deps === null)
       return;
     for (const dep of derived2.deps) {
-      (dep.reactions ?? (dep.reactions = [])).push(derived2);
+      var reactions = dep.reactions;
+      if (reactions === null) {
+        dep.reactions = [derived2];
+      } else if (!includes.call(reactions, derived2)) {
+        reactions.push(derived2);
+      }
       if ((dep.f & DERIVED) !== 0 && (dep.f & CONNECTED) === 0) {
         unfreeze_derived_effects(
           /** @type {Derived} */
@@ -3631,6 +3631,15 @@ ${component_stack}
   }
 
   // node_modules/svelte/src/utils.js
+  var regex_return_characters = /\r/g;
+  function hash(str) {
+    str = str.replace(regex_return_characters, "");
+    let hash2 = 5381;
+    let i = str.length;
+    while (i--)
+      hash2 = (hash2 << 5) - hash2 ^ str.charCodeAt(i);
+    return (hash2 >>> 0).toString(36);
+  }
   var DOM_BOOLEAN_ATTRIBUTES = [
     "allowfullscreen",
     "async",
@@ -3711,6 +3720,12 @@ ${component_stack}
       "$host"
     ]
   );
+  function sanitize_location(location) {
+    return (
+      /** @type {T} */
+      location?.replace(/\//g, "/\u200B")
+    );
+  }
 
   // node_modules/svelte/src/internal/client/dev/css.js
   var all_styles = /* @__PURE__ */ new Map();
@@ -3739,8 +3754,11 @@ ${component_stack}
       }
     }
     if (event_name.startsWith("pointer") || event_name.startsWith("touch") || event_name === "wheel") {
+      target_handler.__removed = false;
       queue_micro_task(() => {
-        dom.addEventListener(event_name, target_handler, options);
+        if (!target_handler.__removed) {
+          dom.addEventListener(event_name, target_handler, options);
+        }
       });
     } else {
       dom.addEventListener(event_name, target_handler, options);
@@ -3755,6 +3773,7 @@ ${component_stack}
     dom === document || // Firefox has quirky behavior, it can happen that we still get "canplay" events when the element is already removed
     dom instanceof HTMLMediaElement) {
       teardown(() => {
+        target_handler.__removed = true;
         dom.removeEventListener(event_name, target_handler, options);
       });
     }
@@ -3771,6 +3790,7 @@ ${component_stack}
     }
   }
   var last_propagated_event = null;
+  var last_propagated_event_clear_scheduled = false;
   function handle_event_propagation(event2) {
     var handler_element = this;
     var owner_document = (
@@ -3784,6 +3804,13 @@ ${component_stack}
       path[0] || event2.target
     );
     last_propagated_event = event2;
+    if (!last_propagated_event_clear_scheduled) {
+      last_propagated_event_clear_scheduled = true;
+      setTimeout(() => {
+        last_propagated_event_clear_scheduled = false;
+        last_propagated_event = null;
+      });
+    }
     var path_idx = 0;
     var handled_at = last_propagated_event === event2 && event2[event_symbol];
     if (handled_at) {
@@ -3819,8 +3846,8 @@ ${component_stack}
       var throw_error;
       var other_errors = [];
       while (current_target !== null) {
-        var parent_element = current_target.assignedSlot || current_target.parentNode || /** @type {any} */
-        current_target.host || null;
+        if (current_target === handler_element)
+          break;
         try {
           var delegated2 = current_target[event_symbol]?.[event_name];
           if (delegated2 != null && (!/** @type {any} */
@@ -3836,10 +3863,13 @@ ${component_stack}
             throw_error = error;
           }
         }
-        if (event2.cancelBubble || parent_element === handler_element || parent_element === null) {
+        if (event2.cancelBubble)
           break;
-        }
-        current_target = parent_element;
+        path_idx++;
+        current_target = path_idx < path.length ? (
+          /** @type {Element} */
+          path[path_idx]
+        ) : null;
       }
       if (throw_error) {
         for (let error of other_errors) {
@@ -3873,10 +3903,9 @@ ${component_stack}
       policy?.createHTML(html2) ?? html2
     );
   }
-  function create_fragment_from_html(html2, trusted2 = false) {
+  function create_fragment_from_html(html2) {
     var elem = create_element("template");
-    html2 = html2.replaceAll("<!>", "<!---->");
-    elem.innerHTML = trusted2 ? create_trusted_html(html2) : html2;
+    elem.innerHTML = create_trusted_html(html2.replaceAll("<!>", "<!---->"));
     return elem.content;
   }
 
@@ -3902,7 +3931,7 @@ ${component_stack}
         return hydrate_node;
       }
       if (node === void 0) {
-        node = create_fragment_from_html(has_start ? content : "<!>" + content, true);
+        node = create_fragment_from_html(has_start ? content : "<!>" + content);
         if (!is_fragment)
           node = /** @type {TemplateNode} */
           get_first_child(node);
@@ -3941,23 +3970,23 @@ ${component_stack}
       if (!node) {
         var fragment = (
           /** @type {DocumentFragment} */
-          create_fragment_from_html(wrapped, true)
+          create_fragment_from_html(wrapped)
         );
-        var root6 = (
+        var root7 = (
           /** @type {Element} */
           get_first_child(fragment)
         );
         if (is_fragment) {
           node = document.createDocumentFragment();
-          while (get_first_child(root6)) {
+          while (get_first_child(root7)) {
             node.appendChild(
               /** @type {TemplateNode} */
-              get_first_child(root6)
+              get_first_child(root7)
             );
           }
         } else {
           node = /** @type {Element} */
-          get_first_child(root6);
+          get_first_child(root7);
         }
       }
       var clone = (
@@ -4017,13 +4046,539 @@ ${component_stack}
     );
   }
 
+  // node_modules/svelte/src/reactivity/create-subscriber.js
+  function createSubscriber(start) {
+    let subscribers = 0;
+    let version = source(0);
+    let stop;
+    if (dev_fallback_default) {
+      tag(version, "createSubscriber version");
+    }
+    return () => {
+      if (effect_tracking()) {
+        get(version);
+        render_effect(() => {
+          if (subscribers === 0) {
+            stop = untrack(() => start(() => increment(version)));
+          }
+          subscribers += 1;
+          return () => {
+            queue_micro_task(() => {
+              subscribers -= 1;
+              if (subscribers === 0) {
+                stop?.();
+                stop = void 0;
+                increment(version);
+              }
+            });
+          };
+        });
+      }
+    };
+  }
+
+  // node_modules/svelte/src/internal/client/dom/blocks/boundary.js
+  var flags = EFFECT_TRANSPARENT | EFFECT_PRESERVED;
+  function boundary(node, props, children, transform_error) {
+    new Boundary(node, props, children, transform_error);
+  }
+  var _anchor, _hydrate_open, _props, _children, _effect, _main_effect, _pending_effect, _failed_effect, _offscreen_fragment, _local_pending_count, _pending_count, _pending_count_update_queued, _dirty_effects2, _maybe_dirty_effects2, _effect_pending, _effect_pending_subscriber, _hydrate_resolved_content, hydrate_resolved_content_fn, _hydrate_failed_content, hydrate_failed_content_fn, _create_reset, create_reset_fn, _is_destroyed, is_destroyed_fn, _hydrate_pending_content, hydrate_pending_content_fn, _render, render_fn, _resolve2, resolve_fn2, _run, run_fn, _update_pending_count, update_pending_count_fn, _handle_error, handle_error_fn;
+  var Boundary = class {
+    /**
+     * @param {TemplateNode} node
+     * @param {BoundaryProps} props
+     * @param {((anchor: Node) => void)} children
+     * @param {((error: unknown) => unknown) | undefined} [transform_error]
+     */
+    constructor(node, props, children, transform_error) {
+      __privateAdd(this, _hydrate_resolved_content);
+      /**
+       * @param {unknown} error The deserialized error from the server's hydration comment
+       */
+      __privateAdd(this, _hydrate_failed_content);
+      /**
+       * Creates the `reset` function for a failed boundary, along with a function
+       * that invokes `onerror` with it (if provided)
+       * @param {unknown} error
+       * @returns {{ reset: () => void, invoke_onerror: () => void }}
+       */
+      __privateAdd(this, _create_reset);
+      __privateAdd(this, _is_destroyed);
+      __privateAdd(this, _hydrate_pending_content);
+      __privateAdd(this, _render);
+      /**
+       * @param {Batch} batch
+       */
+      __privateAdd(this, _resolve2);
+      /**
+       * @template T
+       * @param {() => T} fn
+       */
+      __privateAdd(this, _run);
+      /**
+       * Updates the pending count associated with the currently visible pending snippet,
+       * if any, such that we can replace the snippet with content once work is done
+       * @param {1 | -1} d
+       * @param {Batch} batch
+       */
+      __privateAdd(this, _update_pending_count);
+      /**
+       * @param {unknown} error
+       */
+      __privateAdd(this, _handle_error);
+      /** @type {Boundary | null} */
+      __publicField(this, "parent");
+      __publicField(this, "is_pending", false);
+      /**
+       * API-level transformError transform function. Transforms errors before they reach the `failed` snippet.
+       * Inherited from parent boundary, or defaults to identity.
+       * @type {(error: unknown) => unknown}
+       */
+      __publicField(this, "transform_error");
+      /** @type {TemplateNode} */
+      __privateAdd(this, _anchor, void 0);
+      /** @type {TemplateNode | null} */
+      __privateAdd(this, _hydrate_open, hydrating ? hydrate_node : null);
+      /** @type {BoundaryProps} */
+      __privateAdd(this, _props, void 0);
+      /** @type {((anchor: Node) => void)} */
+      __privateAdd(this, _children, void 0);
+      /** @type {Effect} */
+      __privateAdd(this, _effect, void 0);
+      /** @type {Effect | null} */
+      __privateAdd(this, _main_effect, null);
+      /** @type {Effect | null} */
+      __privateAdd(this, _pending_effect, null);
+      /** @type {Effect | null} */
+      __privateAdd(this, _failed_effect, null);
+      /** @type {DocumentFragment | null} */
+      __privateAdd(this, _offscreen_fragment, null);
+      __privateAdd(this, _local_pending_count, 0);
+      __privateAdd(this, _pending_count, 0);
+      __privateAdd(this, _pending_count_update_queued, false);
+      /** @type {Set<Effect>} */
+      __privateAdd(this, _dirty_effects2, /* @__PURE__ */ new Set());
+      /** @type {Set<Effect>} */
+      __privateAdd(this, _maybe_dirty_effects2, /* @__PURE__ */ new Set());
+      /**
+       * A source containing the number of pending async deriveds/expressions.
+       * Only created if `$effect.pending()` is used inside the boundary,
+       * otherwise updating the source results in needless `Batch.ensure()`
+       * calls followed by no-op flushes
+       * @type {Source<number> | null}
+       */
+      __privateAdd(this, _effect_pending, null);
+      __privateAdd(this, _effect_pending_subscriber, createSubscriber(() => {
+        __privateSet(this, _effect_pending, source(__privateGet(this, _local_pending_count)));
+        if (dev_fallback_default) {
+          tag(__privateGet(this, _effect_pending), "$effect.pending()");
+        }
+        return () => {
+          __privateSet(this, _effect_pending, null);
+        };
+      }));
+      __privateSet(this, _anchor, node);
+      __privateSet(this, _props, props);
+      __privateSet(this, _children, (anchor) => {
+        var effect2 = (
+          /** @type {Effect} */
+          active_effect
+        );
+        effect2.b = this;
+        effect2.f |= BOUNDARY_EFFECT;
+        children(anchor);
+      });
+      this.parent = /** @type {Effect} */
+      active_effect.b;
+      this.transform_error = transform_error ?? this.parent?.transform_error ?? ((e) => e);
+      __privateSet(this, _effect, block(() => {
+        if (hydrating) {
+          const comment_data = read_hydration_instruction(
+            /** @type {TemplateNode} */
+            __privateGet(this, _hydrate_open)
+          );
+          hydrate_next();
+          const server_rendered_pending = comment_data === HYDRATION_START_ELSE;
+          const server_rendered_failed = comment_data.startsWith(HYDRATION_START_FAILED);
+          if (server_rendered_failed) {
+            const serialized_error = JSON.parse(comment_data.slice(HYDRATION_START_FAILED.length));
+            __privateMethod(this, _hydrate_failed_content, hydrate_failed_content_fn).call(this, serialized_error);
+          } else if (server_rendered_pending) {
+            __privateMethod(this, _hydrate_pending_content, hydrate_pending_content_fn).call(this);
+          } else {
+            __privateMethod(this, _hydrate_resolved_content, hydrate_resolved_content_fn).call(this);
+          }
+        } else {
+          __privateMethod(this, _render, render_fn).call(this);
+        }
+      }, flags));
+      if (hydrating) {
+        __privateSet(this, _anchor, hydrate_node);
+      }
+    }
+    /**
+     * Defer an effect inside a pending boundary until the boundary resolves
+     * @param {Effect} effect
+     */
+    defer_effect(effect2) {
+      defer_effect(effect2, __privateGet(this, _dirty_effects2), __privateGet(this, _maybe_dirty_effects2));
+    }
+    /**
+     * Returns `false` if the effect exists inside a boundary whose pending snippet is shown
+     * @returns {boolean}
+     */
+    is_rendered() {
+      return !this.is_pending && (!this.parent || this.parent.is_rendered());
+    }
+    has_pending_snippet() {
+      return !!__privateGet(this, _props).pending;
+    }
+    /**
+     * Update the source that powers `$effect.pending()` inside this boundary,
+     * and controls when the current `pending` snippet (if any) is removed.
+     * Do not call from inside the class
+     * @param {1 | -1} d
+     * @param {Batch} batch
+     */
+    update_pending_count(d, batch) {
+      __privateMethod(this, _update_pending_count, update_pending_count_fn).call(this, d, batch);
+      __privateSet(this, _local_pending_count, __privateGet(this, _local_pending_count) + d);
+      if (!__privateGet(this, _effect_pending) || __privateGet(this, _pending_count_update_queued))
+        return;
+      __privateSet(this, _pending_count_update_queued, true);
+      queue_micro_task(() => {
+        __privateSet(this, _pending_count_update_queued, false);
+        if (__privateGet(this, _effect_pending)) {
+          internal_set(__privateGet(this, _effect_pending), __privateGet(this, _local_pending_count));
+        }
+      });
+    }
+    get_effect_pending() {
+      __privateGet(this, _effect_pending_subscriber).call(this);
+      return get(
+        /** @type {Source<number>} */
+        __privateGet(this, _effect_pending)
+      );
+    }
+    /** @param {unknown} error */
+    error(error) {
+      if (error === HYDRATION_ERROR) {
+        throw error;
+      }
+      if (!__privateGet(this, _props).onerror && !__privateGet(this, _props).failed) {
+        throw error;
+      }
+      if (current_batch?.is_fork) {
+        if (__privateGet(this, _main_effect))
+          current_batch.skip_effect(__privateGet(this, _main_effect));
+        if (__privateGet(this, _pending_effect))
+          current_batch.skip_effect(__privateGet(this, _pending_effect));
+        if (__privateGet(this, _failed_effect))
+          current_batch.skip_effect(__privateGet(this, _failed_effect));
+        current_batch.oncommit(() => {
+          if (!__privateMethod(this, _is_destroyed, is_destroyed_fn).call(this))
+            __privateMethod(this, _handle_error, handle_error_fn).call(this, error);
+        });
+      } else {
+        __privateMethod(this, _handle_error, handle_error_fn).call(this, error);
+      }
+    }
+  };
+  _anchor = new WeakMap();
+  _hydrate_open = new WeakMap();
+  _props = new WeakMap();
+  _children = new WeakMap();
+  _effect = new WeakMap();
+  _main_effect = new WeakMap();
+  _pending_effect = new WeakMap();
+  _failed_effect = new WeakMap();
+  _offscreen_fragment = new WeakMap();
+  _local_pending_count = new WeakMap();
+  _pending_count = new WeakMap();
+  _pending_count_update_queued = new WeakMap();
+  _dirty_effects2 = new WeakMap();
+  _maybe_dirty_effects2 = new WeakMap();
+  _effect_pending = new WeakMap();
+  _effect_pending_subscriber = new WeakMap();
+  _hydrate_resolved_content = new WeakSet();
+  hydrate_resolved_content_fn = function() {
+    try {
+      __privateSet(this, _main_effect, branch(() => __privateGet(this, _children).call(this, __privateGet(this, _anchor))));
+    } catch (error) {
+      this.error(error);
+    }
+  };
+  _hydrate_failed_content = new WeakSet();
+  hydrate_failed_content_fn = function(error) {
+    const failed = __privateGet(this, _props).failed;
+    const { reset: reset2, invoke_onerror } = __privateMethod(this, _create_reset, create_reset_fn).call(this, error);
+    queue_micro_task(invoke_onerror);
+    if (!failed)
+      return;
+    __privateSet(this, _failed_effect, branch(() => {
+      failed(
+        __privateGet(this, _anchor),
+        () => error,
+        () => reset2
+      );
+    }));
+  };
+  _create_reset = new WeakSet();
+  create_reset_fn = function(error) {
+    var did_reset = false;
+    var calling_on_error = false;
+    const reset2 = () => {
+      if (__privateMethod(this, _is_destroyed, is_destroyed_fn).call(this))
+        return;
+      if (did_reset) {
+        svelte_boundary_reset_noop();
+        return;
+      }
+      did_reset = true;
+      if (calling_on_error) {
+        svelte_boundary_reset_onerror();
+      }
+      if (__privateGet(this, _failed_effect) !== null) {
+        pause_effect(__privateGet(this, _failed_effect), () => {
+          __privateSet(this, _failed_effect, null);
+        });
+      }
+      __privateMethod(this, _run, run_fn).call(this, () => {
+        __privateMethod(this, _render, render_fn).call(this);
+      });
+    };
+    const invoke_onerror = () => {
+      if (__privateMethod(this, _is_destroyed, is_destroyed_fn).call(this))
+        return;
+      try {
+        calling_on_error = true;
+        __privateGet(this, _props).onerror?.(error, reset2);
+        calling_on_error = false;
+      } catch (err) {
+        invoke_error_boundary(err, __privateGet(this, _effect) && __privateGet(this, _effect).parent);
+      }
+    };
+    return { reset: reset2, invoke_onerror };
+  };
+  _is_destroyed = new WeakSet();
+  is_destroyed_fn = function() {
+    return (__privateGet(this, _effect).f & (DESTROYED | DESTROYING)) !== 0;
+  };
+  _hydrate_pending_content = new WeakSet();
+  hydrate_pending_content_fn = function() {
+    const pending2 = __privateGet(this, _props).pending;
+    if (!pending2)
+      return;
+    this.is_pending = true;
+    __privateSet(this, _pending_effect, branch(() => pending2(__privateGet(this, _anchor))));
+    queue_micro_task(() => {
+      if (__privateMethod(this, _is_destroyed, is_destroyed_fn).call(this))
+        return;
+      var fragment = __privateSet(this, _offscreen_fragment, document.createDocumentFragment());
+      var anchor = create_text();
+      var handled = false;
+      fragment.append(anchor);
+      __privateSet(this, _main_effect, __privateMethod(this, _run, run_fn).call(this, () => {
+        try {
+          return branch(() => __privateGet(this, _children).call(this, anchor));
+        } catch (error) {
+          try {
+            this.error(error);
+            handled = true;
+          } catch (error2) {
+            invoke_error_boundary(error2, __privateGet(this, _effect).parent);
+          }
+          return null;
+        }
+      }));
+      if (__privateGet(this, _main_effect) === null) {
+        __privateSet(this, _offscreen_fragment, null);
+        if (handled)
+          __privateMethod(this, _resolve2, resolve_fn2).call(
+            this,
+            /** @type {Batch} */
+            current_batch
+          );
+        return;
+      }
+      if (__privateGet(this, _pending_count) === 0) {
+        __privateGet(this, _anchor).before(fragment);
+        __privateSet(this, _offscreen_fragment, null);
+        pause_effect(
+          /** @type {Effect} */
+          __privateGet(this, _pending_effect),
+          () => {
+            __privateSet(this, _pending_effect, null);
+          }
+        );
+        __privateMethod(this, _resolve2, resolve_fn2).call(
+          this,
+          /** @type {Batch} */
+          current_batch
+        );
+      }
+    });
+  };
+  _render = new WeakSet();
+  render_fn = function() {
+    try {
+      this.is_pending = this.has_pending_snippet();
+      __privateSet(this, _pending_count, 0);
+      __privateSet(this, _local_pending_count, 0);
+      __privateSet(this, _main_effect, branch(() => {
+        __privateGet(this, _children).call(this, __privateGet(this, _anchor));
+      }));
+      if (__privateGet(this, _pending_count) > 0) {
+        var fragment = __privateSet(this, _offscreen_fragment, document.createDocumentFragment());
+        move_effect(__privateGet(this, _main_effect), fragment);
+        const pending2 = (
+          /** @type {(anchor: Node) => void} */
+          __privateGet(this, _props).pending
+        );
+        __privateSet(this, _pending_effect, branch(() => pending2(__privateGet(this, _anchor))));
+      } else {
+        __privateMethod(this, _resolve2, resolve_fn2).call(
+          this,
+          /** @type {Batch} */
+          current_batch
+        );
+      }
+    } catch (error) {
+      this.error(error);
+    }
+  };
+  _resolve2 = new WeakSet();
+  resolve_fn2 = function(batch) {
+    this.is_pending = false;
+    batch.transfer_effects(__privateGet(this, _dirty_effects2), __privateGet(this, _maybe_dirty_effects2));
+  };
+  _run = new WeakSet();
+  run_fn = function(fn) {
+    var previous_effect = active_effect;
+    var previous_reaction = active_reaction;
+    var previous_ctx = component_context;
+    set_active_effect(__privateGet(this, _effect));
+    set_active_reaction(__privateGet(this, _effect));
+    set_component_context(__privateGet(this, _effect).ctx);
+    try {
+      Batch.ensure();
+      return fn();
+    } finally {
+      set_active_effect(previous_effect);
+      set_active_reaction(previous_reaction);
+      set_component_context(previous_ctx);
+    }
+  };
+  _update_pending_count = new WeakSet();
+  update_pending_count_fn = function(d, batch) {
+    var _a2;
+    if (!this.has_pending_snippet()) {
+      if (this.parent) {
+        __privateMethod(_a2 = this.parent, _update_pending_count, update_pending_count_fn).call(_a2, d, batch);
+      }
+      return;
+    }
+    __privateSet(this, _pending_count, __privateGet(this, _pending_count) + d);
+    if (__privateGet(this, _pending_count) === 0) {
+      __privateMethod(this, _resolve2, resolve_fn2).call(this, batch);
+      if (__privateGet(this, _pending_effect)) {
+        pause_effect(__privateGet(this, _pending_effect), () => {
+          __privateSet(this, _pending_effect, null);
+        });
+      }
+      if (__privateGet(this, _offscreen_fragment)) {
+        __privateGet(this, _anchor).before(__privateGet(this, _offscreen_fragment));
+        __privateSet(this, _offscreen_fragment, null);
+      }
+    }
+  };
+  _handle_error = new WeakSet();
+  handle_error_fn = function(error) {
+    if (__privateGet(this, _main_effect)) {
+      destroy_effect(__privateGet(this, _main_effect));
+      __privateSet(this, _main_effect, null);
+    }
+    if (__privateGet(this, _pending_effect)) {
+      destroy_effect(__privateGet(this, _pending_effect));
+      __privateSet(this, _pending_effect, null);
+    }
+    if (__privateGet(this, _failed_effect)) {
+      destroy_effect(__privateGet(this, _failed_effect));
+      __privateSet(this, _failed_effect, null);
+    }
+    if (hydrating) {
+      set_hydrate_node(
+        /** @type {TemplateNode} */
+        __privateGet(this, _hydrate_open)
+      );
+      next();
+      set_hydrate_node(skip_nodes());
+    }
+    let failed = __privateGet(this, _props).failed;
+    const handle_error_result = (transformed_error) => {
+      if (__privateMethod(this, _is_destroyed, is_destroyed_fn).call(this))
+        return;
+      const { reset: reset2, invoke_onerror } = __privateMethod(this, _create_reset, create_reset_fn).call(this, transformed_error);
+      invoke_onerror();
+      if (failed && !__privateMethod(this, _is_destroyed, is_destroyed_fn).call(this)) {
+        __privateSet(this, _failed_effect, __privateMethod(this, _run, run_fn).call(this, () => {
+          try {
+            return branch(() => {
+              var effect2 = (
+                /** @type {Effect} */
+                active_effect
+              );
+              effect2.b = this;
+              effect2.f |= BOUNDARY_EFFECT;
+              failed(
+                __privateGet(this, _anchor),
+                () => transformed_error,
+                () => reset2
+              );
+            });
+          } catch (error2) {
+            invoke_error_boundary(
+              error2,
+              /** @type {Effect} */
+              __privateGet(this, _effect).parent
+            );
+            return null;
+          }
+        }));
+      }
+    };
+    queue_micro_task(() => {
+      if (__privateMethod(this, _is_destroyed, is_destroyed_fn).call(this))
+        return;
+      var result;
+      try {
+        result = this.transform_error(error);
+      } catch (e) {
+        invoke_error_boundary(e, __privateGet(this, _effect) && __privateGet(this, _effect).parent);
+        return;
+      }
+      if (result !== null && typeof result === "object" && typeof /** @type {any} */
+      result.then === "function") {
+        result.then(
+          handle_error_result,
+          /** @param {unknown} e */
+          (e) => invoke_error_boundary(e, __privateGet(this, _effect) && __privateGet(this, _effect).parent)
+        );
+      } else {
+        handle_error_result(result);
+      }
+    });
+  };
+
   // node_modules/svelte/src/internal/client/render.js
   var should_intro = true;
   function set_text(text2, value) {
-    var str = value == null ? "" : typeof value === "object" ? value + "" : value;
-    if (str !== (text2.__t ?? (text2.__t = text2.nodeValue))) {
-      text2.__t = str;
-      text2.nodeValue = str + "";
+    var _a2;
+    var str = value == null ? "" : typeof value === "object" ? `${value}` : value;
+    if (str !== /** @type {any} */
+    (text2[_a2 = TEXT_CACHE] ?? (text2[_a2] = text2.nodeValue))) {
+      text2[TEXT_CACHE] = str;
+      text2.nodeValue = `${str}`;
     }
   }
   function mount(component2, options) {
@@ -4075,7 +4630,7 @@ ${component_stack}
     }
   }
   var listeners = /* @__PURE__ */ new Map();
-  function _mount(Component, { target, anchor, props = {}, events, context, intro = true }) {
+  function _mount(Component, { target, anchor, props = {}, events, context, intro = true, transformError }) {
     init_operations();
     var component2 = void 0;
     var unmount2 = component_root(() => {
@@ -4106,7 +4661,7 @@ ${component_stack}
             );
           }
           should_intro = intro;
-          component2 = Component(anchor_node2, props) || {};
+          component2 = Component(anchor_node2, props) || mark_as_component();
           should_intro = true;
           if (hydrating) {
             active_effect.nodes.end = hydrate_node;
@@ -4117,7 +4672,8 @@ ${component_stack}
             }
           }
           pop();
-        }
+        },
+        transformError
       );
       var registered_events = /* @__PURE__ */ new Set();
       var event_handle = (events2) => {
@@ -4184,11 +4740,7 @@ ${component_stack}
       return fn(options);
     }
     if (dev_fallback_default) {
-      if (STATE_SYMBOL in component2) {
-        state_proxy_unmount();
-      } else {
-        lifecycle_double_unmount();
-      }
+      lifecycle_double_unmount();
     }
     return Promise.resolve();
   }
@@ -4236,11 +4788,10 @@ ${component_stack}
        * This is necessary for `<svelte:element>`
        */
       __privateAdd(this, _transition, true);
-      __privateAdd(this, _commit2, () => {
-        var batch = (
-          /** @type {Batch} */
-          current_batch
-        );
+      /**
+       * @param {Batch} batch
+       */
+      __privateAdd(this, _commit2, (batch) => {
         if (!__privateGet(this, _batches).has(batch))
           return;
         var key2 = (
@@ -4254,8 +4805,12 @@ ${component_stack}
         } else {
           var offscreen = __privateGet(this, _offscreen).get(key2);
           if (offscreen) {
+            resume_effect(offscreen.effect);
             __privateGet(this, _onscreen).set(key2, offscreen.effect);
             __privateGet(this, _offscreen).delete(key2);
+            if (dev_fallback_default) {
+              offscreen.fragment.lastChild[HMR_ANCHOR] = this.anchor;
+            }
             offscreen.fragment.lastChild.remove();
             this.anchor.before(offscreen.fragment);
             onscreen = offscreen.effect;
@@ -4361,7 +4916,7 @@ ${component_stack}
         if (hydrating) {
           this.anchor = hydrate_node;
         }
-        __privateGet(this, _commit2).call(this);
+        __privateGet(this, _commit2).call(this, batch);
       }
     }
   };
@@ -4375,23 +4930,20 @@ ${component_stack}
 
   // node_modules/svelte/src/internal/client/dom/blocks/if.js
   function if_block(node, fn, elseif = false) {
+    var marker;
     if (hydrating) {
+      marker = hydrate_node;
       hydrate_next();
     }
     var branches = new BranchManager(node);
     var flags2 = elseif ? EFFECT_TRANSPARENT : 0;
     function update_branch(key2, fn2) {
       if (hydrating) {
-        const data = read_hydration_instruction(node);
-        var hydrated_key;
-        if (data === HYDRATION_START) {
-          hydrated_key = 0;
-        } else if (data === HYDRATION_START_ELSE) {
-          hydrated_key = false;
-        } else {
-          hydrated_key = parseInt(data.substring(1));
-        }
-        if (key2 !== hydrated_key) {
+        var data = read_hydration_instruction(
+          /** @type {TemplateNode} */
+          marker
+        );
+        if (key2 !== parseInt(data.substring(1))) {
           var anchor = skip_nodes();
           set_hydrate_node(anchor);
           branches.anchor = anchor;
@@ -4410,7 +4962,7 @@ ${component_stack}
         update_branch(key2, fn2);
       });
       if (!has_branch) {
-        update_branch(false, null);
+        update_branch(-1, null);
       }
     }, flags2);
   }
@@ -4440,7 +4992,7 @@ ${component_stack}
                 /** @type {Set<EachOutroGroup>} */
                 state2.outrogroups
               );
-              destroy_effects(array_from(group.done));
+              destroy_effects(state2, array_from(group.done));
               groups.delete(group);
               if (groups.size === 0) {
                 state2.outrogroups = null;
@@ -4454,7 +5006,7 @@ ${component_stack}
       );
     }
     if (remaining === 0) {
-      var fast_path = transitions.length === 0 && controlled_anchor !== null;
+      var fast_path = transitions.length === 0 && controlled_anchor !== null && state2.pending.size === 0;
       if (fast_path) {
         var anchor = (
           /** @type {Element} */
@@ -4468,7 +5020,7 @@ ${component_stack}
         parent_node.append(anchor);
         state2.items.clear();
       }
-      destroy_effects(to_destroy, !fast_path);
+      destroy_effects(state2, to_destroy, !fast_path);
     } else {
       group = {
         pending: new Set(to_destroy),
@@ -4477,9 +5029,28 @@ ${component_stack}
       (state2.outrogroups ?? (state2.outrogroups = /* @__PURE__ */ new Set())).add(group);
     }
   }
-  function destroy_effects(to_destroy, remove_dom = true) {
+  function destroy_effects(state2, to_destroy, remove_dom = true) {
+    var preserved_effects;
+    if (state2.pending.size > 0) {
+      preserved_effects = /* @__PURE__ */ new Set();
+      for (const keys of state2.pending.values()) {
+        for (const key2 of keys) {
+          preserved_effects.add(
+            /** @type {EachItem} */
+            state2.items.get(key2).e
+          );
+        }
+      }
+    }
     for (var i = 0; i < to_destroy.length; i++) {
-      destroy_effect(to_destroy[i], remove_dom);
+      var e = to_destroy[i];
+      if (preserved_effects?.has(e)) {
+        e.f |= EFFECT_OFFSCREEN;
+        const fragment = document.createDocumentFragment();
+        move_effect(e, fragment);
+      } else {
+        destroy_effect(to_destroy[i], remove_dom);
+      }
     }
   }
   var offscreen_anchor;
@@ -4500,11 +5071,22 @@ ${component_stack}
     var fallback2 = null;
     var each_array = derived_safe_equal(() => {
       var collection = get_collection();
-      return is_array(collection) ? collection : collection == null ? [] : array_from(collection);
+      return (
+        /** @type {V[]} */
+        is_array(collection) ? collection : collection == null ? [] : array_from(collection)
+      );
     });
-    var array;
+    if (dev_fallback_default) {
+      tag(each_array, "{#each ...}");
+    }
+    var pending2 = /* @__PURE__ */ new Map();
     var first_run = true;
-    function commit() {
+    function commit(batch) {
+      if ((state2.effect.f & DESTROYED) !== 0) {
+        return;
+      }
+      state2.pending.delete(batch);
+      var array = get(each_array);
       state2.fallback = fallback2;
       reconcile(state2, array, anchor, flags2, get_key);
       if (fallback2 !== null) {
@@ -4522,9 +5104,14 @@ ${component_stack}
         }
       }
     }
+    function discard(batch) {
+      state2.pending.delete(batch);
+    }
     var effect2 = block(() => {
-      array = /** @type {V[]} */
-      get(each_array);
+      var array = (
+        /** @type {V[]} */
+        get(each_array)
+      );
       var length = array.length;
       let mismatch = false;
       if (hydrating) {
@@ -4552,6 +5139,12 @@ ${component_stack}
         }
         var value = array[index2];
         var key2 = get_key(value, index2);
+        if (dev_fallback_default) {
+          var key_again = get_key(value, index2);
+          if (key2 !== key_again) {
+            each_key_volatile(String(index2), String(key2), String(key_again));
+          }
+        }
         var item = first_run ? null : items.get(key2);
         if (item) {
           if (item.v)
@@ -4598,6 +5191,7 @@ ${component_stack}
         set_hydrate_node(skip_nodes());
       }
       if (!first_run) {
+        pending2.set(batch, keys);
         if (defer) {
           for (const [key3, item2] of items) {
             if (!keys.has(key3)) {
@@ -4605,10 +5199,9 @@ ${component_stack}
             }
           }
           batch.oncommit(commit);
-          batch.ondiscard(() => {
-          });
+          batch.ondiscard(discard);
         } else {
-          commit();
+          commit(batch);
         }
       }
       if (mismatch) {
@@ -4616,7 +5209,7 @@ ${component_stack}
       }
       get(each_array);
     });
-    var state2 = { effect: effect2, flags: flags2, items, outrogroups: null, fallback: fallback2 };
+    var state2 = { effect: effect2, flags: flags2, items, pending: pending2, outrogroups: null, fallback: fallback2 };
     first_run = false;
     if (hydrating) {
       anchor = hydrate_node;
@@ -4633,7 +5226,7 @@ ${component_stack}
     var length = array.length;
     var items = state2.items;
     var current = skip_to_branch(state2.effect.first);
-    var seen;
+    var seen2;
     var prev = null;
     var to_animate;
     var matched = [];
@@ -4665,6 +5258,13 @@ ${component_stack}
           group.done.delete(effect2);
         }
       }
+      if ((effect2.f & INERT) !== 0) {
+        resume_effect(effect2);
+        if (is_animated) {
+          effect2.nodes?.a?.unfix();
+          (to_animate ?? (to_animate = /* @__PURE__ */ new Set())).delete(effect2);
+        }
+      }
       if ((effect2.f & EFFECT_OFFSCREEN) !== 0) {
         effect2.f ^= EFFECT_OFFSCREEN;
         if (effect2 === current) {
@@ -4688,15 +5288,8 @@ ${component_stack}
           continue;
         }
       }
-      if ((effect2.f & INERT) !== 0) {
-        resume_effect(effect2);
-        if (is_animated) {
-          effect2.nodes?.a?.unfix();
-          (to_animate ?? (to_animate = /* @__PURE__ */ new Set())).delete(effect2);
-        }
-      }
       if (effect2 !== current) {
-        if (seen !== void 0 && seen.has(effect2)) {
+        if (seen2 !== void 0 && seen2.has(effect2)) {
           if (matched.length < stashed.length) {
             var start = stashed[0];
             var j;
@@ -4707,7 +5300,7 @@ ${component_stack}
               move(matched[j], start, anchor);
             }
             for (j = 0; j < stashed.length; j += 1) {
-              seen.delete(stashed[j]);
+              seen2.delete(stashed[j]);
             }
             link(state2, a.prev, b.next);
             link(state2, prev, a);
@@ -4718,7 +5311,7 @@ ${component_stack}
             matched = [];
             stashed = [];
           } else {
-            seen.delete(effect2);
+            seen2.delete(effect2);
             move(effect2, current, anchor);
             link(state2, effect2.prev, effect2.next);
             link(state2, effect2, prev === null ? state2.effect.first : prev.next);
@@ -4730,7 +5323,7 @@ ${component_stack}
         matched = [];
         stashed = [];
         while (current !== null && current !== effect2) {
-          (seen ?? (seen = /* @__PURE__ */ new Set())).add(current);
+          (seen2 ?? (seen2 = /* @__PURE__ */ new Set())).add(current);
           stashed.push(current);
           current = skip_to_branch(current.next);
         }
@@ -4747,7 +5340,7 @@ ${component_stack}
     if (state2.outrogroups !== null) {
       for (const group of state2.outrogroups) {
         if (group.pending.size === 0) {
-          destroy_effects(array_from(group.done));
+          destroy_effects(state2, array_from(group.done));
           state2.outrogroups?.delete(group);
         }
       }
@@ -4755,10 +5348,10 @@ ${component_stack}
         state2.outrogroups = null;
       }
     }
-    if (current !== null || seen !== void 0) {
+    if (current !== null || seen2 !== void 0) {
       var to_destroy = [];
-      if (seen !== void 0) {
-        for (effect2 of seen) {
+      if (seen2 !== void 0) {
+        for (effect2 of seen2) {
           if ((effect2.f & INERT) === 0) {
             to_destroy.push(effect2);
           }
@@ -4863,12 +5456,139 @@ ${component_stack}
     }
   }
 
+  // node_modules/svelte/src/internal/client/dom/blocks/html.js
+  function check_hash(element2, server_hash, value) {
+    if (!server_hash || server_hash === hash(String(value ?? "")))
+      return;
+    let location;
+    const loc = element2.__svelte_meta?.loc;
+    if (loc) {
+      location = `near ${loc.file}:${loc.line}:${loc.column}`;
+    } else if (dev_current_component_function?.[FILENAME]) {
+      location = `in ${dev_current_component_function[FILENAME]}`;
+    }
+    hydration_html_changed(sanitize_location(location));
+  }
+  function html(node, get_value, is_controlled = false, svg = false, mathml = false, skip_warning = false) {
+    var anchor = node;
+    var value = "";
+    if (is_controlled) {
+      var parent_node = (
+        /** @type {Element} */
+        node
+      );
+      if (hydrating) {
+        anchor = set_hydrate_node(get_first_child(parent_node));
+      }
+    }
+    template_effect(() => {
+      var effect2 = (
+        /** @type {Effect} */
+        active_effect
+      );
+      if (value === (value = get_value() ?? "")) {
+        if (hydrating)
+          hydrate_next();
+        return;
+      }
+      if (is_controlled && !hydrating) {
+        effect2.nodes = null;
+        parent_node.innerHTML = /** @type {string} */
+        value;
+        if (value !== "") {
+          assign_nodes(
+            /** @type {TemplateNode} */
+            get_first_child(parent_node),
+            /** @type {TemplateNode} */
+            parent_node.lastChild
+          );
+        }
+        return;
+      }
+      if (effect2.nodes !== null) {
+        remove_effect_dom(
+          effect2.nodes.start,
+          /** @type {TemplateNode} */
+          effect2.nodes.end
+        );
+        effect2.nodes = null;
+      }
+      if (value === "")
+        return;
+      if (hydrating) {
+        var hash2 = (
+          /** @type {Comment} */
+          hydrate_node.data
+        );
+        var next2 = hydrate_next();
+        var last = next2;
+        while (next2 !== null && (next2.nodeType !== COMMENT_NODE || /** @type {Comment} */
+        next2.data !== "")) {
+          last = next2;
+          next2 = get_next_sibling(next2);
+        }
+        if (next2 === null) {
+          hydration_mismatch();
+          throw HYDRATION_ERROR;
+        }
+        if (dev_fallback_default && !skip_warning) {
+          check_hash(
+            /** @type {Element} */
+            next2.parentNode,
+            hash2,
+            value
+          );
+        }
+        assign_nodes(hydrate_node, last);
+        anchor = set_hydrate_node(next2);
+        return;
+      }
+      var ns = svg ? NAMESPACE_SVG : mathml ? NAMESPACE_MATHML : void 0;
+      var wrapper = (
+        /** @type {HTMLTemplateElement | SVGElement | MathMLElement} */
+        create_element(svg ? "svg" : mathml ? "math" : "template", ns)
+      );
+      wrapper.innerHTML = /** @type {any} */
+      value;
+      var node2 = svg || mathml ? wrapper : (
+        /** @type {HTMLTemplateElement} */
+        wrapper.content
+      );
+      assign_nodes(
+        /** @type {TemplateNode} */
+        get_first_child(node2),
+        /** @type {TemplateNode} */
+        node2.lastChild
+      );
+      if (svg || mathml) {
+        while (get_first_child(node2)) {
+          anchor.before(
+            /** @type {TemplateNode} */
+            get_first_child(node2)
+          );
+        }
+      } else {
+        anchor.before(node2);
+      }
+    });
+  }
+
   // node_modules/svelte/src/internal/client/dom/css.js
   function append_styles(anchor, css) {
     effect(() => {
-      var root6 = (anchor && anchor.getRootNode) ? anchor.getRootNode() : document;
-      var target = (root6 && root6.host) ? root6 : ((root6 && root6.head) ?? (root6 && root6.ownerDocument && root6.ownerDocument.head) ?? document.head);
-      if (!target) target = document.head;
+      anchor = active_effect?.parent?.nodes?.start ?? anchor;
+      var root7 = anchor.getRootNode();
+      var target = (
+        /** @type {ShadowRoot} */
+        root7.host ? (
+          /** @type {ShadowRoot} */
+          root7
+        ) : (
+          /** @type {Document} */
+          root7.head ?? /** @type {Document} */
+          root7.ownerDocument.head
+        )
+      );
       if (!target.querySelector("#" + css.hash)) {
         const style = create_element("style");
         style.id = css.hash;
@@ -4917,7 +5637,7 @@ ${component_stack}
       classname = classname ? classname + " " + hash2 : hash2;
     }
     if (directives) {
-      for (var key2 in directives) {
+      for (var key2 of Object.keys(directives)) {
         if (directives[key2]) {
           classname = classname ? classname + " " + key2 : key2;
         } else if (classname.length) {
@@ -4939,7 +5659,7 @@ ${component_stack}
   function append_styles2(styles, important = false) {
     var separator = important ? " !important;" : ";";
     var css = "";
-    for (var key2 in styles) {
+    for (var key2 of Object.keys(styles)) {
       var value = styles[key2];
       if (value != null && value !== "") {
         css += " " + key2 + ": " + value + separator;
@@ -4965,7 +5685,7 @@ ${component_stack}
         normal_styles = styles;
       }
       if (value) {
-        value = String(value).replaceAll(/\s*\/\*.*?\*\/\s*/g, "").trim();
+        value = String(value).replaceAll(/\/\*.*?\*\//g, "").trim();
         var in_str = false;
         var in_apo = 0;
         var in_comment = false;
@@ -5032,7 +5752,10 @@ ${component_stack}
 
   // node_modules/svelte/src/internal/client/dom/elements/class.js
   function set_class(dom, is_html, value, hash2, prev_classes, next_classes) {
-    var prev = dom.__className;
+    var prev = (
+      /** @type {any} */
+      dom[CLASS_CACHE]
+    );
     if (hydrating || prev !== value || prev === void 0) {
       var next_class_name = to_class(value, hash2, next_classes);
       if (!hydrating || next_class_name !== dom.getAttribute("class")) {
@@ -5044,7 +5767,7 @@ ${component_stack}
           dom.setAttribute("class", next_class_name);
         }
       }
-      dom.__className = value;
+      dom[CLASS_CACHE] = value;
     } else if (next_classes && prev_classes !== next_classes) {
       for (var key2 in next_classes) {
         var is_present = !!next_classes[key2];
@@ -5070,7 +5793,10 @@ ${component_stack}
     }
   }
   function set_style(dom, value, prev_styles, next_styles) {
-    var prev = dom.__style;
+    var prev = (
+      /** @type {any} */
+      dom[STYLE_CACHE]
+    );
     if (hydrating || prev !== value) {
       var next_style_attr = to_style(value, next_styles);
       if (!hydrating || next_style_attr !== dom.getAttribute("style")) {
@@ -5080,7 +5806,7 @@ ${component_stack}
           dom.style.cssText = next_style_attr;
         }
       }
-      dom.__style = value;
+      dom[STYLE_CACHE] = value;
     } else if (next_styles) {
       if (Array.isArray(next_styles)) {
         update_styles(dom, prev_styles?.[0], next_styles[0]);
@@ -5098,29 +5824,6 @@ ${component_stack}
   var IS_CUSTOM_ELEMENT = Symbol("is custom element");
   var IS_HTML = Symbol("is html");
   var LINK_TAG = IS_XHTML ? "link" : "LINK";
-  function remove_input_defaults(input) {
-    if (!hydrating)
-      return;
-    var already_removed = false;
-    var remove_defaults = () => {
-      if (already_removed)
-        return;
-      already_removed = true;
-      if (input.hasAttribute("value")) {
-        var value = input.value;
-        set_attribute2(input, "value", null);
-        input.value = value;
-      }
-      if (input.hasAttribute("checked")) {
-        var checked = input.checked;
-        set_attribute2(input, "checked", null);
-        input.checked = checked;
-      }
-    };
-    input.__on_r = remove_defaults;
-    queue_micro_task(remove_defaults);
-    add_form_reset_listener();
-  }
   function set_attribute2(element2, attribute, value, skip_warning) {
     var attributes = get_attributes(element2);
     if (hydrating) {
@@ -5139,17 +5842,18 @@ ${component_stack}
     }
     if (value == null) {
       element2.removeAttribute(attribute);
-    } else if (typeof value !== "string" && get_setters(element2).includes(attribute)) {
+    } else if (typeof value !== "string" && get_setters(element2).has(attribute)) {
       element2[attribute] = value;
     } else {
       element2.setAttribute(attribute, value);
     }
   }
   function get_attributes(element2) {
+    var _a2;
     return (
       /** @type {Record<string | symbol, unknown>} **/
-      // @ts-expect-error
-      element2.__attributes ?? (element2.__attributes = {
+      /** @type {any} */
+      element2[_a2 = ATTRIBUTES_CACHE] ?? (element2[_a2] = {
         [IS_CUSTOM_ELEMENT]: element2.nodeName.includes("-"),
         [IS_HTML]: element2.namespaceURI === NAMESPACE_HTML
       })
@@ -5161,15 +5865,16 @@ ${component_stack}
     var setters = setters_cache.get(cache_key);
     if (setters)
       return setters;
-    setters_cache.set(cache_key, setters = []);
+    setters_cache.set(cache_key, setters = /* @__PURE__ */ new Set());
     var descriptors;
     var proto = element2;
     var element_proto = Element.prototype;
     while (element_proto !== proto) {
       descriptors = get_descriptors(proto);
       for (var key2 in descriptors) {
-        if (descriptors[key2].set) {
-          setters.push(key2);
+        if (descriptors[key2].set && // better safe than sorry, we don't want spread attributes to mess with HTML content
+        key2 !== "innerHTML" && key2 !== "textContent" && key2 !== "innerText") {
+          setters.add(key2);
         }
       }
       proto = get_prototype_of(proto);
@@ -5210,87 +5915,19 @@ ${component_stack}
     );
   }
 
-  // node_modules/svelte/src/internal/client/dom/elements/bindings/input.js
-  function bind_value(input, get3, set2 = get3) {
-    var batches2 = /* @__PURE__ */ new WeakSet();
-    listen_to_event_and_reset_event(input, "input", async (is_reset) => {
-      if (dev_fallback_default && input.type === "checkbox") {
-        bind_invalid_checkbox_value();
-      }
-      var value = is_reset ? input.defaultValue : input.value;
-      value = is_numberlike_input(input) ? to_number(value) : value;
-      set2(value);
-      if (current_batch !== null) {
-        batches2.add(current_batch);
-      }
-      await tick();
-      if (value !== (value = get3())) {
-        var start = input.selectionStart;
-        var end = input.selectionEnd;
-        var length = input.value.length;
-        input.value = value ?? "";
-        if (end !== null) {
-          var new_length = input.value.length;
-          if (start === end && end === length && new_length > length) {
-            input.selectionStart = new_length;
-            input.selectionEnd = new_length;
-          } else {
-            input.selectionStart = start;
-            input.selectionEnd = Math.min(end, new_length);
-          }
-        }
-      }
-    });
-    if (
-      // If we are hydrating and the value has since changed,
-      // then use the updated value from the input instead.
-      hydrating && input.defaultValue !== input.value || // If defaultValue is set, then value == defaultValue
-      // TODO Svelte 6: remove input.value check and set to empty string?
-      untrack(get3) == null && input.value
-    ) {
-      set2(is_numberlike_input(input) ? to_number(input.value) : input.value);
-      if (current_batch !== null) {
-        batches2.add(current_batch);
-      }
-    }
-    render_effect(() => {
-      if (dev_fallback_default && input.type === "checkbox") {
-        bind_invalid_checkbox_value();
-      }
-      var value = get3();
-      if (input === document.activeElement) {
-        var batch = (
-          /** @type {Batch} */
-          previous_batch ?? current_batch
-        );
-        if (batches2.has(batch)) {
-          return;
-        }
-      }
-      if (is_numberlike_input(input) && value === to_number(input.value)) {
-        return;
-      }
-      if (input.type === "date" && !value && !input.value) {
-        return;
-      }
-      if (value !== input.value) {
-        input.value = value ?? "";
-      }
-    });
-  }
-  function is_numberlike_input(input) {
-    var type = input.type;
-    return type === "number" || type === "range";
-  }
-  function to_number(value) {
-    return value === "" ? null : +value;
-  }
-
   // node_modules/svelte/src/internal/client/dom/elements/bindings/this.js
   function is_bound_this(bound_value, element_or_component) {
     return bound_value === element_or_component || bound_value?.[STATE_SYMBOL] === element_or_component;
   }
-  function bind_this(element_or_component = {}, update2, get_value, get_parts) {
+  function bind_this(element_or_component = mark_as_component(), update2, get_value, get_parts) {
+    var component_effect = (
+      /** @type {ComponentContext} */
+      component_context.r
+    );
+    var parent = (
+      /** @type {Effect} */
+      active_effect
+    );
     effect(() => {
       var old_parts;
       var parts;
@@ -5298,7 +5935,7 @@ ${component_stack}
         old_parts = parts;
         parts = get_parts?.() || [];
         untrack(() => {
-          if (element_or_component !== get_value(...parts)) {
+          if (!is_bound_this(get_value(...parts), element_or_component)) {
             update2(element_or_component, ...parts);
             if (old_parts && is_bound_this(get_value(...old_parts), element_or_component)) {
               update2(null, ...old_parts);
@@ -5307,18 +5944,172 @@ ${component_stack}
         });
       });
       return () => {
-        queue_micro_task(() => {
+        let p = parent;
+        while (p !== component_effect && p.parent !== null && p.parent.f & DESTROYING) {
+          p = p.parent;
+        }
+        const teardown2 = () => {
           if (parts && is_bound_this(get_value(...parts), element_or_component)) {
             update2(null, ...parts);
           }
-        });
+        };
+        const original_teardown = p.teardown;
+        p.teardown = () => {
+          teardown2();
+          original_teardown?.();
+        };
       };
     });
     return element_or_component;
   }
 
   // node_modules/svelte/src/internal/client/reactivity/store.js
-  var IS_UNMOUNTED = Symbol();
+  var is_store_binding = false;
+  var IS_UNMOUNTED = Symbol("unmounted");
+  function capture_store_binding(fn) {
+    var previous_is_store_binding = is_store_binding;
+    try {
+      is_store_binding = false;
+      return [fn(), is_store_binding];
+    } finally {
+      is_store_binding = previous_is_store_binding;
+    }
+  }
+
+  // node_modules/svelte/src/internal/client/reactivity/props.js
+  function prop(props, key2, flags2, fallback2) {
+    var runes = !legacy_mode_flag || (flags2 & PROPS_IS_RUNES) !== 0;
+    var bindable = (flags2 & PROPS_IS_BINDABLE) !== 0;
+    var lazy = (flags2 & PROPS_IS_LAZY_INITIAL) !== 0;
+    var fallback_value = (
+      /** @type {V} */
+      fallback2
+    );
+    var fallback_dirty = true;
+    var fallback_signal = (
+      /** @type {Derived<V> | undefined} */
+      void 0
+    );
+    var get_fallback = () => {
+      if (lazy && runes) {
+        fallback_signal ?? (fallback_signal = derived(
+          /** @type {() => V} */
+          fallback2
+        ));
+        return get(fallback_signal);
+      }
+      if (fallback_dirty) {
+        fallback_dirty = false;
+        fallback_value = lazy ? untrack(
+          /** @type {() => V} */
+          fallback2
+        ) : (
+          /** @type {V} */
+          fallback2
+        );
+      }
+      return fallback_value;
+    };
+    let setter;
+    if (bindable) {
+      var is_entry_props = STATE_SYMBOL in props || LEGACY_PROPS in props;
+      setter = get_descriptor(props, key2)?.set ?? (is_entry_props && key2 in props ? (v) => props[key2] = v : void 0);
+    }
+    var initial_value;
+    var is_store_sub = false;
+    if (bindable) {
+      [initial_value, is_store_sub] = capture_store_binding(() => (
+        /** @type {V} */
+        props[key2]
+      ));
+    } else {
+      initial_value = /** @type {V} */
+      props[key2];
+    }
+    if (initial_value === void 0 && fallback2 !== void 0) {
+      initial_value = get_fallback();
+      if (setter) {
+        if (runes)
+          props_invalid_value(key2);
+        setter(initial_value);
+      }
+    }
+    var getter;
+    if (runes) {
+      getter = () => {
+        var value = (
+          /** @type {V} */
+          props[key2]
+        );
+        if (value === void 0)
+          return get_fallback();
+        fallback_dirty = true;
+        return value;
+      };
+    } else {
+      getter = () => {
+        var value = (
+          /** @type {V} */
+          props[key2]
+        );
+        if (value !== void 0) {
+          fallback_value = /** @type {V} */
+          void 0;
+        }
+        return value === void 0 ? fallback_value : value;
+      };
+    }
+    if (runes && (flags2 & PROPS_IS_UPDATED) === 0) {
+      return getter;
+    }
+    if (setter) {
+      var legacy_parent = props.$$legacy;
+      return (
+        /** @type {() => V} */
+        function(value, mutation) {
+          if (arguments.length > 0) {
+            if (!runes || !mutation || legacy_parent || is_store_sub) {
+              setter(mutation ? getter() : value);
+            }
+            return value;
+          }
+          return getter();
+        }
+      );
+    }
+    var overridden = false;
+    var d = ((flags2 & PROPS_IS_IMMUTABLE) !== 0 ? derived : derived_safe_equal)(() => {
+      overridden = false;
+      return getter();
+    });
+    if (dev_fallback_default) {
+      d.label = key2;
+    }
+    if (bindable)
+      get(d);
+    var parent_effect = (
+      /** @type {Effect} */
+      active_effect
+    );
+    return (
+      /** @type {() => V} */
+      function(value, mutation) {
+        if (arguments.length > 0) {
+          const new_value = mutation ? get(d) : runes && bindable ? proxy(value) : value;
+          set(d, new_value);
+          overridden = true;
+          if (fallback_value !== void 0) {
+            fallback_value = new_value;
+          }
+          return value;
+        }
+        if (is_destroying_effect && overridden || (parent_effect.f & DESTROYED) !== 0) {
+          return d.v;
+        }
+        return get(d);
+      }
+    );
+  }
 
   // node_modules/svelte/src/legacy/legacy-client.js
   function createClassComponent(options) {
@@ -5366,7 +6157,8 @@ ${component_stack}
         props,
         context: options.context,
         intro: options.intro ?? false,
-        recover: options.recover
+        recover: options.recover,
+        transformError: options.transformError
       }));
       if (!async_mode_flag && (!options?.props?.$$host || options.sync === false)) {
         flushSync();
@@ -5712,15 +6504,18 @@ ${component_stack}
   }
 
   // webview/shared/vscodeApi.ts
-  var api;
+  var api = null;
   function getVsCodeApi() {
-    if (!api) {
+    if (!api && typeof acquireVsCodeApi === "function") {
       api = acquireVsCodeApi();
     }
     return api;
   }
   function postMessage(type, payload) {
-    getVsCodeApi().postMessage({ type, payload });
+    const vscode = getVsCodeApi();
+    if (vscode) {
+      vscode.postMessage({ type, payload });
+    }
   }
   function onMessage(handler) {
     const listener = (event2) => {
@@ -5729,55 +6524,72 @@ ${component_stack}
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
   }
-
+  function escapePushHtml(str) {
+    if (!str)
+      return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function escapeAttr(str) {
+    if (!str)
+      return "";
+    return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function getPushFileIcon(filename) {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    if (ext === "dart") {
+      return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4.5 12L12 4.5L19.5 12L12 19.5L4.5 12Z" stroke="#4fc3f7" stroke-width="2.5" fill="#0288d1"/><circle cx="12" cy="12" r="3" fill="#ffffff"/></svg>';
+    }
+    if (ext === "xml") {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#e57373"><path d="M8 2L13 6L8 14L3 6L8 2Z" stroke="#ef5350" stroke-width="1.2" fill="#c62828"/></svg>';
+    }
+    if (ext === "json") {
+      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#ce93d8"><text x="2" y="12" fill="#ab47bc" font-size="12" font-weight="bold">{ }</text></svg>';
+    }
+    return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#90a4ae"><path d="M3 2h7l3 3v9H3V2z" fill="#37474f" stroke="#78909c" stroke-width="1.2"/><path d="M10 2v3h3" fill="none" stroke="#78909c" stroke-width="1.2"/></svg>';
+  }
   function openCreateBranchDialog(startPoint) {
     const existing = document.querySelector(".as-branch-dialog-overlay");
-    if (existing) existing.remove();
-
+    if (existing)
+      existing.remove();
     const overlay = document.createElement("div");
     overlay.className = "as-branch-dialog-overlay";
     overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
-
     const baseName = startPoint || "HEAD";
     const displayBase = baseName.length > 30 ? baseName.slice(0, 27) + "..." : baseName;
-
     const card = document.createElement("div");
     card.className = "as-dialog-card";
     card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
-
     card.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
-        <span class="as-cb-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
-        </span>
-        <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
-        </button>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
+      <span class="as-cb-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
+      </span>
+      <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+      </button>
+    </div>
+    <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <label for="as-cb-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Branch Name:</label>
+        <input type="text" id="as-cb-name" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
       </div>
-      <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <label for="as-cb-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Branch Name:</label>
-          <input type="text" id="as-cb-name" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
-        </div>
-        <div style="display:flex;align-items:center;gap:20px;padding-left:102px;">
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
-            <input type="checkbox" id="as-cb-checkout" class="as-custom-chk" checked style="width:14px;height:14px;cursor:pointer;margin:0;">
-            <span>Checkout branch</span>
-          </label>
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
-            <input type="checkbox" id="as-cb-overwrite" class="as-custom-chk" style="width:14px;height:14px;cursor:pointer;margin:0;">
-            <span>Overwrite existing branch</span>
-          </label>
-        </div>
+      <div style="display:flex;align-items:center;gap:20px;padding-left:102px;">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
+          <input type="checkbox" id="as-cb-checkout" class="as-custom-chk" checked style="width:14px;height:14px;cursor:pointer;margin:0;">
+          <span>Checkout branch</span>
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
+          <input type="checkbox" id="as-cb-overwrite" class="as-custom-chk" style="width:14px;height:14px;cursor:pointer;margin:0;">
+          <span>Overwrite existing branch</span>
+        </label>
       </div>
-      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
-        <button class="as-dialog-btn" id="as-cb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-        <button class="as-dialog-btn" id="as-cb-create" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
-      </div>
-    `;
-
+    </div>
+    <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
+      <button class="as-dialog-btn" id="as-cb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+      <button class="as-dialog-btn" id="as-cb-create" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+    </div>
+  `;
     overlay.appendChild(card);
     document.body.appendChild(overlay);
-
     const titleEl = card.querySelector(".as-cb-title");
     titleEl.textContent = "Create Branch from " + displayBase;
     const nameInput = card.querySelector("#as-cb-name");
@@ -5787,28 +6599,10 @@ ${component_stack}
     const btnCancel = card.querySelector("#as-cb-cancel");
     const btnCreate = card.querySelector("#as-cb-create");
     const dotClose = card.querySelector(".as-dot-close");
-
-    if (dotClose) {
-      dotClose.onmouseenter = () => {
-        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
-        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
-      };
-      dotClose.onmouseleave = () => {
-        dotClose.style.background = "none";
-        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
-      };
-    }
-
-    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
-    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
-    btnCreate.onmouseenter = () => { btnCreate.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
-    btnCreate.onmouseleave = () => { btnCreate.style.background = "var(--vscode-button-background, #3574f0)"; };
-
     const closeDialog = () => {
       overlay.remove();
       document.removeEventListener("keydown", onKeyDown);
     };
-
     const submitDialog = () => {
       const name = nameInput.value.trim();
       if (!name) {
@@ -5820,15 +6614,14 @@ ${component_stack}
       postMessage("createBranch", { name, startPoint: baseName, checkout, force });
       closeDialog();
     };
-
     btnCancel.addEventListener("click", closeDialog);
-    if (dotClose) dotClose.addEventListener("click", closeDialog);
+    if (dotClose)
+      dotClose.addEventListener("click", closeDialog);
     btnCreate.addEventListener("click", submitDialog);
-
     overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) closeDialog();
+      if (e.target === overlay)
+        closeDialog();
     });
-
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -5838,50 +6631,43 @@ ${component_stack}
         submitDialog();
       }
     };
-
     document.addEventListener("keydown", onKeyDown);
-
     setTimeout(() => {
       nameInput.focus();
       nameInput.select();
     }, 50);
   }
-
   function openRenameBranchDialog(oldName) {
     const existing = document.querySelector(".as-branch-dialog-overlay");
-    if (existing) existing.remove();
-
+    if (existing)
+      existing.remove();
     const overlay = document.createElement("div");
     overlay.className = "as-branch-dialog-overlay";
     overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
-
     const card = document.createElement("div");
     card.className = "as-dialog-card";
     card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
-
     card.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
-        <span class="as-rb-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
-        </span>
-        <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
-        </button>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
+      <span class="as-rb-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
+      </span>
+      <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+      </button>
+    </div>
+    <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <label for="as-rb-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Branch Name:</label>
+        <input type="text" id="as-rb-name" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
       </div>
-      <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <label for="as-rb-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Branch Name:</label>
-          <input type="text" id="as-rb-name" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
-        </div>
-      </div>
-      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
-        <button class="as-dialog-btn" id="as-rb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-        <button class="as-dialog-btn" id="as-rb-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Rename</button>
-      </div>
-    `;
-
+    </div>
+    <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
+      <button class="as-dialog-btn" id="as-rb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+      <button class="as-dialog-btn" id="as-rb-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Rename</button>
+    </div>
+  `;
     overlay.appendChild(card);
     document.body.appendChild(overlay);
-
     const titleEl = card.querySelector(".as-rb-title");
     titleEl.textContent = "Rename Branch '" + (oldName || "") + "'";
     const nameInput = card.querySelector("#as-rb-name");
@@ -5889,28 +6675,10 @@ ${component_stack}
     const btnCancel = card.querySelector("#as-rb-cancel");
     const btnOk = card.querySelector("#as-rb-ok");
     const dotClose = card.querySelector(".as-dot-close");
-
-    if (dotClose) {
-      dotClose.onmouseenter = () => {
-        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
-        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
-      };
-      dotClose.onmouseleave = () => {
-        dotClose.style.background = "none";
-        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
-      };
-    }
-
-    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
-    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
-    btnOk.onmouseenter = () => { btnOk.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
-    btnOk.onmouseleave = () => { btnOk.style.background = "var(--vscode-button-background, #3574f0)"; };
-
     const closeDialog = () => {
       overlay.remove();
       document.removeEventListener("keydown", onKeyDown);
     };
-
     const submitDialog = () => {
       const newName = nameInput.value.trim();
       if (!newName) {
@@ -5922,15 +6690,14 @@ ${component_stack}
       }
       closeDialog();
     };
-
     btnCancel.addEventListener("click", closeDialog);
-    if (dotClose) dotClose.addEventListener("click", closeDialog);
+    if (dotClose)
+      dotClose.addEventListener("click", closeDialog);
     btnOk.addEventListener("click", submitDialog);
-
     overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) closeDialog();
+      if (e.target === overlay)
+        closeDialog();
     });
-
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -5940,98 +6707,71 @@ ${component_stack}
         submitDialog();
       }
     };
-
     document.addEventListener("keydown", onKeyDown);
-
     setTimeout(() => {
       nameInput.focus();
       nameInput.select();
     }, 50);
   }
-
-  function openCreateTagDialog(hash) {
+  function openCreateTagDialog(hash2) {
     const existing = document.querySelector(".as-branch-dialog-overlay");
-    if (existing) existing.remove();
-
+    if (existing)
+      existing.remove();
     const overlay = document.createElement("div");
     overlay.className = "as-branch-dialog-overlay";
     overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
-
-    const shortHash = hash ? hash.slice(0, 8) : "";
-
+    const shortHash = hash2 ? hash2.slice(0, 8) : "";
     const card = document.createElement("div");
     card.className = "as-dialog-card";
     card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:460px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
-
     card.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
-        <span class="as-tag-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
-        </span>
-        <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
-        </button>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
+      <span class="as-tag-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
+      </span>
+      <button class="as-dialog-close-btn as-dot-close" title="Close" type="button" style="background:none;border:none;color:var(--vscode-icon-foreground,var(--vscode-descriptionForeground,#8c9199));width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:4px;padding:0;outline:none;">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+      </button>
+    </div>
+    <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <label for="as-tag-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Tag Name:</label>
+        <input type="text" id="as-tag-name" placeholder="v1.0.0" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
       </div>
-      <div style="padding:18px 20px 14px 20px;display:flex;flex-direction:column;gap:12px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <label for="as-tag-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;">Tag Name:</label>
-          <input type="text" id="as-tag-name" placeholder="v1.0.0" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
-        </div>
-      </div>
-      <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
-        <button class="as-dialog-btn" id="as-tag-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-        <button class="as-dialog-btn" id="as-tag-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
-      </div>
-    `;
-
+    </div>
+    <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
+      <button class="as-dialog-btn" id="as-tag-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
+      <button class="as-dialog-btn" id="as-tag-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+    </div>
+  `;
     overlay.appendChild(card);
     document.body.appendChild(overlay);
-
     const titleEl = card.querySelector(".as-tag-title");
     titleEl.textContent = "Create Tag at " + shortHash;
     const nameInput = card.querySelector("#as-tag-name");
     const btnCancel = card.querySelector("#as-tag-cancel");
     const btnOk = card.querySelector("#as-tag-ok");
     const dotClose = card.querySelector(".as-dot-close");
-
-    if (dotClose) {
-      dotClose.onmouseenter = () => {
-        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
-        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
-      };
-      dotClose.onmouseleave = () => {
-        dotClose.style.background = "none";
-        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
-      };
-    }
-
-    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
-    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
-    btnOk.onmouseenter = () => { btnOk.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
-    btnOk.onmouseleave = () => { btnOk.style.background = "var(--vscode-button-background, #3574f0)"; };
-
     const closeDialog = () => {
       overlay.remove();
       document.removeEventListener("keydown", onKeyDown);
     };
-
     const submitDialog = () => {
       const name = nameInput.value.trim();
       if (!name) {
         nameInput.focus();
         return;
       }
-      postMessage("createTag", { name, hash });
+      postMessage("createTag", { name, hash: hash2 });
       closeDialog();
     };
-
     btnCancel.addEventListener("click", closeDialog);
-    if (dotClose) dotClose.addEventListener("click", closeDialog);
+    if (dotClose)
+      dotClose.addEventListener("click", closeDialog);
     btnOk.addEventListener("click", submitDialog);
-
     overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) closeDialog();
+      if (e.target === overlay)
+        closeDialog();
     });
-
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -6041,42 +6781,39 @@ ${component_stack}
         submitDialog();
       }
     };
-
     document.addEventListener("keydown", onKeyDown);
-
     setTimeout(() => {
       nameInput.focus();
+      nameInput.select();
     }, 50);
   }
-
-  window.openCreateBranchDialog = openCreateBranchDialog;
-  window.openRenameBranchDialog = openRenameBranchDialog;
-  window.openCreateTagDialog = openCreateTagDialog;
-
-  let activeAuthDialog = null;
-
+  if (typeof window !== "undefined") {
+    window.openCreateBranchDialog = openCreateBranchDialog;
+    window.openRenameBranchDialog = openRenameBranchDialog;
+    window.openCreateTagDialog = openCreateTagDialog;
+  }
+  var activeAuthDialog = null;
   function openGitAuthDialog(authInfo) {
     if (activeAuthDialog) {
       activeAuthDialog.remove();
       activeAuthDialog = null;
     }
-
     const overlay = document.createElement("div");
     overlay.className = "as-branch-dialog-overlay as-auth-dialog-overlay";
     overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(1px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
-
     const remote = authInfo?.remote || "origin";
     const rawUrl = authInfo?.url || "";
     let hostName = authInfo?.host || remote;
     if (!authInfo?.host && rawUrl) {
-      try { hostName = new URL(rawUrl).host; } catch {}
+      try {
+        hostName = new URL(rawUrl).host;
+      } catch {
+      }
     }
     const defaultUsername = authInfo?.defaultUsername || "phucdnh";
-
     const card = document.createElement("div");
     card.className = "as-dialog-card";
     card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:490px;max-width:92vw;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
-
     card.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));user-select:none;">
         <span class="as-auth-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
@@ -6153,11 +6890,9 @@ ${component_stack}
         </button>
       </div>
     `;
-
     overlay.appendChild(card);
     document.body.appendChild(overlay);
     activeAuthDialog = overlay;
-
     if (!document.getElementById("as-checkbox-transparent-style")) {
       const cs = document.createElement("style");
       cs.id = "as-checkbox-transparent-style";
@@ -6228,14 +6963,12 @@ ${component_stack}
       `;
       document.head.appendChild(cs);
     }
-
     if (!document.getElementById("as-auth-spin-style")) {
       const s = document.createElement("style");
       s.id = "as-auth-spin-style";
       s.textContent = "@keyframes asAuthSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }";
       document.head.appendChild(s);
     }
-
     let currentAuthMode = "token";
     const tabToken = card.querySelector("#as-auth-tab-token");
     const tabPassword = card.querySelector("#as-auth-tab-password");
@@ -6254,7 +6987,6 @@ ${component_stack}
     const dotClose = card.querySelector(".as-dot-close");
     const tokenToggle = card.querySelector("#as-auth-token-toggle");
     const passToggle = card.querySelector("#as-auth-pass-toggle");
-
     if (dotClose) {
       dotClose.onmouseenter = () => {
         dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
@@ -6265,12 +6997,18 @@ ${component_stack}
         dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
       };
     }
-
-    btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
-    btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
-    btnSubmit.onmouseenter = () => { btnSubmit.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
-    btnSubmit.onmouseleave = () => { btnSubmit.style.background = "var(--vscode-button-background, #3574f0)"; };
-
+    btnCancel.onmouseenter = () => {
+      btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)";
+    };
+    btnCancel.onmouseleave = () => {
+      btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)";
+    };
+    btnSubmit.onmouseenter = () => {
+      btnSubmit.style.background = "var(--vscode-button-hoverBackground, #4682f7)";
+    };
+    btnSubmit.onmouseleave = () => {
+      btnSubmit.style.background = "var(--vscode-button-background, #3574f0)";
+    };
     tabToken.onclick = () => {
       currentAuthMode = "token";
       tabToken.style.borderBottomColor = "var(--vscode-button-background, #3574f0)";
@@ -6283,7 +7021,6 @@ ${component_stack}
       panePassword.style.display = "none";
       tokenInput.focus();
     };
-
     tabPassword.onclick = () => {
       currentAuthMode = "password";
       tabPassword.style.borderBottomColor = "var(--vscode-button-background, #3574f0)";
@@ -6296,31 +7033,28 @@ ${component_stack}
       paneToken.style.display = "none";
       userInput.focus();
     };
-
     tokenToggle.onclick = () => {
       tokenInput.type = tokenInput.type === "password" ? "text" : "password";
     };
     passToggle.onclick = () => {
       passInput.type = passInput.type === "password" ? "text" : "password";
     };
-
     const closeDialog = () => {
       overlay.remove();
       activeAuthDialog = null;
       document.removeEventListener("keydown", onKeyDown);
     };
-
     btnCancel.onclick = closeDialog;
-    if (dotClose) dotClose.onclick = closeDialog;
+    if (dotClose)
+      dotClose.onclick = closeDialog;
     overlay.onclick = (e) => {
-      if (e.target === overlay) closeDialog();
+      if (e.target === overlay)
+        closeDialog();
     };
-
     const submit = () => {
       errorMsg.style.display = "none";
       let username = "";
       let secret = "";
-
       if (currentAuthMode === "token") {
         secret = tokenInput.value.trim();
         username = tokenUserInput.value.trim();
@@ -6343,24 +7077,20 @@ ${component_stack}
           return;
         }
       }
-
       btnSubmit.disabled = true;
       spinner.style.display = "inline-block";
       btnText.textContent = "Verifying...";
-
       postMessage("saveGitCredentials", {
         remote,
         url: rawUrl,
         authType: currentAuthMode,
         username,
-        token: currentAuthMode === "token" ? secret : undefined,
-        password: currentAuthMode === "password" ? secret : undefined,
-        remember: rememberBox.checked,
+        token: currentAuthMode === "token" ? secret : void 0,
+        password: currentAuthMode === "password" ? secret : void 0,
+        remember: rememberBox.checked
       });
     };
-
     btnSubmit.onclick = submit;
-
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -6371,63 +7101,31 @@ ${component_stack}
       }
     };
     document.addEventListener("keydown", onKeyDown);
-
     setTimeout(() => {
       tokenInput.focus();
     }, 50);
   }
-
   window.openGitAuthDialog = openGitAuthDialog;
-
-  function getPushFileIcon(filename) {
-    const ext = filename.split('.').pop().toLowerCase();
-    if (ext === 'dart') {
-      return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4.5 12L12 4.5L19.5 12L12 19.5L4.5 12Z" stroke="#4fc3f7" stroke-width="2.5" fill="#0288d1"/><circle cx="12" cy="12" r="3" fill="#ffffff"/></svg>';
-    }
-    if (ext === 'xml') {
-      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#e57373"><path d="M8 2L13 6L8 14L3 6L8 2Z" stroke="#ef5350" stroke-width="1.2" fill="#c62828"/></svg>';
-    }
-    if (ext === 'json') {
-      return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#ce93d8"><text x="2" y="12" fill="#ab47bc" font-size="12" font-weight="bold">{ }</text></svg>';
-    }
-    return '<svg width="15" height="15" viewBox="0 0 16 16" fill="#90a4ae"><path d="M3 2h7l3 3v9H3V2z" fill="#37474f" stroke="#78909c" stroke-width="1.2"/><path d="M10 2v3h3" fill="none" stroke="#78909c" stroke-width="1.2"/></svg>';
-  }
-
-  function escapePushHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  function escapeAttr(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  let activePushDialog = null;
-
+  var activePushDialog = null;
   function openPushDialog(pushInfo) {
     if (activePushDialog) {
       activePushDialog.remove();
       activePushDialog = null;
     }
-
-    if (!pushInfo) return;
-
-    const overlay = document.createElement('div');
-    overlay.className = 'as-push-dialog-overlay';
+    if (!pushInfo)
+      return;
+    const overlay = document.createElement("div");
+    overlay.className = "as-push-dialog-overlay";
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
-
-    const card = document.createElement('div');
-    card.className = 'as-push-dialog-card';
-    card.style.cssText = 'background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#43454a));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:760px;max-width:95vw;height:520px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);';
-
+    const card = document.createElement("div");
+    card.className = "as-push-dialog-card";
+    card.style.cssText = "background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#43454a));border-radius:6px;box-shadow:0 12px 36px rgba(0,0,0,0.55);width:760px;max-width:95vw;height:520px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;color:var(--vscode-editor-foreground,#dfe1e5);";
     const commits = pushInfo.commits || [];
     const totalFiles = pushInfo.totalFiles || [];
-    let selectedCommitHash = 'ALL';
+    let selectedCommitHash = "ALL";
     let currentRemote = pushInfo.remote;
     let currentTargetBranch = pushInfo.remoteBranch || pushInfo.currentBranch;
-    const availableRemotes = (pushInfo.remotes && pushInfo.remotes.length > 0) ? pushInfo.remotes : [currentRemote];
-
+    const availableRemotes = pushInfo.remotes && pushInfo.remotes.length > 0 ? pushInfo.remotes : [currentRemote];
     card.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#323438));user-select:none;">
         <span id="push-dialog-title" style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);">
@@ -6450,7 +7148,7 @@ ${component_stack}
             <span style="opacity:0.7;margin:0 2px;">:</span>
             <span id="push-target-branch-display" title="Click to edit remote branch name" style="color:var(--vscode-textLink-activeForeground,#d0e3ff);text-decoration:underline;cursor:pointer;font-weight:500;white-space:nowrap;padding:1px 4px;border-radius:3px;">${escapePushHtml(currentTargetBranch)}</span>
             <input id="push-target-branch-input" type="text" value="${escapeAttr(currentTargetBranch)}" style="display:none;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#ffffff);border:1.5px solid var(--vscode-focusBorder,#3574f0);border-radius:3px;padding:2px 6px;font-size:12px;font-family:inherit;outline:none;width:150px;">
-            <span id="push-new-badge" style="background:rgba(255,255,255,0.22);color:#ffffff;font-size:10.5px;padding:1px 5px;border-radius:3px;margin-left:auto;white-space:nowrap;${pushInfo.isNew ? '' : 'display:none;'}">New</span>
+            <span id="push-new-badge" style="background:rgba(255,255,255,0.22);color:#ffffff;font-size:10.5px;padding:1px 5px;border-radius:3px;margin-left:auto;white-space:nowrap;${pushInfo.isNew ? "" : "display:none;"}">New</span>
           </div>
           <div id="push-commits-container" style="flex:1;overflow-y:auto;padding:4px 0;">
           </div>
@@ -6465,7 +7163,7 @@ ${component_stack}
               <span id="push-files-count" style="color:var(--vscode-descriptionForeground,#808080);font-size:11.5px;font-weight:normal;"></span>
             </div>
             <div style="display:flex;align-items:center;gap:6px;color:var(--vscode-icon-foreground,#9aa0a6);">
-              <span title="View Options" style="cursor:pointer;font-size:12px;">👁</span>
+              <span title="View Options" style="cursor:pointer;font-size:12px;">\u{1F441}</span>
             </div>
           </div>
           <div id="push-files-container" style="flex:1;overflow-y:auto;padding:6px 8px;">
@@ -6490,7 +7188,7 @@ ${component_stack}
           <button id="btn-push-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
           <div style="display:inline-flex;border-radius:4px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.3);">
             <button id="btn-push-submit" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Push</button>
-            <button id="btn-push-menu-trigger" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-left:1px solid rgba(255,255,255,0.25);padding:6px 8px;font-size:11px;cursor:pointer;" title="Push Options">▼</button>
+            <button id="btn-push-menu-trigger" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-left:1px solid rgba(255,255,255,0.25);padding:6px 8px;font-size:11px;cursor:pointer;" title="Push Options">\u25BC</button>
           </div>
           <div id="push-dropdown-menu" style="display:none;position:absolute;bottom:36px;right:0;background:var(--vscode-dropdown-background,var(--vscode-editorWidget-background,#2b2d30));border:1px solid var(--vscode-dropdown-border,var(--vscode-widget-border,#43454a));border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.7);padding:4px 0;z-index:100;min-width:180px;">
             <div id="btn-force-push-opt" style="padding:6px 14px;font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);cursor:pointer;">Force Push (no-verify)...</div>
@@ -6498,167 +7196,151 @@ ${component_stack}
         </div>
       </div>
     `;
-
     overlay.appendChild(card);
     document.body.appendChild(overlay);
     activePushDialog = overlay;
-
-    const titleEl = card.querySelector('#push-dialog-title');
-    const branchHeader = card.querySelector('#push-branch-header');
-    const remoteLabel = card.querySelector('#push-remote-label');
-    const remoteDropdown = card.querySelector('#push-remote-dropdown');
-    const branchDisplay = card.querySelector('#push-target-branch-display');
-    const branchInput = card.querySelector('#push-target-branch-input');
-    const newBadge = card.querySelector('#push-new-badge');
-    const commitsContainer = card.querySelector('#push-commits-container');
-    const filesContainer = card.querySelector('#push-files-container');
-    const filesCountEl = card.querySelector('#push-files-count');
-    const btnCancel = card.querySelector('#btn-push-cancel');
-    const btnSubmit = card.querySelector('#btn-push-submit');
-    const btnMenuTrigger = card.querySelector('#btn-push-menu-trigger');
-    const dropdownMenu = card.querySelector('#push-dropdown-menu');
-    const btnForcePush = card.querySelector('#btn-force-push-opt');
-    const chkTags = card.querySelector('#chk-push-tags');
-    const dotClose = card.querySelector('.as-push-dot-close');
-
-    // Remote dropdown setup
+    const titleEl = card.querySelector("#push-dialog-title");
+    const branchHeader = card.querySelector("#push-branch-header");
+    const remoteLabel = card.querySelector("#push-remote-label");
+    const remoteDropdown = card.querySelector("#push-remote-dropdown");
+    const branchDisplay = card.querySelector("#push-target-branch-display");
+    const branchInput = card.querySelector("#push-target-branch-input");
+    const newBadge = card.querySelector("#push-new-badge");
+    const commitsContainer = card.querySelector("#push-commits-container");
+    const filesContainer = card.querySelector("#push-files-container");
+    const filesCountEl = card.querySelector("#push-files-count");
+    const btnCancel = card.querySelector("#btn-push-cancel");
+    const btnSubmit = card.querySelector("#btn-push-submit");
+    const btnMenuTrigger = card.querySelector("#btn-push-menu-trigger");
+    const dropdownMenu = card.querySelector("#push-dropdown-menu");
+    const btnForcePush = card.querySelector("#btn-force-push-opt");
+    const chkTags = card.querySelector("#chk-push-tags");
+    const dotClose = card.querySelector(".as-push-dot-close");
     if (availableRemotes.length > 0) {
-      remoteDropdown.innerHTML = availableRemotes.map(r => `
-        <div class="as-remote-opt" data-remote="${escapeAttr(r)}" style="padding:5px 12px;font-size:12px;color:#dfe1e5;cursor:pointer;${r === currentRemote ? 'background:#3574f0;color:#fff;' : ''}">${escapePushHtml(r)}</div>
-      `).join('');
-      remoteDropdown.querySelectorAll('.as-remote-opt').forEach(opt => {
-        opt.addEventListener('click', (e) => {
+      remoteDropdown.innerHTML = availableRemotes.map((r2) => `
+        <div class="as-remote-opt" data-remote="${escapeAttr(r2)}" style="padding:5px 12px;font-size:12px;color:#dfe1e5;cursor:pointer;${r2 === currentRemote ? "background:#3574f0;color:#fff;" : ""}">${escapePushHtml(r2)}</div>
+      `).join("");
+      remoteDropdown.querySelectorAll(".as-remote-opt").forEach((opt) => {
+        opt.addEventListener("click", (e) => {
           e.stopPropagation();
-          currentRemote = opt.getAttribute('data-remote');
+          currentRemote = opt.getAttribute("data-remote");
           remoteLabel.textContent = currentRemote;
-          if (titleEl) titleEl.textContent = 'Push Commits to ' + currentRemote;
-          remoteDropdown.style.display = 'none';
+          if (titleEl)
+            titleEl.textContent = "Push Commits to " + currentRemote;
+          remoteDropdown.style.display = "none";
         });
       });
     }
-
-    remoteLabel.addEventListener('click', (e) => {
+    remoteLabel.addEventListener("click", (e) => {
       e.stopPropagation();
       if (availableRemotes.length > 1) {
-        remoteDropdown.style.display = remoteDropdown.style.display === 'none' ? 'block' : 'none';
+        remoteDropdown.style.display = remoteDropdown.style.display === "none" ? "block" : "none";
       }
     });
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#push-remote-dropdown') && e.target !== remoteLabel) {
-        remoteDropdown.style.display = 'none';
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#push-remote-dropdown") && e.target !== remoteLabel) {
+        remoteDropdown.style.display = "none";
       }
     });
-
-    // Inline edit target branch
-    branchDisplay.addEventListener('click', (e) => {
+    branchDisplay.addEventListener("click", (e) => {
       e.stopPropagation();
-      branchDisplay.style.display = 'none';
-      branchInput.style.display = 'inline-block';
+      branchDisplay.style.display = "none";
+      branchInput.style.display = "inline-block";
       branchInput.value = currentTargetBranch;
       branchInput.focus();
       branchInput.select();
     });
-
     function finishEditBranch() {
       const val = branchInput.value.trim();
       if (val) {
         currentTargetBranch = val;
         branchDisplay.textContent = currentTargetBranch;
         if (currentTargetBranch !== pushInfo.currentBranch || pushInfo.isNew) {
-          newBadge.style.display = 'inline-block';
+          newBadge.style.display = "inline-block";
         }
       }
-      branchInput.style.display = 'none';
-      branchDisplay.style.display = 'inline-block';
+      branchInput.style.display = "none";
+      branchDisplay.style.display = "inline-block";
     }
-
-    branchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+    branchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
         finishEditBranch();
         e.stopPropagation();
-      } else if (e.key === 'Escape') {
+      } else if (e.key === "Escape") {
         branchInput.value = currentTargetBranch;
-        branchInput.style.display = 'none';
-        branchDisplay.style.display = 'inline-block';
+        branchInput.style.display = "none";
+        branchDisplay.style.display = "inline-block";
         e.stopPropagation();
       }
     });
-
-    branchInput.addEventListener('blur', () => {
+    branchInput.addEventListener("blur", () => {
       finishEditBranch();
     });
-
     function renderCommits() {
       if (commits.length === 0) {
         commitsContainer.innerHTML = '<div style="padding:16px 12px;color:#808080;font-size:12px;">No unpushed commits on this branch.</div>';
         return;
       }
-      let html = '';
-      commits.forEach(c => {
+      let html2 = "";
+      commits.forEach((c) => {
         const isSel = selectedCommitHash === c.hash;
-        const bg = isSel ? '#2d4b73' : 'transparent';
-        const textColor = isSel ? '#ffffff' : '#dfe1e5';
-        html += `
+        const bg = isSel ? "#2d4b73" : "transparent";
+        const textColor = isSel ? "#ffffff" : "#dfe1e5";
+        html2 += `
           <div class="as-push-commit-item" data-hash="${escapePushHtml(c.hash)}" style="display:flex;align-items:center;padding:5px 12px 5px 22px;background:${bg};color:${textColor};font-size:12.5px;cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             <span style="overflow:hidden;text-overflow:ellipsis;" title="${escapePushHtml(c.message)}">${escapePushHtml(c.message)}</span>
           </div>
         `;
       });
-      commitsContainer.innerHTML = html;
-
-      commitsContainer.querySelectorAll('.as-push-commit-item').forEach(el => {
-        el.addEventListener('click', () => {
-          selectedCommitHash = el.getAttribute('data-hash');
-          branchHeader.style.background = '#203248';
+      commitsContainer.innerHTML = html2;
+      commitsContainer.querySelectorAll(".as-push-commit-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          selectedCommitHash = el.getAttribute("data-hash");
+          branchHeader.style.background = "#203248";
           renderCommits();
           renderFiles();
         });
       });
     }
-
     function renderFiles() {
       let currentFiles = [];
-      if (selectedCommitHash === 'ALL') {
+      if (selectedCommitHash === "ALL") {
         currentFiles = totalFiles;
       } else {
-        const c = commits.find(x => x.hash === selectedCommitHash);
+        const c = commits.find((x) => x.hash === selectedCommitHash);
         currentFiles = c ? c.files : [];
       }
-
       filesCountEl.textContent = `${currentFiles.length} files`;
-
       if (currentFiles.length === 0) {
         filesContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#808080;font-size:12px;">No files changed.</div>';
         return;
       }
-
-      const groups = new Map();
-      currentFiles.forEach(f => {
-        const d = f.dir || '';
-        if (!groups.has(d)) groups.set(d, []);
+      const groups = /* @__PURE__ */ new Map();
+      currentFiles.forEach((f) => {
+        const d = f.dir || "";
+        if (!groups.has(d))
+          groups.set(d, []);
         groups.get(d).push(f);
       });
-
-      let html = '';
+      let html2 = "";
       for (const [dir, fList] of groups.entries()) {
-        html += `
+        html2 += `
           <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;color:#9aa0a6;font-size:11.5px;cursor:pointer;font-weight:500;">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A.5.5 0 0 0 8.92 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
-            <span style="color:#dfe1e5;">${escapePushHtml(dir || 'root')}</span>
-            <span style="color:#808080;font-size:11px;">${fList.length} file${fList.length > 1 ? 's' : ''}</span>
+            <span style="color:#dfe1e5;">${escapePushHtml(dir || "root")}</span>
+            <span style="color:#808080;font-size:11px;">${fList.length} file${fList.length > 1 ? "s" : ""}</span>
           </div>
         `;
-        fList.forEach(file => {
-          let statusBadge = '';
-          if (file.status === 'M') {
+        fList.forEach((file) => {
+          let statusBadge = "";
+          if (file.status === "M") {
             statusBadge = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:1px solid #499c54;border-radius:2px;font-size:9.5px;color:#499c54;font-weight:bold;margin-right:2px;">M</span>';
-          } else if (file.status === 'A') {
+          } else if (file.status === "A") {
             statusBadge = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:1px solid #62b543;border-radius:2px;font-size:9.5px;color:#62b543;font-weight:bold;margin-right:2px;">A</span>';
-          } else if (file.status === 'D') {
+          } else if (file.status === "D") {
             statusBadge = '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border:1px solid #e05555;border-radius:2px;font-size:9.5px;color:#e05555;font-weight:bold;margin-right:2px;">D</span>';
           }
-          html += `
+          html2 += `
             <div class="as-push-file-item" data-path="${escapePushHtml(file.path)}" style="display:flex;align-items:center;gap:6px;padding:3px 8px 3px 26px;font-size:12.5px;color:#dfe1e5;cursor:pointer;user-select:none;">
               ${statusBadge}
               ${getPushFileIcon(file.name)}
@@ -6667,277 +7349,1201 @@ ${component_stack}
           `;
         });
       }
-      filesContainer.innerHTML = html;
-
-      filesContainer.querySelectorAll('.as-push-file-item').forEach(el => {
-        el.addEventListener('dblclick', () => {
-          const filePath = el.getAttribute('data-path');
+      filesContainer.innerHTML = html2;
+      filesContainer.querySelectorAll(".as-push-file-item").forEach((el) => {
+        el.addEventListener("dblclick", () => {
+          const filePath = el.getAttribute("data-path");
           if (filePath) {
-            postMessage('openReviewInCenter', { filePath, jumpDiff: true, fromFileList: true });
+            postMessage("openReviewInCenter", { filePath, jumpDiff: true, fromFileList: true });
           }
         });
       });
     }
-
-    branchHeader.addEventListener('click', (e) => {
-      if (e.target.closest('#push-remote-label') || e.target.closest('#push-remote-dropdown') ||
-          e.target.closest('#push-target-branch-display') || e.target.closest('#push-target-branch-input')) {
+    branchHeader.addEventListener("click", (e) => {
+      if (e.target.closest("#push-remote-label") || e.target.closest("#push-remote-dropdown") || e.target.closest("#push-target-branch-display") || e.target.closest("#push-target-branch-input")) {
         return;
       }
-      selectedCommitHash = 'ALL';
-      branchHeader.style.background = '#2675bf';
+      selectedCommitHash = "ALL";
+      branchHeader.style.background = "#2675bf";
       renderCommits();
       renderFiles();
     });
-
     function close() {
       overlay.remove();
       activePushDialog = null;
     }
-
     function doPush(force) {
       btnSubmit.disabled = true;
-      btnSubmit.textContent = 'Pushing...';
-      btnSubmit.style.opacity = '0.7';
-      showToast("Pushing '" + (pushInfo.currentBranch || 'branch') + "'...");
-      postMessage('executePush', {
+      btnSubmit.textContent = "Pushing...";
+      btnSubmit.style.opacity = "0.7";
+      showToast("Pushing '" + (pushInfo.currentBranch || "branch") + "'...");
+      postMessage("executePush", {
         branch: pushInfo.currentBranch,
         targetBranch: currentTargetBranch,
         force: !!force,
-        setUpstream: pushInfo.isNew || (currentTargetBranch !== pushInfo.currentBranch),
+        setUpstream: pushInfo.isNew || currentTargetBranch !== pushInfo.currentBranch,
         remote: currentRemote,
-        tags: chkTags.checked,
+        tags: chkTags.checked
       });
     }
-
-    btnSubmit.addEventListener('click', () => doPush(false));
-    btnCancel.addEventListener('click', close);
+    btnSubmit.addEventListener("click", () => doPush(false));
+    btnCancel.addEventListener("click", close);
     if (dotClose) {
-      dotClose.addEventListener('click', close);
+      dotClose.addEventListener("click", close);
       dotClose.onmouseenter = () => {
-        dotClose.style.background = 'var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))';
-        dotClose.style.color = 'var(--vscode-editor-foreground, #dfe1e5)';
+        dotClose.style.background = "var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2))";
+        dotClose.style.color = "var(--vscode-editor-foreground, #dfe1e5)";
       };
       dotClose.onmouseleave = () => {
-        dotClose.style.background = 'none';
-        dotClose.style.color = 'var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))';
+        dotClose.style.background = "none";
+        dotClose.style.color = "var(--vscode-icon-foreground, var(--vscode-descriptionForeground, #8c9199))";
       };
     }
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay)
+        close();
     });
-
-    btnMenuTrigger.addEventListener('click', (e) => {
+    btnMenuTrigger.addEventListener("click", (e) => {
       e.stopPropagation();
-      dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
+      dropdownMenu.style.display = dropdownMenu.style.display === "none" ? "block" : "none";
     });
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#push-dropdown-menu') && e.target !== btnMenuTrigger) {
-        dropdownMenu.style.display = 'none';
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#push-dropdown-menu") && e.target !== btnMenuTrigger) {
+        dropdownMenu.style.display = "none";
       }
     });
-
-    btnForcePush.addEventListener('click', () => {
-      dropdownMenu.style.display = 'none';
+    btnForcePush.addEventListener("click", () => {
+      dropdownMenu.style.display = "none";
       doPush(true);
     });
-
     renderCommits();
     renderFiles();
   }
+  if (typeof window !== "undefined") {
+    window.openGitAuthDialog = openGitAuthDialog;
+    window.openPushDialog = openPushDialog;
+  }
 
-  window.openPushDialog = openPushDialog;
+  // webview/graph/FilterBar.svelte
+  var root = from_html(`<div class="filter-bar svelte-51df0s"></div>`);
+  var $$css = {
+    hash: "svelte-51df0s",
+    code: '.filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;flex-wrap:nowrap;overflow:hidden;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;transition:background 0.08s ease, color 0.08s ease;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e) !important;color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;max-height:none;overflow:visible;box-sizing:border-box;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.commit-context-menu::-webkit-scrollbar, .branch-context-menu::-webkit-scrollbar {width:5px;}.commit-context-menu::-webkit-scrollbar-thumb, .branch-context-menu::-webkit-scrollbar-thumb {background:rgba(255, 255, 255, 0.2);border-radius:3px;}.commit-context-menu::-webkit-scrollbar-thumb:hover, .branch-context-menu::-webkit-scrollbar-thumb:hover {background:rgba(255, 255, 255, 0.35);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;transition:background 0.08s ease, color 0.08s ease;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e) !important;color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff) !important;opacity:0.95 !important;}.bcm-item:hover .ccm-icon, .ccm-item:hover .ccm-icon {color:var(--vscode-menu-selectionForeground, #ffffff) !important;opacity:1 !important;}.bcm-item:hover span, .ccm-item:hover span, .bcm-item:hover .ccm-label, .ccm-item:hover .ccm-label {color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.ccm-item.disabled {opacity:0.38 !important;cursor:default !important;pointer-events:none !important;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;color:inherit;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", monospace;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.has-submenu:hover > .ccm-submenu {display:flex;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}.as-dialog-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1px);}.as-dialog-card {background:var(--vscode-editor-background, #1e1f22);border:1px solid var(--vscode-panel-border, #393b40);border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.75);width:560px;max-width:92vw;display:flex;flex-direction:column;color:var(--vscode-editor-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;overflow:hidden;box-sizing:border-box;}.as-dialog-header {padding:10px 16px;font-size:13px;font-weight:600;background:var(--vscode-titleBar-activeBackground, #2b2d30);border-bottom:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:space-between;user-select:none;}.as-dialog-close {cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.7;}.as-dialog-close:hover {opacity:1;background:rgba(255,255,255,0.1);}.as-dialog-body {padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}.as-dialog-field-label {font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #8c8c8c);text-transform:uppercase;letter-spacing:0.5px;}.as-dialog-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;}.as-dialog-input:focus, .as-dialog-textarea:focus {border-color:var(--vscode-focusBorder, #3574f0);}.as-dialog-textarea {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:8px 10px;font-size:12px;min-height:140px;max-height:320px;resize:vertical;outline:none;font-family:inherit;line-height:1.45;}.as-dialog-footer {padding:10px 16px;background:var(--vscode-editor-background, #1e1f22);border-top:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box;}.as-dialog-btn {padding:6px 16px;font-size:12px;border-radius:4px;cursor:pointer;border:none;font-weight:500;user-select:none;}.as-dialog-btn-primary {background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);}.as-dialog-btn-primary:hover {background:var(--vscode-button-hoverBackground, #355389);}.as-dialog-btn-secondary {background:transparent;color:var(--vscode-menu-foreground, #dfe1e5);border:1px solid var(--vscode-panel-border, #4e5157);}.as-dialog-btn-secondary:hover {background:rgba(255,255,255,0.08);}.as-dropdown-menu {position:absolute;top:calc(100% + 4px);background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;min-width:215px;z-index:2000;display:none;flex-direction:column;color:var(--vscode-menu-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;font-size:12px;user-select:none;box-sizing:border-box;}.as-menu-section-header {padding:6px 10px 3px 10px;font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-align:left;}.as-menu-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.as-menu-item {display:flex;align-items:center;padding:3px 8px;border-radius:4px;cursor:pointer;height:24px;box-sizing:border-box;color:var(--vscode-menu-foreground, #dfe1e5);white-space:nowrap;position:relative;transition:background 0.08s ease, color 0.08s ease;}.as-menu-item:hover, .as-menu-item.selected {background:var(--vscode-menu-selectionBackground, #2e436e) !important;color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.as-menu-item:hover .as-menu-label, .as-menu-item:hover .as-menu-check, .as-menu-item:hover .as-menu-arrow {color:var(--vscode-menu-selectionForeground, #ffffff) !important;}.as-menu-check {width:18px;min-width:18px;display:inline-flex;align-items:center;justify-content:flex-start;color:inherit;flex-shrink:0;}.as-menu-label {flex:1;text-align:left;color:inherit;}.as-menu-arrow {margin-left:auto;font-size:13px;opacity:0.7;}.as-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;min-width:140px;}.has-submenu:hover > .as-submenu {display:flex;}body.hide-col-author .author {display:none !important;}body.hide-col-date .date {display:none !important;}body.show-col-hash .hash {display:inline-block !important;color:#8c8c8c !important;font-family:var(--vscode-editor-font-family, monospace) !important;font-size:11px !important;user-select:text !important;width:68px !important;min-width:68px !important;}body.compact-refs .labels {gap:3px !important;}body.compact-refs .label {padding:0 3px !important;font-size:0.76em !important;}body.refs-on-left .labels {order:0 !important;margin-left:0 !important;margin-right:8px !important;}'
+  };
+  function FilterBar($$anchor, $$props) {
+    push($$props, true);
+    append_styles($$anchor, $$css);
+    let activeBranch = prop($$props, "activeBranch", 3, ""), branchData = prop($$props, "branchData", 19, () => ({ branches: [], currentBranch: "" })), commits = prop($$props, "commits", 19, () => []), selectedHash = prop($$props, "selectedHash", 3, null);
+    let bar;
+    let updateLabelsFn;
+    let curBranch = "";
+    onMount(() => {
+      let curQuery = "";
+      curBranch = activeBranch() || "";
+      let curUser = "";
+      let curDate = "";
+      let curAfter = "";
+      let curBefore = "";
+      let curPath = "";
+      let isRegex = false;
+      let isCase = false;
+      let sortMode = "date";
+      let isFirstParent = false;
+      let isNoMerges = false;
+      let viewCompactRefs = true;
+      let viewTagNames = false;
+      let viewLongEdges = false;
+      let viewCommitTimestamp = false;
+      let viewRefsOnLeft = false;
+      let colAuthor = true;
+      let colHash = false;
+      let colDate = true;
+      let colGpg = false;
+      let hlMyCommits = true;
+      let hlMergeCommits = true;
+      let hlCurrentBranch = true;
+      let hlNotCherryPicked = false;
+      try {
+        if (localStorage.getItem("intellij_git_hl_my_commits") !== null) {
+          hlMyCommits = localStorage.getItem("intellij_git_hl_my_commits") === "true";
+        }
+        if (localStorage.getItem("intellij_git_hl_merge_commits") !== null) {
+          hlMergeCommits = localStorage.getItem("intellij_git_hl_merge_commits") === "true";
+        }
+        if (localStorage.getItem("intellij_git_hl_current_branch") !== null) {
+          hlCurrentBranch = localStorage.getItem("intellij_git_hl_current_branch") === "true";
+        }
+      } catch {
+      }
+      let graphOptionPopup = null;
+      let viewOptionPopup = null;
+      let tooltipEl = document.querySelector(".app-tooltip");
+      if (!tooltipEl && typeof document !== "undefined") {
+        tooltipEl = document.createElement("div");
+        tooltipEl.className = "app-tooltip";
+        document.body.appendChild(tooltipEl);
+      }
+      function attachTooltip(el, text2, shortcut = "", side = "bottom") {
+        if (!el)
+          return;
+        el.dataset.tooltip = text2;
+        if (shortcut)
+          el.dataset.shortcut = shortcut;
+        el.title = text2 + (shortcut ? " (" + shortcut + ")" : "");
+        let timer;
+        el.addEventListener("mouseenter", () => {
+          const currentText = el.dataset.tooltip || el.title;
+          const currentShortcut = el.dataset.shortcut || "";
+          if (!currentText)
+            return;
+          timer = setTimeout(
+            () => {
+              if (!tooltipEl) {
+                tooltipEl = document.querySelector(".app-tooltip");
+                if (!tooltipEl) {
+                  tooltipEl = document.createElement("div");
+                  tooltipEl.className = "app-tooltip";
+                  document.body.appendChild(tooltipEl);
+                }
+              }
+              tooltipEl.innerHTML = currentText + (currentShortcut ? '<span class="tooltip-shortcut">' + currentShortcut + "</span>" : "");
+              tooltipEl.style.visibility = "hidden";
+              tooltipEl.style.display = "block";
+              tooltipEl.style.left = "-9999px";
+              tooltipEl.style.top = "-9999px";
+              tooltipEl.style.transform = "none";
+              tooltipEl.classList.add("visible");
+              const tipWidth = tooltipEl.offsetWidth || 100;
+              const tipHeight = tooltipEl.offsetHeight || 24;
+              const rect = el.getBoundingClientRect();
+              const pad = 6;
+              const viewWidth = window.innerWidth || document.documentElement.clientWidth;
+              const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+              let tipLeft;
+              let tipTop;
+              if (side === "bottom") {
+                tipLeft = rect.left + rect.width / 2 - tipWidth / 2;
+                tipTop = rect.bottom + 6;
+                if (tipTop + tipHeight > viewHeight - pad && rect.top - tipHeight - 6 >= pad) {
+                  tipTop = rect.top - tipHeight - 6;
+                  tooltipEl.classList.remove("side-bottom");
+                  tooltipEl.classList.add("side-top");
+                } else {
+                  tooltipEl.classList.remove("side-top");
+                  tooltipEl.classList.add("side-bottom");
+                }
+              } else if (side === "right") {
+                tipLeft = rect.right + 7;
+                tipTop = rect.top + rect.height / 2 - tipHeight / 2;
+                if (tipLeft + tipWidth > viewWidth - pad && rect.left - tipWidth - 7 >= pad) {
+                  tipLeft = rect.left - tipWidth - 7;
+                  tooltipEl.classList.remove("side-right");
+                  tooltipEl.classList.add("side-left");
+                } else {
+                  tooltipEl.classList.remove("side-left");
+                  tooltipEl.classList.add("side-right");
+                }
+              } else {
+                tipLeft = rect.left + rect.width / 2 - tipWidth / 2;
+                tipTop = rect.bottom + 6;
+              }
+              if (tipLeft < pad) {
+                tipLeft = pad;
+              } else if (tipLeft + tipWidth > viewWidth - pad) {
+                tipLeft = Math.max(pad, viewWidth - tipWidth - pad);
+              }
+              if (tipTop < pad) {
+                tipTop = pad;
+              } else if (tipTop + tipHeight > viewHeight - pad) {
+                tipTop = Math.max(pad, viewHeight - tipHeight - pad);
+              }
+              tooltipEl.style.left = Math.round(tipLeft) + "px";
+              tooltipEl.style.top = Math.round(tipTop) + "px";
+              tooltipEl.style.transform = "none";
+              tooltipEl.style.visibility = "visible";
+            },
+            90
+          );
+        });
+        el.addEventListener("mouseleave", () => {
+          clearTimeout(timer);
+          if (tooltipEl)
+            tooltipEl.classList.remove("visible");
+        });
+        el.addEventListener("click", () => {
+          clearTimeout(timer);
+          if (tooltipEl)
+            tooltipEl.classList.remove("visible");
+        });
+      }
+      function applyViewOptions() {
+        if (typeof document !== "undefined" && document.body) {
+          document.body.classList.toggle("hide-col-author", !colAuthor);
+          document.body.classList.toggle("hide-col-date", !colDate);
+          document.body.classList.toggle("show-col-hash", colHash);
+          document.body.classList.toggle("compact-refs", viewCompactRefs);
+          document.body.classList.toggle("refs-on-left", viewRefsOnLeft);
+          document.body.classList.toggle("hl-my-commits", hlMyCommits);
+          document.body.classList.toggle("hl-merge-commits", hlMergeCommits);
+          document.body.classList.toggle("hl-current-branch", hlCurrentBranch);
+        }
+      }
+      applyViewOptions();
+      function applyFilter() {
+        $$props.onFilter({
+          query: curQuery || void 0,
+          branch: curBranch || void 0,
+          author: curUser || void 0,
+          after: curAfter || void 0,
+          before: curBefore || void 0,
+          path: curPath || void 0,
+          order: sortMode,
+          firstParent: isFirstParent,
+          noMerges: isNoMerges
+        });
+        updateLabels();
+      }
+      function createMenuItem(label, isChecked, onClick, hasSubmenu = false) {
+        const item = document.createElement("div");
+        item.className = "as-menu-item" + (hasSubmenu ? " has-submenu" : "");
+        const checkSpan = document.createElement("span");
+        checkSpan.className = "as-menu-check";
+        if (isChecked) {
+          checkSpan.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>';
+        }
+        item.appendChild(checkSpan);
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "as-menu-label";
+        labelSpan.textContent = label;
+        item.appendChild(labelSpan);
+        if (hasSubmenu) {
+          const arrowSpan = document.createElement("span");
+          arrowSpan.className = "as-menu-arrow";
+          arrowSpan.innerHTML = "\u203A";
+          item.appendChild(arrowSpan);
+        }
+        item.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onClick(e);
+        });
+        return item;
+      }
+      function createSectionHeader(title) {
+        const hdr = document.createElement("div");
+        hdr.className = "as-menu-section-header";
+        hdr.textContent = title;
+        return hdr;
+      }
+      function createDivider() {
+        const d = document.createElement("div");
+        d.className = "as-menu-divider";
+        return d;
+      }
+      const searchBox = document.createElement("div");
+      searchBox.className = "as-search-box";
+      searchBox.innerHTML = '<span class="as-search-icon" title="Search commits"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14.5" y2="14.5"/></svg></span>';
+      const searchInput = document.createElement("input");
+      searchInput.type = "text";
+      searchInput.className = "as-search-input";
+      searchInput.placeholder = "Text or hash";
+      let searchDebounceTimer;
+      searchInput.addEventListener("input", () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(
+          () => {
+            const val = searchInput.value.trim();
+            if (val !== curQuery) {
+              curQuery = val;
+              applyFilter();
+            }
+          },
+          300
+        );
+      });
+      searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          clearTimeout(searchDebounceTimer);
+          curQuery = searchInput.value.trim();
+          applyFilter();
+        }
+      });
+      searchBox.appendChild(searchInput);
+      const regexBtn = document.createElement("span");
+      regexBtn.className = "as-search-opt";
+      regexBtn.textContent = ".*";
+      regexBtn.title = "Regex";
+      regexBtn.addEventListener("click", () => {
+        isRegex = !isRegex;
+        regexBtn.className = "as-search-opt" + (isRegex ? " active" : "");
+      });
+      searchBox.appendChild(regexBtn);
+      const caseBtn = document.createElement("span");
+      caseBtn.className = "as-search-opt";
+      caseBtn.textContent = "Cc";
+      caseBtn.title = "Match Case";
+      caseBtn.addEventListener("click", () => {
+        isCase = !isCase;
+        caseBtn.className = "as-search-opt" + (isCase ? " active" : "");
+      });
+      searchBox.appendChild(caseBtn);
+      bar.appendChild(searchBox);
+      function closeAllPopups() {
+        branchPopup.style.display = "none";
+        userPopup.style.display = "none";
+        datePopup.style.display = "none";
+        pathPopup.style.display = "none";
+        if (graphOptionPopup)
+          graphOptionPopup.style.display = "none";
+        if (viewOptionPopup)
+          viewOptionPopup.style.display = "none";
+      }
+      document.addEventListener("click", (e) => {
+        if (!bar.contains(e.target)) {
+          closeAllPopups();
+        }
+      });
+      const branchContainer = document.createElement("div");
+      branchContainer.style.position = "relative";
+      const branchLabel = document.createElement("div");
+      branchLabel.className = "as-filter-label";
+      branchContainer.appendChild(branchLabel);
+      const branchPopup = document.createElement("div");
+      branchPopup.className = "filter-popup";
+      branchPopup.innerHTML = '<div class="filter-popup-search"><input type="text" placeholder="Search branch..." /></div><div class="branch-popup-items" style="overflow-y:auto;flex:1;"></div>';
+      branchContainer.appendChild(branchPopup);
+      const branchSearchInput = branchPopup.querySelector("input");
+      const branchItemsContainer = branchPopup.querySelector(".branch-popup-items");
+      branchSearchInput.addEventListener("input", () => {
+        renderBranchItems(branchSearchInput.value.toLowerCase());
+      });
+      function renderBranchItems(search = "") {
+        branchItemsContainer.innerHTML = "";
+        const bData = branchData() || { branches: [], currentBranch: "" };
+        const branches = bData.branches || [];
+        const allItem = document.createElement("div");
+        allItem.className = "filter-popup-item" + (!curBranch ? " selected" : "");
+        allItem.textContent = "All Branches";
+        allItem.addEventListener("click", () => {
+          curBranch = "";
+          if ($$props.setActiveBranch)
+            $$props.setActiveBranch("");
+          closeAllPopups();
+          applyFilter();
+        });
+        branchItemsContainer.appendChild(allItem);
+        if (bData.currentBranch && (!search || bData.currentBranch.toLowerCase().includes(search))) {
+          const headItem = document.createElement("div");
+          headItem.className = "filter-popup-item" + (curBranch === "HEAD" ? " selected" : "");
+          headItem.innerHTML = "<span>HEAD (" + bData.currentBranch + ")</span>";
+          headItem.addEventListener("click", () => {
+            curBranch = "HEAD";
+            if ($$props.setActiveBranch)
+              $$props.setActiveBranch("HEAD");
+            closeAllPopups();
+            applyFilter();
+          });
+          branchItemsContainer.appendChild(headItem);
+        }
+        const localList = branches.filter((b) => !b.remote && (!search || b.name.toLowerCase().includes(search)));
+        if (localList.length > 0) {
+          const hdr = document.createElement("div");
+          hdr.className = "filter-popup-header";
+          hdr.textContent = "Local";
+          branchItemsContainer.appendChild(hdr);
+          for (const b of localList) {
+            const item = document.createElement("div");
+            item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
+            item.textContent = b.name;
+            item.addEventListener("click", () => {
+              curBranch = b.name;
+              if ($$props.setActiveBranch)
+                $$props.setActiveBranch(b.name);
+              closeAllPopups();
+              applyFilter();
+            });
+            branchItemsContainer.appendChild(item);
+          }
+        }
+        const remoteList = branches.filter((b) => b.remote && (!search || b.name.toLowerCase().includes(search)));
+        if (remoteList.length > 0) {
+          const hdr = document.createElement("div");
+          hdr.className = "filter-popup-header";
+          hdr.textContent = "Remote";
+          branchItemsContainer.appendChild(hdr);
+          for (const b of remoteList) {
+            const item = document.createElement("div");
+            item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
+            item.textContent = b.name;
+            item.addEventListener("click", () => {
+              curBranch = b.name;
+              if ($$props.setActiveBranch)
+                $$props.setActiveBranch(b.name);
+              closeAllPopups();
+              applyFilter();
+            });
+            branchItemsContainer.appendChild(item);
+          }
+        }
+      }
+      branchLabel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (branchPopup && !branchContainer.contains(branchPopup)) {
+          branchContainer.appendChild(branchPopup);
+        }
+        const open = branchPopup.style.display === "flex";
+        closeAllPopups();
+        if (!open) {
+          renderBranchItems();
+          branchPopup.style.display = "flex";
+          setTimeout(() => branchSearchInput.focus(), 20);
+        }
+      });
+      bar.appendChild(branchContainer);
+      const userContainer = document.createElement("div");
+      userContainer.style.position = "relative";
+      const userLabel = document.createElement("div");
+      userLabel.className = "as-filter-label";
+      userContainer.appendChild(userLabel);
+      const userPopup = document.createElement("div");
+      userPopup.className = "filter-popup";
+      userPopup.innerHTML = '<div class="filter-popup-search"><input type="text" placeholder="Type user name or email..." /></div><div class="user-popup-items" style="overflow-y:auto;flex:1;"></div>';
+      userContainer.appendChild(userPopup);
+      const userSearchInput = userPopup.querySelector("input");
+      const userItemsContainer = userPopup.querySelector(".user-popup-items");
+      userSearchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && userSearchInput.value.trim()) {
+          curUser = userSearchInput.value.trim();
+          closeAllPopups();
+          applyFilter();
+        }
+      });
+      userSearchInput.addEventListener("input", () => {
+        renderUserItems(userSearchInput.value.toLowerCase());
+      });
+      function renderUserItems(search = "") {
+        userItemsContainer.innerHTML = "";
+        const allItem = document.createElement("div");
+        allItem.className = "filter-popup-item" + (!curUser ? " selected" : "");
+        allItem.textContent = "All Users";
+        allItem.addEventListener("click", () => {
+          curUser = "";
+          closeAllPopups();
+          applyFilter();
+        });
+        userItemsContainer.appendChild(allItem);
+        const commitsList = commits() || [];
+        const authorCounts = {};
+        for (const c of commitsList) {
+          if (c.author)
+            authorCounts[c.author] = (authorCounts[c.author] || 0) + 1;
+        }
+        const authorNames = Object.keys(authorCounts).sort();
+        const filtered = authorNames.filter((name) => !search || name.toLowerCase().includes(search));
+        if (filtered.length > 0) {
+          const hdr = document.createElement("div");
+          hdr.className = "filter-popup-header";
+          hdr.textContent = "Authors in repo";
+          userItemsContainer.appendChild(hdr);
+          for (const name of filtered) {
+            const item = document.createElement("div");
+            item.className = "filter-popup-item" + (curUser === name ? " selected" : "");
+            item.innerHTML = "<span>" + name + '</span> <span style="opacity:0.6;font-size:11px;">(' + authorCounts[name] + ")</span>";
+            item.addEventListener("click", () => {
+              curUser = name;
+              closeAllPopups();
+              applyFilter();
+            });
+            userItemsContainer.appendChild(item);
+          }
+        }
+      }
+      userLabel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (userPopup && !userContainer.contains(userPopup)) {
+          userContainer.appendChild(userPopup);
+        }
+        const open = userPopup.style.display === "flex";
+        closeAllPopups();
+        if (!open) {
+          renderUserItems();
+          userPopup.style.display = "flex";
+          setTimeout(() => userSearchInput.focus(), 20);
+        }
+      });
+      bar.appendChild(userContainer);
+      const dateContainer = document.createElement("div");
+      dateContainer.style.position = "relative";
+      const dateLabel = document.createElement("div");
+      dateLabel.className = "as-filter-label";
+      dateContainer.appendChild(dateLabel);
+      const datePopup = document.createElement("div");
+      datePopup.className = "filter-popup";
+      const dateOptions = [
+        { label: "All", key: "" },
+        { label: "Today", key: "today" },
+        { label: "Yesterday", key: "yesterday" },
+        { label: "Last 7 Days", key: "7days" },
+        { label: "Last 30 Days", key: "30days" }
+      ];
+      for (const opt of dateOptions) {
+        const item = document.createElement("div");
+        item.className = "filter-popup-item";
+        item.textContent = opt.label;
+        item.addEventListener("click", () => {
+          if (!opt.key) {
+            curDate = "";
+            curAfter = "";
+            curBefore = "";
+          } else if (opt.key === "today") {
+            curDate = "Today";
+            const now = /* @__PURE__ */ new Date();
+            now.setHours(0, 0, 0, 0);
+            curAfter = now.toISOString();
+            curBefore = "";
+          } else if (opt.key === "yesterday") {
+            curDate = "Yesterday";
+            const now = /* @__PURE__ */ new Date();
+            now.setHours(0, 0, 0, 0);
+            const y = new Date(now.getTime() - 864e5);
+            curAfter = y.toISOString();
+            curBefore = now.toISOString();
+          } else if (opt.key === "7days") {
+            curDate = "Last 7 Days";
+            curAfter = new Date(Date.now() - 7 * 864e5).toISOString();
+            curBefore = "";
+          } else if (opt.key === "30days") {
+            curDate = "Last 30 Days";
+            curAfter = new Date(Date.now() - 30 * 864e5).toISOString();
+            curBefore = "";
+          }
+          closeAllPopups();
+          applyFilter();
+        });
+        datePopup.appendChild(item);
+      }
+      const divdr = document.createElement("div");
+      divdr.className = "filter-popup-divider";
+      datePopup.appendChild(divdr);
+      const customDateBox = document.createElement("div");
+      customDateBox.className = "filter-custom-date";
+      customDateBox.innerHTML = '<label>Custom Range:</label><input type="date" id="c-after" /><input type="date" id="c-before" /><button class="filter-apply-btn">Apply</button>';
+      const cAfter = customDateBox.querySelector("#c-after");
+      const cBefore = customDateBox.querySelector("#c-before");
+      const cApply = customDateBox.querySelector("button");
+      cApply.addEventListener("click", () => {
+        if (cAfter.value || cBefore.value) {
+          curDate = (cAfter.value || "...") + " - " + (cBefore.value || "...");
+          curAfter = cAfter.value ? new Date(cAfter.value).toISOString() : "";
+          curBefore = cBefore.value ? new Date(cBefore.value).toISOString() : "";
+        } else {
+          curDate = "";
+          curAfter = "";
+          curBefore = "";
+        }
+        closeAllPopups();
+        applyFilter();
+      });
+      datePopup.appendChild(customDateBox);
+      dateContainer.appendChild(datePopup);
+      dateLabel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (datePopup && !dateContainer.contains(datePopup)) {
+          dateContainer.appendChild(datePopup);
+        }
+        const open = datePopup.style.display === "flex";
+        closeAllPopups();
+        if (!open) {
+          datePopup.style.display = "flex";
+        }
+      });
+      bar.appendChild(dateContainer);
+      const pathContainer = document.createElement("div");
+      pathContainer.style.position = "relative";
+      const pathLabel = document.createElement("div");
+      pathLabel.className = "as-filter-label";
+      pathContainer.appendChild(pathLabel);
+      const pathPopup = document.createElement("div");
+      pathPopup.className = "filter-popup";
+      pathPopup.style.padding = "8px 12px";
+      pathPopup.innerHTML = '<input type="text" placeholder="e.g. lib/models or file.dart" style="width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:3px;padding:3px 6px;font-size:11px;outline:none;margin-bottom:6px;" /><button class="filter-apply-btn">Apply</button>';
+      const pathInput = pathPopup.querySelector("input");
+      const pathBtn = pathPopup.querySelector("button");
+      pathBtn.addEventListener("click", () => {
+        curPath = pathInput.value.trim();
+        closeAllPopups();
+        applyFilter();
+      });
+      pathInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          curPath = pathInput.value.trim();
+          closeAllPopups();
+          applyFilter();
+        }
+      });
+      pathContainer.appendChild(pathPopup);
+      pathLabel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (pathPopup && !pathContainer.contains(pathPopup)) {
+          pathContainer.appendChild(pathPopup);
+        }
+        const open = pathPopup.style.display === "flex";
+        closeAllPopups();
+        if (!open) {
+          pathPopup.style.display = "flex";
+          setTimeout(() => pathInput.focus(), 20);
+        }
+      });
+      bar.appendChild(pathContainer);
+      const graphOptionContainer = document.createElement("div");
+      graphOptionContainer.style.position = "relative";
+      const graphOptionBtn = document.createElement("div");
+      graphOptionBtn.className = "as-filter-label as-tool-icon";
+      graphOptionBtn.title = "Graph Options";
+      graphOptionBtn.style.padding = "2px 4px";
+      graphOptionBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <line x1="4.5" y1="2.5" x2="4.5" y2="13.5"/>
+        <polyline points="2.5,10.5 4.5,13.5 6.5,10.5"/>
+        <line x1="11.5" y1="2.5" x2="11.5" y2="13.5"/>
+        <polygon points="11.5,3.5 13.5,5.5 11.5,7.5 9.5,5.5" fill="var(--vscode-editor-background, #1e1f22)" stroke="currentColor" stroke-width="1.2"/>
+        <polygon points="11.5,8.5 13.5,10.5 11.5,12.5 9.5,10.5" fill="var(--vscode-editor-background, #1e1f22)" stroke="currentColor" stroke-width="1.2"/>
+        <polygon points="12,15 15,15 15,12" fill="currentColor" stroke="none"/>
+      </svg>
+    `;
+      graphOptionContainer.appendChild(graphOptionBtn);
+      graphOptionPopup = document.createElement("div");
+      graphOptionPopup.className = "as-dropdown-menu";
+      graphOptionPopup.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+      graphOptionContainer.appendChild(graphOptionPopup);
+      function renderGraphOptionMenu() {
+        graphOptionPopup.innerHTML = "";
+        graphOptionPopup.appendChild(createSectionHeader("Sort"));
+        graphOptionPopup.appendChild(createMenuItem("By Commit Date", sortMode === "date", () => {
+          sortMode = "date";
+          renderGraphOptionMenu();
+          applyFilter();
+        }));
+        graphOptionPopup.appendChild(createMenuItem("Topologically", sortMode === "topo", () => {
+          sortMode = "topo";
+          renderGraphOptionMenu();
+          applyFilter();
+        }));
+        graphOptionPopup.appendChild(createDivider());
+        graphOptionPopup.appendChild(createSectionHeader("Options"));
+        graphOptionPopup.appendChild(createMenuItem("First Parent", isFirstParent, () => {
+          isFirstParent = !isFirstParent;
+          renderGraphOptionMenu();
+          applyFilter();
+        }));
+        graphOptionPopup.appendChild(createMenuItem("No Merges", isNoMerges, () => {
+          isNoMerges = !isNoMerges;
+          renderGraphOptionMenu();
+          applyFilter();
+        }));
+        graphOptionPopup.appendChild(createDivider());
+        graphOptionPopup.appendChild(createSectionHeader("Branch Actions"));
+        graphOptionPopup.appendChild(createMenuItem("Collapse Linear Branches", false, () => {
+          closeAllPopups();
+          postMessage("collapseLinearBranches");
+          showToast("Collapsed linear branches");
+        }));
+        graphOptionPopup.appendChild(createMenuItem("Expand Linear Branches", false, () => {
+          closeAllPopups();
+          postMessage("expandLinearBranches");
+          showToast("Expanded linear branches");
+        }));
+      }
+      graphOptionBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (graphOptionPopup && !graphOptionContainer.contains(graphOptionPopup)) {
+          graphOptionContainer.appendChild(graphOptionPopup);
+        }
+        const open = graphOptionPopup.style.display === "flex";
+        closeAllPopups();
+        if (!open) {
+          renderGraphOptionMenu();
+          graphOptionPopup.style.display = "flex";
+        }
+      });
+      bar.appendChild(graphOptionContainer);
+      const tbRight = document.createElement("div");
+      tbRight.className = "as-toolbar-right";
+      const btnRefresh = document.createElement("span");
+      btnRefresh.className = "as-tool-icon";
+      btnRefresh.title = "Refresh";
+      btnRefresh.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+        <path fill-rule="evenodd" d="M12.5747152,11.8852806 C11.4741474,13.1817355 9.83247882,14.0044386 7.99865879,14.0044386 C5.03907292,14.0044386 2.57997332,11.8615894 2.08820756,9.0427473 L3.94774327,9.10768372 C4.43372186,10.8898575 6.06393114,12.2000519 8.00015362,12.2000519 C9.30149237,12.2000519 10.4645985,11.6082097 11.2349873,10.6790094 L9.05000019,8.71167959 L14.0431479,8.44999981 L14.3048222,13.4430431 L12.5747152,11.8852806 Z M3.42785637,4.11741586 C4.52839138,2.82452748 6.16775464,2.00443857 7.99865879,2.00443857 C10.918604,2.00443857 13.3513802,4.09026967 13.8882946,6.8532307 L12.0226389,6.78808057 C11.5024872,5.05935553 9.89838095,3.8000774 8.00015362,3.8000774 C6.69867367,3.8000774 5.53545628,4.39204806 4.76506921,5.32142241 L6.95482203,7.29304326 L1.96167436,7.55472304 L1.70000005,2.56167973 L3.42785637,4.11741586 Z" transform="rotate(3 8.002 8.004)"/>
+      </svg>
+    `;
+      btnRefresh.addEventListener("click", () => {
+        postMessage("refresh");
+      });
+      tbRight.appendChild(btnRefresh);
+      const btnCherry = document.createElement("span");
+      btnCherry.className = "as-tool-icon";
+      btnCherry.title = "Cherry-Pick Commit";
+      btnCherry.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M6.5 11C6.5 12.1046 5.60457 13 4.5 13C3.39543 13 2.5 12.1046 2.5 11C2.5 9.89543 3.39543 9 4.5 9C5.60457 9 6.5 9.89543 6.5 11ZM4.5 14C6.15685 14 7.5 12.6569 7.5 11C7.5 9.34315 6.15685 8 4.5 8C2.84315 8 1.5 9.34315 1.5 11C1.5 12.6569 2.84315 14 4.5 14ZM13.5 11C13.5 12.1046 12.6046 13 11.5 13C10.3954 13 9.5 12.1046 9.5 11C9.5 9.89543 10.3954 9 11.5 9C12.6046 9 13.5 9.89543 13.5 11ZM11.5 14C13.1569 14 14.5 12.6569 14.5 11C14.5 9.34315 13.1569 8 11.5 8C9.84315 8 8.5 9.34315 8.5 11C8.5 12.6569 9.84315 14 11.5 14Z" fill="currentColor"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M11.8537 1.14647C11.7934 1.08617 11.7216 1.04449 11.6453 1.02143C11.5869 1.00372 11.5244 0.996452 11.46 1.00164L11.4585 1.00175L11.4577 1.00183C8.89299 1.21581 7.10682 2.51359 5.92996 4.03112C4.76214 5.53699 4.18349 7.26955 4.00588 8.424C3.9639 8.69693 4.15111 8.95222 4.42404 8.99421C4.69697 9.0362 4.95227 8.84899 4.99426 8.57606C5.14998 7.56384 5.67133 5.9964 6.72018 4.64394C7.43375 3.72381 8.38624 2.9082 9.6361 2.42686L10.8329 1.87283L10.1507 2.48553C9.63716 3.45813 9.48624 4.482 9.53842 5.42758C9.61459 6.8079 10.1221 8.0385 10.5761 8.76503C10.7225 8.9992 11.031 9.07038 11.2651 8.92403C11.4993 8.77767 11.5705 8.4692 11.4241 8.23503C11.0449 7.62822 10.6024 6.55883 10.5369 5.37248C10.4723 4.20114 10.7737 2.93361 11.8537 1.85358C12.049 1.65832 12.049 1.34174 11.8537 1.14647Z" fill="currentColor"/>
+      </svg>
+    `;
+      btnCherry.addEventListener("click", () => {
+        const selHash = selectedHash();
+        if (selHash) {
+          postMessage("cherryPick", { hash: selHash });
+        } else {
+          showToast("Select a commit from the log to cherry-pick");
+        }
+      });
+      tbRight.appendChild(btnCherry);
+      const viewOptionContainer = document.createElement("div");
+      viewOptionContainer.style.position = "relative";
+      viewOptionContainer.style.display = "inline-flex";
+      const btnViewOption = document.createElement("span");
+      btnViewOption.className = "as-tool-icon";
+      btnViewOption.title = "View Options";
+      btnViewOption.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <path d="M1.5 8C3 4.5 7 2.8 8 2.8C9 2.8 13 4.5 14.5 8C13 11.5 9 13.2 8 13.2C7 13.2 3 11.5 1.5 8Z"/>
+        <circle cx="8" cy="8" r="2.2"/>
+        <polygon points="12,15 15,15 15,12" fill="currentColor" stroke="none"/>
+      </svg>
+    `;
+      viewOptionContainer.appendChild(btnViewOption);
+      viewOptionPopup = document.createElement("div");
+      viewOptionPopup.className = "as-dropdown-menu";
+      viewOptionPopup.style.right = "0";
+      viewOptionPopup.style.left = "auto";
+      viewOptionPopup.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+      viewOptionContainer.appendChild(viewOptionPopup);
+      function renderViewOptionMenu() {
+        viewOptionPopup.innerHTML = "";
+        viewOptionPopup.appendChild(createSectionHeader("Show"));
+        viewOptionPopup.appendChild(createMenuItem("Compact References View", viewCompactRefs, () => {
+          viewCompactRefs = !viewCompactRefs;
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        viewOptionPopup.appendChild(createMenuItem("Tag Names", viewTagNames, () => {
+          viewTagNames = !viewTagNames;
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        viewOptionPopup.appendChild(createMenuItem("Long Edges", viewLongEdges, () => {
+          viewLongEdges = !viewLongEdges;
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        viewOptionPopup.appendChild(createMenuItem("Commit Timestamp", viewCommitTimestamp, () => {
+          viewCommitTimestamp = !viewCommitTimestamp;
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        viewOptionPopup.appendChild(createMenuItem("References on the Left", viewRefsOnLeft, () => {
+          viewRefsOnLeft = !viewRefsOnLeft;
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        const columnsItem = createMenuItem(
+          "Columns",
+          false,
+          (ev) => {
+          },
+          true
+        );
+        const subMenu = document.createElement("div");
+        subMenu.className = "as-dropdown-menu as-submenu";
+        subMenu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+        function renderColumnsSubMenu() {
+          subMenu.innerHTML = "";
+          subMenu.appendChild(createMenuItem("Author", colAuthor, () => {
+            colAuthor = !colAuthor;
+            applyViewOptions();
+            renderColumnsSubMenu();
+          }));
+          subMenu.appendChild(createMenuItem("Hash", colHash, () => {
+            colHash = !colHash;
+            applyViewOptions();
+            renderColumnsSubMenu();
+          }));
+          subMenu.appendChild(createMenuItem("Date", colDate, () => {
+            colDate = !colDate;
+            applyViewOptions();
+            renderColumnsSubMenu();
+          }));
+          subMenu.appendChild(createMenuItem("GPG Signature", colGpg, () => {
+            colGpg = !colGpg;
+            applyViewOptions();
+            renderColumnsSubMenu();
+          }));
+        }
+        renderColumnsSubMenu();
+        columnsItem.addEventListener("mouseenter", () => {
+          const rect = columnsItem.getBoundingClientRect();
+          if (rect.right + 150 > window.innerWidth) {
+            subMenu.style.left = "auto";
+            subMenu.style.right = "100%";
+            subMenu.style.marginLeft = "0";
+            subMenu.style.marginRight = "2px";
+          } else {
+            subMenu.style.left = "100%";
+            subMenu.style.right = "auto";
+            subMenu.style.marginLeft = "2px";
+            subMenu.style.marginRight = "0";
+          }
+        });
+        columnsItem.appendChild(subMenu);
+        viewOptionPopup.appendChild(columnsItem);
+        viewOptionPopup.appendChild(createDivider());
+        viewOptionPopup.appendChild(createSectionHeader("Highlight"));
+        viewOptionPopup.appendChild(createMenuItem("My Commits", hlMyCommits, () => {
+          hlMyCommits = !hlMyCommits;
+          try {
+            localStorage.setItem("intellij_git_hl_my_commits", hlMyCommits ? "true" : "false");
+          } catch {
+          }
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        viewOptionPopup.appendChild(createMenuItem("Merge Commits", hlMergeCommits, () => {
+          hlMergeCommits = !hlMergeCommits;
+          try {
+            localStorage.setItem("intellij_git_hl_merge_commits", hlMergeCommits ? "true" : "false");
+          } catch {
+          }
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        viewOptionPopup.appendChild(createMenuItem("Current Branch", hlCurrentBranch, () => {
+          hlCurrentBranch = !hlCurrentBranch;
+          try {
+            localStorage.setItem("intellij_git_hl_current_branch", hlCurrentBranch ? "true" : "false");
+          } catch {
+          }
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+        viewOptionPopup.appendChild(createMenuItem("Not Cherry-Picked Commits", hlNotCherryPicked, () => {
+          hlNotCherryPicked = !hlNotCherryPicked;
+          applyViewOptions();
+          renderViewOptionMenu();
+        }));
+      }
+      btnViewOption.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (viewOptionPopup && !viewOptionContainer.contains(viewOptionPopup)) {
+          viewOptionContainer.appendChild(viewOptionPopup);
+        }
+        const open = viewOptionPopup.style.display === "flex";
+        closeAllPopups();
+        if (!open) {
+          renderViewOptionMenu();
+          viewOptionPopup.style.display = "flex";
+        }
+      });
+      tbRight.appendChild(viewOptionContainer);
+      const btnSearch = document.createElement("span");
+      btnSearch.className = "as-tool-icon";
+      btnSearch.title = "Search Commits (/)";
+      btnSearch.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+        <circle cx="6.5" cy="6.5" r="4.5"/>
+        <line x1="10" y1="10" x2="14.5" y2="14.5"/>
+      </svg>
+    `;
+      btnSearch.addEventListener("click", () => {
+        searchInput.focus();
+        searchInput.select();
+      });
+      tbRight.appendChild(btnSearch);
+      bar.appendChild(tbRight);
+      attachTooltip(btnRefresh, "Refresh", "Cmd+R", "bottom");
+      attachTooltip(btnCherry, "Cherry-Pick Commit", "", "bottom");
+      attachTooltip(btnViewOption, "View Options", "", "bottom");
+      attachTooltip(btnSearch, "Search Commits", "/", "bottom");
+      attachTooltip(graphOptionBtn, "Graph Options", "", "bottom");
+      attachTooltip(regexBtn, "Regex", "", "bottom");
+      attachTooltip(caseBtn, "Match Case", "", "bottom");
+      const asSearchIcon = searchBox.querySelector(".as-search-icon");
+      if (asSearchIcon)
+        attachTooltip(asSearchIcon, "Search commits by text or hash", "", "bottom");
+      attachTooltip(branchLabel, "Filter by Branch", "", "bottom");
+      attachTooltip(userLabel, "Filter by User", "", "bottom");
+      attachTooltip(dateLabel, "Filter by Date", "", "bottom");
+      attachTooltip(pathLabel, "Filter by Structure / Path", "", "bottom");
+      function updateLabels() {
+        if (curBranch) {
+          branchLabel.className = "as-filter-label active";
+          branchLabel.innerHTML = '<span class="lbl-prefix">Branch:</span> <span class="lbl-val">' + curBranch + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+          branchLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+            e.stopPropagation();
+            curBranch = "";
+            if ($$props.setActiveBranch)
+              $$props.setActiveBranch("");
+            applyFilter();
+          });
+        } else {
+          branchLabel.className = "as-filter-label";
+          branchLabel.innerHTML = '<span class="lbl-prefix">Branch</span> <span class="lbl-arrow">&#9662;</span>';
+        }
+        if (curUser) {
+          userLabel.className = "as-filter-label active";
+          userLabel.innerHTML = '<span class="lbl-prefix">User:</span> <span class="lbl-val">' + curUser + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+          userLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+            e.stopPropagation();
+            curUser = "";
+            applyFilter();
+          });
+        } else {
+          userLabel.className = "as-filter-label";
+          userLabel.innerHTML = '<span class="lbl-prefix">User</span> <span class="lbl-arrow">&#9662;</span>';
+        }
+        if (curDate) {
+          dateLabel.className = "as-filter-label active";
+          dateLabel.innerHTML = '<span class="lbl-prefix">Date:</span> <span class="lbl-val">' + curDate + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+          dateLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+            e.stopPropagation();
+            curDate = "";
+            curAfter = "";
+            curBefore = "";
+            applyFilter();
+          });
+        } else {
+          dateLabel.className = "as-filter-label";
+          dateLabel.innerHTML = '<span class="lbl-prefix">Date</span> <span class="lbl-arrow">&#9662;</span>';
+        }
+        if (curPath) {
+          pathLabel.className = "as-filter-label active";
+          pathLabel.innerHTML = '<span class="lbl-prefix">Paths:</span> <span class="lbl-val">' + curPath + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
+          pathLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
+            e.stopPropagation();
+            curPath = "";
+            applyFilter();
+          });
+        } else {
+          pathLabel.className = "as-filter-label";
+          pathLabel.innerHTML = '<span class="lbl-prefix">Paths</span> <span class="lbl-arrow">&#9662;</span>';
+        }
+      }
+      updateLabelsFn = updateLabels;
+      updateLabels();
+    });
+    user_effect(() => {
+      const extBranch = activeBranch();
+      if (extBranch !== void 0 && extBranch !== curBranch) {
+        curBranch = extBranch || "";
+        if (updateLabelsFn)
+          updateLabelsFn();
+      }
+    });
+    var div = root();
+    bind_this(div, ($$value) => bar = $$value, () => bar);
+    append($$anchor, div);
+    pop();
+  }
 
   // webview/shared/theme.ts
   var GRAPH_COLORS = [
-    "#a6823c", // Android Studio gold/ocher
-    "#399478", // Android Studio teal
-    "#4a67a8", // Android Studio indigo/blue
-    "#4e8e52", // Android Studio green
-    "#7d57a6", // Android Studio purple
-    "#b36939", // Android Studio amber/brown
-    "#327e99", // Android Studio cerulean/cyan
-    "#9c4949", // Android Studio muted red
-    "#857930", // Android Studio olive
-    "#4f728c"  // Android Studio slate
+    "#a6823c",
+    // Android Studio gold/ocher
+    "#399478",
+    // Android Studio teal
+    "#4a67a8",
+    // Android Studio indigo/blue
+    "#4e8e52",
+    // Android Studio green
+    "#7d57a6",
+    // Android Studio purple
+    "#b36939",
+    // Android Studio amber/brown
+    "#327e99",
+    // Android Studio cerulean/cyan
+    "#9c4949",
+    // Android Studio muted red
+    "#857930",
+    // Android Studio olive
+    "#4f728c"
+    // Android Studio slate
   ];
   function branchColor(index2) {
     return GRAPH_COLORS[index2 % GRAPH_COLORS.length];
   }
 
   // webview/graph/CommitGraph.svelte
-  function computeAngularPath(x1, y1, x2, y2) {
-    if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return "";
-    const dx = x2 - x1;
-    if (Math.abs(dx) < 0.5) {
-      return `M ${x1} ${y1} L ${x2} ${y2}`;
-    }
-    const midY = (y1 + y2) / 2;
-    return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
-  }
-
-
-
-  var root_2 = from_svg(`<line stroke-width="1.8" stroke-linecap="round"></line>`);
-  var root_3 = from_svg(`<path fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>`);
-  var root_4 = from_svg(`<circle stroke="var(--vscode-editor-background)" stroke-width="1.5"></circle>`);
-  var root = from_svg(`<svg class="graph-svg svelte-154okp0"><!><!></svg>`);
-  var $$css = {
+  var root2 = from_svg(`<line stroke-width="1.8" stroke-linecap="round"></line>`);
+  var root_1 = from_svg(`<path fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>`);
+  var root_2 = from_svg(`<circle r="6.5" fill="none" stroke-width="1.5"></circle>`);
+  var root_3 = from_svg(`<!><circle stroke="var(--vscode-editor-background)" stroke-width="1.5"></circle>`, 1);
+  var root_4 = from_svg(`<svg class="graph-svg svelte-154okp0"><!><!></svg>`);
+  var $$css2 = {
     hash: "svelte-154okp0",
     code: ".graph-svg.svelte-154okp0 {flex-shrink:0;}"
   };
   function CommitGraph($$anchor, $$props) {
     push($$props, true);
-    append_styles($$anchor, $$css);
+    append_styles($$anchor, $$css2);
+    let nodes = prop($$props, "nodes", 19, () => []), startIndex = prop($$props, "startIndex", 3, 0), visibleCount = prop($$props, "visibleCount", 3, 0), rowHeight = prop($$props, "rowHeight", 3, 28), graphWidth = prop($$props, "graphWidth", 3, 1);
     const COL_WIDTH = 16;
     const DOT_RADIUS = 3.8;
     const PADDING = 10;
-    function svgWidth() {
-      return Math.max(4, $$props.graphWidth || 1) * COL_WIDTH + PADDING * 2;
+    function computeAngularPath(x1, y1, x2, y2) {
+      if (x1 === void 0 || y1 === void 0 || x2 === void 0 || y2 === void 0)
+        return "";
+      const dx = x2 - x1;
+      if (Math.abs(dx) < 0.5) {
+        return `M ${x1} ${y1} L ${x2} ${y2}`;
+      }
+      const midY = (y1 + y2) / 2;
+      return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
     }
-    function svgHeight() {
-      return $$props.visibleCount * $$props.rowHeight;
-    }
+    let svgWidth = user_derived(() => Math.max(4, graphWidth() || 1) * COL_WIDTH + PADDING * 2);
+    let svgHeight = user_derived(() => visibleCount() * rowHeight());
     function cx(col) {
       return PADDING + col * COL_WIDTH + COL_WIDTH / 2;
     }
     function cy(row) {
-      return (row - $$props.startIndex) * $$props.rowHeight + $$props.rowHeight / 2;
+      return (row - startIndex()) * rowHeight() + rowHeight() / 2;
     }
-    function visibleLines() {
+    let visibleLines = user_derived(() => {
       const result = [];
-      const endIndex = $$props.startIndex + $$props.visibleCount + 1;
-      for (let i = Math.max(0, $$props.startIndex - 1); i < Math.min($$props.nodes.length, endIndex + 1); i++) {
-        const node = $$props.nodes[i];
-        if (!node || !node.lines) continue;
+      const endIndex = startIndex() + visibleCount() + 1;
+      for (let i = Math.max(0, startIndex() - 1); i < Math.min(nodes().length, endIndex + 1); i++) {
+        const node = nodes()[i];
+        if (!node || !node.lines)
+          continue;
         for (const line of node.lines) {
           result.push({ line, color: branchColor(line.color) });
         }
       }
       return result;
-    }
-    function visibleDots() {
-      const endIndex = $$props.startIndex + $$props.visibleCount;
+    });
+    let visibleDots = user_derived(() => {
+      const endIndex = startIndex() + visibleCount();
       const result = [];
-      for (let i = $$props.startIndex; i < Math.min($$props.nodes.length, endIndex); i++) {
-        const node = $$props.nodes[i];
+      for (let i = startIndex(); i < Math.min(nodes().length, endIndex); i++) {
+        const node = nodes()[i];
+        if (!node)
+          continue;
         result.push({
           x: cx(node.column),
           y: cy(i),
           color: branchColor(node.color),
           hash: node.hash,
-          isHead: (i === 0)
+          isHead: i === 0
         });
       }
       return result;
-    }
-    var svg = root();
+    });
+    var svg = root_4();
     var node_1 = child(svg);
-    each(node_1, 17, visibleLines, index, ($$anchor2, $$item) => {
-      let line = () => get($$item).line;
-      let color = () => get($$item).color;
+    each(node_1, 17, () => get(visibleLines), index, ($$anchor2, item) => {
       var fragment = comment();
       var node_2 = first_child(fragment);
       {
         var consequent = ($$anchor3) => {
-          var line_1 = root_2();
+          var line_1 = root2();
           template_effect(
             ($0, $1, $2, $3) => {
               set_attribute2(line_1, "x1", $0);
               set_attribute2(line_1, "y1", $1);
               set_attribute2(line_1, "x2", $2);
               set_attribute2(line_1, "y2", $3);
-              set_attribute2(line_1, "stroke", color());
+              set_attribute2(line_1, "stroke", get(item).color);
             },
             [
-              () => cx(line().fromColumn),
-              () => cy(line().fromRow),
-              () => cx(line().toColumn),
-              () => cy(line().toRow)
+              () => cx(get(item).line.fromColumn),
+              () => cy(get(item).line.fromRow),
+              () => cx(get(item).line.toColumn),
+              () => cy(get(item).line.toRow)
             ]
           );
           append($$anchor3, line_1);
         };
         var alternate = ($$anchor3) => {
-          var path = root_3();
+          var path = root_1();
           template_effect(
-            ($0, $1, $2, $3) => {
-              set_attribute2(path, "d", computeAngularPath($0, $1, $2, $3));
-              set_attribute2(path, "stroke", color());
+            ($0) => {
+              set_attribute2(path, "d", $0);
+              set_attribute2(path, "stroke", get(item).color);
             },
             [
-              () => cx(line().fromColumn),
-              () => cy(line().fromRow),
-              () => cx(line().toColumn),
-              () => cy(line().toRow)
+              () => computeAngularPath(cx(get(item).line.fromColumn), cy(get(item).line.fromRow), cx(get(item).line.toColumn), cy(get(item).line.toRow))
             ]
           );
           append($$anchor3, path);
         };
         if_block(node_2, ($$render) => {
-          if (line().fromColumn === line().toColumn)
+          if (get(item).line.fromColumn === get(item).line.toColumn)
             $$render(consequent);
           else
-            $$render(alternate, false);
+            $$render(alternate, -1);
         });
       }
       append($$anchor2, fragment);
     });
     var node_3 = sibling(node_1);
-    each(node_3, 17, visibleDots, index, ($$anchor2, dot) => {
-      var circle = root_4();
-      set_attribute2(circle, "r", DOT_RADIUS);
-      var ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      ring.setAttribute("fill", "none");
-      ring.setAttribute("stroke-width", "1.5");
-      ring.setAttribute("r", "6.5");
+    each(node_3, 17, () => get(visibleDots), index, ($$anchor2, dot) => {
+      var fragment_1 = root_3();
+      var node_4 = first_child(fragment_1);
+      {
+        var consequent_1 = ($$anchor3) => {
+          var circle = root_2();
+          template_effect(() => {
+            set_attribute2(circle, "cx", get(dot).x);
+            set_attribute2(circle, "cy", get(dot).y);
+            set_attribute2(circle, "stroke", get(dot).color);
+          });
+          append($$anchor3, circle);
+        };
+        if_block(node_4, ($$render) => {
+          if (get(dot).isHead)
+            $$render(consequent_1);
+        });
+      }
+      var circle_1 = sibling(node_4);
+      set_attribute2(circle_1, "r", DOT_RADIUS);
       template_effect(() => {
-        set_attribute2(circle, "cx", get(dot).x);
-        set_attribute2(circle, "cy", get(dot).y);
-        set_attribute2(circle, "fill", get(dot).color);
-        if (get(dot).isHead) {
-          ring.setAttribute("cx", get(dot).x);
-          ring.setAttribute("cy", get(dot).y);
-          ring.setAttribute("stroke", get(dot).color);
-          ring.style.display = "";
-        } else {
-          ring.style.display = "none";
-        }
+        set_attribute2(circle_1, "cx", get(dot).x);
+        set_attribute2(circle_1, "cy", get(dot).y);
+        set_attribute2(circle_1, "fill", get(dot).color);
       });
-      append($$anchor2, ring);
-      append($$anchor2, circle);
+      append($$anchor2, fragment_1);
     });
     reset(svg);
-    template_effect(
-      ($0, $1) => {
-        set_attribute2(svg, "width", $0);
-        set_attribute2(svg, "height", $1);
-      },
-      [svgWidth, svgHeight]
-    );
+    template_effect(() => {
+      set_attribute2(svg, "width", get(svgWidth));
+      set_attribute2(svg, "height", get(svgHeight));
+    });
     append($$anchor, svg);
     pop();
   }
 
   // webview/graph/BranchLabels.svelte
-  var root_1 = from_html(`<span> </span>`);
-  var root2 = from_html(`<span class="labels svelte-et0zx2"></span>`);
-  var $$css2 = {
+  var root3 = from_html(`<span><!> <span> </span></span>`);
+  var root_12 = from_html(`<span class="labels svelte-et0zx2"></span>`);
+  var $$css3 = {
     hash: "svelte-et0zx2",
     code: ".labels.svelte-et0zx2 {order:5;margin-left:16px;display:inline-flex;gap:5px;flex-shrink:0;padding-right:16px;min-width:max-content;overflow:visible;align-items:center;}.label.svelte-et0zx2 {display:inline-flex;align-items:center;gap:3px;padding:0 5px;border-radius:3px;font-size:0.8em;font-weight:500;line-height:1.3;white-space:nowrap;flex-shrink:0;background:transparent;}.label-icon {display:inline-flex;align-items:center;vertical-align:-1px;margin-right:2px;}.branch.svelte-et0zx2 {color:#3fb950;border:1px solid #238636;}.remote.svelte-et0zx2 {color:#bc8cff;border:1px solid #8957e5;}.tag.svelte-et0zx2 {color:#d29922;border:1px solid #9e6a03;}.head.svelte-et0zx2 {color:#e5a50a;border:1px solid #e5a50a;font-weight:600;}"
   };
   function BranchLabels($$anchor, $$props) {
-    append_styles($$anchor, $$css2);
+    append_styles($$anchor, $$css3);
+    let refs = prop($$props, "refs", 19, () => []);
     function labelClass(ref) {
-      if (ref.startsWith("tag: ")) return "label tag";
-      if (ref.startsWith("HEAD") || ref === "HEAD") return "label head";
-      if (ref.includes("/")) return "label remote";
+      if (ref.startsWith("tag: "))
+        return "label tag";
+      if (ref.startsWith("HEAD") || ref === "HEAD")
+        return "label head";
+      if (ref.includes("/"))
+        return "label remote";
       return "label branch";
     }
     function labelText(ref) {
-      if (ref.startsWith("HEAD -> ")) return ref.slice(8);
-      if (ref.startsWith("tag: ")) return ref.slice(5);
+      if (ref.startsWith("HEAD -> "))
+        return ref.slice(8);
+      if (ref.startsWith("tag: "))
+        return ref.slice(5);
       return ref;
     }
     function labelIcon(ref) {
@@ -6946,15 +8552,18 @@ ${component_stack}
       }
       return '<span class="label-icon"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="4.5" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="10.8" cy="6.2" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="4.5" y1="6.3" x2="4.5" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M4.5 9.8H9.3C10.13 9.8 10.8 9.13 10.8 8.3V8.0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></span>';
     }
-    var span = root2();
-    each(span, 21, () => $$props.refs, index, ($$anchor2, ref) => {
-      var span_1 = root_1();
-      var text2 = child(span_1, true);
+    var span = root_12();
+    each(span, 21, refs, index, ($$anchor2, ref) => {
+      var span_1 = root3();
+      var node = child(span_1);
+      html(node, () => labelIcon(get(ref)));
+      var span_2 = sibling(node, 2);
+      var text2 = only_child(span_2, true);
       reset(span_1);
       template_effect(
         ($0, $1) => {
           set_class(span_1, 1, $0, "svelte-et0zx2");
-          span_1.innerHTML = labelIcon(get(ref)) + ' <span>' + $1 + '</span>';
+          set_text(text2, $1);
         },
         [
           () => clsx2(labelClass(get(ref))),
@@ -6968,49 +8577,58 @@ ${component_stack}
   }
 
   // webview/graph/CommitList.svelte
-  var root_12 = from_html(`<div role="row" tabindex="0"><span class="hash svelte-1rusxbg"> </span> <!> <span class="subject svelte-1rusxbg"> </span> <span class="author svelte-1rusxbg"> </span> <span class="date svelte-1rusxbg"> </span></div>`);
-  var root_32 = from_html(`<div class="context-menu svelte-1rusxbg"><button class="context-item svelte-1rusxbg">Interactively Rebase from Here...</button></div>`);
-  var root3 = from_html(`<div class="commit-list-container svelte-1rusxbg"><div class="scroll-content"><div class="visible-rows svelte-1rusxbg"><div class="graph-column svelte-1rusxbg"><!></div> <div class="rows-column svelte-1rusxbg"></div></div></div></div> <!>`, 1);
-  var $$css3 = {
+  var root4 = from_html(`<div role="row" tabindex="0" style="height: 25px;"><span class="hash svelte-1rusxbg"></span> <!> <span class="subject svelte-1rusxbg"> </span> <span> </span> <span class="date svelte-1rusxbg"> </span></div>`);
+  var root_13 = from_html(`<div class="context-menu svelte-1rusxbg"><button class="context-item svelte-1rusxbg">Interactively Rebase from Here...</button></div>`);
+  var root_22 = from_html(`<div class="commit-list-container svelte-1rusxbg"><div class="scroll-content svelte-1rusxbg"><div class="visible-rows svelte-1rusxbg"><div class="graph-column svelte-1rusxbg"><!></div> <div class="rows-column svelte-1rusxbg"></div></div></div></div> <!>`, 1);
+  var $$css4 = {
     hash: "svelte-1rusxbg",
-    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:auto;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar {width:6px;height:6px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-track {background:transparent;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-corner {background:transparent;}.scroll-content {min-width:100%;width:max-content;}.visible-rows.svelte-1rusxbg {position:relative;display:block;min-width:100%;width:max-content;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg {box-sizing:border-box !important;height:25px !important;min-height:25px !important;max-height:25px !important;line-height:25px !important;display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;position:relative;border-bottom:none;min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg * {box-sizing:border-box;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground) !important;color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08) !important;}.commit-row.selected.svelte-1rusxbg:hover {background:var(--vscode-list-activeSelectionBackground) !important;filter:brightness(1.18);box-shadow:inset 0 0 0 999px rgba(255,255,255,0.14) !important;}.commit-row.selected.svelte-1rusxbg .author,.commit-row.selected.svelte-1rusxbg .date,.commit-row.selected.svelte-1rusxbg .subject,.commit-row.selected.svelte-1rusxbg .hash,.commit-row.selected.svelte-1rusxbg * {color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:400;color:#9aa0a6;font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:#8c8c8c;font-size:0.88em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:0 0 auto;min-width:max-content;white-space:nowrap;color:#dfe1e5;font-size:0.92em;}body.hl-my-commits .author.is-my-commit {font-weight:700 !important;color:#ffffff !important;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .subject {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .author {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.selected.svelte-1rusxbg .subject,body.hl-merge-commits .commit-row.selected.svelte-1rusxbg .author {color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;}body.hl-current-branch .commit-row.is-current-branch:not(.selected) {background:rgba(255,255,255,0.038) !important;box-shadow:none !important;}body.hl-current-branch .commit-row.is-current-branch:not(.selected):hover {background:var(--vscode-list-hoverBackground) !important;box-shadow:none !important;}body.hl-current-branch .commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground) !important;}body.hl-current-branch .commit-row.selected.svelte-1rusxbg:hover {background:var(--vscode-list-activeSelectionBackground) !important;filter:brightness(1.18);}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
+    code: ".commit-list-container.svelte-1rusxbg {position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:auto;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar {width:6px;height:6px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-track {background:transparent;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.commit-list-container.svelte-1rusxbg::-webkit-scrollbar-corner {background:transparent;}.scroll-content.svelte-1rusxbg {min-width:100%;width:max-content;}.visible-rows.svelte-1rusxbg {position:relative;display:block;min-width:100%;width:max-content;}.graph-column.svelte-1rusxbg {position:absolute;top:0;left:244px;pointer-events:none;z-index:1;}.rows-column.svelte-1rusxbg {min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg {box-sizing:border-box !important;height:25px !important;min-height:25px !important;max-height:25px !important;line-height:25px !important;display:flex;align-items:center;gap:8px;padding:0 8px;cursor:pointer;white-space:nowrap;position:relative;border-bottom:none;min-width:100%;width:max-content;}.commit-row.svelte-1rusxbg :where(.svelte-1rusxbg) {box-sizing:border-box;}.commit-row.svelte-1rusxbg:hover {background:var(--vscode-list-hoverBackground);}.commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground) !important;color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;box-shadow:inset 0 0 0 999px rgba(255,255,255,0.08) !important;}.commit-row.selected.svelte-1rusxbg:hover {background:var(--vscode-list-activeSelectionBackground) !important;filter:brightness(1.18);box-shadow:inset 0 0 0 999px rgba(255,255,255,0.14) !important;}.commit-row.selected.svelte-1rusxbg .author:where(.svelte-1rusxbg),\n  .commit-row.selected.svelte-1rusxbg .date:where(.svelte-1rusxbg),\n  .commit-row.selected.svelte-1rusxbg .subject:where(.svelte-1rusxbg),\n  .commit-row.selected.svelte-1rusxbg .hash:where(.svelte-1rusxbg),\n  .commit-row.selected.svelte-1rusxbg :where(.svelte-1rusxbg) {color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;}.author.svelte-1rusxbg {order:1;flex-shrink:0;font-weight:400;color:#9aa0a6;font-size:0.92em;width:95px;min-width:95px;overflow:hidden;text-overflow:ellipsis;}.date.svelte-1rusxbg {order:2;flex-shrink:0;color:#8c8c8c;font-size:0.88em;width:125px;min-width:125px;overflow:hidden;text-overflow:ellipsis;}.hash.svelte-1rusxbg {order:3;flex-shrink:0;color:transparent;user-select:none;font-size:0;}.subject.svelte-1rusxbg {order:4;flex:0 0 auto;min-width:max-content;white-space:nowrap;color:#dfe1e5;font-size:0.92em;}body.hl-my-commits .author.is-my-commit.svelte-1rusxbg {font-weight:700 !important;color:#ffffff !important;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .subject:where(.svelte-1rusxbg) {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.is-merge.svelte-1rusxbg .author:where(.svelte-1rusxbg) {color:#8c8c8c !important;font-weight:400;}body.hl-merge-commits .commit-row.selected.svelte-1rusxbg .subject:where(.svelte-1rusxbg),\n  body.hl-merge-commits .commit-row.selected.svelte-1rusxbg .author:where(.svelte-1rusxbg) {color:var(--vscode-list-activeSelectionForeground, #ffffff) !important;}body.hl-current-branch .commit-row.is-current-branch.svelte-1rusxbg:not(.selected) {background:rgba(255,255,255,0.038) !important;box-shadow:none !important;}body.hl-current-branch .commit-row.is-current-branch.svelte-1rusxbg:not(.selected):hover {background:var(--vscode-list-hoverBackground) !important;box-shadow:none !important;}body.hl-current-branch .commit-row.selected.svelte-1rusxbg {background:var(--vscode-list-activeSelectionBackground) !important;}body.hl-current-branch .commit-row.selected.svelte-1rusxbg:hover {background:var(--vscode-list-activeSelectionBackground) !important;filter:brightness(1.18);}.context-menu.svelte-1rusxbg {position:fixed;background:var(--vscode-menu-background, #252526);border:1px solid var(--vscode-menu-border, #454545);border-radius:4px;padding:4px 0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}.context-item.svelte-1rusxbg {display:block;width:100%;padding:6px 20px;border:none;background:none;color:var(--vscode-menu-foreground, #ccc);font-size:inherit;text-align:left;cursor:pointer;}.context-item.svelte-1rusxbg:hover {background:var(--vscode-menu-selectionBackground, #094771);color:var(--vscode-menu-selectionForeground, #fff);}"
   };
-  function showToast(text) {
-    const old = document.querySelector(".as-mini-toast");
-    if (old) old.remove();
-    const t = document.createElement("div");
-    t.className = "as-mini-toast";
-    t.innerText = text;
-    document.body.appendChild(t);
-    setTimeout(() => t.classList.add("visible"), 10);
-    setTimeout(() => {
-      t.classList.remove("visible");
-      setTimeout(() => t.remove(), 250);
-    }, 2000);
-  }
-  if (typeof window !== "undefined") {
-    window.showToast = showToast;
-  }
   function CommitList($$anchor, $$props) {
     push($$props, true);
-    append_styles($$anchor, $$css3);
+    append_styles($$anchor, $$css4);
+    let commits = prop($$props, "commits", 19, () => []), selectedHash = prop($$props, "selectedHash", 3, null), graphWidth = prop($$props, "graphWidth", 3, 1), scrollToIndex = prop($$props, "scrollToIndex", 19, () => -1);
     const ROW_HEIGHT = 25;
     const OVERSCAN = 5;
     let containerEl = state(void 0);
     let scrollTop = state(0);
     let containerHeight = state(600);
     let contextMenuHash = state(null);
-    let contextMenuPos = state(proxy({ x: 0, y: 0 }));
+    let contextMenuPos = proxy({ x: 0, y: 0 });
     let showContextMenu = state(false);
+    function showToast2(text2) {
+      const old = document.querySelector(".as-mini-toast");
+      if (old)
+        old.remove();
+      const t = document.createElement("div");
+      t.className = "as-mini-toast";
+      t.innerText = text2;
+      document.body.appendChild(t);
+      setTimeout(() => t.classList.add("visible"), 10);
+      setTimeout(
+        () => {
+          t.classList.remove("visible");
+          setTimeout(() => t.remove(), 250);
+        },
+        2e3
+      );
+    }
+    if (typeof window !== "undefined") {
+      window.showToast = showToast2;
+    }
     user_effect(() => {
       if (!get(containerEl))
         return;
       window.__commitListContainer__ = get(containerEl);
-      window.__commitListSetScrollTop__ = (st) => set(scrollTop, st, true);
+      window.__commitListSetScrollTop__ = (st) => {
+        set(scrollTop, st, true);
+      };
       const obs = new ResizeObserver((entries) => {
-        if (!entries || !entries.length) return;
+        if (!entries || !entries.length)
+          return;
         window.requestAnimationFrame(() => {
-          if (!entries[0]) return;
+          if (!entries[0])
+            return;
           const h = entries[0].contentRect.height;
           if (h && Math.abs(h - get(containerHeight)) > 1) {
             set(containerHeight, h, true);
@@ -7032,7 +8650,7 @@ ${component_stack}
     function onScroll(e) {
       const el = e.target;
       set(scrollTop, el.scrollTop, true);
-      const curCount = ($$props.commits ? $$props.commits.length : 0);
+      const curCount = commits() ? commits().length : 0;
       if (curCount !== prevCommitCount) {
         isLoadingMore = false;
         hasReachedEnd = false;
@@ -7045,91 +8663,86 @@ ${component_stack}
       }
     }
     let startIndex = user_derived(() => Math.max(0, Math.floor(get(scrollTop) / ROW_HEIGHT) - OVERSCAN));
-    let endIndex = user_derived(() => Math.min($$props.commits.length, Math.ceil((get(scrollTop) + get(containerHeight)) / ROW_HEIGHT) + OVERSCAN));
-    let visibleCommits = user_derived(() => $$props.commits.slice(get(startIndex), get(endIndex)));
-    let graphNodes = user_derived(() => $$props.commits.map((c) => c.graph));
+    let endIndex = user_derived(() => Math.min(commits().length, Math.ceil((get(scrollTop) + get(containerHeight)) / ROW_HEIGHT) + OVERSCAN));
+    let visibleCommits = user_derived(() => commits().slice(get(startIndex), get(endIndex)));
+    let graphNodes = user_derived(() => commits().map((c) => c.graph));
     function formatDate(iso) {
       const d = new Date(iso);
-      const now = new Date();
+      const now = /* @__PURE__ */ new Date();
       const diffMs = now.getTime() - d.getTime();
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      if (diffMins < 1) return "Just now";
-      if (diffMins < 60) return `${diffMins} minutes ago`;
+      const diffMins = Math.floor(diffMs / (1e3 * 60));
+      if (diffMins < 1)
+        return "Just now";
+      if (diffMins < 60)
+        return `${diffMins} minutes ago`;
       const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
       const isToday = d.toDateString() === now.toDateString();
-      if (isToday) return `Today ${timeStr}`;
+      if (isToday)
+        return `Today ${timeStr}`;
       const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
-      if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${timeStr}`;
+      if (d.toDateString() === yesterday.toDateString())
+        return `Yesterday ${timeStr}`;
       const day = d.getDate();
       const month = d.getMonth() + 1;
       const year = String(d.getFullYear()).slice(-2);
       return `${day}/${month}/${year}, ${timeStr}`;
     }
-    const ICON_COPY = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>`;
-    const ICON_PLUS = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.1232 2.67714C11.7828 2.33692 11.3696 2.16676 10.8834 2.16676C10.3975 2.16676 9.98427 2.33682 9.64395 2.67714C9.30375 3.01737 9.13366 3.43051 9.13366 3.91672C9.13366 4.23268 9.21242 4.52588 9.37041 4.79626C9.52838 5.06666 9.74087 5.27787 10.0084 5.42971C10.0084 5.74567 9.98273 6.02377 9.93118 6.26375C9.87939 6.50373 9.79441 6.71478 9.67597 6.8972C9.55721 7.07953 9.43442 7.23436 9.30672 7.36203C9.17899 7.4897 8.99973 7.60961 8.76885 7.72208C8.538 7.83449 8.32366 7.92857 8.12624 8.00464C7.92881 8.08047 7.66288 8.17008 7.32869 8.27342C6.72097 8.46187 6.25317 8.63491 5.92501 8.793V4.26292C6.19238 4.11111 6.40507 3.89993 6.56303 3.62953C6.72097 3.35912 6.79995 3.06589 6.79995 2.74993C6.79995 2.26388 6.62988 1.85064 6.28956 1.51042C5.94937 1.17022 5.53623 1 5.05005 1C4.56383 1 4.15069 1.1701 3.81037 1.51042C3.47018 1.85064 3.29999 2.26388 3.29999 2.74993C3.29999 3.06589 3.37897 3.35912 3.5369 3.62953C3.69487 3.89993 3.90752 4.11111 4.17492 4.26292V11.7371C3.90752 11.8888 3.69487 12.1002 3.5369 12.3705C3.37897 12.641 3.29999 12.9343 3.29999 13.2501C3.29999 13.7362 3.47005 14.1494 3.81037 14.4896C4.15069 14.8298 4.56393 15 5.05005 15C5.53614 15 5.94937 14.8298 6.28956 14.4896C6.62979 14.1494 6.79995 13.7362 6.79995 13.2501C6.79995 12.9343 6.72097 12.641 6.56303 12.3705C6.40504 12.1002 6.19238 11.8888 5.92501 11.7371V11.5001C5.92501 11.0809 6.05109 10.7772 6.30323 10.5888C6.55537 10.4003 7.07035 10.1846 7.84823 9.94163C8.66867 9.68029 9.28553 9.43405 9.6987 9.20307C11.0598 8.43155 11.7464 7.17367 11.7585 5.42968C12.0261 5.27787 12.2386 5.06663 12.3965 4.79622C12.5544 4.52582 12.6335 4.23265 12.6335 3.91669C12.6336 3.4306 12.4634 3.01746 12.1232 2.67714Z"/></svg>`;
-    const ICON_CHERRY = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.5 11C6.5 12.1046 5.60457 13 4.5 13C3.39543 13 2.5 12.1046 2.5 11C2.5 9.89543 3.39543 9 4.5 9C5.60457 9 6.5 9.89543 6.5 11ZM4.5 14C6.15685 14 7.5 12.6569 7.5 11C7.5 9.34315 6.15685 8 4.5 8C2.84315 8 1.5 9.34315 1.5 11C1.5 12.6569 2.84315 14 4.5 14ZM13.5 11C13.5 12.1046 12.6046 13 11.5 13C10.3954 13 9.5 12.1046 9.5 11C9.5 9.89543 10.3954 9 11.5 9C12.6046 9 13.5 9.89543 13.5 11ZM11.5 14C13.1569 14 14.5 12.6569 14.5 11C14.5 9.34315 13.1569 8 11.5 8C9.84315 8 8.5 9.34315 8.5 11C8.5 12.6569 9.84315 14 11.5 14Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M11.8537 1.14647C11.7934 1.08617 11.7216 1.04449 11.6453 1.02143C11.5869 1.00372 11.5244 0.996452 11.46 1.00164L11.4585 1.00175L11.4577 1.00183C8.89299 1.21581 7.10682 2.51359 5.92996 4.03112C4.76214 5.53699 4.18349 7.26955 4.00588 8.424C3.9639 8.69693 4.15111 8.95222 4.42404 8.99421C4.69697 9.0362 4.95227 8.84899 4.99426 8.57606C5.14998 7.56384 5.67133 5.9964 6.72018 4.64394C7.43375 3.72381 8.38624 2.9082 9.6361 2.42686L10.8329 1.87283L10.1507 2.48553C9.63716 3.45813 9.48624 4.482 9.53842 5.42758C9.61459 6.8079 10.1221 8.0385 10.5761 8.76503C10.7225 8.9992 11.031 9.07038 11.2651 8.92403C11.4993 8.77767 11.5705 8.4692 11.4241 8.23503C11.0449 7.62822 10.6024 6.55883 10.5369 5.37248C10.4723 4.20114 10.7737 2.93361 11.8537 1.85358C12.049 1.65832 12.049 1.34174 11.8537 1.14647Z" fill="currentColor"/></svg>`;
-    const ICON_RESET = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><g fill-rule="evenodd" transform="translate(2 1)"><polygon points="0 0 4 4 0 8" transform="matrix(-1 0 0 1 4 0)"/><path d="M4.15058343,11 L8.06891179,11 C9.72576604,11 11.0689118,9.65685425 11.0689118,8 C11.0689118,6.34314575 9.72576604,5 8.06891179,5 L4.03764586,5 L4,3 L8,3 C10.7614237,3 13,5.23857625 13,8 C13,10.7614237 10.7614237,13 8,13 L4.18822929,13 L4.15058343,11 Z"/></g></svg>`;
-    const ICON_WEB = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>`;
-
-
+    const ICON_COPY = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>';
+    const ICON_PLUS = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.1232 2.67714C11.7828 2.33692 11.3696 2.16676 10.8834 2.16676C10.3975 2.16676 9.98427 2.33682 9.64395 2.67714C9.30375 3.01737 9.13366 3.43051 9.13366 3.91672C9.13366 4.23268 9.21242 4.52588 9.37041 4.79626C9.52838 5.06666 9.74087 5.27787 10.0084 5.42971C10.0084 5.74567 9.98273 6.02377 9.93118 6.26375C9.87939 6.50373 9.79441 6.71478 9.67597 6.8972C9.55721 7.07953 9.43442 7.23436 9.30672 7.36203C9.17899 7.4897 8.99973 7.60961 8.76885 7.72208C8.538 7.83449 8.32366 7.92857 8.12624 8.00464C7.92881 8.08047 7.66288 8.17008 7.32869 8.27342C6.72097 8.46187 6.25317 8.63491 5.92501 8.793V4.26292C6.19238 4.11111 6.40507 3.89993 6.56303 3.62953C6.72097 3.35912 6.79995 3.06589 6.79995 2.74993C6.79995 2.26388 6.62988 1.85064 6.28956 1.51042C5.94937 1.17022 5.53623 1 5.05005 1C4.56383 1 4.15069 1.1701 3.81037 1.51042C3.47018 1.85064 3.29999 2.26388 3.29999 2.74993C3.29999 3.06589 3.37897 3.35912 3.5369 3.62953C3.69487 3.89993 3.90752 4.11111 4.17492 4.26292V11.7371C3.90752 11.8888 3.69487 12.1002 3.5369 12.3705C3.37897 12.641 3.29999 12.9343 3.29999 13.2501C3.29999 13.7362 3.47005 14.1494 3.81037 14.4896C4.15069 14.8298 4.56393 15 5.05005 15C5.53614 15 5.94937 14.8298 6.28956 14.4896C6.62979 14.1494 6.79995 13.7362 6.79995 13.2501C6.79995 12.9343 6.72097 12.641 6.56303 12.3705C6.40504 12.1002 6.19238 11.8888 5.92501 11.7371V11.5001C5.92501 11.0809 6.05109 10.7772 6.30323 10.5888C6.55537 10.4003 7.07035 10.1846 7.84823 9.94163C8.66867 9.68029 9.28553 9.43405 9.6987 9.20307C11.0598 8.43155 11.7464 7.17367 11.7585 5.42968C12.0261 5.27787 12.2386 5.06663 12.3965 4.79622C12.5544 4.52582 12.6335 4.23265 12.6335 3.91669C12.6336 3.4306 12.4634 3.01746 12.1232 2.67714Z"/></svg>';
+    const ICON_CHERRY = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.5 11C6.5 12.1046 5.60457 13 4.5 13C3.39543 13 2.5 12.1046 2.5 11C2.5 9.89543 3.39543 9 4.5 9C5.60457 9 6.5 9.89543 6.5 11ZM4.5 14C6.15685 14 7.5 12.6569 7.5 11C7.5 9.34315 6.15685 8 4.5 8C2.84315 8 1.5 9.34315 1.5 11C1.5 12.6569 2.84315 14 4.5 14ZM13.5 11C13.5 12.1046 12.6046 13 11.5 13C10.3954 13 9.5 12.1046 9.5 11C9.5 9.89543 10.3954 9 11.5 9C12.6046 9 13.5 9.89543 13.5 11ZM11.5 14C13.1569 14 14.5 12.6569 14.5 11C14.5 9.34315 13.1569 8 11.5 8C9.84315 8 8.5 9.34315 8.5 11C8.5 12.6569 9.84315 14 11.5 14Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M11.8537 1.14647C11.7934 1.08617 11.7216 1.04449 11.6453 1.02143C11.5869 1.00372 11.5244 0.996452 11.46 1.00164L11.4585 1.00175L11.4577 1.00183C8.89299 1.21581 7.10682 2.51359 5.92996 4.03112C4.76214 5.53699 4.18349 7.26955 4.00588 8.424C3.9639 8.69693 4.15111 8.95222 4.42404 8.99421C4.69697 9.0362 4.95227 8.84899 4.99426 8.57606C5.14998 7.56384 5.67133 5.9964 6.72018 4.64394C7.43375 3.72381 8.38624 2.9082 9.6361 2.42686L10.8329 1.87283L10.1507 2.48553C9.63716 3.45813 9.48624 4.482 9.53842 5.42758C9.61459 6.8079 10.1221 8.0385 10.5761 8.76503C10.7225 8.9992 11.031 9.07038 11.2651 8.92403C11.4993 8.77767 11.5705 8.4692 11.4241 8.23503C11.0449 7.62822 10.6024 6.55883 10.5369 5.37248C10.4723 4.20114 10.7737 2.93361 11.8537 1.85358C12.049 1.65832 12.049 1.34174 11.8537 1.14647Z" fill="currentColor"/></svg>';
+    const ICON_RESET = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><g fill-rule="evenodd" transform="translate(2 1)"><polygon points="0 0 4 4 0 8" transform="matrix(-1 0 0 1 4 0)"/><path d="M4.15058343,11 L8.06891179,11 C9.72576604,11 11.0689118,9.65685425 11.0689118,8 C11.0689118,6.34314575 9.72576604,5 8.06891179,5 L4.03764586,5 L4,3 L8,3 C10.7614237,3 13,5.23857625 13,8 C13,10.7614237 10.7614237,13 8,13 L4.18822929,13 L4.15058343,11 Z"/></g></svg>';
+    const ICON_WEB = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
     function closeCommitContextMenu() {
       const menus = document.querySelectorAll(".commit-context-menu");
-      menus.forEach(m => m.remove());
+      menus.forEach((m) => m.remove());
     }
-
     function closeBranchContextMenu() {
       const old = document.querySelector(".branch-context-menu");
-      if (old) old.remove();
+      if (old)
+        old.remove();
     }
-
     function openEditCommitMessageDialog(commit) {
-      if (!commit) return;
+      if (!commit)
+        return;
       const existing = document.querySelector(".as-dialog-overlay");
-      if (existing) existing.remove();
-
+      if (existing)
+        existing.remove();
       const overlay = document.createElement("div");
       overlay.className = "as-dialog-overlay";
-
       const card = document.createElement("div");
       card.className = "as-dialog-card";
-
       const shortHash = commit.hash ? commit.hash.slice(0, 8) : "";
       card.innerHTML = `
-        <div class="as-dialog-header">
-          <span>Edit Commit Message (${shortHash})</span>
-          <span class="as-dialog-close">✕</span>
-        </div>
-        <div class="as-dialog-body">
-          <div class="as-dialog-field-label">Summary (Title)</div>
-          <input type="text" class="as-dialog-input" id="as-edit-summary" placeholder="Commit summary...">
-          <div class="as-dialog-field-label">Description (Details)</div>
-          <textarea class="as-dialog-textarea" id="as-edit-desc" placeholder="Detailed commit description (optional)..."></textarea>
-        </div>
-        <div class="as-dialog-footer">
-          <div style="margin-right:auto;font-size:11px;opacity:0.6;">Ctrl+Enter to save, Esc to cancel</div>
-          <button class="as-dialog-btn as-dialog-btn-secondary" id="as-edit-cancel">Cancel</button>
-          <button class="as-dialog-btn as-dialog-btn-primary" id="as-edit-ok">Save</button>
-        </div>
-      `;
-
+      <div class="as-dialog-header">
+        <span>Edit Commit Message (${shortHash})</span>
+        <span class="as-dialog-close">\u2715</span>
+      </div>
+      <div class="as-dialog-body">
+        <div class="as-dialog-field-label">Summary (Title)</div>
+        <input type="text" class="as-dialog-input" id="as-edit-summary" placeholder="Commit summary...">
+        <div class="as-dialog-field-label">Description (Details)</div>
+        <textarea class="as-dialog-textarea" id="as-edit-desc" placeholder="Detailed commit description (optional)..."></textarea>
+      </div>
+      <div class="as-dialog-footer">
+        <div style="margin-right:auto;font-size:11px;opacity:0.6;">Ctrl+Enter to save, Esc to cancel</div>
+        <button class="as-dialog-btn as-dialog-btn-secondary" id="as-edit-cancel">Cancel</button>
+        <button class="as-dialog-btn as-dialog-btn-primary" id="as-edit-ok">Save</button>
+      </div>
+    `;
       overlay.appendChild(card);
       document.body.appendChild(overlay);
-
       const summaryInput = card.querySelector("#as-edit-summary");
       const descInput = card.querySelector("#as-edit-desc");
       const btnCancel = card.querySelector("#as-edit-cancel");
       const btnOk = card.querySelector("#as-edit-ok");
       const btnClose = card.querySelector(".as-dialog-close");
-
       summaryInput.value = commit.subject || "";
       descInput.value = commit.body ? commit.body.trim() : "";
-
       const closeDialog = () => {
         overlay.remove();
         document.removeEventListener("keydown", onKeyDown);
       };
-
       const submitDialog = () => {
         const title = summaryInput.value.trim();
         if (!title) {
@@ -7137,19 +8750,17 @@ ${component_stack}
           return;
         }
         const desc = descInput.value.trim();
-        const fullMessage = desc ? (title + "\\n\\n" + desc) : title;
+        const fullMessage = desc ? title + "\n\n" + desc : title;
         postMessage("editCommitMessage", { hash: commit.hash, message: fullMessage });
         closeDialog();
       };
-
       btnCancel.addEventListener("click", closeDialog);
       btnClose.addEventListener("click", closeDialog);
       btnOk.addEventListener("click", submitDialog);
-
       overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) closeDialog();
+        if (e.target === overlay)
+          closeDialog();
       });
-
       const onKeyDown = (e) => {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -7159,31 +8770,30 @@ ${component_stack}
           submitDialog();
         }
       };
-
       document.addEventListener("keydown", onKeyDown);
-
       summaryInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           descInput.focus();
         }
       });
-
-      setTimeout(() => {
-        summaryInput.focus();
-        summaryInput.select();
-      }, 50);
+      setTimeout(
+        () => {
+          summaryInput.focus();
+          summaryInput.select();
+        },
+        50
+      );
     }
-
     function showCommitContextMenu(e, commit) {
       e.preventDefault();
       e.stopPropagation();
       closeCommitContextMenu();
       const oldBranch = document.querySelector(".branch-context-menu");
-      if (oldBranch) oldBranch.remove();
-
-      const commits = $$props.commits || [];
-      const isHead = commits.length > 0 && commits[0].hash === commit.hash;
+      if (oldBranch)
+        oldBranch.remove();
+      const commitList = commits() || [];
+      const isHead = commitList.length > 0 && commitList[0].hash === commit.hash;
       const menu = document.createElement("div");
       menu.className = "commit-context-menu";
       menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
@@ -7191,28 +8801,24 @@ ${component_stack}
         ev.preventDefault();
         ev.stopPropagation();
       });
-
       function addItem(label, shortcut, iconSvg, onClick, disabled = false) {
         const it = document.createElement("div");
         it.className = "ccm-item" + (disabled ? " disabled" : "");
-
         const iconSpan = document.createElement("span");
         iconSpan.className = "ccm-icon";
-        if (iconSvg) iconSpan.innerHTML = iconSvg;
+        if (iconSvg)
+          iconSpan.innerHTML = iconSvg;
         it.appendChild(iconSpan);
-
         const lblSpan = document.createElement("span");
         lblSpan.className = "ccm-label";
         lblSpan.innerText = label;
         it.appendChild(lblSpan);
-
         if (shortcut) {
           const scSpan = document.createElement("span");
           scSpan.className = "ccm-shortcut";
           scSpan.innerText = shortcut;
           it.appendChild(scSpan);
         }
-
         if (!disabled && onClick) {
           it.addEventListener("click", (ev) => {
             ev.stopPropagation();
@@ -7223,110 +8829,71 @@ ${component_stack}
         menu.appendChild(it);
         return it;
       }
-
       function addDivider() {
         const d = document.createElement("div");
         d.className = "ccm-divider";
         menu.appendChild(d);
       }
-
-      // 1. Copy Revision Number
-      addItem("Copy Revision Number", "⌥⇧⌘C", ICON_COPY, () => {
+      addItem("Copy Revision Number", "\u2325\u21E7\u2318C", ICON_COPY, () => {
         navigator.clipboard.writeText(commit.hash);
-        showToast("Copied " + commit.hash.slice(0, 8) + " to clipboard");
+        showToast2("Copied " + commit.hash.slice(0, 8) + " to clipboard");
       });
-
-      // 2. Create Patch...
       addItem("Create Patch...", "", ICON_PLUS, () => {
         postMessage("createPatch", { hash: commit.hash });
       });
-
-      // 3. Cherry-Pick
       addItem("Cherry-Pick", "", ICON_CHERRY, () => {
         postMessage("cherryPick", { hash: commit.hash });
       });
-
       addDivider();
-
-      // 4. Checkout Revision
       addItem("Checkout Revision", "", "", () => {
         postMessage("checkout", commit.hash);
       });
-
-      // 5. Show Repository at Revision
       addItem("Show Repository at Revision", "", "", () => {
         postMessage("showRepoAtRevision", { hash: commit.hash });
       });
-
-      // 6. Compare with Local
       addItem("Compare with Local", "", "", () => {
         postMessage("compareWithLocal", { hash: commit.hash });
       });
-
       addDivider();
-
-      // 7. Reset Current Branch to Here...
       addItem("Reset Current Branch to Here...", "", ICON_RESET, () => {
         postMessage("resetToCommit", { hash: commit.hash });
       });
-
-      // 8. Revert Commit
       addItem("Revert Commit", "", "", () => {
         postMessage("revertCommit", { hash: commit.hash });
       });
-
-      // 9. Undo Commit... (enabled only if HEAD)
-      addItem("Undo Commit...", "", "", () => {
-        postMessage("undoCommit", { hash: commit.hash });
-      }, !isHead);
-
+      addItem(
+        "Undo Commit...",
+        "",
+        "",
+        () => {
+          postMessage("undoCommit", { hash: commit.hash });
+        },
+        !isHead
+      );
       addDivider();
-
-      // 10. Edit Commit Message...
       addItem("Edit Commit Message...", "F2", "", () => {
         openEditCommitMessageDialog(commit);
       });
-
-      // 11. Fixup...
       addItem("Fixup...", "", "", () => {
         postMessage("rebaseFromHere", commit.hash);
       });
-
-      // 12. Squash Into...
       addItem("Squash Into...", "", "", () => {
         postMessage("rebaseFromHere", commit.hash);
       });
-
-      // 13. Drop Commit
       addItem("Drop Commit", "", "", () => {
         postMessage("dropCommit", { hash: commit.hash });
       });
-
-      // 14. Interactively Rebase from Here...
       addItem("Interactively Rebase from Here...", "", "", () => {
         postMessage("rebaseFromHere", commit.hash);
       });
-
-      // 15. Push All up to Here...
       addItem("Push All up to Here...", "", "", () => {
-        showToast("Pushing up to " + commit.hash.slice(0, 8) + "...");
+        showToast2("Pushing up to " + commit.hash.slice(0, 8) + "...");
         postMessage("pushUpToHere", { hash: commit.hash });
       });
-
       addDivider();
-
-      // 16. Branch '<name>' Submenu
-      const branchRef = (commit.refs || []).find(r => !r.startsWith("tag: ") && r !== "HEAD") || (commit.refs && commit.refs[0]);
+      const branchRef = (commit.refs || []).find((r2) => !r2.startsWith("tag: ") && r2 !== "HEAD") || commit.refs && commit.refs[0];
       if (branchRef) {
-        const cleanBranch = branchRef.replace(/^HEAD -> /, '');
-        const branchItem = document.createElement("div");
-        branchItem.className = "ccm-item has-submenu";
-        branchItem.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">Branch '${cleanBranch}'</span><span class="ccm-arrow">›</span>`;
-
-        const subMenu = document.createElement("div");
-        subMenu.className = "commit-context-menu ccm-submenu";
-
-        function addSubItem(label, onClick) {
+        let addSubItem = function(label, onClick) {
           const it = document.createElement("div");
           it.className = "ccm-item";
           it.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">${label}</span>`;
@@ -7336,27 +8903,15 @@ ${component_stack}
             onClick();
           });
           subMenu.appendChild(it);
-        }
-
-        addSubItem("Checkout", () => postMessage("checkout", cleanBranch));
-        addSubItem("Show Diff with Working Tree", () => postMessage("showDiff", { branch: cleanBranch }));
-        addSubItem("Update", () => {
-          showToast("Updating '" + cleanBranch + "'...");
-          postMessage("pull", cleanBranch);
-        });
-        addSubItem("Push...", () => postMessage("push", cleanBranch));
-        addSubItem("Rename...", () => {
-          openRenameBranchDialog(cleanBranch);
-        });
-
-        let subMenuTimer;
-        function hideSubMenu() {
+        }, hideSubMenu = function() {
           clearTimeout(subMenuTimer);
-          subMenuTimer = setTimeout(() => {
-            subMenu.remove();
-          }, 150);
-        }
-        function showSubMenu() {
+          subMenuTimer = setTimeout(
+            () => {
+              subMenu.remove();
+            },
+            150
+          );
+        }, showSubMenu = function() {
           clearTimeout(subMenuTimer);
           document.body.appendChild(subMenu);
           subMenu.style.display = "block";
@@ -7372,51 +8927,69 @@ ${component_stack}
           }
           subMenu.style.left = Math.max(0, sx) + "px";
           subMenu.style.top = Math.max(0, sy) + "px";
-        }
-
+        };
+        const cleanBranch = branchRef.replace(/^HEAD -> /, "");
+        const branchItem = document.createElement("div");
+        branchItem.className = "ccm-item has-submenu";
+        branchItem.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">Branch '${cleanBranch}'</span><span class="ccm-arrow">\u203A</span>`;
+        const subMenu = document.createElement("div");
+        subMenu.className = "commit-context-menu ccm-submenu";
+        addSubItem("Checkout", () => postMessage("checkout", cleanBranch));
+        addSubItem("Show Diff with Working Tree", () => postMessage("showDiff", { branch: cleanBranch }));
+        addSubItem("Update", () => {
+          showToast2("Updating '" + cleanBranch + "'...");
+          postMessage("pull", cleanBranch);
+        });
+        addSubItem("Push...", () => postMessage("push", cleanBranch));
+        addSubItem("Rename...", () => {
+          openRenameBranchDialog(cleanBranch);
+        });
+        let subMenuTimer;
         branchItem.addEventListener("mouseenter", showSubMenu);
         branchItem.addEventListener("mouseleave", hideSubMenu);
         subMenu.addEventListener("mouseenter", () => clearTimeout(subMenuTimer));
         subMenu.addEventListener("mouseleave", hideSubMenu);
         menu.appendChild(branchItem);
       }
-
-      // 17. New Branch...
-      addItem("New Branch...", "⌥⌘N", "", () => {
+      addItem("New Branch...", "\u2325\u2318N", "", () => {
         openCreateBranchDialog(commit.hash);
       });
-
-      // 18. New Tag...
       addItem("New Tag...", "", "", () => {
         openCreateTagDialog(commit.hash);
       });
-
       addDivider();
-
-      // 19. Go to Child Commit
-      let childCommit = commits.find(c => c.parents && c.parents.includes(commit.hash));
-      addItem("Go to Child Commit", "←", "", () => {
-        if (childCommit) $$props.onSelectCommit(childCommit.hash);
-      }, !childCommit);
-
-      // 20. Go to Parent Commit
+      let childCommit = commitList.find((c) => c.parents && c.parents.includes(commit.hash));
+      addItem(
+        "Go to Child Commit",
+        "\u2190",
+        "",
+        () => {
+          if (childCommit)
+            $$props.onSelectCommit(childCommit.hash);
+        },
+        !childCommit
+      );
       const hasParent = commit.parents && commit.parents.length > 0;
-      addItem("Go to Parent Commit", "→", "", () => {
-        if (hasParent) $$props.onSelectCommit(commit.parents[0]);
-      }, !hasParent);
-
+      addItem(
+        "Go to Parent Commit",
+        "\u2192",
+        "",
+        () => {
+          if (hasParent)
+            $$props.onSelectCommit(commit.parents[0]);
+        },
+        !hasParent
+      );
       addDivider();
-
-      // 21. View in browser
       addItem("View in browser", "", ICON_WEB, () => {
         postMessage("openInBrowser", { hash: commit.hash });
       });
-
       document.body.appendChild(menu);
       let x = e.clientX;
       let y = e.clientY;
       const rect = menu.getBoundingClientRect();
-      if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+      if (x + rect.width > window.innerWidth - 8)
+        x = Math.max(8, window.innerWidth - rect.width - 8);
       if (y + rect.height > window.innerHeight - 8) {
         const yAbove = e.clientY - rect.height;
         if (yAbove >= 8) {
@@ -7428,7 +9001,6 @@ ${component_stack}
       menu.style.left = Math.max(0, x) + "px";
       menu.style.top = Math.max(0, y) + "px";
     }
-
     function onContextMenu(e, commit) {
       if (commit && commit.hash) {
         $$props.onSelectCommit(commit.hash);
@@ -7446,8 +9018,8 @@ ${component_stack}
       closeContextMenu();
     }
     user_effect(() => {
-      if ($$props.scrollToIndex >= 0 && get(containerEl)) {
-        const targetY = $$props.scrollToIndex * ROW_HEIGHT;
+      if (scrollToIndex() >= 0 && get(containerEl)) {
+        const targetY = scrollToIndex() * ROW_HEIGHT;
         get(containerEl).scrollTo({
           top: targetY - get(containerHeight) / 2 + ROW_HEIGHT,
           behavior: "smooth"
@@ -7460,35 +9032,35 @@ ${component_stack}
         closeCommitContextMenu();
         closeBranchContextMenu();
       };
-
       const mousedownHandler = (ev) => {
         const target = ev.target && ev.target.nodeType === 1 ? ev.target : ev.target?.parentElement;
-        if (!target || (!target.closest?.(".commit-context-menu") && !target.closest?.(".branch-context-menu"))) {
+        if (!target || !target.closest?.(".commit-context-menu") && !target.closest?.(".branch-context-menu")) {
           closeAllMenus();
         }
       };
-
       const keydownHandler = (ev) => {
         if (ev.key === "Escape") {
           closeAllMenus();
           return;
         }
-        if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) return;
-        const selHash = $$props.selectedHash;
-        if (!selHash) return;
-        const commits = $$props.commits || [];
-        const commit = commits.find(c => c.hash === selHash);
-        if (!commit) return;
-
+        if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA"))
+          return;
+        const selHash = selectedHash();
+        if (!selHash)
+          return;
+        const commitList = commits() || [];
+        const commit = commitList.find((c) => c.hash === selHash);
+        if (!commit)
+          return;
         if (ev.key === "F2") {
           ev.preventDefault();
           openEditCommitMessageDialog(commit);
         } else if ((ev.metaKey || ev.ctrlKey) && (ev.key === "c" || ev.key === "C") && !window.getSelection()?.toString()) {
           ev.preventDefault();
           navigator.clipboard.writeText(commit.hash);
-          showToast("Copied " + commit.hash.slice(0, 8) + " to clipboard");
+          showToast2("Copied " + commit.hash.slice(0, 8) + " to clipboard");
         } else if (ev.key === "ArrowLeft") {
-          const childCommit = commits.find(c => c.parents && c.parents.includes(commit.hash));
+          const childCommit = commitList.find((c) => c.parents && c.parents.includes(commit.hash));
           if (childCommit) {
             ev.preventDefault();
             $$props.onSelectCommit(childCommit.hash);
@@ -7500,16 +9072,59 @@ ${component_stack}
           }
         }
       };
-
       document.addEventListener("mousedown", mousedownHandler);
       window.addEventListener("keydown", keydownHandler);
-
+      window.addEventListener("blur", closeAllMenus);
+      const visHandler = () => {
+        if (document.hidden)
+          closeAllMenus();
+      };
+      document.addEventListener("visibilitychange", visHandler);
+      const msgHandler = (ev) => {
+        if (ev.data?.type === "closeAllMenus")
+          closeAllMenus();
+      };
+      window.addEventListener("message", msgHandler);
       return () => {
         document.removeEventListener("mousedown", mousedownHandler);
         window.removeEventListener("keydown", keydownHandler);
+        window.removeEventListener("blur", closeAllMenus);
+        document.removeEventListener("visibilitychange", visHandler);
+        window.removeEventListener("message", msgHandler);
       };
     });
-    var fragment = root3();
+    function isMyCommit(commit) {
+      const cUser = typeof window !== "undefined" ? window.__GIT_CURRENT_USER__ : null;
+      if (!cUser)
+        return false;
+      const ca = (commit.author || "").trim().toLowerCase();
+      const ce = (commit.authorEmail || "").trim().toLowerCase();
+      const un = (cUser.name || "").trim().toLowerCase();
+      const ue = (cUser.email || "").trim().toLowerCase();
+      if (un && ca && (ca === un || ca.includes(un) || un.includes(ca)))
+        return true;
+      if (ue && ce && (ce === ue || ce.includes(ue) || ue.includes(ce)))
+        return true;
+      if (ue && ca && ca === ue.split("@")[0])
+        return true;
+      return false;
+    }
+    function computeGraphWidth(commit) {
+      const g = commit.graph;
+      let maxCol = g ? g.column : 0;
+      if (g && g.lines) {
+        for (let li = 0; li < g.lines.length; li++) {
+          const l = g.lines[li];
+          if (l.fromColumn > maxCol)
+            maxCol = l.fromColumn;
+          if (l.toColumn > maxCol)
+            maxCol = l.toColumn;
+        }
+      }
+      const rowBranches = Math.max(4, maxCol + 1);
+      return rowBranches * 16 + 20;
+    }
+    var fragment = root_22();
     var div = first_child(fragment);
     var div_1 = child(div);
     var div_2 = child(div_1);
@@ -7522,7 +9137,7 @@ ${component_stack}
           return get(graphNodes);
         },
         get graphWidth() {
-          return $$props.graphWidth;
+          return graphWidth();
         },
         get startIndex() {
           return get(startIndex);
@@ -7535,14 +9150,14 @@ ${component_stack}
     }
     reset(div_3);
     var div_4 = sibling(div_3, 2);
-    each(div_4, 21, () => get(visibleCommits), index, ($$anchor2, commit, i) => {
-      const rowIdx = user_derived(() => get(startIndex) + i);
-      var div_5 = root_12();
+    each(div_4, 21, () => get(visibleCommits), (commit) => commit.hash, ($$anchor2, commit) => {
+      const isMerge = user_derived(() => get(commit).parents && get(commit).parents.length > 1 || get(commit).subject && get(commit).subject.startsWith("Merge "));
+      const isCur = user_derived(() => get(commit).isCurrentBranch !== false);
+      const isMy = user_derived(() => isMyCommit(get(commit)));
+      const gw = user_derived(() => computeGraphWidth(get(commit)));
+      var div_5 = root4();
       let classes;
-      set_style(div_5, "height: 25px;");
       var span = child(div_5);
-      var text2 = child(span, true);
-      reset(span);
       var node_1 = sibling(span, 2);
       {
         var consequent = ($$anchor3) => {
@@ -7553,61 +9168,40 @@ ${component_stack}
           });
         };
         if_block(node_1, ($$render) => {
-          if (get(commit).refs.length > 0)
+          if (get(commit).refs && get(commit).refs.length > 0)
             $$render(consequent);
         });
       }
       var span_1 = sibling(node_1, 2);
-      var text_1 = child(span_1, true);
-      reset(span_1);
+      var text_1 = only_child(span_1, true);
       var span_2 = sibling(span_1, 2);
-      var text_2 = child(span_2, true);
-      reset(span_2);
+      let classes_1;
+      var text_2 = only_child(span_2, true);
       var span_3 = sibling(span_2, 2);
-      var text_3 = child(span_3, true);
-      reset(span_3);
+      var text_3 = only_child(span_3, true);
       reset(div_5);
       template_effect(
         ($0) => {
-          const isMerge = (get(commit).parents && get(commit).parents.length > 1) || (get(commit).subject && get(commit).subject.startsWith("Merge "));
-          const isCur = get(commit).isCurrentBranch !== false;
-          const cUser = (typeof window !== "undefined") ? window.__GIT_CURRENT_USER__ : null;
-          let isMy = false;
-          if (cUser) {
-            const ca = (get(commit).author || "").trim().toLowerCase();
-            const ce = (get(commit).authorEmail || "").trim().toLowerCase();
-            const un = (cUser.name || "").trim().toLowerCase();
-            const ue = (cUser.email || "").trim().toLowerCase();
-            if (un && ca && (ca === un || ca.includes(un) || un.includes(ca))) isMy = true;
-            else if (ue && ce && (ce === ue || ce.includes(ue) || ue.includes(ce))) isMy = true;
-            else if (ue && ca && ca === ue.split('@')[0]) isMy = true;
-          }
-          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg" + (isMerge ? " is-merge" : "") + (isCur ? " is-current-branch" : ""), null, classes, { selected: get(commit).hash === $$props.selectedHash });
-          span_2.className = "author svelte-1rusxbg" + (isMy ? " is-my-commit" : "");
-          const g = get(commit).graph;
-          let maxCol = g ? g.column : 0;
-          if (g && g.lines) {
-            for (let li = 0; li < g.lines.length; li++) {
-              const l = g.lines[li];
-              if (l.fromColumn > maxCol) maxCol = l.fromColumn;
-              if (l.toColumn > maxCol) maxCol = l.toColumn;
-            }
-          }
-          const rowBranches = Math.max(4, maxCol + 1);
-          const gw = rowBranches * 16 + 20;
-          set_style(span, `width: ${gw}px; min-width: ${gw}px;`);
-          set_text(text2, "");
+          classes = set_class(div_5, 1, "commit-row svelte-1rusxbg", null, classes, {
+            "is-merge": get(isMerge),
+            "is-current-branch": get(isCur),
+            selected: get(commit).hash === selectedHash()
+          });
+          set_style(span, `width: ${get(gw) ?? ""}px; min-width: ${get(gw) ?? ""}px;`);
           set_attribute2(span_1, "title", get(commit).subject);
           set_text(text_1, get(commit).subject);
+          classes_1 = set_class(span_2, 1, "author svelte-1rusxbg", null, classes_1, { "is-my-commit": get(isMy) });
           set_text(text_2, get(commit).author);
           set_text(text_3, $0);
         },
         [() => formatDate(get(commit).authorDate)]
       );
-      div_5.addEventListener("click", () => $$props.onSelectCommit(get(commit).hash));
-      div_5.addEventListener("contextmenu", (e) => onContextMenu(e, get(commit)));
       delegated("click", div_5, () => $$props.onSelectCommit(get(commit).hash));
       delegated("contextmenu", div_5, (e) => onContextMenu(e, get(commit)));
+      delegated("keydown", div_5, (e) => {
+        if (e.key === "Enter")
+          $$props.onSelectCommit(get(commit).hash);
+      });
       append($$anchor2, div_5);
     });
     reset(div_4);
@@ -7618,10 +9212,9 @@ ${component_stack}
     var node_2 = sibling(div, 2);
     {
       var consequent_1 = ($$anchor2) => {
-        var div_6 = root_32();
-        var button = child(div_6);
-        reset(div_6);
-        template_effect(() => set_style(div_6, `left: ${get(contextMenuPos).x ?? ""}px; top: ${get(contextMenuPos).y ?? ""}px;`));
+        var div_6 = root_13();
+        var button = only_child(div_6);
+        template_effect(() => set_style(div_6, `left: ${contextMenuPos.x ?? ""}px; top: ${contextMenuPos.y ?? ""}px;`));
         delegated("click", button, handleRebase);
         append($$anchor2, div_6);
       };
@@ -7631,34 +9224,35 @@ ${component_stack}
       });
     }
     template_effect(() => {
-      set_style(div_1, `height: ${$$props.commits.length * ROW_HEIGHT}px; position: relative; min-width: 100%; width: max-content;`);
+      set_style(div_1, `height: ${commits().length * ROW_HEIGHT}px; position: relative; min-width: 100%; width: max-content;`);
       set_style(div_2, `transform: translateY(${get(startIndex) * ROW_HEIGHT}px); min-width: 100%; width: max-content;`);
     });
     event("scroll", div, onScroll);
     append($$anchor, fragment);
     pop();
   }
-  delegate(["click", "contextmenu"]);
+  delegate(["click", "contextmenu", "keydown"]);
 
   // webview/graph/CommitDetail.svelte
-  var root_22 = from_html(`<div class="body svelte-ctw68d"> </div>`);
-  var root_33 = from_html(`<div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Parents</span> <span class="meta-value mono svelte-ctw68d"> </span></div>`);
-  var root_42 = from_html(`<div class="loading-files svelte-ctw68d">Loading...</div>`);
-  var root_6 = from_html(`<button class="file-row svelte-ctw68d" type="button"><span> </span> <span class="file-path svelte-ctw68d"><span class="file-dir svelte-ctw68d"> </span> <span class="file-name svelte-ctw68d"> </span></span></button>`);
-  var root_5 = from_html(`<div class="files-list svelte-ctw68d"></div>`);
-  var root_13 = from_html(`<div class="detail svelte-ctw68d"><div class="header svelte-ctw68d"><div class="subject svelte-ctw68d"> </div> <!> <div class="meta svelte-ctw68d"><div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Hash</span> <span class="meta-value mono svelte-ctw68d"> </span></div> <div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Author</span> <span class="meta-value svelte-ctw68d"> </span></div> <div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Date</span> <span class="meta-value svelte-ctw68d"> </span></div> <!></div></div> <div class="files-header svelte-ctw68d"> </div> <!></div>`);
-  var $$css4 = {
+  var root5 = from_html(`<div class="body svelte-ctw68d"> </div>`);
+  var root_14 = from_html(`<div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Parents</span> <span class="meta-value mono svelte-ctw68d"> </span></div>`);
+  var root_23 = from_html(`<div class="loading-files svelte-ctw68d">Loading...</div>`);
+  var root_32 = from_html(`<button class="file-row svelte-ctw68d" type="button"><span> </span> <span class="file-path svelte-ctw68d"><span class="file-dir svelte-ctw68d"> </span> <span class="file-name svelte-ctw68d"> </span></span></button>`);
+  var root_42 = from_html(`<div class="files-list svelte-ctw68d"></div>`);
+  var root_5 = from_html(`<div class="detail svelte-ctw68d"><div class="header svelte-ctw68d"><div class="subject svelte-ctw68d"> </div> <!> <div class="meta svelte-ctw68d"><div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Hash</span> <span class="meta-value mono svelte-ctw68d"> </span></div> <div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Author</span> <span class="meta-value svelte-ctw68d"> </span></div> <div class="meta-row svelte-ctw68d"><span class="meta-label svelte-ctw68d">Date</span> <span class="meta-value svelte-ctw68d"> </span></div> <!></div></div> <div class="files-header svelte-ctw68d"> </div> <!></div>`);
+  var $$css5 = {
     hash: "svelte-ctw68d",
     code: ".detail.svelte-ctw68d {padding:12px;position:relative;}.header.svelte-ctw68d {padding-bottom:12px;border-bottom:1px solid var(--vscode-panel-border);padding-right:24px;}.subject.svelte-ctw68d {font-weight:600;margin-bottom:4px;}.body.svelte-ctw68d {white-space:pre-wrap;color:var(--vscode-descriptionForeground);font-size:0.9em;margin-bottom:8px;}.meta.svelte-ctw68d {font-size:0.85em;}.meta-row.svelte-ctw68d {display:flex;gap:8px;padding:2px 0;}.meta-label.svelte-ctw68d {color:var(--vscode-descriptionForeground);width:50px;flex-shrink:0;}.meta-value.svelte-ctw68d {overflow:hidden;text-overflow:ellipsis;word-break:break-all;}.mono.svelte-ctw68d {font-family:var(--vscode-editor-font-family, monospace);font-size:0.95em;}.files-header.svelte-ctw68d {padding:8px 0 4px;font-weight:600;font-size:0.9em;color:var(--vscode-descriptionForeground);}.loading-files.svelte-ctw68d {padding:8px 0;color:var(--vscode-descriptionForeground);font-size:0.9em;}.files-list.svelte-ctw68d {display:flex;flex-direction:column;}.file-row.svelte-ctw68d {display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;border-radius:3px;background:none;border:none;color:inherit;font:inherit;text-align:left;width:100%;}.file-row.svelte-ctw68d:hover {background:var(--vscode-list-hoverBackground);}.file-status.svelte-ctw68d {flex-shrink:0;width:16px;text-align:center;font-weight:600;font-size:0.85em;}.status-added.svelte-ctw68d {color:#73c991;}.status-modified.svelte-ctw68d {color:#e2c08d;}.status-deleted.svelte-ctw68d {color:#c74e39;}.status-renamed.svelte-ctw68d {color:#569cd6;}.file-path.svelte-ctw68d {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.9em;}.file-dir.svelte-ctw68d {color:var(--vscode-descriptionForeground);}.file-name.svelte-ctw68d {color:var(--vscode-foreground);}"
   };
   function CommitDetail($$anchor, $$props) {
     push($$props, true);
-    append_styles($$anchor, $$css4);
+    append_styles($$anchor, $$css5);
+    let commit = prop($$props, "commit", 3, null), files = prop($$props, "files", 19, () => []);
     function handleFileClick(file) {
-      if (!$$props.commit)
+      if (!commit())
         return;
       postMessage("openDiff", {
-        hash: $$props.commit.hash,
+        hash: commit().hash,
         file: { path: file.path, status: file.status, oldPath: file.oldPath }
       });
     }
@@ -7708,89 +9302,77 @@ ${component_stack}
     var node = first_child(fragment);
     {
       var consequent_3 = ($$anchor2) => {
-        var div = root_13();
+        var div = root_5();
         var div_1 = child(div);
         var div_2 = child(div_1);
-        var text2 = child(div_2, true);
-        reset(div_2);
+        var text2 = only_child(div_2, true);
         var node_1 = sibling(div_2, 2);
         {
           var consequent = ($$anchor3) => {
-            var div_3 = root_22();
-            var text_1 = child(div_3, true);
-            reset(div_3);
-            template_effect(() => set_text(text_1, $$props.commit.body));
+            var div_3 = root5();
+            var text_1 = only_child(div_3, true);
+            template_effect(() => set_text(text_1, commit().body));
             append($$anchor3, div_3);
           };
           if_block(node_1, ($$render) => {
-            if ($$props.commit.body)
+            if (commit().body)
               $$render(consequent);
           });
         }
         var div_4 = sibling(node_1, 2);
         var div_5 = child(div_4);
         var span = sibling(child(div_5), 2);
-        var text_2 = child(span, true);
-        reset(span);
+        var text_2 = only_child(span, true);
         reset(div_5);
         var div_6 = sibling(div_5, 2);
         var span_1 = sibling(child(div_6), 2);
-        var text_3 = child(span_1);
-        reset(span_1);
+        var text_3 = only_child(span_1);
         reset(div_6);
         var div_7 = sibling(div_6, 2);
         var span_2 = sibling(child(div_7), 2);
-        var text_4 = child(span_2, true);
-        reset(span_2);
+        var text_4 = only_child(span_2, true);
         reset(div_7);
         var node_2 = sibling(div_7, 2);
         {
           var consequent_1 = ($$anchor3) => {
-            var div_8 = root_33();
+            var div_8 = root_14();
             var span_3 = sibling(child(div_8), 2);
-            var text_5 = child(span_3, true);
-            reset(span_3);
+            var text_5 = only_child(span_3, true);
             reset(div_8);
-            template_effect(($0) => set_text(text_5, $0), [
-              () => $$props.commit.parents.map((p) => p.slice(0, 7)).join(", ")
-            ]);
+            template_effect(($0) => set_text(text_5, $0), [() => commit().parents.map((p) => p.slice(0, 7)).join(", ")]);
             append($$anchor3, div_8);
           };
           if_block(node_2, ($$render) => {
-            if ($$props.commit.parents.length > 0)
+            if (commit().parents && commit().parents.length > 0)
               $$render(consequent_1);
           });
         }
         reset(div_4);
         reset(div_1);
         var div_9 = sibling(div_1, 2);
-        var text_6 = child(div_9);
-        reset(div_9);
+        var text_6 = only_child(div_9);
         var node_3 = sibling(div_9, 2);
         {
           var consequent_2 = ($$anchor3) => {
-            var div_10 = root_42();
+            var div_10 = root_23();
             append($$anchor3, div_10);
           };
           var alternate = ($$anchor3) => {
-            var div_11 = root_5();
-            each(div_11, 21, () => $$props.files, index, ($$anchor4, file) => {
-              var button = root_6();
+            var div_11 = root_42();
+            each(div_11, 21, files, index, ($$anchor4, file) => {
+              var button = root_32();
               var span_4 = child(button);
-              var text_7 = child(span_4, true);
-              reset(span_4);
+              var text_7 = only_child(span_4, true);
               var span_5 = sibling(span_4, 2);
               var span_6 = child(span_5);
-              var text_8 = child(span_6, true);
-              reset(span_6);
+              var text_8 = only_child(span_6, true);
               var span_7 = sibling(span_6, 2);
-              var text_9 = child(span_7, true);
-              reset(span_7);
+              var text_9 = only_child(span_7, true);
               reset(span_5);
               reset(button);
               template_effect(
                 ($0, $1, $2, $3) => {
-                  set_class(span_4, 1, `file-status ${$0 ?? ""}`, "svelte-ctw68d");
+                  set_class(span_4, 1, $0, "svelte-ctw68d");
                   set_attribute2(span_4, "title", $1);
                   set_text(text_7, get(file).status);
                   set_attribute2(span_5, "title", get(file).path);
@@ -7798,7 +9380,7 @@ ${component_stack}
                   set_text(text_9, $3);
                 },
                 [
-                  () => statusClass(get(file).status),
+                  () => `file-status ${statusClass(get(file).status)}`,
                   () => statusLabel(get(file).status),
                   () => dirName(get(file).path),
                   () => fileName(get(file).path)
@@ -7811,27 +9393,27 @@ ${component_stack}
             append($$anchor3, div_11);
           };
           if_block(node_3, ($$render) => {
-            if ($$props.files.length === 0)
+            if (files().length === 0)
               $$render(consequent_2);
             else
-              $$render(alternate, false);
+              $$render(alternate, -1);
           });
         }
         reset(div);
         template_effect(
           ($0) => {
-            set_text(text2, $$props.commit.subject);
-            set_text(text_2, $$props.commit.hash);
-            set_text(text_3, `${$$props.commit.author ?? ""} <${$$props.commit.authorEmail ?? ""}>`);
+            set_text(text2, commit().subject);
+            set_text(text_2, commit().hash);
+            set_text(text_3, `${commit().author ?? ""} <${commit().authorEmail ?? ""}>`);
             set_text(text_4, $0);
-            set_text(text_6, `Changed Files (${$$props.files.length ?? ""})`);
+            set_text(text_6, `Changed Files (${files().length ?? ""})`);
           },
-          [() => formatFullDate($$props.commit.authorDate)]
+          [() => formatFullDate(commit().authorDate)]
         );
         append($$anchor2, div);
       };
       if_block(node, ($$render) => {
-        if ($$props.commit)
+        if (commit())
           $$render(consequent_3);
       });
     }
@@ -7840,112 +9422,313 @@ ${component_stack}
   }
   delegate(["click"]);
 
-  // webview/graph/FilterBar.svelte
-  var root4 = from_html(`<div class="filter-bar svelte-51df0s"><input type="text" placeholder="Branch..." class="filter-input svelte-51df0s"/> <input type="text" placeholder="Author..." class="filter-input svelte-51df0s"/> <input type="date" placeholder="After..." class="filter-input date-input svelte-51df0s"/> <input type="date" placeholder="Before..." class="filter-input date-input svelte-51df0s"/> <input type="text" placeholder="File path..." class="filter-input svelte-51df0s"/> <button class="filter-btn svelte-51df0s">Filter</button> <button class="filter-btn clear svelte-51df0s">Clear</button></div>`);
-  var $$css5 = {
-    hash: "svelte-51df0s",
-    code: ".filter-bar.svelte-51df0s {display:flex;gap:12px;padding:0 12px;background:var(--vscode-editor-background);border-bottom:1px solid var(--vscode-panel-border);align-items:center;height:34px;min-height:34px;box-sizing:border-box;font-size:12px;position:relative;z-index:100;user-select:none;}.as-search-box {display:flex;align-items:center;background:var(--vscode-input-background, #3c3c3c);border:1px solid rgba(128,128,128,0.25);border-radius:4px;padding:0 6px;height:24px;width:200px;gap:4px;flex-shrink:0;}.as-search-box:focus-within {border-color:var(--vscode-focusBorder, #007acc);}.as-search-input {background:transparent;border:none;outline:none;color:var(--vscode-input-foreground);font-size:12px;flex:1;min-width:60px;}.as-search-icon {color:#8c8c8c;font-size:11px;display:flex;align-items:center;}.as-search-opt {font-size:11px;color:#8c8c8c;padding:1px 3px;border-radius:2px;cursor:pointer;user-select:none;font-family:monospace;}.as-search-opt:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.as-search-opt.active {color:#58a6ff;background:rgba(56,139,253,0.2);}.as-filter-label {display:inline-flex;align-items:center;gap:3px;height:24px;padding:0 5px;border-radius:3px;cursor:pointer;font-size:12px;color:#cccccc;position:relative;flex-shrink:0;white-space:nowrap;}.as-filter-label:hover {background:rgba(255, 255, 255, 0.08);color:#ffffff;}.as-filter-label .lbl-prefix {color:#8c8c8c;}.as-filter-label .lbl-val {color:#ffffff;font-weight:500;}.as-filter-label .lbl-arrow {font-size:9px;color:#8c8c8c;margin-left:2px;}.as-filter-label .lbl-clear {color:#8c8c8c;margin-left:3px;font-size:12px;padding:0 2px;border-radius:50%;line-height:1;}.as-filter-label .lbl-clear:hover {color:#ffffff;background:rgba(255,255,255,0.2);}.as-toolbar-right {margin-left:auto;display:flex;align-items:center;gap:10px;color:#8c8c8c;}.as-tool-icon {cursor:pointer;display:flex;align-items:center;padding:2px 4px;border-radius:3px;}.as-tool-icon:hover {color:#ffffff;background:rgba(255,255,255,0.1);}.filter-popup {position:absolute;top:calc(100% + 4px);left:0;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);min-width:230px;max-width:340px;max-height:360px;overflow-y:auto;z-index:1000;padding:4px;display:none;flex-direction:column;}.filter-popup-search {padding:4px 6px 6px;border-bottom:1px solid var(--vscode-menu-border, #393b40);flex-shrink:0;}.filter-popup-search input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-popup-item {padding:4px 12px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;font-size:12px;white-space:nowrap;margin:1px 0;}.filter-popup-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.filter-popup-item.selected {font-weight:600;color:var(--vscode-terminal-ansiYellow, #e5a50a);}.filter-popup-header {padding:6px 10px 2px;font-size:10px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-transform:uppercase;letter-spacing:0.5px;}.filter-popup-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.filter-custom-date {padding:8px 12px;display:flex;flex-direction:column;gap:6px;}.filter-custom-date label {font-size:11px;color:var(--vscode-descriptionForeground, #7f858e);}.filter-custom-date input {background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:3px 6px;font-size:11px;outline:none;}.filter-apply-btn {margin-top:4px;background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;align-self:flex-end;}.filter-apply-btn:hover {background:var(--vscode-button-hoverBackground, #355389);}.branch-context-menu, .commit-context-menu {position:fixed;background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;z-index:2000;min-width:270px;max-height:none;overflow:visible;box-sizing:border-box;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;color:var(--vscode-menu-foreground, #dfe1e5);}.commit-context-menu::-webkit-scrollbar, .branch-context-menu::-webkit-scrollbar {width:5px;}.commit-context-menu::-webkit-scrollbar-thumb, .branch-context-menu::-webkit-scrollbar-thumb {background:rgba(255, 255, 255, 0.2);border-radius:3px;}.commit-context-menu::-webkit-scrollbar-thumb:hover, .branch-context-menu::-webkit-scrollbar-thumb:hover {background:rgba(255, 255, 255, 0.35);}.bcm-item, .ccm-item {padding:4px 10px;border-radius:4px;display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--vscode-menu-foreground, #dfe1e5);cursor:pointer;white-space:nowrap;margin:1px 0;height:24px;box-sizing:border-box;}.bcm-item:hover, .ccm-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.ccm-item.disabled {opacity:0.38;cursor:default;pointer-events:none;}.ccm-icon {width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit;opacity:0.85;}.ccm-label {flex:1;text-align:left;}.bcm-shortcut, .ccm-shortcut {font-size:11px;color:var(--vscode-descriptionForeground, #8c8c8c);opacity:0.65;margin-left:auto;padding-left:16px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;}.bcm-item:hover .bcm-shortcut, .ccm-item:hover .ccm-shortcut {color:var(--vscode-menu-selectionForeground, #ffffff);opacity:0.9;}.bcm-divider, .ccm-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.ccm-arrow {margin-left:auto;font-size:12px;opacity:0.65;}.has-submenu {position:relative;}.ccm-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;}.as-mini-toast {position:fixed;bottom:24px;right:24px;background:var(--vscode-notifications-background, #2b2d30);color:var(--vscode-notifications-foreground, #dfe1e5);border:1px solid var(--vscode-notifications-border, #393b40);border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,0.5);z-index:9999;opacity:0;transform:translateY(8px);transition:all 0.2s ease;pointer-events:none;}.as-mini-toast.visible {opacity:1;transform:translateY(0);}.as-dialog-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1px);}.as-dialog-card {background:var(--vscode-editor-background, #1e1f22);border:1px solid var(--vscode-panel-border, #393b40);border-radius:8px;box-shadow:0 16px 48px rgba(0,0,0,0.75);width:560px;max-width:92vw;display:flex;flex-direction:column;color:var(--vscode-editor-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;overflow:hidden;box-sizing:border-box;}.as-dialog-header {padding:10px 16px;font-size:13px;font-weight:600;background:var(--vscode-titleBar-activeBackground, #2b2d30);border-bottom:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:space-between;user-select:none;}.as-dialog-close {cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.7;}.as-dialog-close:hover {opacity:1;background:rgba(255,255,255,0.1);}.as-dialog-body {padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;}.as-dialog-field-label {font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #8c8c8c);text-transform:uppercase;letter-spacing:0.5px;}.as-dialog-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;}.as-dialog-input:focus, .as-dialog-textarea:focus {border-color:var(--vscode-focusBorder, #3574f0);}.as-dialog-textarea {width:100%;box-sizing:border-box;background:var(--vscode-input-background, #1e1f22);color:var(--vscode-input-foreground, #dfe1e5);border:1px solid var(--vscode-input-border, #4e5157);border-radius:4px;padding:8px 10px;font-size:12px;min-height:140px;max-height:320px;resize:vertical;outline:none;font-family:inherit;line-height:1.45;}.as-dialog-footer {padding:10px 16px;background:var(--vscode-editor-background, #1e1f22);border-top:1px solid var(--vscode-panel-border, #393b40);display:flex;align-items:center;justify-content:flex-end;gap:8px;box-sizing:border-box;}.as-dialog-btn {padding:6px 16px;font-size:12px;border-radius:4px;cursor:pointer;border:none;font-weight:500;user-select:none;}.as-dialog-btn-primary {background:var(--vscode-button-background, #2e436e);color:var(--vscode-button-foreground, #ffffff);}.as-dialog-btn-primary:hover {background:var(--vscode-button-hoverBackground, #355389);}.as-dialog-btn-secondary {background:transparent;color:var(--vscode-menu-foreground, #dfe1e5);border:1px solid var(--vscode-panel-border, #4e5157);}.as-dialog-btn-secondary:hover {background:rgba(255,255,255,0.08);}.as-dropdown-menu {position:absolute;top:calc(100% + 4px);background:var(--vscode-menu-background, #2b2d30);border:1px solid var(--vscode-menu-border, #393b40);border-radius:6px;box-shadow:0 8px 24px rgba(0, 0, 0, 0.65);padding:4px;min-width:215px;z-index:2000;display:none;flex-direction:column;color:var(--vscode-menu-foreground, #dfe1e5);font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:12px;user-select:none;box-sizing:border-box;}.as-menu-section-header {padding:6px 10px 3px 10px;font-size:11px;font-weight:600;color:var(--vscode-descriptionForeground, #7f858e);text-align:left;}.as-menu-divider {height:1px;background:var(--vscode-menu-separatorBackground, var(--vscode-menu-border, #393b40));margin:4px 0;}.as-menu-item {display:flex;align-items:center;padding:3px 8px;border-radius:4px;cursor:pointer;height:24px;box-sizing:border-box;color:var(--vscode-menu-foreground, #dfe1e5);white-space:nowrap;position:relative;}.as-menu-item:hover {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-item.selected {background:var(--vscode-menu-selectionBackground, #2e436e);color:var(--vscode-menu-selectionForeground, #ffffff);}.as-menu-check {width:18px;min-width:18px;display:inline-flex;align-items:center;justify-content:flex-start;color:inherit;flex-shrink:0;}.as-menu-label {flex:1;text-align:left;}.as-menu-arrow {margin-left:auto;font-size:13px;opacity:0.7;}.as-submenu {display:none;position:absolute;left:100%;top:-4px;margin-left:2px;min-width:140px;}.has-submenu:hover > .as-submenu {display:flex;}body.hide-col-author .author {display:none !important;}body.hide-col-date .date {display:none !important;}body.show-col-hash .hash {display:inline-block !important;color:#8c8c8c !important;font-family:var(--vscode-editor-font-family, monospace) !important;font-size:11px !important;user-select:text !important;width:68px !important;min-width:68px !important;}body.compact-refs .labels {gap:3px !important;}body.compact-refs .label {padding:0 3px !important;font-size:0.76em !important;}body.refs-on-left .labels {order:0 !important;margin-left:0 !important;margin-right:8px !important;}"
-  };
-      function FilterBar($$anchor, $$props) {
-    push($$props, true);
-    append_styles($$anchor, $$css5);
-
-    var bar = document.createElement("div");
-    bar.className = "filter-bar svelte-51df0s";
-
-    let curQuery = "";
-    let curBranch = $$props.activeBranch || "";
-    let curUser = "";
-    let curDate = "";
-    let curAfter = "";
-    let curBefore = "";
-    let curPath = "";
-    let isRegex = false;
-    let isCase = false;
-
-    // Graph Options state
-    let sortMode = "date"; // "date" | "topo"
-    let isFirstParent = false;
-    let isNoMerges = false;
-
-    // View Options state
-    let viewCompactRefs = true;
-    let viewTagNames = false;
-    let viewLongEdges = false;
-    let viewCommitTimestamp = false;
-    let viewRefsOnLeft = false;
-
-    let colAuthor = true;
-    let colHash = false;
-    let colDate = true;
-    let colGpg = false;
-
-    let hlMyCommits = true;
-    let hlMergeCommits = true;
-    let hlCurrentBranch = true;
-    let hlNotCherryPicked = false;
-    try {
-      if (localStorage.getItem("intellij_git_hl_my_commits") !== null) {
-        hlMyCommits = localStorage.getItem("intellij_git_hl_my_commits") === "true";
+  // webview/graph/branchSidebar.ts
+  function renderSidebarContent(container, getBranchData, getActiveBranch, setActiveBranch) {
+    if (!container)
+      return;
+    if (container._selectedTreeBranch === void 0) {
+      container._selectedTreeBranch = getActiveBranch() || "";
+    }
+    const data = getBranchData();
+    const currentActive = getActiveBranch();
+    const { branches = [], tags = [], currentBranch = "" } = data;
+    function getFavorites() {
+      try {
+        const raw = localStorage.getItem("intellij_git_fav_branches");
+        if (raw)
+          return new Set(JSON.parse(raw));
+      } catch {
       }
-      if (localStorage.getItem("intellij_git_hl_merge_commits") !== null) {
-        hlMergeCommits = localStorage.getItem("intellij_git_hl_merge_commits") === "true";
+      return /* @__PURE__ */ new Set(["develop", "main", "master"]);
+    }
+    function saveFavorites(favSet) {
+      try {
+        localStorage.setItem("intellij_git_fav_branches", JSON.stringify(Array.from(favSet)));
+      } catch {
       }
-      if (localStorage.getItem("intellij_git_hl_current_branch") !== null) {
-        hlCurrentBranch = localStorage.getItem("intellij_git_hl_current_branch") === "true";
+    }
+    function isBranchFavorite(name) {
+      if (!name)
+        return false;
+      const favs = getFavorites();
+      return favs.has(name);
+    }
+    function toggleBranchFavorite(name) {
+      if (!name)
+        return;
+      const favs = getFavorites();
+      if (favs.has(name)) {
+        favs.delete(name);
+      } else {
+        favs.add(name);
       }
-    } catch {}
-
-    let graphOptionPopup = null;
-    let viewOptionPopup = null;
-
+      saveFavorites(favs);
+    }
+    const getCurrentBranchName = () => getBranchData() && getBranchData().currentBranch || window.__GIT_CURRENT_BRANCH__ || "";
+    function closeBranchContextMenu() {
+      const old = document.querySelector(".branch-context-menu");
+      if (old)
+        old.remove();
+      const oldCommit = document.querySelectorAll(".commit-context-menu");
+      oldCommit.forEach((m) => m.remove());
+    }
+    window.addEventListener("blur", closeBranchContextMenu);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden)
+        closeBranchContextMenu();
+    });
+    window.addEventListener("message", (ev) => {
+      if (ev.data?.type === "closeAllMenus")
+        closeBranchContextMenu();
+    });
+    function showBranchContextMenu(e, branchName) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeBranchContextMenu();
+      const isCurrent = branchName === currentBranch;
+      const menu = document.createElement("div");
+      menu.className = "branch-context-menu";
+      menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+      menu.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      });
+      function addItem(label, shortcut, onClick, disabled = false) {
+        const it = document.createElement("div");
+        it.className = "bcm-item" + (disabled ? " disabled" : "");
+        if (disabled) {
+          it.style.pointerEvents = "none";
+          it.style.opacity = "0.45";
+        }
+        it.innerHTML = "<span>" + label + "</span>" + (shortcut ? '<span class="bcm-shortcut">' + shortcut + "</span>" : "");
+        it.addEventListener("click", (ev) => {
+          if (disabled)
+            return;
+          ev.stopPropagation();
+          closeBranchContextMenu();
+          onClick();
+        });
+        menu.appendChild(it);
+      }
+      function addDivider() {
+        const d = document.createElement("div");
+        d.className = "bcm-divider";
+        menu.appendChild(d);
+      }
+      const branchInfo = branches.find((b) => b.name === branchName);
+      const isRemote = branchInfo ? !!branchInfo.remote || branchName.startsWith("origin/") : branchName.startsWith("origin/");
+      if (isCurrent) {
+        addItem("New Branch from '" + branchName + "'...", "", () => {
+          openCreateBranchDialog(branchName);
+        });
+        addItem("Show Diff with Working Tree", "", () => {
+          postMessage("showDiff", { branch: branchName });
+        });
+        addDivider();
+        addItem("Update", "", () => {
+          showToast("Updating '" + branchName + "'...");
+          postMessage("pull", branchName);
+        });
+        addItem("Push...", "", () => {
+          postMessage("push", branchName);
+        });
+        if (branchInfo && branchInfo.upstream) {
+          addItem("Unset Tracked Branch (" + branchInfo.upstream + ")", "", () => {
+            showToast("Unsetting tracked branch for '" + branchName + "'...");
+            postMessage("unsetUpstream", { branch: branchName });
+          });
+        }
+        addDivider();
+        addItem("Rename...", "F2", () => {
+          openRenameBranchDialog(branchName);
+        });
+      } else if (isRemote) {
+        addItem("Checkout", "", () => {
+          postMessage("checkout", branchName);
+        });
+        addItem("Fetch Branch", "", () => {
+          showToast("Fetching '" + branchName + "'...");
+          postMessage("fetchSingleBranch", { branch: branchName });
+        });
+        const curBranchInfo = currentBranch ? branches.find((b) => b.name === currentBranch && !b.remote) : null;
+        const isAlreadyTrackingThis = curBranchInfo && curBranchInfo.upstream === branchName;
+        if (currentBranch) {
+          const trackLabel = "Track into '" + currentBranch + "'" + (isAlreadyTrackingThis ? " (already tracked)" : "");
+          addItem(trackLabel, "", () => {
+            showToast("Tracking '" + currentBranch + "' -> '" + branchName + "'...");
+            postMessage("setUpstream", { branch: currentBranch, upstream: branchName });
+          }, isAlreadyTrackingThis);
+        }
+        addItem("New Branch from '" + branchName + "'...", "", () => {
+          openCreateBranchDialog(branchName);
+        });
+        addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
+          postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
+        });
+        addDivider();
+        addItem("Compare with '" + (currentBranch || "HEAD") + "'", "", () => {
+          postMessage("compareBranch", { branch: branchName, withBranch: currentBranch });
+        });
+        addItem("Show Diff with Working Tree", "", () => {
+          postMessage("showDiff", { branch: branchName });
+        });
+        addDivider();
+        addItem("Rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'", "", () => {
+          postMessage("rebase", branchName);
+        });
+        addItem("Merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'", "", () => {
+          postMessage("mergeBranch", branchName);
+        });
+        addDivider();
+        addItem("Delete Remote Branch...", "", () => {
+          postMessage("deleteBranch", branchName);
+        });
+      } else {
+        addItem("Checkout", "", () => {
+          postMessage("checkout", branchName);
+        });
+        addItem("New Branch from '" + branchName + "'...", "", () => {
+          openCreateBranchDialog(branchName);
+        });
+        addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
+          postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
+        });
+        addDivider();
+        addItem("Compare with '" + (currentBranch || "HEAD") + "'", "", () => {
+          postMessage("compareBranch", { branch: branchName, withBranch: currentBranch });
+        });
+        addItem("Show Diff with Working Tree", "", () => {
+          postMessage("showDiff", { branch: branchName });
+        });
+        addDivider();
+        addItem("Rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'", "", () => {
+          postMessage("rebase", branchName);
+        });
+        addItem("Merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'", "", () => {
+          postMessage("mergeBranch", branchName);
+        });
+        addDivider();
+        addItem("Update", "", () => {
+          showToast("Updating '" + branchName + "'...");
+          postMessage("pull", branchName);
+        });
+        addItem("Push...", "", () => {
+          postMessage("push", branchName);
+        });
+        if (branchInfo && branchInfo.upstream) {
+          addItem("Unset Tracked Branch (" + branchInfo.upstream + ")", "", () => {
+            showToast("Unsetting tracked branch for '" + branchName + "'...");
+            postMessage("unsetUpstream", { branch: branchName });
+          });
+        }
+        addDivider();
+        addItem("Rename...", "F2", () => {
+          openRenameBranchDialog(branchName);
+        });
+        addItem("Delete", "", () => {
+          postMessage("deleteBranch", branchName);
+        });
+      }
+      document.body.appendChild(menu);
+      let x = e.clientX;
+      let y = e.clientY;
+      const rect = menu.getBoundingClientRect();
+      if (x + rect.width > window.innerWidth - 8)
+        x = Math.max(8, window.innerWidth - rect.width - 8);
+      if (y + rect.height > window.innerHeight - 8) {
+        const yAbove = e.clientY - rect.height;
+        if (yAbove >= 8) {
+          y = yAbove;
+        } else {
+          y = Math.max(4, window.innerHeight - rect.height - 8);
+        }
+      }
+      menu.style.left = Math.max(0, x) + "px";
+      menu.style.top = Math.max(0, y) + "px";
+    }
+    function showGeneralBranchContextMenu(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeBranchContextMenu();
+      const menu = document.createElement("div");
+      menu.className = "branch-context-menu";
+      menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+      menu.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      });
+      function addItem(label, shortcut, onClick) {
+        const it = document.createElement("div");
+        it.className = "bcm-item";
+        it.innerHTML = "<span>" + label + "</span>" + (shortcut ? '<span class="bcm-shortcut">' + shortcut + "</span>" : "");
+        it.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          closeBranchContextMenu();
+          onClick();
+        });
+        menu.appendChild(it);
+      }
+      addItem("New Branch...", "", () => {
+        openCreateBranchDialog(currentBranch || "HEAD");
+      });
+      addItem("Refresh Branches", "", () => {
+        postMessage("refreshBranches");
+      });
+      document.body.appendChild(menu);
+      let x = e.clientX;
+      let y = e.clientY;
+      const rect = menu.getBoundingClientRect();
+      if (x + rect.width > window.innerWidth - 8)
+        x = Math.max(8, window.innerWidth - rect.width - 8);
+      if (y + rect.height > window.innerHeight - 8) {
+        const yAbove = e.clientY - rect.height;
+        if (yAbove >= 8) {
+          y = yAbove;
+        } else {
+          y = Math.max(4, window.innerHeight - rect.height - 8);
+        }
+      }
+      menu.style.left = Math.max(0, x) + "px";
+      menu.style.top = Math.max(0, y) + "px";
+    }
     let tooltipEl = document.querySelector(".app-tooltip");
-    if (!tooltipEl && typeof document !== "undefined") {
+    if (!tooltipEl) {
       tooltipEl = document.createElement("div");
       tooltipEl.className = "app-tooltip";
       document.body.appendChild(tooltipEl);
     }
-
-    function attachTooltip(el, text, shortcut = "", side = "bottom") {
-      if (!el) return;
-      el.dataset.tooltip = text;
-      if (shortcut) el.dataset.shortcut = shortcut;
-      el.title = text + (shortcut ? " (" + shortcut + ")" : "");
+    function updateTooltip(el, text2, shortcut = "") {
+      el.dataset.tooltip = text2;
+      if (shortcut)
+        el.dataset.shortcut = shortcut;
+      el.title = text2 + (shortcut ? " (" + shortcut + ")" : "");
+    }
+    function attachTooltip(el, text2, shortcut = "", side = "right") {
+      updateTooltip(el, text2, shortcut);
       let timer;
       el.addEventListener("mouseenter", () => {
         const currentText = el.dataset.tooltip || el.title;
         const currentShortcut = el.dataset.shortcut || "";
-        if (!currentText) return;
+        if (!currentText)
+          return;
         timer = setTimeout(() => {
-          if (!tooltipEl) {
-            tooltipEl = document.querySelector(".app-tooltip");
-            if (!tooltipEl) {
-              tooltipEl = document.createElement("div");
-              tooltipEl.className = "app-tooltip";
-              document.body.appendChild(tooltipEl);
-            }
-          }
-          tooltipEl.innerHTML = currentText + (currentShortcut ? '<span class="tooltip-shortcut">' + currentShortcut + '</span>' : '');
-
+          tooltipEl.innerHTML = currentText + (currentShortcut ? '<span class="tooltip-shortcut">' + currentShortcut + "</span>" : "");
           tooltipEl.style.visibility = "hidden";
           tooltipEl.style.display = "block";
           tooltipEl.style.left = "-9999px";
           tooltipEl.style.top = "-9999px";
           tooltipEl.style.transform = "none";
           tooltipEl.classList.add("visible");
-
           const tipWidth = tooltipEl.offsetWidth || 100;
           const tipHeight = tooltipEl.offsetHeight || 24;
           const rect = el.getBoundingClientRect();
           const pad = 6;
           const viewWidth = window.innerWidth || document.documentElement.clientWidth;
           const viewHeight = window.innerHeight || document.documentElement.clientHeight;
-
           let tipLeft;
           let tipTop;
-
           if (side === "bottom") {
-            tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+            tipLeft = rect.left + rect.width / 2 - tipWidth / 2;
             tipTop = rect.bottom + 6;
             if (tipTop + tipHeight > viewHeight - pad && rect.top - tipHeight - 6 >= pad) {
               tipTop = rect.top - tipHeight - 6;
@@ -7957,7 +9740,7 @@ ${component_stack}
             }
           } else if (side === "right") {
             tipLeft = rect.right + 7;
-            tipTop = rect.top + (rect.height / 2) - (tipHeight / 2);
+            tipTop = rect.top + rect.height / 2 - tipHeight / 2;
             if (tipLeft + tipWidth > viewWidth - pad && rect.left - tipWidth - 7 >= pad) {
               tipLeft = rect.left - tipWidth - 7;
               tooltipEl.classList.remove("side-right");
@@ -7967,883 +9750,587 @@ ${component_stack}
               tooltipEl.classList.add("side-right");
             }
           } else {
-            tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
+            tipLeft = rect.left + rect.width / 2 - tipWidth / 2;
             tipTop = rect.bottom + 6;
           }
-
           if (tipLeft < pad) {
             tipLeft = pad;
           } else if (tipLeft + tipWidth > viewWidth - pad) {
             tipLeft = Math.max(pad, viewWidth - tipWidth - pad);
           }
-
           if (tipTop < pad) {
             tipTop = pad;
           } else if (tipTop + tipHeight > viewHeight - pad) {
             tipTop = Math.max(pad, viewHeight - tipHeight - pad);
           }
-
           tooltipEl.style.left = Math.round(tipLeft) + "px";
           tooltipEl.style.top = Math.round(tipTop) + "px";
           tooltipEl.style.transform = "none";
           tooltipEl.style.visibility = "visible";
-        }, 90);
+        }, 80);
       });
       el.addEventListener("mouseleave", () => {
         clearTimeout(timer);
-        if (tooltipEl) tooltipEl.classList.remove("visible");
+        tooltipEl.classList.remove("visible");
       });
       el.addEventListener("click", () => {
         clearTimeout(timer);
-        if (tooltipEl) tooltipEl.classList.remove("visible");
+        tooltipEl.classList.remove("visible");
       });
     }
-
-    function applyViewOptions() {
-      if (typeof document !== "undefined" && document.body) {
-        document.body.classList.toggle("hide-col-author", !colAuthor);
-        document.body.classList.toggle("hide-col-date", !colDate);
-        document.body.classList.toggle("show-col-hash", colHash);
-        document.body.classList.toggle("compact-refs", viewCompactRefs);
-        document.body.classList.toggle("refs-on-left", viewRefsOnLeft);
-        document.body.classList.toggle("hl-my-commits", hlMyCommits);
-        document.body.classList.toggle("hl-merge-commits", hlMergeCommits);
-        document.body.classList.toggle("hl-current-branch", hlCurrentBranch);
-      }
+    let strip = container.querySelector(".sidebar-strip");
+    let mainArea = container.querySelector(".sidebar-main");
+    let sInput = container.querySelector(".branch-search-input");
+    let treeContent = container.querySelector(".branch-tree-content");
+    if (!container._repoFolderStates) {
+      container._repoFolderStates = /* @__PURE__ */ new Map();
     }
-    applyViewOptions();
-
-    function applyFilter() {
-      $$props.onFilter({
-        query: curQuery || void 0,
-        branch: curBranch || void 0,
-        author: curUser || void 0,
-        after: curAfter || void 0,
-        before: curBefore || void 0,
-        path: curPath || void 0,
-        order: sortMode,
-        firstParent: isFirstParent,
-        noMerges: isNoMerges
-      });
-      updateLabels();
+    if (!container._sectionCollapseState) {
+      container._sectionCollapseState = /* @__PURE__ */ new Map();
     }
-
-    function createMenuItem(label, isChecked, onClick, hasSubmenu = false) {
-      const item = document.createElement("div");
-      item.className = "as-menu-item" + (hasSubmenu ? " has-submenu" : "");
-      
-      const checkSpan = document.createElement("span");
-      checkSpan.className = "as-menu-check";
-      if (isChecked) {
-        checkSpan.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>';
-      }
-      item.appendChild(checkSpan);
-
-      const labelSpan = document.createElement("span");
-      labelSpan.className = "as-menu-label";
-      labelSpan.textContent = label;
-      item.appendChild(labelSpan);
-
-      if (hasSubmenu) {
-        const arrowSpan = document.createElement("span");
-        arrowSpan.className = "as-menu-arrow";
-        arrowSpan.innerHTML = "›";
-        item.appendChild(arrowSpan);
-      }
-
-      item.addEventListener("click", (e) => {
-        e.stopPropagation();
-        onClick(e);
-      });
-
-      return item;
-    }
-
-    function createSectionHeader(title) {
-      const hdr = document.createElement("div");
-      hdr.className = "as-menu-section-header";
-      hdr.textContent = title;
-      return hdr;
-    }
-
-    function createDivider() {
-      const d = document.createElement("div");
-      d.className = "as-menu-divider";
-      return d;
-    }
-
-    // 1. Search Box with Q icon and .* Cc options
-    const searchBox = document.createElement("div");
-    searchBox.className = "as-search-box";
-    searchBox.innerHTML = '<span class="as-search-icon" title="Search commits"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14.5" y2="14.5"/></svg></span>';
-    const searchInput = document.createElement("input");
-    searchInput.type = "text";
-    searchInput.className = "as-search-input";
-    searchInput.placeholder = "Text or hash";
-    let searchDebounceTimer;
-    searchInput.addEventListener("input", () => {
-      clearTimeout(searchDebounceTimer);
-      searchDebounceTimer = setTimeout(() => {
-        const val = searchInput.value.trim();
-        if (val !== curQuery) {
-          curQuery = val;
-          applyFilter();
+    const sectionCollapseState = container._sectionCollapseState;
+    const svgArrowRight = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 3.5L10.5 8L6 12.5"/></svg>';
+    const svgArrowDown = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3.5 6L8 10.5L12.5 6"/></svg>';
+    const svgTagIcon = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;color:#dfe1e5;"><path d="M7.707 2.293L1.295 8.705C0.904 9.096 0.904 9.729 1.295 10.119L5.881 14.705C6.271 15.096 6.904 15.096 7.295 14.705L13.707 8.293C13.895 8.105 14 7.851 14 7.586V3C14 2.448 13.552 2 13 2H8.414C8.149 2 7.895 2.105 7.707 2.293Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="10.2" cy="5.8" r="1.3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
+    const svgCheckoutYellow = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.70708 2.29289L1.29497 8.705C0.904444 9.09553 0.904444 9.72869 1.29497 10.1192L5.88075 14.705C6.27128 15.0955 6.90444 15.0955 7.29497 14.705L13.7071 8.29289C13.8946 8.10536 14 7.851 14 7.58579V3C14 2.44772 13.5523 2 13 2H8.41418C8.14897 2 7.89461 2.10536 7.70708 2.29289ZM10 8C11.1046 8 12 7.10457 12 6C12 4.89543 11.1046 4 10 4C8.89543 4 8 4.89543 8 6C8 7.10457 8.89543 8 10 8Z" fill="#F2C55C"/></svg>';
+    const svgBranchWhite = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;color:#dfe1e5;"><circle cx="4.5" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="10.8" cy="6.2" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="4.5" y1="6.3" x2="4.5" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M4.5 9.8H9.3C10.13 9.8 10.8 9.13 10.8 8.3V8.0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+    function populateTree(searchQuery) {
+      if (!treeContent)
+        return;
+      treeContent.innerHTML = "";
+      const currentActive2 = container._selectedTreeBranch !== void 0 && container._selectedTreeBranch !== null ? container._selectedTreeBranch : getActiveBranch() || "";
+      const latestData = getBranchData() || {};
+      const branches2 = latestData.branches || [];
+      const tags2 = latestData.tags || [];
+      const currentBranch2 = latestData.currentBranch || "";
+      const currentRepoKey = latestData.repoPath || window.__GIT_REPO_PATH__ || "default_repo";
+      if (!container._repoFolderStates.has(currentRepoKey)) {
+        const repoMap = /* @__PURE__ */ new Map();
+        try {
+          const raw = localStorage.getItem("intellij_git_folders_" + currentRepoKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            Object.keys(parsed).forEach((k) => repoMap.set(k, parsed[k]));
+          }
+        } catch {
         }
-      }, 300);
-    });
-    searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        clearTimeout(searchDebounceTimer);
-        curQuery = searchInput.value.trim();
-        applyFilter();
+        container._repoFolderStates.set(currentRepoKey, repoMap);
       }
-    });
-    searchBox.appendChild(searchInput);
-
-    const regexBtn = document.createElement("span");
-    regexBtn.className = "as-search-opt";
-    regexBtn.textContent = ".*";
-    regexBtn.title = "Regex";
-    regexBtn.addEventListener("click", () => {
-      isRegex = !isRegex;
-      regexBtn.className = "as-search-opt" + (isRegex ? " active" : "");
-    });
-    searchBox.appendChild(regexBtn);
-
-    const caseBtn = document.createElement("span");
-    caseBtn.className = "as-search-opt";
-    caseBtn.textContent = "Cc";
-    caseBtn.title = "Match Case";
-    caseBtn.addEventListener("click", () => {
-      isCase = !isCase;
-      caseBtn.className = "as-search-opt" + (isCase ? " active" : "");
-    });
-    searchBox.appendChild(caseBtn);
-
-    bar.appendChild(searchBox);
-
-    function closeAllPopups() {
-      branchPopup.style.display = "none";
-      userPopup.style.display = "none";
-      datePopup.style.display = "none";
-      pathPopup.style.display = "none";
-      if (graphOptionPopup) graphOptionPopup.style.display = "none";
-      if (viewOptionPopup) viewOptionPopup.style.display = "none";
-    }
-
-    document.addEventListener("click", (e) => {
-      if (!bar.contains(e.target)) {
-        closeAllPopups();
-      }
-    });
-
-    // 2. Branch Dropdown
-    const branchContainer = document.createElement("div");
-    branchContainer.style.position = "relative";
-    const branchLabel = document.createElement("div");
-    branchLabel.className = "as-filter-label";
-    branchContainer.appendChild(branchLabel);
-
-    const branchPopup = document.createElement("div");
-    branchPopup.className = "filter-popup";
-    branchPopup.innerHTML = '<div class="filter-popup-search"><input type="text" placeholder="Search branch..." /></div><div class="branch-popup-items" style="overflow-y:auto;flex:1;"></div>';
-    branchContainer.appendChild(branchPopup);
-    const branchSearchInput = branchPopup.querySelector("input");
-    const branchItemsContainer = branchPopup.querySelector(".branch-popup-items");
-
-    branchSearchInput.addEventListener("input", () => {
-      renderBranchItems(branchSearchInput.value.toLowerCase());
-    });
-
-    function renderBranchItems(search = "") {
-      branchItemsContainer.innerHTML = "";
-      const bData = $$props.branchData || { branches: [], currentBranch: "" };
-      const branches = bData.branches || [];
-
-      const allItem = document.createElement("div");
-      allItem.className = "filter-popup-item" + (!curBranch ? " selected" : "");
-      allItem.textContent = "All Branches";
-      allItem.addEventListener("click", () => {
-        curBranch = "";
-        if ($$props.setActiveBranch) $$props.setActiveBranch("");
-        closeAllPopups();
-        applyFilter();
-      });
-      branchItemsContainer.appendChild(allItem);
-
-      if (bData.currentBranch && (!search || bData.currentBranch.toLowerCase().includes(search))) {
-        const headItem = document.createElement("div");
-        headItem.className = "filter-popup-item" + (curBranch === "HEAD" ? " selected" : "");
-        headItem.innerHTML = '<span>HEAD (' + bData.currentBranch + ')</span>';
-        headItem.addEventListener("click", () => {
-          curBranch = "HEAD";
-          if ($$props.setActiveBranch) $$props.setActiveBranch("HEAD");
-          closeAllPopups();
-          applyFilter();
+      const folderCollapseState2 = container._repoFolderStates.get(currentRepoKey);
+      const query = (searchQuery !== void 0 ? searchQuery : sInput ? sInput.value : "").toLowerCase().trim();
+      const filterFn = (name) => {
+        if (query && !name.toLowerCase().includes(query))
+          return false;
+        return true;
+      };
+      function createSec(title, isOpenDefault = true) {
+        const sec = document.createElement("div");
+        sec.className = "tree-section";
+        const hdr = document.createElement("div");
+        hdr.className = "tree-section-header";
+        const isCollapsed = sectionCollapseState.has(title) ? sectionCollapseState.get(title) : !isOpenDefault;
+        hdr.innerHTML = '<span class="arrow">' + (isCollapsed ? svgArrowRight : svgArrowDown) + '</span> <span style="color:#ffffff;">' + title + "</span>";
+        const bdy = document.createElement("div");
+        bdy.className = "tree-section-body";
+        bdy.style.display = isCollapsed ? "none" : "block";
+        hdr.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isNowCollapsed = bdy.style.display !== "none";
+          bdy.style.display = isNowCollapsed ? "none" : "block";
+          const arrow = hdr.querySelector(".arrow");
+          if (arrow)
+            arrow.innerHTML = isNowCollapsed ? svgArrowRight : svgArrowDown;
+          sectionCollapseState.set(title, isNowCollapsed);
         });
-        branchItemsContainer.appendChild(headItem);
+        sec.appendChild(hdr);
+        sec.appendChild(bdy);
+        return { sec, bdy };
       }
-
-      const localList = branches.filter(b => !b.remote && (!search || b.name.toLowerCase().includes(search)));
+      function selectBranch(name) {
+        container._selectedTreeBranch = name;
+        if (container._updateStarBtn) {
+          container._updateStarBtn();
+        }
+        populateTree();
+      }
+      function openBranchLog(name) {
+        container._selectedTreeBranch = name;
+        setActiveBranch(name);
+        onFilter({ branch: name });
+        if (container._updateStarBtn) {
+          container._updateStarBtn();
+        }
+        populateTree();
+      }
+      function getTrackingHtml(b) {
+        if (!b)
+          return "";
+        let trackHtml = "";
+        if (b.behind || b.ahead) {
+          trackHtml = '<span class="branch-track" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:11px;font-family:var(--vscode-editor-font-family, monospace);">';
+          if (b.behind) {
+            const behindTxt = "Behind remote by " + b.behind + " commit" + (b.behind > 1 ? "s" : "");
+            trackHtml += '<span class="track-badge behind" style="color:#58a6ff;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + behindTxt + '" title="' + behindTxt + '">\u2199 ' + b.behind + "</span>";
+          }
+          if (b.ahead) {
+            const aheadTxt = "Ahead of remote by " + b.ahead + " commit" + (b.ahead > 1 ? "s" : "");
+            trackHtml += '<span class="track-badge ahead" style="color:#3fb950;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + aheadTxt + '" title="' + aheadTxt + '">\u2197 ' + b.ahead + "</span>";
+          }
+          trackHtml += "</span>";
+        }
+        return trackHtml;
+      }
+      if (currentBranch2 && (!query || currentBranch2.toLowerCase().includes(query) || "head (current branch)".includes(query))) {
+        const headBox = document.createElement("div");
+        headBox.className = "head-branch-box" + (currentActive2 === "HEAD" ? " active" : "");
+        const curInfo = branches2.find((b) => b.name === currentBranch2);
+        headBox.innerHTML = '<span class="head-title" style="display:inline-flex;align-items:center;gap:4px;">HEAD (Current Branch)</span>';
+        headBox.title = "HEAD (" + currentBranch2 + ")";
+        headBox.addEventListener("click", () => selectBranch("HEAD"));
+        headBox.addEventListener("dblclick", () => openBranchLog("HEAD"));
+        headBox.addEventListener("contextmenu", (e) => {
+          selectBranch("HEAD");
+          showBranchContextMenu(e, currentBranch2);
+        });
+        treeContent.appendChild(headBox);
+      }
+      function createTreeNode(name = "", fullPath = "") {
+        return { name, fullPath, folders: {}, branches: [] };
+      }
+      function insertBranchIntoTree(root7, parts, branchObj) {
+        if (branchObj.name.startsWith("(") || branchObj.name.startsWith("HEAD")) {
+          root7.branches.push({ ...branchObj, leafName: branchObj.name });
+          return;
+        }
+        let current = root7;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          if (!current.folders[part]) {
+            const nextPath = current.fullPath ? current.fullPath + "/" + part : part;
+            current.folders[part] = createTreeNode(part, nextPath);
+          }
+          current = current.folders[part];
+        }
+        const leafName = parts[parts.length - 1];
+        current.branches.push({ ...branchObj, leafName });
+      }
+      function hasCurrentBranchInNode(n) {
+        if (!n || !currentBranch2)
+          return false;
+        if (n.branches && n.branches.some((b) => b.name === currentBranch2))
+          return true;
+        if (n.folders) {
+          for (const k in n.folders) {
+            if (hasCurrentBranchInNode(n.folders[k]))
+              return true;
+          }
+        }
+        return false;
+      }
+      function hasFavoriteInNode(n) {
+        if (!n)
+          return false;
+        if (n.branches && n.branches.some((b) => isBranchFavorite(b.name)))
+          return true;
+        if (n.folders) {
+          for (const k in n.folders) {
+            if (hasFavoriteInNode(n.folders[k]))
+              return true;
+          }
+        }
+        return false;
+      }
+      function renderTreeLevel(lvlContainer, node, isRemoteTree = false) {
+        const hasSiblingFolders = !!(node.folders && Object.keys(node.folders).length > 0);
+        function renderBranchItem(b) {
+          const item = document.createElement("div");
+          item.className = "tree-item" + (currentActive2 === b.name ? " active" : "") + (b.name === currentBranch2 ? " current-head" : "");
+          const isCur = b.name === currentBranch2;
+          const isFav = isBranchFavorite(b.name);
+          let icon = "";
+          if (isFav) {
+            icon = '<span class="tree-item-icon tree-item-star-slot is-fav" title="Favorite" style="cursor:pointer;color:#e5a50a;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;">\u2605</span>';
+          } else if (isCur) {
+            icon = '<span class="tree-item-icon">' + svgCheckoutYellow + "</span>";
+          } else {
+            icon = '<span class="tree-item-icon">' + svgBranchWhite + "</span>";
+          }
+          const spacer = hasSiblingFolders ? '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;width:16px;height:16px;min-width:16px;display:inline-flex;flex-shrink:0;"></span>' : "";
+          const trackHtml = getTrackingHtml(b);
+          item.innerHTML = spacer + icon + '<span class="branch-name" style="' + (isCur ? "font-weight:600;" : "") + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + "</span>" + trackHtml;
+          item.title = b.name;
+          item.addEventListener("click", () => selectBranch(b.name));
+          item.addEventListener("dblclick", () => openBranchLog(b.name));
+          item.addEventListener("contextmenu", (e) => {
+            selectBranch(b.name);
+            showBranchContextMenu(e, b.name);
+          });
+          const starEl = item.querySelector(".tree-item-star-slot");
+          if (starEl) {
+            starEl.addEventListener("click", (e) => {
+              e.stopPropagation();
+              toggleBranchFavorite(b.name);
+              if (container && container._updateStarBtn)
+                container._updateStarBtn();
+              populateTree();
+            });
+          }
+          lvlContainer.appendChild(item);
+        }
+        function renderFolderItem(fk) {
+          const subNode = node.folders[fk];
+          const fDiv = document.createElement("div");
+          fDiv.className = "tree-folder";
+          const fHdr = document.createElement("div");
+          fHdr.className = "tree-folder-header";
+          const folderIconSvg = '<span class="tree-item-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;"><path d="M8.10584 4.34613L8.25344 4.5H8.46667H13C13.8284 4.5 14.5 5.17157 14.5 6V12.1333C14.5 12.9529 13.932 13.5 13.3667 13.5H2.63333C2.06804 13.5 1.5 12.9529 1.5 12.1333V3.86667C1.5 3.04707 2.06804 2.5 2.63333 2.5H6.1217C6.25792 2.5 6.38824 2.55557 6.48253 2.65387L8.10584 4.34613Z" fill="#43454A" stroke="#FFFFFF" stroke-width="1.1"/></svg></span>';
+          const isFolderCollapsed = query ? false : folderCollapseState2.has(subNode.fullPath) ? folderCollapseState2.get(subNode.fullPath) : !hasCurrentBranchInNode(subNode);
+          fHdr.innerHTML = '<span class="arrow">' + (isFolderCollapsed ? svgArrowRight : svgArrowDown) + "</span>" + folderIconSvg + '<span class="folder-name" style="color:#ffffff;">' + fk + "</span>";
+          const fBdy = document.createElement("div");
+          fBdy.className = "tree-folder-body";
+          fBdy.style.display = isFolderCollapsed ? "none" : "block";
+          fHdr.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isNowCollapsed = fBdy.style.display !== "none";
+            fBdy.style.display = isNowCollapsed ? "none" : "block";
+            const arrow = fHdr.querySelector(".arrow");
+            if (arrow)
+              arrow.innerHTML = isNowCollapsed ? svgArrowRight : svgArrowDown;
+            folderCollapseState2.set(subNode.fullPath, isNowCollapsed);
+            try {
+              const obj = {};
+              folderCollapseState2.forEach((val, key2) => {
+                obj[key2] = val;
+              });
+              localStorage.setItem("intellij_git_folders_" + currentRepoKey, JSON.stringify(obj));
+            } catch {
+            }
+          });
+          if (isRemoteTree) {
+            fHdr.addEventListener("contextmenu", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              closeBranchContextMenu();
+              const locals = branches2.filter((b) => !b.remote && !b.name.startsWith("("));
+              const slashIdx = subNode.fullPath.indexOf("/");
+              const isRootRemote = slashIdx === -1;
+              const remoteName = isRootRemote ? subNode.fullPath : subNode.fullPath.slice(0, slashIdx);
+              const folderSubPath = isRootRemote ? "" : subNode.fullPath.slice(slashIdx + 1);
+              const targetLocals = isRootRemote ? locals : locals.filter((b) => b.name === folderSubPath || b.name.startsWith(folderSubPath + "/"));
+              const allTracked = targetLocals.length > 0 && targetLocals.every((b) => {
+                const expectedUpstream = remoteName + "/" + b.name;
+                return b.upstream === expectedUpstream;
+              });
+              const menu = document.createElement("div");
+              menu.className = "branch-context-menu";
+              menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
+              menu.addEventListener("contextmenu", (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+              });
+              if (isRootRemote) {
+                const itFetch = document.createElement("div");
+                itFetch.className = "bcm-item";
+                itFetch.innerHTML = "<span>Fetch '" + remoteName + "'</span>";
+                itFetch.addEventListener("click", (ev) => {
+                  ev.stopPropagation();
+                  closeBranchContextMenu();
+                  showToast("Fetching remote '" + remoteName + "'...");
+                  postMessage("fetchRemote", { remote: remoteName });
+                });
+                menu.appendChild(itFetch);
+              }
+              const itAll = document.createElement("div");
+              itAll.className = "bcm-item" + (allTracked ? " disabled" : "");
+              if (allTracked) {
+                itAll.style.pointerEvents = "none";
+                itAll.style.opacity = "0.45";
+              }
+              const labelText = isRootRemote ? "Track All Local Branches to '" + remoteName + "'" : "Track '" + subNode.fullPath + "' for '" + folderSubPath + "'";
+              itAll.innerHTML = "<span>" + labelText + (allTracked ? " (already tracked)" : "") + "</span>";
+              itAll.addEventListener("click", (ev) => {
+                if (allTracked)
+                  return;
+                ev.stopPropagation();
+                closeBranchContextMenu();
+                showToast("Tracking " + (isRootRemote ? "all local branches" : "'" + folderSubPath + "'") + " to '" + remoteName + "'...");
+                postMessage("trackAllBranchesToRemote", { remote: remoteName, prefix: folderSubPath || void 0 });
+              });
+              menu.appendChild(itAll);
+              document.body.appendChild(menu);
+              let x = e.clientX;
+              let y = e.clientY;
+              const rect = menu.getBoundingClientRect();
+              if (x + rect.width > window.innerWidth - 8)
+                x = Math.max(8, window.innerWidth - rect.width - 8);
+              if (y + rect.height > window.innerHeight - 8) {
+                const yAbove = e.clientY - rect.height;
+                if (yAbove >= 8)
+                  y = yAbove;
+                else
+                  y = Math.max(4, window.innerHeight - rect.height - 8);
+              }
+              menu.style.left = Math.max(0, x) + "px";
+              menu.style.top = Math.max(0, y) + "px";
+            });
+          }
+          fDiv.appendChild(fHdr);
+          renderTreeLevel(fBdy, subNode, isRemoteTree);
+          fDiv.appendChild(fBdy);
+          lvlContainer.appendChild(fDiv);
+        }
+        const curBranchObj = node.branches.find((b) => b.name === currentBranch2);
+        if (curBranchObj) {
+          renderBranchItem(curBranchObj);
+        }
+        const allFolderKeys = Object.keys(node.folders);
+        const curFolders = allFolderKeys.filter((k) => hasCurrentBranchInNode(node.folders[k])).sort((a, b) => a.localeCompare(b));
+        for (const fk of curFolders) {
+          renderFolderItem(fk);
+        }
+        const favBranches = node.branches.filter((b) => isBranchFavorite(b.name) && b.name !== currentBranch2).sort((a, b) => a.leafName.localeCompare(b.leafName));
+        for (const b of favBranches) {
+          renderBranchItem(b);
+        }
+        const favFolders = allFolderKeys.filter((k) => !hasCurrentBranchInNode(node.folders[k]) && hasFavoriteInNode(node.folders[k])).sort((a, b) => a.localeCompare(b));
+        for (const fk of favFolders) {
+          renderFolderItem(fk);
+        }
+        const otherFolders = allFolderKeys.filter((k) => !hasCurrentBranchInNode(node.folders[k]) && !hasFavoriteInNode(node.folders[k])).sort((a, b) => a.localeCompare(b));
+        for (const fk of otherFolders) {
+          renderFolderItem(fk);
+        }
+        const nonFavBranches = node.branches.filter((b) => !isBranchFavorite(b.name) && b.name !== currentBranch2).sort((a, b) => a.leafName.localeCompare(b.leafName));
+        for (const b of nonFavBranches) {
+          renderBranchItem(b);
+        }
+      }
+      const localList = branches2.filter((b) => !b.remote && !b.name.startsWith("origin/") && !b.name.startsWith("(") && !b.name.includes("detached") && filterFn(b.name));
       if (localList.length > 0) {
-        const hdr = document.createElement("div");
-        hdr.className = "filter-popup-header";
-        hdr.textContent = "Local";
-        branchItemsContainer.appendChild(hdr);
+        const localSec = createSec("Local", true);
+        const localTree = createTreeNode();
         for (const b of localList) {
-          const item = document.createElement("div");
-          item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
-          item.textContent = b.name;
-          item.addEventListener("click", () => {
-            curBranch = b.name;
-            if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
-            closeAllPopups();
-            applyFilter();
-          });
-          branchItemsContainer.appendChild(item);
+          const parts = b.name.split("/");
+          insertBranchIntoTree(localTree, parts, b);
         }
+        renderTreeLevel(localSec.bdy, localTree);
+        treeContent.appendChild(localSec.sec);
       }
-
-      const remoteList = branches.filter(b => b.remote && (!search || b.name.toLowerCase().includes(search)));
+      const configuredRemotes = latestData.remotes || [];
+      const remoteList = branches2.filter((b) => (b.remote || b.name.startsWith("origin/") || configuredRemotes.some((r2) => b.name.startsWith(r2 + "/"))) && b.name.includes("/") && !b.name.endsWith("/HEAD")).filter((b) => filterFn(b.name));
       if (remoteList.length > 0) {
-        const hdr = document.createElement("div");
-        hdr.className = "filter-popup-header";
-        hdr.textContent = "Remote";
-        branchItemsContainer.appendChild(hdr);
+        const remoteSec = createSec("Remote", true);
+        const remoteTree = createTreeNode();
         for (const b of remoteList) {
+          const parts = b.name.split("/");
+          insertBranchIntoTree(remoteTree, parts, { ...b, remote: true });
+        }
+        renderTreeLevel(remoteSec.bdy, remoteTree, true);
+        treeContent.appendChild(remoteSec.sec);
+      }
+      if (tags2.length > 0) {
+        const tagSec = createSec("Tags", false);
+        for (const t of tags2.filter((t2) => filterFn(t2.name))) {
           const item = document.createElement("div");
-          item.className = "filter-popup-item" + (curBranch === b.name ? " selected" : "");
-          item.textContent = b.name;
-          item.addEventListener("click", () => {
-            curBranch = b.name;
-            if ($$props.setActiveBranch) $$props.setActiveBranch(b.name);
-            closeAllPopups();
-            applyFilter();
-          });
-          branchItemsContainer.appendChild(item);
+          item.className = "tree-item" + (currentActive2 === t.name ? " active" : "");
+          item.innerHTML = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span><span class="tree-item-icon">' + svgTagIcon + "</span><span>" + t.name + "</span>";
+          item.addEventListener("click", () => selectBranch(t.name));
+          item.addEventListener("dblclick", () => openBranchLog(t.name));
+          tagSec.bdy.appendChild(item);
         }
+        treeContent.appendChild(tagSec.sec);
       }
-    }
-
-    branchLabel.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (branchPopup && !branchContainer.contains(branchPopup)) {
-        branchContainer.appendChild(branchPopup);
+      if (localList.length === 0 && remoteList.length === 0 && (!tags2 || tags2.filter((t) => filterFn(t.name)).length === 0) && (!currentBranch2 || !filterFn(currentBranch2))) {
+        const emptyEl = document.createElement("div");
+        emptyEl.style.cssText = "padding:16px 12px;text-align:center;color:var(--vscode-descriptionForeground);font-size:12px;";
+        emptyEl.textContent = query ? 'No branches matching "' + query + '"' : "No branches";
+        treeContent.appendChild(emptyEl);
       }
-      const open = branchPopup.style.display === "flex";
-      closeAllPopups();
-      if (!open) {
-        renderBranchItems();
-        branchPopup.style.display = "flex";
-        setTimeout(() => branchSearchInput.focus(), 20);
-      }
-    });
-
-    bar.appendChild(branchContainer);
-
-    // 3. User Dropdown
-    const userContainer = document.createElement("div");
-    userContainer.style.position = "relative";
-    const userLabel = document.createElement("div");
-    userLabel.className = "as-filter-label";
-    userContainer.appendChild(userLabel);
-
-    const userPopup = document.createElement("div");
-    userPopup.className = "filter-popup";
-    userPopup.innerHTML = '<div class="filter-popup-search"><input type="text" placeholder="Type user name or email..." /></div><div class="user-popup-items" style="overflow-y:auto;flex:1;"></div>';
-    userContainer.appendChild(userPopup);
-    const userSearchInput = userPopup.querySelector("input");
-    const userItemsContainer = userPopup.querySelector(".user-popup-items");
-
-    userSearchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && userSearchInput.value.trim()) {
-        curUser = userSearchInput.value.trim();
-        closeAllPopups();
-        applyFilter();
-      }
-    });
-    userSearchInput.addEventListener("input", () => {
-      renderUserItems(userSearchInput.value.toLowerCase());
-    });
-
-    function renderUserItems(search = "") {
-      userItemsContainer.innerHTML = "";
-      const allItem = document.createElement("div");
-      allItem.className = "filter-popup-item" + (!curUser ? " selected" : "");
-      allItem.textContent = "All Users";
-      allItem.addEventListener("click", () => {
-        curUser = "";
-        closeAllPopups();
-        applyFilter();
+      treeContent.querySelectorAll(".track-badge").forEach((badge) => {
+        attachTooltip(badge, badge.dataset.tooltip || badge.title || "", "", "bottom");
       });
-      userItemsContainer.appendChild(allItem);
-
-      const commitsList = $$props.commits || [];
-      const authorCounts = {};
-      for (const c of commitsList) {
-        if (c.author) authorCounts[c.author] = (authorCounts[c.author] || 0) + 1;
-      }
-      const authorNames = Object.keys(authorCounts).sort();
-      const filtered = authorNames.filter(name => !search || name.toLowerCase().includes(search));
-
-      if (filtered.length > 0) {
-        const hdr = document.createElement("div");
-        hdr.className = "filter-popup-header";
-        hdr.textContent = "Authors in repo";
-        userItemsContainer.appendChild(hdr);
-
-        for (const name of filtered) {
-          const item = document.createElement("div");
-          item.className = "filter-popup-item" + (curUser === name ? " selected" : "");
-          item.innerHTML = '<span>' + name + '</span> <span style="opacity:0.6;font-size:11px;">(' + authorCounts[name] + ')</span>';
-          item.addEventListener("click", () => {
-            curUser = name;
-            closeAllPopups();
-            applyFilter();
-          });
-          userItemsContainer.appendChild(item);
-        }
-      }
+      if (container._updateStarBtn)
+        container._updateStarBtn();
+      if (container._updateExitBtn)
+        container._updateExitBtn();
+      container._populateTree = populateTree;
     }
-
-    userLabel.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (userPopup && !userContainer.contains(userPopup)) {
-        userContainer.appendChild(userPopup);
-      }
-      const open = userPopup.style.display === "flex";
-      closeAllPopups();
-      if (!open) {
-        renderUserItems();
-        userPopup.style.display = "flex";
-        setTimeout(() => userSearchInput.focus(), 20);
-      }
-    });
-
-    bar.appendChild(userContainer);
-
-    // 4. Date Dropdown
-    const dateContainer = document.createElement("div");
-    dateContainer.style.position = "relative";
-    const dateLabel = document.createElement("div");
-    dateLabel.className = "as-filter-label";
-    dateContainer.appendChild(dateLabel);
-
-    const datePopup = document.createElement("div");
-    datePopup.className = "filter-popup";
-    const dateOptions = [
-      { label: "All", key: "" },
-      { label: "Today", key: "today" },
-      { label: "Yesterday", key: "yesterday" },
-      { label: "Last 7 Days", key: "7days" },
-      { label: "Last 30 Days", key: "30days" }
-    ];
-    for (const opt of dateOptions) {
-      const item = document.createElement("div");
-      item.className = "filter-popup-item";
-      item.textContent = opt.label;
-      item.addEventListener("click", () => {
-        if (!opt.key) {
-          curDate = "";
-          curAfter = "";
-          curBefore = "";
-        } else if (opt.key === "today") {
-          curDate = "Today";
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-          curAfter = now.toISOString();
-          curBefore = "";
-        } else if (opt.key === "yesterday") {
-          curDate = "Yesterday";
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-          const y = new Date(now.getTime() - 86400000);
-          curAfter = y.toISOString();
-          curBefore = now.toISOString();
-        } else if (opt.key === "7days") {
-          curDate = "Last 7 Days";
-          curAfter = new Date(Date.now() - 7 * 86400000).toISOString();
-          curBefore = "";
-        } else if (opt.key === "30days") {
-          curDate = "Last 30 Days";
-          curAfter = new Date(Date.now() - 30 * 86400000).toISOString();
-          curBefore = "";
-        }
-        closeAllPopups();
-        applyFilter();
-      });
-      datePopup.appendChild(item);
-    }
-    const divdr = document.createElement("div");
-    divdr.className = "filter-popup-divider";
-    datePopup.appendChild(divdr);
-
-    const customDateBox = document.createElement("div");
-    customDateBox.className = "filter-custom-date";
-    customDateBox.innerHTML = '<label>Custom Range:</label><input type="date" id="c-after" /><input type="date" id="c-before" /><button class="filter-apply-btn">Apply</button>';
-    const cAfter = customDateBox.querySelector("#c-after");
-    const cBefore = customDateBox.querySelector("#c-before");
-    const cApply = customDateBox.querySelector("button");
-    cApply.addEventListener("click", () => {
-      if (cAfter.value || cBefore.value) {
-        curDate = (cAfter.value || "...") + " - " + (cBefore.value || "...");
-        curAfter = cAfter.value ? new Date(cAfter.value).toISOString() : "";
-        curBefore = cBefore.value ? new Date(cBefore.value).toISOString() : "";
-      } else {
-        curDate = "";
-        curAfter = "";
-        curBefore = "";
-      }
-      closeAllPopups();
-      applyFilter();
-    });
-    datePopup.appendChild(customDateBox);
-    dateContainer.appendChild(datePopup);
-
-    dateLabel.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (datePopup && !dateContainer.contains(datePopup)) {
-        dateContainer.appendChild(datePopup);
-      }
-      const open = datePopup.style.display === "flex";
-      closeAllPopups();
-      if (!open) {
-        datePopup.style.display = "flex";
-      }
-    });
-
-    bar.appendChild(dateContainer);
-
-    // 5. Path Dropdown (>)
-    const pathContainer = document.createElement("div");
-    pathContainer.style.position = "relative";
-    const pathLabel = document.createElement("div");
-    pathLabel.className = "as-filter-label";
-    pathContainer.appendChild(pathLabel);
-
-    const pathPopup = document.createElement("div");
-    pathPopup.className = "filter-popup";
-    pathPopup.style.padding = "8px 12px";
-    pathPopup.innerHTML = '<input type="text" placeholder="e.g. lib/models or file.dart" style="width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, rgba(128,128,128,0.3));border-radius:3px;padding:3px 6px;font-size:11px;outline:none;margin-bottom:6px;" /><button class="filter-apply-btn">Apply</button>';
-    const pathInput = pathPopup.querySelector("input");
-    const pathBtn = pathPopup.querySelector("button");
-
-    pathBtn.addEventListener("click", () => {
-      curPath = pathInput.value.trim();
-      closeAllPopups();
-      applyFilter();
-    });
-    pathInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        curPath = pathInput.value.trim();
-        closeAllPopups();
-        applyFilter();
-      }
-    });
-    pathContainer.appendChild(pathPopup);
-
-    pathLabel.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (pathPopup && !pathContainer.contains(pathPopup)) {
-        pathContainer.appendChild(pathPopup);
-      }
-      const open = pathPopup.style.display === "flex";
-      closeAllPopups();
-      if (!open) {
-        pathPopup.style.display = "flex";
-        setTimeout(() => pathInput.focus(), 20);
-      }
-    });
-
-    bar.appendChild(pathContainer);
-
-    // Graph Option Button & Menu (Image 1 & Image 3)
-    const graphOptionContainer = document.createElement("div");
-    graphOptionContainer.style.position = "relative";
-    const graphOptionBtn = document.createElement("div");
-    graphOptionBtn.className = "as-filter-label as-tool-icon";
-    graphOptionBtn.title = "Graph Options";
-    graphOptionBtn.style.padding = "2px 4px";
-    graphOptionBtn.innerHTML = `
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-        <line x1="4.5" y1="2.5" x2="4.5" y2="13.5"/>
-        <polyline points="2.5,10.5 4.5,13.5 6.5,10.5"/>
-        <line x1="11.5" y1="2.5" x2="11.5" y2="13.5"/>
-        <polygon points="11.5,3.5 13.5,5.5 11.5,7.5 9.5,5.5" fill="var(--vscode-editor-background, #1e1f22)" stroke="currentColor" stroke-width="1.2"/>
-        <polygon points="11.5,8.5 13.5,10.5 11.5,12.5 9.5,10.5" fill="var(--vscode-editor-background, #1e1f22)" stroke="currentColor" stroke-width="1.2"/>
-        <polygon points="12,15 15,15 15,12" fill="currentColor" stroke="none"/>
-      </svg>
-    `;
-    graphOptionContainer.appendChild(graphOptionBtn);
-
-    graphOptionPopup = document.createElement("div");
-    graphOptionPopup.className = "as-dropdown-menu";
-    graphOptionPopup.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
-    graphOptionContainer.appendChild(graphOptionPopup);
-
-    function renderGraphOptionMenu() {
-      graphOptionPopup.innerHTML = "";
-
-      // Section 1: Sort
-      graphOptionPopup.appendChild(createSectionHeader("Sort"));
-      graphOptionPopup.appendChild(createMenuItem("By Commit Date", sortMode === "date", () => {
-        sortMode = "date";
-        renderGraphOptionMenu();
-        applyFilter();
-      }));
-      graphOptionPopup.appendChild(createMenuItem("Topologically", sortMode === "topo", () => {
-        sortMode = "topo";
-        renderGraphOptionMenu();
-        applyFilter();
-      }));
-
-      graphOptionPopup.appendChild(createDivider());
-
-      // Section 2: Options
-      graphOptionPopup.appendChild(createSectionHeader("Options"));
-      graphOptionPopup.appendChild(createMenuItem("First Parent", isFirstParent, () => {
-        isFirstParent = !isFirstParent;
-        renderGraphOptionMenu();
-        applyFilter();
-      }));
-      graphOptionPopup.appendChild(createMenuItem("No Merges", isNoMerges, () => {
-        isNoMerges = !isNoMerges;
-        renderGraphOptionMenu();
-        applyFilter();
-      }));
-
-      graphOptionPopup.appendChild(createDivider());
-
-      // Section 3: Branch Actions
-      graphOptionPopup.appendChild(createSectionHeader("Branch Actions"));
-      graphOptionPopup.appendChild(createMenuItem("Collapse Linear Branches", false, () => {
-        closeAllPopups();
-        postMessage("collapseLinearBranches");
-        showToast("Collapsed linear branches");
-      }));
-      graphOptionPopup.appendChild(createMenuItem("Expand Linear Branches", false, () => {
-        closeAllPopups();
-        postMessage("expandLinearBranches");
-        showToast("Expanded linear branches");
-      }));
-    }
-
-    graphOptionBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (graphOptionPopup && !graphOptionContainer.contains(graphOptionPopup)) {
-        graphOptionContainer.appendChild(graphOptionPopup);
-      }
-      const open = graphOptionPopup.style.display === "flex";
-      closeAllPopups();
-      if (!open) {
-        renderGraphOptionMenu();
-        graphOptionPopup.style.display = "flex";
-      }
-    });
-
-    bar.appendChild(graphOptionContainer);
-
-    // 6. Right toolbar actions (Refresh, Cherry-Pick, View Options, Search)
-    const tbRight = document.createElement("div");
-    tbRight.className = "as-toolbar-right";
-
-    // 1. Refresh
-    const btnRefresh = document.createElement("span");
-    btnRefresh.className = "as-tool-icon";
-    btnRefresh.title = "Refresh";
-    btnRefresh.innerHTML = `
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
-        <path fill-rule="evenodd" d="M12.5747152,11.8852806 C11.4741474,13.1817355 9.83247882,14.0044386 7.99865879,14.0044386 C5.03907292,14.0044386 2.57997332,11.8615894 2.08820756,9.0427473 L3.94774327,9.10768372 C4.43372186,10.8898575 6.06393114,12.2000519 8.00015362,12.2000519 C9.30149237,12.2000519 10.4645985,11.6082097 11.2349873,10.6790094 L9.05000019,8.71167959 L14.0431479,8.44999981 L14.3048222,13.4430431 L12.5747152,11.8852806 Z M3.42785637,4.11741586 C4.52839138,2.82452748 6.16775464,2.00443857 7.99865879,2.00443857 C10.918604,2.00443857 13.3513802,4.09026967 13.8882946,6.8532307 L12.0226389,6.78808057 C11.5024872,5.05935553 9.89838095,3.8000774 8.00015362,3.8000774 C6.69867367,3.8000774 5.53545628,4.39204806 4.76506921,5.32142241 L6.95482203,7.29304326 L1.96167436,7.55472304 L1.70000005,2.56167973 L3.42785637,4.11741586 Z" transform="rotate(3 8.002 8.004)"/>
-      </svg>
-    `;
-    btnRefresh.addEventListener("click", () => {
-      postMessage("refresh");
-    });
-    tbRight.appendChild(btnRefresh);
-
-    // 2. Cherry-Pick
-    const btnCherry = document.createElement("span");
-    btnCherry.className = "as-tool-icon";
-    btnCherry.title = "Cherry-Pick Commit";
-    btnCherry.innerHTML = `
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M6.5 11C6.5 12.1046 5.60457 13 4.5 13C3.39543 13 2.5 12.1046 2.5 11C2.5 9.89543 3.39543 9 4.5 9C5.60457 9 6.5 9.89543 6.5 11ZM4.5 14C6.15685 14 7.5 12.6569 7.5 11C7.5 9.34315 6.15685 8 4.5 8C2.84315 8 1.5 9.34315 1.5 11C1.5 12.6569 2.84315 14 4.5 14ZM13.5 11C13.5 12.1046 12.6046 13 11.5 13C10.3954 13 9.5 12.1046 9.5 11C9.5 9.89543 10.3954 9 11.5 9C12.6046 9 13.5 9.89543 13.5 11ZM11.5 14C13.1569 14 14.5 12.6569 14.5 11C14.5 9.34315 13.1569 8 11.5 8C9.84315 8 8.5 9.34315 8.5 11C8.5 12.6569 9.84315 14 11.5 14Z" fill="currentColor"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M11.8537 1.14647C11.7934 1.08617 11.7216 1.04449 11.6453 1.02143C11.5869 1.00372 11.5244 0.996452 11.46 1.00164L11.4585 1.00175L11.4577 1.00183C8.89299 1.21581 7.10682 2.51359 5.92996 4.03112C4.76214 5.53699 4.18349 7.26955 4.00588 8.424C3.9639 8.69693 4.15111 8.95222 4.42404 8.99421C4.69697 9.0362 4.95227 8.84899 4.99426 8.57606C5.14998 7.56384 5.67133 5.9964 6.72018 4.64394C7.43375 3.72381 8.38624 2.9082 9.6361 2.42686L10.8329 1.87283L10.1507 2.48553C9.63716 3.45813 9.48624 4.482 9.53842 5.42758C9.61459 6.8079 10.1221 8.0385 10.5761 8.76503C10.7225 8.9992 11.031 9.07038 11.2651 8.92403C11.4993 8.77767 11.5705 8.4692 11.4241 8.23503C11.0449 7.62822 10.6024 6.55883 10.5369 5.37248C10.4723 4.20114 10.7737 2.93361 11.8537 1.85358C12.049 1.65832 12.049 1.34174 11.8537 1.14647Z" fill="currentColor"/>
-      </svg>
-    `;
-    btnCherry.addEventListener("click", () => {
-      const selHash = $$props.selectedHash;
-      if (selHash) {
-        postMessage("cherryPick", { hash: selHash });
-      } else {
-        showToast("Select a commit from the log to cherry-pick");
-      }
-    });
-    tbRight.appendChild(btnCherry);
-
-    // 3. View Options
-    const viewOptionContainer = document.createElement("div");
-    viewOptionContainer.style.position = "relative";
-    viewOptionContainer.style.display = "inline-flex";
-
-    const btnViewOption = document.createElement("span");
-    btnViewOption.className = "as-tool-icon";
-    btnViewOption.title = "View Options";
-    btnViewOption.innerHTML = `
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-        <path d="M1.5 8C3 4.5 7 2.8 8 2.8C9 2.8 13 4.5 14.5 8C13 11.5 9 13.2 8 13.2C7 13.2 3 11.5 1.5 8Z"/>
-        <circle cx="8" cy="8" r="2.2"/>
-        <polygon points="12,15 15,15 15,12" fill="currentColor" stroke="none"/>
-      </svg>
-    `;
-    viewOptionContainer.appendChild(btnViewOption);
-
-    viewOptionPopup = document.createElement("div");
-    viewOptionPopup.className = "as-dropdown-menu";
-    viewOptionPopup.style.right = "0";
-    viewOptionPopup.style.left = "auto";
-    viewOptionPopup.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
-    viewOptionContainer.appendChild(viewOptionPopup);
-
-    function renderViewOptionMenu() {
-      viewOptionPopup.innerHTML = "";
-
-      // Section 1: Show
-      viewOptionPopup.appendChild(createSectionHeader("Show"));
-      viewOptionPopup.appendChild(createMenuItem("Compact References View", viewCompactRefs, () => {
-        viewCompactRefs = !viewCompactRefs;
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-      viewOptionPopup.appendChild(createMenuItem("Tag Names", viewTagNames, () => {
-        viewTagNames = !viewTagNames;
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-      viewOptionPopup.appendChild(createMenuItem("Long Edges", viewLongEdges, () => {
-        viewLongEdges = !viewLongEdges;
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-      viewOptionPopup.appendChild(createMenuItem("Commit Timestamp", viewCommitTimestamp, () => {
-        viewCommitTimestamp = !viewCommitTimestamp;
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-      viewOptionPopup.appendChild(createMenuItem("References on the Left", viewRefsOnLeft, () => {
-        viewRefsOnLeft = !viewRefsOnLeft;
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-
-      // Columns Submenu
-      const columnsItem = createMenuItem("Columns", false, (ev) => {
-        // keep open
-      }, true);
-
-      const subMenu = document.createElement("div");
-      subMenu.className = "as-dropdown-menu as-submenu";
-      subMenu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
-
-      function renderColumnsSubMenu() {
-        subMenu.innerHTML = "";
-        subMenu.appendChild(createMenuItem("Author", colAuthor, () => {
-          colAuthor = !colAuthor;
-          applyViewOptions();
-          renderColumnsSubMenu();
-        }));
-        subMenu.appendChild(createMenuItem("Hash", colHash, () => {
-          colHash = !colHash;
-          applyViewOptions();
-          renderColumnsSubMenu();
-        }));
-        subMenu.appendChild(createMenuItem("Date", colDate, () => {
-          colDate = !colDate;
-          applyViewOptions();
-          renderColumnsSubMenu();
-        }));
-        subMenu.appendChild(createMenuItem("GPG Signature", colGpg, () => {
-          colGpg = !colGpg;
-          applyViewOptions();
-          renderColumnsSubMenu();
-        }));
-      }
-      renderColumnsSubMenu();
-      columnsItem.addEventListener("mouseenter", () => {
-        const rect = columnsItem.getBoundingClientRect();
-        if (rect.right + 150 > window.innerWidth) {
-          subMenu.style.left = "auto";
-          subMenu.style.right = "100%";
-          subMenu.style.marginLeft = "0";
-          subMenu.style.marginRight = "2px";
+    if (!strip || !mainArea || !sInput || !treeContent) {
+      let addStripBtn = function(iconSvg, title, onClick, extraClass = "", shortcut = "") {
+        const btn = document.createElement("button");
+        btn.className = "sidebar-strip-btn " + extraClass;
+        btn.innerHTML = iconSvg;
+        attachTooltip(btn, title, shortcut);
+        btn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          onClick(btn);
+        });
+        strip.appendChild(btn);
+        return btn;
+      }, updateStarBtn = function() {
+        if (!starBtn)
+          return;
+        const sel = container._selectedTreeBranch || getActiveBranch();
+        const target = sel === "HEAD" ? getCurrentBranchName() : sel || getCurrentBranchName();
+        const fav = isBranchFavorite(target);
+        starBtn.innerHTML = fav ? starFilledSvg : starOutlineSvg;
+        starBtn.classList.toggle("active", fav);
+        if (target) {
+          updateTooltip(starBtn, fav ? "Remove '" + target + "' from Favorites (\u2605)" : "Add '" + target + "' to Favorites (\u2605)");
         } else {
-          subMenu.style.left = "100%";
-          subMenu.style.right = "auto";
-          subMenu.style.marginLeft = "2px";
-          subMenu.style.marginRight = "0";
+          updateTooltip(starBtn, "Favorite / Unfavorite Selected Branch (\u2605)");
+        }
+      }, updateExitBtn = function() {
+        if (!exitRepoBtn)
+          return;
+        const latestData = getBranchData() || {};
+        const isSub = !!(latestData.isSubRepo || window.__IS_SUB_REPO__);
+        exitRepoBtn.style.display = isSub ? "flex" : "none";
+      };
+      container.innerHTML = "";
+      strip = document.createElement("div");
+      strip.className = "sidebar-strip";
+      const collapseSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+      const expandSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+      const isCollapsed = container.classList.contains("collapsed");
+      const collapseBtn = addStripBtn(isCollapsed ? expandSvg : collapseSvg, isCollapsed ? "Expand Branches" : "Collapse Branches", (btn) => {
+        container.classList.toggle("collapsed");
+        const coll = container.classList.contains("collapsed");
+        btn.innerHTML = coll ? expandSvg : collapseSvg;
+        updateTooltip(btn, coll ? "Expand Branches" : "Collapse Branches");
+      });
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch...", () => {
+        const base = container._selectedTreeBranch || getActiveBranch() || getCurrentBranchName() || "HEAD";
+        openCreateBranchDialog(base);
+      }, "", "+");
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch", () => {
+        const target = container._selectedTreeBranch || getActiveBranch() || getCurrentBranchName();
+        if (target) {
+          showToast("Updating '" + target + "'...");
+          postMessage("pull", target);
+        }
+      }, "", "Fetch/Pull");
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch", () => {
+        const target = container._selectedTreeBranch || getActiveBranch();
+        if (target && target !== getCurrentBranchName()) {
+          postMessage("deleteBranch", target);
+        }
+      }, "", "Delete");
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.85355 8.14645C5.65829 7.95118 5.34171 7.95118 5.14645 8.14645C4.95118 8.34171 4.95118 8.65829 5.14645 8.85355L7.29289 11H0.5C0.223858 11 0 11.2239 0 11.5C0 11.7761 0.223858 12 0.5 12H7.29289L5.14645 14.1464C4.95118 14.3417 4.95118 14.6583 5.14645 14.8536C5.34171 15.0488 5.65829 15.0488 5.85355 14.8536L8.85355 11.8536L9.20711 11.5L8.85355 11.1464L5.85355 8.14645Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z" fill="currentColor"/></svg>', "Compare with Current Branch", () => {
+        const target = container._selectedTreeBranch || getActiveBranch();
+        const cur = getCurrentBranchName();
+        if (target) {
+          postMessage("compareBranch", { branch: target, withBranch: cur });
+        }
+      }, "", "Compare");
+      addStripBtn('<svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;"><path d="M12.8536 3.14645C13.0488 3.34171 13.0488 3.65829 12.8536 3.85355L11.4393 5.26777C11.2441 5.46303 10.9275 5.46303 10.7322 5.26777C10.537 5.0725 10.537 4.75592 10.7322 4.56066L12.1464 3.14645C12.3417 2.95118 12.6583 2.95118 12.8536 3.14645Z" fill="currentColor"/><path d="M10.0251 5.97487C10.2204 6.17014 10.2204 6.48672 10.0251 6.68198L8.61091 8.09619C8.41565 8.29146 8.09907 8.29146 7.90381 8.09619C7.70854 7.90093 7.70854 7.58435 7.90381 7.38909L9.31802 5.97487C9.51328 5.77961 9.82986 5.77961 10.0251 5.97487Z" fill="currentColor"/><path d="M7.1967 8.8033C7.39196 8.99856 7.39196 9.31515 7.1967 9.51041L5.78249 10.9246C5.58722 11.1199 5.27064 11.1199 5.07538 10.9246C4.88012 10.7294 4.88012 10.4128 5.07538 10.2175L6.48959 8.8033C6.68485 8.60804 7.00144 8.60804 7.1967 8.8033Z" fill="currentColor"/><path d="M3.5 5C3.77614 5 4 5.22386 4 5.5V7.5C4 7.77614 3.77614 8 3.5 8C3.22386 8 3 7.77614 3 7.5V5.5C3 5.22386 3.22386 5 3.5 5Z" fill="currentColor"/><path d="M3.5 9C3.77614 9 4 9.22386 4 9.5V12H6.5C6.77614 12 7 12.2239 7 12.5C7 12.7761 6.77614 13 6.5 13H3.5C3.22386 13 3 12.7761 3 12.5V9.5C3 9.22386 3.22386 9 3.5 9Z" fill="currentColor"/><path d="M8 12.5C8 12.2239 8.22386 12 8.5 12H10.5C10.7761 12 11 12.2239 11 12.5C11 12.7761 10.7761 13 10.5 13H8.5C8.22386 13 8 12.7761 8 12.5Z" fill="currentColor"/></svg>', "Fetch All Remotes", () => {
+        postMessage("fetchAll");
+      }, "", "git fetch --all");
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', "Search Branches", () => {
+        if (container.classList.contains("collapsed")) {
+          container.classList.remove("collapsed");
+          collapseBtn.innerHTML = collapseSvg;
+          updateTooltip(collapseBtn, "Collapse Branches");
+        }
+        if (sInput) {
+          sInput.focus();
+          sInput.select();
+        }
+      }, "", "Search");
+      addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>', "Expand / Collapse All Folders", () => {
+        const bodies = treeContent.querySelectorAll(".tree-section-body, .tree-folder-body");
+        let anyOpen = false;
+        bodies.forEach((b) => {
+          if (b.style.display !== "none")
+            anyOpen = true;
+        });
+        const shouldOpen = !anyOpen;
+        bodies.forEach((b) => {
+          b.style.display = shouldOpen ? "block" : "none";
+        });
+        treeContent.querySelectorAll(".arrow").forEach((a) => {
+          a.innerHTML = shouldOpen ? svgArrowDown : svgArrowRight;
+        });
+        folderCollapseState.forEach((_, k) => folderCollapseState.set(k, !shouldOpen));
+        sectionCollapseState.forEach((_, k) => sectionCollapseState.set(k, !shouldOpen));
+      });
+      const starOutlineSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
+      const starFilledSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#e5a50a" stroke="#e5a50a" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
+      let starBtn = addStripBtn(starOutlineSvg, "Favorite / Unfavorite Selected Branch (\u2605)", () => {
+        const sel = container._selectedTreeBranch || getActiveBranch();
+        const target = sel === "HEAD" ? getCurrentBranchName() : sel || getCurrentBranchName();
+        if (!target)
+          return;
+        toggleBranchFavorite(target);
+        updateStarBtn();
+        populateTree();
+      }, "", "Favorite");
+      container._updateStarBtn = updateStarBtn;
+      updateStarBtn();
+      const keyOutlinedSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 2.5 2.5"></path><path d="m18.5 4.5 2.5 2.5"></path><circle cx="7.5" cy="15.5" r="1.5"></circle></svg>';
+      addStripBtn(keyOutlinedSvg, "Git Remote Logins & Credentials", () => {
+        postMessage("openAuthDialog");
+      }, "", "Git Log In");
+      const exitDoorSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>';
+      const exitRepoBtn = addStripBtn(exitDoorSvg, "Exit Repository (Choose Another Repo)", () => {
+        postMessage("exitSubRepo");
+      }, "exit-subrepo-btn", "Exit");
+      exitRepoBtn.style.marginTop = "auto";
+      container._updateExitBtn = updateExitBtn;
+      updateExitBtn();
+      container.appendChild(strip);
+      mainArea = document.createElement("div");
+      mainArea.className = "sidebar-main";
+      const searchBox = document.createElement("div");
+      searchBox.className = "branch-search-box";
+      sInput = document.createElement("input");
+      sInput.type = "text";
+      sInput.className = "branch-search-input";
+      sInput.placeholder = "Search branches...";
+      sInput.addEventListener("input", (e) => {
+        if (container._populateTree) {
+          container._populateTree(e.target.value);
+        } else {
+          populateTree(e.target.value);
         }
       });
-      columnsItem.appendChild(subMenu);
-      viewOptionPopup.appendChild(columnsItem);
-
-      viewOptionPopup.appendChild(createDivider());
-
-      // Section 2: Highlight
-      viewOptionPopup.appendChild(createSectionHeader("Highlight"));
-      viewOptionPopup.appendChild(createMenuItem("My Commits", hlMyCommits, () => {
-        hlMyCommits = !hlMyCommits;
-        try { localStorage.setItem("intellij_git_hl_my_commits", hlMyCommits ? "true" : "false"); } catch {}
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-      viewOptionPopup.appendChild(createMenuItem("Merge Commits", hlMergeCommits, () => {
-        hlMergeCommits = !hlMergeCommits;
-        try { localStorage.setItem("intellij_git_hl_merge_commits", hlMergeCommits ? "true" : "false"); } catch {}
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-      viewOptionPopup.appendChild(createMenuItem("Current Branch", hlCurrentBranch, () => {
-        hlCurrentBranch = !hlCurrentBranch;
-        try { localStorage.setItem("intellij_git_hl_current_branch", hlCurrentBranch ? "true" : "false"); } catch {}
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
-      viewOptionPopup.appendChild(createMenuItem("Not Cherry-Picked Commits", hlNotCherryPicked, () => {
-        hlNotCherryPicked = !hlNotCherryPicked;
-        applyViewOptions();
-        renderViewOptionMenu();
-      }));
+      searchBox.appendChild(sInput);
+      mainArea.appendChild(searchBox);
+      treeContent = document.createElement("div");
+      treeContent.className = "branch-tree-content";
+      treeContent.addEventListener("contextmenu", (e) => {
+        const item = e.target.closest(".tree-item, .head-branch-box");
+        if (!item) {
+          e.preventDefault();
+          e.stopPropagation();
+          showGeneralBranchContextMenu(e);
+        }
+      });
+      mainArea.appendChild(treeContent);
+      mainArea.addEventListener("contextmenu", (e) => {
+        const item = e.target.closest(".tree-item, .head-branch-box");
+        if (!item) {
+          e.preventDefault();
+          e.stopPropagation();
+          showGeneralBranchContextMenu(e);
+        }
+      });
+      container.appendChild(mainArea);
     }
-
-    btnViewOption.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (viewOptionPopup && !viewOptionContainer.contains(viewOptionPopup)) {
-        viewOptionContainer.appendChild(viewOptionPopup);
-      }
-      const open = viewOptionPopup.style.display === "flex";
-      closeAllPopups();
-      if (!open) {
-        renderViewOptionMenu();
-        viewOptionPopup.style.display = "flex";
-      }
-    });
-    tbRight.appendChild(viewOptionContainer);
-
-    // 4. Search
-    const btnSearch = document.createElement("span");
-    btnSearch.className = "as-tool-icon";
-    btnSearch.title = "Search Commits (/)";
-    btnSearch.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-        <circle cx="6.5" cy="6.5" r="4.5"/>
-        <line x1="10" y1="10" x2="14.5" y2="14.5"/>
-      </svg>
-    `;
-    btnSearch.addEventListener("click", () => {
-      searchInput.focus();
-      searchInput.select();
-    });
-    tbRight.appendChild(btnSearch);
-
-    bar.appendChild(tbRight);
-
-    attachTooltip(btnRefresh, "Refresh", "Cmd+R", "bottom");
-    attachTooltip(btnCherry, "Cherry-Pick Commit", "", "bottom");
-    attachTooltip(btnViewOption, "View Options", "", "bottom");
-    attachTooltip(btnSearch, "Search Commits", "/", "bottom");
-    attachTooltip(graphOptionBtn, "Graph Options", "", "bottom");
-    attachTooltip(regexBtn, "Regex", "", "bottom");
-    attachTooltip(caseBtn, "Match Case", "", "bottom");
-    const asSearchIcon = searchBox.querySelector(".as-search-icon");
-    if (asSearchIcon) attachTooltip(asSearchIcon, "Search commits by text or hash", "", "bottom");
-    attachTooltip(branchLabel, "Filter by Branch", "", "bottom");
-    attachTooltip(userLabel, "Filter by User", "", "bottom");
-    attachTooltip(dateLabel, "Filter by Date", "", "bottom");
-    attachTooltip(pathLabel, "Filter by Structure / Path", "", "bottom");
-
-    function updateLabels() {
-      // Branch Label
-      if (curBranch) {
-        branchLabel.className = "as-filter-label active";
-        branchLabel.innerHTML = '<span class="lbl-prefix">Branch:</span> <span class="lbl-val">' + curBranch + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
-        branchLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
-          e.stopPropagation();
-          curBranch = "";
-          if ($$props.setActiveBranch) $$props.setActiveBranch("");
-          applyFilter();
-        });
-      } else {
-        branchLabel.className = "as-filter-label";
-        branchLabel.innerHTML = '<span class="lbl-prefix">Branch</span> <span class="lbl-arrow">&#9662;</span>';
-      }
-
-      // User Label
-      if (curUser) {
-        userLabel.className = "as-filter-label active";
-        userLabel.innerHTML = '<span class="lbl-prefix">User:</span> <span class="lbl-val">' + curUser + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
-        userLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
-          e.stopPropagation();
-          curUser = "";
-          applyFilter();
-        });
-      } else {
-        userLabel.className = "as-filter-label";
-        userLabel.innerHTML = '<span class="lbl-prefix">User</span> <span class="lbl-arrow">&#9662;</span>';
-      }
-
-      // Date Label
-      if (curDate) {
-        dateLabel.className = "as-filter-label active";
-        dateLabel.innerHTML = '<span class="lbl-prefix">Date:</span> <span class="lbl-val">' + curDate + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
-        dateLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
-          e.stopPropagation();
-          curDate = "";
-          curAfter = "";
-          curBefore = "";
-          applyFilter();
-        });
-      } else {
-        dateLabel.className = "as-filter-label";
-        dateLabel.innerHTML = '<span class="lbl-prefix">Date</span> <span class="lbl-arrow">&#9662;</span>';
-      }
-
-      // Path Label
-      if (curPath) {
-        pathLabel.className = "as-filter-label active";
-        pathLabel.innerHTML = '<span class="lbl-prefix">Paths:</span> <span class="lbl-val">' + curPath + '</span> <span class="lbl-clear" title="Clear">&times;</span>';
-        pathLabel.querySelector(".lbl-clear").addEventListener("click", (e) => {
-          e.stopPropagation();
-          curPath = "";
-          applyFilter();
-        });
-      } else {
-        pathLabel.className = "as-filter-label";
-        pathLabel.innerHTML = '<span class="lbl-prefix">Paths</span> <span class="lbl-arrow">&#9662;</span>';
-      }
-    }
-
-    user_effect(() => {
-      const extBranch = $$props.activeBranch;
-      if (extBranch !== undefined && extBranch !== curBranch) {
-        curBranch = extBranch || "";
-        updateLabels();
-      }
-    });
-
-    updateLabels();
-    append($$anchor, bar);
-    pop();
+    populateTree();
   }
 
   // webview/graph/App.svelte
-  var root_14 = from_html(`<div class="loading svelte-1lrl78g">Loading commits...</div>`);
-  var root_23 = from_html(`<div class="empty svelte-1lrl78g">No commits found.</div>`);
-  var root_43 = from_html(`<div class="detail-panel svelte-1lrl78g"><!></div>`);
-  var root5 = from_html(`<div class="app svelte-1lrl78g"><!> <div class="main-area svelte-1lrl78g"><div class="center-area svelte-1lrl78g"><!></div> <!></div></div>`);
+  var root6 = from_html(`<div class="loading">Loading commits...</div>`);
+  var root_15 = from_html(`<button class="no-git-btn primary" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;border-radius:4px;background:#2e436e;color:#ffffff;border:1px solid #3e5b94;font-size:12px;font-weight:500;cursor:pointer;width:100%;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"></path><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg> </button>`);
+  var root_24 = from_html(`<div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--vscode-descriptionForeground);text-transform:uppercase;letter-spacing:0.5px;">Detected Git repository in subfolder:</div> <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;width:100%;max-width:360px;"></div>`, 1);
+  var root_33 = from_html(`<div class="no-git-container"><div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:440px;margin:auto 0;padding:12px 0;flex-shrink:0;"><div><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div> <div style="font-size:16px;font-weight:600;margin:14px 0 6px;">No Git Repository Found</div> <div style="font-size:12px;color:var(--vscode-descriptionForeground);max-width:440px;line-height:1.5;margin-bottom:20px;"> </div> <!> <button class="no-git-btn secondary" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;background:var(--vscode-button-secondaryBackground, #3a3d41);color:var(--vscode-button-secondaryForeground, #ffffff);border:1px solid rgba(255,255,255,0.1);font-size:12px;cursor:pointer;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Initialize Git Repository Here (git init)</button></div></div>`);
+  var root_43 = from_html(`<div class="empty">No commits found.</div>`);
+  var root_52 = from_html(`<div class="detail-splitter"></div> <div class="detail-panel"><button class="detail-close-btn" title="Close Details (Esc)"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1.5 1.5L10.5 10.5M1.5 10.5L10.5 1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></button> <!></div>`, 1);
+  var root_6 = from_html(`<div class="app"><!> <div class="main-area"><div class="branch-sidebar"></div> <div class="branch-splitter"></div> <div class="center-area"><!></div> <!></div></div>`);
   var $$css6 = {
     hash: "svelte-1lrl78g",
-    code: "html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app.svelte-1lrl78g {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading.svelte-1lrl78g, .empty.svelte-1lrl78g {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area.svelte-1lrl78g {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar.svelte-1lrl78g {width:260px;min-width:140px;background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:1em;transition:width 0.12s ease;}.branch-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:transparent;z-index:10;user-select:none;position:relative;}.branch-splitter::before {content:'';position:absolute;top:0;bottom:0;left:-4px;right:-4px;cursor:col-resize;z-index:1;}.branch-splitter:hover, .branch-splitter.active {background:transparent !important;}.branch-sidebar.collapsed + .branch-splitter {display:none !important;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.95em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:scroll;overflow-x:hidden;padding:4px 0;scrollbar-color:rgb(70, 62, 62) transparent !important;}.branch-tree-content::-webkit-scrollbar {width:8px !important;height:8px !important;background:transparent !important;background-color:transparent !important;}.branch-tree-content::-webkit-scrollbar-track, .branch-tree-content::-webkit-scrollbar-track-piece, .branch-tree-content::-webkit-scrollbar-corner {background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;}.branch-tree-content::-webkit-scrollbar-thumb {background:rgb(70, 62, 62) !important;background-color:rgb(70, 62, 62) !important;border-radius:4px !important;border:none !important;}.branch-tree-content::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35) !important;background-color:rgba(255,255,255,0.35) !important;}.tree-section-header {padding:4px 8px;font-weight:600;color:#ffffff;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:1em;}.tree-section-header:hover {background:var(--vscode-list-hoverBackground);}.tree-folder-header {padding:3px 6px;font-weight:400;color:#ffffff;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:1em;border-radius:3px;margin:1px 4px;user-select:none;}.tree-folder-header:hover {background:var(--vscode-list-hoverBackground);color:#ffffff;}.tree-folder-header:hover .tree-item-icon {color:#dfe1e5 !important;}.tree-item-icon {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:4px;}.tree-item {display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:1em;user-select:none;}.tree-folder-body {margin-left:18px;border-left:1px solid rgba(140, 140, 140, 0.45);padding-left:14px;}.tree-section-body {margin-left:16px;border-left:1px solid rgba(140, 140, 140, 0.45);padding-left:0px;}.arrow.spacer {visibility:hidden !important;pointer-events:none;}.tree-item-star-slot {display:none;}.tree-item-star-slot.is-fav {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;line-height:1;margin-right:2px;user-select:none;color:#e5a50a !important;visibility:visible !important;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.current-head:not(.active) {color:var(--vscode-foreground,#dfe1e5);font-weight:600;}.tree-item.active {background:var(--vscode-list-activeSelectionBackground) !important;color:var(--vscode-list-activeSelectionForeground) !important;font-weight:600;}.tree-item.active .branch-name {color:var(--vscode-list-activeSelectionForeground) !important;}.head-branch-box {display:flex;align-items:center;justify-content:space-between;padding:4px 8px;margin:2px 4px 4px 4px;background:transparent;border-radius:4px;cursor:pointer;user-select:none;font-size:1em;font-weight:600;color:var(--vscode-foreground,#dfe1e5);transition:background 0.12s ease;}.head-branch-box:hover {background:var(--vscode-list-hoverBackground, rgba(255,255,255,0.08));}.head-branch-box.active {background:var(--vscode-list-activeSelectionBackground,#04395e);color:var(--vscode-list-activeSelectionForeground,#ffffff);}.branch-icon {color:#dfe1e5;}.branch-icon.remote {color:#dfe1e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#8c8c8c;}.arrow {color:var(--vscode-descriptionForeground, #8c8c8c);width:16px;height:16px;min-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;opacity:0.85;transition:opacity 0.1s ease, color 0.1s ease;}.arrow:hover {opacity:1;color:var(--vscode-foreground, #dfe1e5);}.center-area.svelte-1lrl78g {flex:1;min-height:0;position:relative;}.detail-panel.svelte-1lrl78g {position:relative;width:300px;min-width:180px;overflow-y:auto;flex-shrink:0;box-sizing:border-box;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar {width:6px;height:6px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-track {background:transparent;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.detail-panel.svelte-1lrl78g::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.detail-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.detail-splitter::before {content:\"\";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.detail-splitter:hover, .detail-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.detail-close-btn {position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:4px;color:var(--vscode-foreground, #cccccc);opacity:0.7;cursor:pointer;z-index:10;transition:all 0.15s ease;padding:0;}.detail-close-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;overflow-y:auto;overflow-x:hidden;height:100%;box-sizing:border-box;user-select:none;padding:32px 16px;text-align:center;color:var(--vscode-foreground);scrollbar-color:rgb(70, 62, 62) transparent !important;}.no-git-container::-webkit-scrollbar {width:8px !important;height:8px !important;background:transparent !important;}.no-git-container::-webkit-scrollbar-thumb {background:rgb(70, 62, 62) !important;border-radius:4px !important;}.no-git-container::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35) !important;}.app-tooltip {position:fixed;z-index:99999;pointer-events:none;background:var(--vscode-editorHoverWidget-background, #252526);color:var(--vscode-editorHoverWidget-foreground, #cccccc);border:1px solid var(--vscode-editorHoverWidget-border, #454545);box-shadow:0 4px 14px rgba(0,0,0,0.45);padding:4px 8px;border-radius:4px;font-size:11px;font-family:var(--vscode-font-family, system-ui, sans-serif);line-height:1.4;white-space:nowrap;opacity:0;visibility:hidden;transition:opacity 0.12s ease, visibility 0.12s ease;}.app-tooltip.visible {opacity:1;visibility:visible;}.app-tooltip .tooltip-shortcut {margin-left:6px;opacity:0.65;font-size:10px;background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);}.app-tooltip.side-right::before {content:\"\";position:absolute;top:50%;left:-5px;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--vscode-editorHoverWidget-border, #454545);}.app-tooltip.side-bottom::before {content:\"\";position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:5px solid var(--vscode-editorHoverWidget-border, #454545);}"
-
+    code: `html, body {margin:0;padding:0;height:100%;overflow:hidden;font-family:var(--vscode-font-family, system-ui, sans-serif);font-size:var(--vscode-font-size, 13px);color:var(--vscode-foreground);background:var(--vscode-editor-background);}.app {position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}.loading, .empty {padding:20px;text-align:center;color:var(--vscode-descriptionForeground);}.main-area {display:flex;flex:1;min-height:0;overflow:hidden;position:relative;}.branch-sidebar {width:260px;min-width:140px;background:var(--vscode-sideBar-background, #1e1e1e);overflow:hidden;display:flex;flex-direction:row;flex-shrink:0;user-select:none;font-size:1em;transition:width 0.12s ease;}.branch-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:transparent;z-index:10;user-select:none;position:relative;}.branch-splitter::before {content:'';position:absolute;top:0;bottom:0;left:-4px;right:-4px;cursor:col-resize;z-index:1;}.branch-splitter:hover, .branch-splitter.active {background:transparent !important;}.branch-sidebar.collapsed + .branch-splitter {display:none !important;}.branch-sidebar.collapsed {width:34px !important;min-width:34px !important;}.sidebar-strip {width:34px;background:var(--vscode-sideBar-background, #1e1e1e);border-right:1px solid var(--vscode-panel-border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;flex-shrink:0;box-sizing:border-box;}.sidebar-strip-btn {width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--vscode-foreground);opacity:0.8;border-radius:4px;cursor:pointer;padding:0;transition:all 0.1s ease;}.sidebar-strip-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.sidebar-strip-btn.active {background:var(--vscode-toolbar-activeBackground, rgba(255,255,255,0.2));opacity:1;color:#e5a50a;}.sidebar-main {flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}.branch-sidebar.collapsed .sidebar-main {display:none;}.branch-search-box {padding:6px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;}.branch-search-input {width:100%;box-sizing:border-box;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border, transparent);border-radius:3px;padding:4px 6px;font-size:0.95em;outline:none;}.branch-search-input:focus {border-color:var(--vscode-focusBorder);}.branch-tree-content {flex:1;overflow-y:scroll;overflow-x:hidden;padding:4px 0;scrollbar-color:rgb(70, 62, 62) transparent !important;}.branch-tree-content::-webkit-scrollbar {width:8px !important;height:8px !important;background:transparent !important;background-color:transparent !important;}.branch-tree-content::-webkit-scrollbar-track, .branch-tree-content::-webkit-scrollbar-track-piece, .branch-tree-content::-webkit-scrollbar-corner {background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;}.branch-tree-content::-webkit-scrollbar-thumb {background:rgb(70, 62, 62) !important;background-color:rgb(70, 62, 62) !important;border-radius:4px !important;border:none !important;}.branch-tree-content::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35) !important;background-color:rgba(255,255,255,0.35) !important;}.tree-section-header {padding:4px 8px;font-weight:600;color:#ffffff;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:1em;}.tree-section-header:hover {background:var(--vscode-list-hoverBackground);}.tree-folder-header {padding:3px 6px;font-weight:400;color:#ffffff;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:1em;border-radius:3px;margin:1px 4px;user-select:none;}.tree-folder-header:hover {background:var(--vscode-list-hoverBackground);color:#ffffff;}.tree-folder-header:hover .tree-item-icon {color:#dfe1e5 !important;}.tree-item-icon {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:4px;}.tree-item {display:flex;align-items:center;gap:4px;padding:3px 6px;cursor:pointer;border-radius:3px;margin:1px 4px;white-space:nowrap;overflow:hidden;color:var(--vscode-foreground);font-size:1em;user-select:none;}.tree-folder-body {margin-left:18px;border-left:1px solid rgba(140, 140, 140, 0.45);padding-left:14px;}.tree-section-body {margin-left:16px;border-left:1px solid rgba(140, 140, 140, 0.45);padding-left:0px;}.arrow.spacer {visibility:hidden !important;pointer-events:none;}.tree-item-star-slot {display:none;}.tree-item-star-slot.is-fav {width:16px;height:16px;min-width:16px;max-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;line-height:1;margin-right:2px;user-select:none;color:#e5a50a !important;visibility:visible !important;}.tree-item:hover {background:var(--vscode-list-hoverBackground);}.tree-item.current-head:not(.active) {color:var(--vscode-foreground,#dfe1e5);font-weight:600;}.tree-item.active {background:var(--vscode-list-activeSelectionBackground) !important;color:var(--vscode-list-activeSelectionForeground) !important;font-weight:600;}.tree-item.active .branch-name {color:var(--vscode-list-activeSelectionForeground) !important;}.head-branch-box {display:flex;align-items:center;justify-content:space-between;padding:4px 8px;margin:2px 4px 4px 4px;background:transparent;border-radius:4px;cursor:pointer;user-select:none;font-size:1em;font-weight:600;color:var(--vscode-foreground,#dfe1e5);transition:background 0.12s ease;}.head-branch-box:hover {background:var(--vscode-list-hoverBackground, rgba(255,255,255,0.08));}.head-branch-box.active {background:var(--vscode-list-activeSelectionBackground,#04395e);color:var(--vscode-list-activeSelectionForeground,#ffffff);}.branch-icon {color:#dfe1e5;}.branch-icon.remote {color:#dfe1e5;}.star-icon {color:#e5a50a;}.folder-icon {color:#8c8c8c;}.arrow {color:var(--vscode-descriptionForeground, #8c8c8c);width:16px;height:16px;min-width:16px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;opacity:0.85;transition:opacity 0.1s ease, color 0.1s ease;}.arrow:hover {opacity:1;color:var(--vscode-foreground, #dfe1e5);}.center-area {flex:1;min-height:0;position:relative;}.detail-panel {position:relative;width:300px;min-width:180px;overflow-y:auto;flex-shrink:0;box-sizing:border-box;}.detail-panel::-webkit-scrollbar {width:6px;height:6px;}.detail-panel::-webkit-scrollbar-track {background:transparent;}.detail-panel::-webkit-scrollbar-thumb {background:rgba(255,255,255,0.18);border-radius:3px;}.detail-panel::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35);}.detail-splitter {width:1px;cursor:col-resize;flex-shrink:0;background:var(--vscode-panel-border, #393b40);z-index:10;user-select:none;position:relative;transition:background 0.15s ease;}.detail-splitter::before {content:"";position:absolute;top:0;bottom:0;left:-3px;right:-3px;cursor:col-resize;z-index:1;}.detail-splitter:hover, .detail-splitter.active {background:var(--vscode-focusBorder, #3574f0) !important;}.detail-close-btn {position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:4px;color:var(--vscode-foreground, #cccccc);opacity:0.7;cursor:pointer;z-index:10;transition:all 0.15s ease;padding:0;}.detail-close-btn:hover {opacity:1;background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));}.no-git-container {position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;overflow-y:auto;overflow-x:hidden;height:100%;box-sizing:border-box;user-select:none;padding:32px 16px;text-align:center;color:var(--vscode-foreground);scrollbar-color:rgb(70, 62, 62) transparent !important;}.no-git-container::-webkit-scrollbar {width:8px !important;height:8px !important;background:transparent !important;}.no-git-container::-webkit-scrollbar-thumb {background:rgb(70, 62, 62) !important;border-radius:4px !important;}.no-git-container::-webkit-scrollbar-thumb:hover {background:rgba(255,255,255,0.35) !important;}.app-tooltip {position:fixed;z-index:99999;pointer-events:none;background:var(--vscode-editorHoverWidget-background, #252526);color:var(--vscode-editorHoverWidget-foreground, #cccccc);border:1px solid var(--vscode-editorHoverWidget-border, #454545);box-shadow:0 4px 14px rgba(0,0,0,0.45);padding:4px 8px;border-radius:4px;font-size:11px;font-family:var(--vscode-font-family, system-ui, sans-serif);line-height:1.4;white-space:nowrap;opacity:0;visibility:hidden;transition:opacity 0.12s ease, visibility 0.12s ease;}.app-tooltip.visible {opacity:1;visibility:visible;}.app-tooltip .tooltip-shortcut {margin-left:6px;opacity:0.65;font-size:10px;background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);}.app-tooltip.side-right::before {content:"";position:absolute;top:50%;left:-5px;transform:translateY(-50%);width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--vscode-editorHoverWidget-border, #454545);}.app-tooltip.side-bottom::before {content:"";position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:5px solid var(--vscode-editorHoverWidget-border, #454545);}`
   };
   function App($$anchor, $$props) {
     push($$props, true);
@@ -8854,25 +10341,56 @@ ${component_stack}
     let selectedFiles = state(proxy([]));
     let loading = state(true);
     let scrollToIndex = state(-1);
-    let unsubscribe;
-    let branchData = state({ branches: [], tags: [], currentBranch: "" });
+    let branchData = state(proxy({ branches: [], tags: [], currentBranch: "" }));
     let activeBranch = state("");
-    let branchSearch = state("");
     let noGitData = state(null);
     let hasInitializedActiveBranch = false;
-
+    let selectedCommit = user_derived(() => get(commits).find((c) => c.hash === get(selectedHash)) || null);
+    let branchSidebarEl = state(void 0);
+    let branchSplitterEl = state(void 0);
+    let detailPanelEl = state(void 0);
+    let detailSplitterEl = state(void 0);
+    let unsubscribe;
+    function onSelectCommit(hash2) {
+      set(selectedHash, hash2, true);
+      set(selectedFiles, [], true);
+      postMessage("selectCommit", hash2);
+    }
+    function onFilter2(filter) {
+      set(loading, true);
+      postMessage("filter", filter);
+    }
+    function onLoadMore() {
+      postMessage("loadMore");
+    }
+    function onRebaseFromHere(hash2) {
+      postMessage("rebaseFromHere", hash2);
+    }
     onMount(() => {
       postMessage("ready");
+      const closeAllFloatingMenus = () => {
+        document.querySelectorAll(".commit-context-menu, .branch-context-menu, .filter-popup, .as-dropdown-menu").forEach((el) => el.remove());
+      };
+      window.addEventListener("blur", closeAllFloatingMenus);
+      const visChangeHandler = () => {
+        if (document.hidden)
+          closeAllFloatingMenus();
+      };
+      document.addEventListener("visibilitychange", visChangeHandler);
       unsubscribe = onMessage((msg) => {
         switch (msg.type) {
+          case "closeAllMenus": {
+            closeAllFloatingMenus();
+            break;
+          }
           case "noGitRepo": {
             window.__IS_SUB_REPO__ = false;
             hasInitializedActiveBranch = false;
             set(loading, false);
             set(commits, [], true);
-            set(selectedHash, null, true);
+            set(selectedHash, null);
             set(selectedFiles, [], true);
-            set(activeBranch, "", true);
+            set(activeBranch, "");
             set(branchData, { branches: [], tags: [], currentBranch: "" }, true);
             set(noGitData, msg.payload, true);
             break;
@@ -8884,7 +10402,6 @@ ${component_stack}
           case "pushSuccess": {
             if (activePushDialog) {
               activePushDialog.remove();
-              activePushDialog = null;
             }
             break;
           }
@@ -8895,23 +10412,25 @@ ${component_stack}
           case "authSuccess": {
             if (activeAuthDialog) {
               activeAuthDialog.remove();
-              activeAuthDialog = null;
             }
             break;
           }
           case "authError": {
             if (activeAuthDialog) {
-              const errEl = activeAuthDialog.querySelector('#as-auth-error-msg');
-              const submitBtn = activeAuthDialog.querySelector('#as-auth-submit');
-              const spinner = activeAuthDialog.querySelector('#as-auth-spinner');
-              const btnText = activeAuthDialog.querySelector('#as-auth-btn-text');
+              const errEl = activeAuthDialog.querySelector("#as-auth-error-msg");
+              const submitBtn = activeAuthDialog.querySelector("#as-auth-submit");
+              const spinner = activeAuthDialog.querySelector("#as-auth-spinner");
+              const btnText = activeAuthDialog.querySelector("#as-auth-btn-text");
               if (errEl) {
-                errEl.style.display = 'block';
-                errEl.textContent = msg.payload?.error || 'Authentication failed. Please verify credentials.';
+                errEl.style.display = "block";
+                errEl.textContent = msg.payload?.error || "Authentication failed. Please verify credentials.";
               }
-              if (submitBtn) submitBtn.disabled = false;
-              if (spinner) spinner.style.display = 'none';
-              if (btnText) btnText.textContent = 'Log In';
+              if (submitBtn)
+                submitBtn.disabled = false;
+              if (spinner)
+                spinner.style.display = "none";
+              if (btnText)
+                btnText.textContent = "Log In";
             }
             break;
           }
@@ -8920,85 +10439,79 @@ ${component_stack}
             if (p.currentUser) {
               window.__GIT_CURRENT_USER__ = p.currentUser;
             }
-            if (p.currentBranch !== undefined) {
+            if (p.currentBranch !== void 0) {
               window.__GIT_CURRENT_BRANCH__ = p.currentBranch;
             }
-            if (p.isSubRepo !== undefined) {
+            if (p.isSubRepo !== void 0) {
               window.__IS_SUB_REPO__ = !!p.isSubRepo;
             }
             if (p.repoPath) {
               window.__GIT_REPO_PATH__ = p.repoPath;
             }
-            document.querySelectorAll(".no-git-container").forEach(el => el.remove());
-            const seen = new Set();
+            document.querySelectorAll(".no-git-container").forEach((el) => el.remove());
+            const seen2 = /* @__PURE__ */ new Set();
             const unique = [];
             if (p.commits) {
               for (const c of p.commits) {
-                if (!seen.has(c.hash)) {
-                  seen.add(c.hash);
+                if (!seen2.has(c.hash)) {
+                  seen2.add(c.hash);
                   unique.push(c);
                 }
               }
             }
-            // Scroll Anchor: Lưu lại commit đang ở đỉnh viewport và commit đang chọn
             const cEl = window.__commitListContainer__ || document.querySelector(".commit-list-container");
             const oldCommits = get(commits) || [];
             const ROW_HEIGHT = 25;
             let anchorHash = null;
             let anchorOffset = 0;
             const curSelected = get(selectedHash);
-
             if (cEl && oldCommits.length > 0) {
               const curScrollTop = cEl.scrollTop;
               const anchorRow = Math.max(0, Math.floor(curScrollTop / ROW_HEIGHT));
               if (oldCommits[anchorRow]) {
                 anchorHash = oldCommits[anchorRow].hash;
-                anchorOffset = curScrollTop - (anchorRow * ROW_HEIGHT);
+                anchorOffset = curScrollTop - anchorRow * ROW_HEIGHT;
               }
             }
-
             let newIndex = -1;
             if (anchorHash) {
-              newIndex = unique.findIndex(c => c.hash === anchorHash);
+              newIndex = unique.findIndex((c) => c.hash === anchorHash);
             }
             if (newIndex === -1 && curSelected) {
-              newIndex = unique.findIndex(c => c.hash === curSelected);
+              newIndex = unique.findIndex((c) => c.hash === curSelected);
               anchorOffset = 0;
             }
-
-            set(noGitData, null, true);
+            set(noGitData, null);
             set(commits, unique, true);
             set(graphWidth, p.graphWidth, true);
             set(loading, false);
-
             if (cEl && unique.length > 0) {
               if (newIndex !== -1) {
-                // TÌM THẤY COMMIT CŨ: Giữ nguyên commit đó ngay vị trí mắt đang nhìn!
-                const targetScrollTop = (newIndex * ROW_HEIGHT) + anchorOffset;
+                const targetScrollTop = newIndex * ROW_HEIGHT + anchorOffset;
                 cEl.scrollTop = targetScrollTop;
                 if (window.__commitListSetScrollTop__) {
                   window.__commitListSetScrollTop__(targetScrollTop);
                 }
                 requestAnimationFrame(() => {
-                  if (cEl) cEl.scrollTop = targetScrollTop;
+                  if (cEl)
+                    cEl.scrollTop = targetScrollTop;
                   if (window.__commitListSetScrollTop__) {
                     window.__commitListSetScrollTop__(targetScrollTop);
                   }
                 });
               } else if (oldCommits.length > 0) {
-                // Nhánh mới hoàn toàn tách biệt: cuộn lên đầu nhánh mới
                 cEl.scrollTop = 0;
                 if (window.__commitListSetScrollTop__) {
                   window.__commitListSetScrollTop__(0);
                 }
-                if (curSelected && !unique.some(c => c.hash === curSelected) && unique[0]) {
+                if (curSelected && !unique.some((c) => c.hash === curSelected) && unique[0]) {
                   onSelectCommit(unique[0].hash);
                 }
               }
             }
-
             const sideEl = document.querySelector(".branch-sidebar");
-            if (sideEl && sideEl._updateExitBtn) sideEl._updateExitBtn();
+            if (sideEl && sideEl._updateExitBtn)
+              sideEl._updateExitBtn();
             break;
           }
           case "reachedEnd": {
@@ -9012,10 +10525,10 @@ ${component_stack}
             if (msg.payload && msg.payload.currentUser) {
               window.__GIT_CURRENT_USER__ = msg.payload.currentUser;
             }
-            if (msg.payload && msg.payload.currentBranch !== undefined) {
+            if (msg.payload && msg.payload.currentBranch !== void 0) {
               window.__GIT_CURRENT_BRANCH__ = msg.payload.currentBranch;
             }
-            if (msg.payload && msg.payload.isSubRepo !== undefined) {
+            if (msg.payload && msg.payload.isSubRepo !== void 0) {
               window.__IS_SUB_REPO__ = !!msg.payload.isSubRepo;
             }
             if (msg.payload && msg.payload.repoPath) {
@@ -9029,8 +10542,10 @@ ${component_stack}
               }
             }
             const sideEl = document.querySelector(".branch-sidebar");
-            if (sideEl && sideEl._updateExitBtn) sideEl._updateExitBtn();
-            if (sideEl && sideEl._updateStarBtn) sideEl._updateStarBtn();
+            if (sideEl && sideEl._updateExitBtn)
+              sideEl._updateExitBtn();
+            if (sideEl && sideEl._updateStarBtn)
+              sideEl._updateStarBtn();
             break;
           }
           case "commitFiles": {
@@ -9053,1103 +10568,225 @@ ${component_stack}
           }
         }
       });
+      try {
+        const savedW = localStorage.getItem("intellij_git_branch_sidebar_width");
+        if (savedW && get(branchSidebarEl)) {
+          const w = parseInt(savedW, 10);
+          if (w >= 140 && w <= 700) {
+            get(branchSidebarEl).style.width = w + "px";
+            get(branchSidebarEl).style.minWidth = w + "px";
+          }
+        }
+      } catch (e) {
+      }
+      let isDraggingBranchSplitter = false;
+      let startX = 0;
+      let startWidth = 260;
+      const onBranchSplitterDown = (e) => {
+        if (!get(branchSidebarEl) || get(branchSidebarEl).classList.contains("collapsed"))
+          return;
+        isDraggingBranchSplitter = true;
+        startX = e.clientX;
+        startWidth = get(branchSidebarEl).getBoundingClientRect().width;
+        get(branchSplitterEl)?.classList.add("active");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        get(branchSidebarEl).style.transition = "none";
+        e.preventDefault();
+      };
+      const onBranchSplitterMove = (e) => {
+        if (!isDraggingBranchSplitter || !get(branchSidebarEl))
+          return;
+        const dx = e.clientX - startX;
+        const newWidth = Math.max(140, Math.min(700, startWidth + dx));
+        get(branchSidebarEl).style.width = newWidth + "px";
+        get(branchSidebarEl).style.minWidth = newWidth + "px";
+        try {
+          localStorage.setItem("intellij_git_branch_sidebar_width", String(newWidth));
+        } catch (err) {
+        }
+      };
+      const onBranchSplitterUp = () => {
+        if (isDraggingBranchSplitter && get(branchSidebarEl)) {
+          isDraggingBranchSplitter = false;
+          get(branchSplitterEl)?.classList.remove("active");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+          get(branchSidebarEl).style.transition = "";
+        }
+      };
+      get(branchSplitterEl)?.addEventListener("mousedown", onBranchSplitterDown);
+      window.addEventListener("mousemove", onBranchSplitterMove);
+      window.addEventListener("mouseup", onBranchSplitterUp);
+      const onKeyEscape = (e) => {
+        if (e.key === "Escape" && get(selectedHash)) {
+          set(selectedHash, null);
+        }
+      };
+      window.addEventListener("keydown", onKeyEscape);
+      return () => {
+        get(branchSplitterEl)?.removeEventListener("mousedown", onBranchSplitterDown);
+        window.removeEventListener("mousemove", onBranchSplitterMove);
+        window.removeEventListener("mouseup", onBranchSplitterUp);
+        window.removeEventListener("keydown", onKeyEscape);
+      };
     });
-    onDestroy(() => unsubscribe?.());
-    function onSelectCommit(hash2) {
-      set(selectedHash, hash2, true);
-      set(selectedFiles, [], true);
-      postMessage("selectCommit", hash2);
-    }
-    function onFilter(filter) {
-      set(loading, true);
-      postMessage("filter", filter);
-    }
-    function onLoadMore() {
-      postMessage("loadMore");
-    }
-    function onRebaseFromHere(hash2) {
-      postMessage("rebaseFromHere", hash2);
-    }
-    function renderSidebarContent(container) {
-      if (!container) return;
-      if (container._selectedTreeBranch === undefined) {
-        container._selectedTreeBranch = get(activeBranch) || "";
+    onDestroy(() => {
+      unsubscribe?.();
+    });
+    user_effect(() => {
+      if (!get(branchSidebarEl))
+        return;
+      if (get(noGitData)) {
+        get(branchSidebarEl).style.display = "none";
+        if (get(branchSplitterEl))
+          get(branchSplitterEl).style.display = "none";
+      } else {
+        get(branchSidebarEl).style.display = "";
+        if (get(branchSplitterEl)) {
+          get(branchSplitterEl).style.display = get(branchSidebarEl).classList.contains("collapsed") ? "none" : "";
+        }
+        renderSidebarContent(get(branchSidebarEl), () => get(branchData), () => get(activeBranch), (b) => {
+          set(activeBranch, b, true);
+        });
       }
-      const data = get(branchData);
-      const currentActive = get(activeBranch);
-      const { branches = [], tags = [], currentBranch = "" } = data;
-
-      function getFavorites() {
+    });
+    user_effect(() => {
+      if (!get(selectedHash) || !get(detailSplitterEl) || !get(detailPanelEl))
+        return;
+      try {
+        const savedDW = localStorage.getItem("intellij_git_detail_panel_width");
+        if (savedDW) {
+          const dw = parseInt(savedDW, 10);
+          if (dw >= 180 && dw <= 800) {
+            get(detailPanelEl).style.width = dw + "px";
+            get(detailPanelEl).style.minWidth = dw + "px";
+          }
+        }
+      } catch (e) {
+      }
+      let isDraggingDetailSplitter = false;
+      let startXDetail = 0;
+      let startWidthDetail = 300;
+      const onMouseMoveDetail = (e) => {
+        if (!isDraggingDetailSplitter || !get(detailPanelEl))
+          return;
+        const dx = startXDetail - e.clientX;
+        const newWidth = Math.max(180, Math.min(800, startWidthDetail + dx));
+        get(detailPanelEl).style.width = newWidth + "px";
+        get(detailPanelEl).style.minWidth = newWidth + "px";
         try {
-          const raw = localStorage.getItem("intellij_git_fav_branches");
-          if (raw) return new Set(JSON.parse(raw));
-        } catch {}
-        return new Set(["develop", "main", "master"]);
-      }
-
-      function saveFavorites(favSet) {
-        try {
-          localStorage.setItem("intellij_git_fav_branches", JSON.stringify(Array.from(favSet)));
-        } catch {}
-      }
-
-      function isBranchFavorite(name) {
-        if (!name) return false;
-        const favs = getFavorites();
-        return favs.has(name);
-      }
-
-      function toggleBranchFavorite(name) {
-        if (!name) return;
-        const favs = getFavorites();
-        if (favs.has(name)) {
-          favs.delete(name);
-        } else {
-          favs.add(name);
+          localStorage.setItem("intellij_git_detail_panel_width", String(newWidth));
+        } catch (err) {
         }
-        saveFavorites(favs);
-      }
-
-      const getCurrentBranchName = () => (get(branchData) && get(branchData).currentBranch) || window.__GIT_CURRENT_BRANCH__ || "";
-
-      // Close any open context menu
-      function closeBranchContextMenu() {
-        const old = document.querySelector(".branch-context-menu");
-        if (old) old.remove();
-        const oldCommit = document.querySelectorAll(".commit-context-menu");
-        oldCommit.forEach(m => m.remove());
-      }
-
-      function showBranchContextMenu(e, branchName) {
+      };
+      const onMouseUpDetail = () => {
+        if (isDraggingDetailSplitter && get(detailPanelEl)) {
+          isDraggingDetailSplitter = false;
+          get(detailSplitterEl)?.classList.remove("active");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+          get(detailPanelEl).style.transition = "";
+          window.removeEventListener("mousemove", onMouseMoveDetail);
+          window.removeEventListener("mouseup", onMouseUpDetail);
+        }
+      };
+      const onMouseDownDetail = (e) => {
+        isDraggingDetailSplitter = true;
+        startXDetail = e.clientX;
+        startWidthDetail = get(detailPanelEl).getBoundingClientRect().width;
+        get(detailSplitterEl)?.classList.add("active");
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        get(detailPanelEl).style.transition = "none";
+        window.addEventListener("mousemove", onMouseMoveDetail);
+        window.addEventListener("mouseup", onMouseUpDetail);
         e.preventDefault();
-        e.stopPropagation();
-        closeBranchContextMenu();
-
-        const isCurrent = (branchName === currentBranch);
-        const menu = document.createElement("div");
-        menu.className = "branch-context-menu";
-        menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
-        menu.addEventListener("contextmenu", (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-        });
-
-        function addItem(label, shortcut, onClick, disabled = false) {
-          const it = document.createElement("div");
-          it.className = "bcm-item" + (disabled ? " disabled" : "");
-          if (disabled) {
-            it.style.pointerEvents = "none";
-            it.style.opacity = "0.45";
-          }
-          it.innerHTML = '<span>' + label + '</span>' + (shortcut ? '<span class="bcm-shortcut">' + shortcut + '</span>' : '');
-          it.addEventListener("click", (ev) => {
-            if (disabled) return;
-            ev.stopPropagation();
-            closeBranchContextMenu();
-            onClick();
-          });
-          menu.appendChild(it);
-        }
-
-        function addDivider() {
-          const d = document.createElement("div");
-          d.className = "bcm-divider";
-          menu.appendChild(d);
-        }
-
-        const branchInfo = branches.find((b) => b.name === branchName);
-        const isRemote = branchInfo ? (!!branchInfo.remote || branchName.startsWith("origin/")) : branchName.startsWith("origin/");
-
-        if (isCurrent) {
-          addItem("New Branch from '" + branchName + "'...", "", () => {
-            openCreateBranchDialog(branchName);
-          });
-          addItem("Show Diff with Working Tree", "", () => {
-            postMessage("showDiff", { branch: branchName });
-          });
-          addDivider();
-          addItem("Update", "", () => {
-            showToast("Updating '" + branchName + "'...");
-            postMessage("pull", branchName);
-          });
-          addItem("Push...", "", () => {
-            postMessage("push", branchName);
-          });
-          if (branchInfo && branchInfo.upstream) {
-            addItem("Unset Tracked Branch (" + branchInfo.upstream + ")", "", () => {
-              showToast("Unsetting tracked branch for '" + branchName + "'...");
-              postMessage("unsetUpstream", { branch: branchName });
-            });
-          }
-          addDivider();
-          addItem("Rename...", "F2", () => {
-            openRenameBranchDialog(branchName);
-          });
-        } else if (isRemote) {
-          addItem("Checkout", "", () => {
-            postMessage("checkout", branchName);
-          });
-          addItem("Fetch Branch", "", () => {
-            showToast("Fetching '" + branchName + "'...");
-            postMessage("fetchSingleBranch", { branch: branchName });
-          });
-          const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
-          const isAlreadyTrackingThis = curBranchInfo && curBranchInfo.upstream === branchName;
-          if (currentBranch) {
-            const trackLabel = "Track into '" + currentBranch + "'" + (isAlreadyTrackingThis ? " (already tracked)" : "");
-            addItem(trackLabel, "", () => {
-              showToast("Tracking '" + currentBranch + "' -> '" + branchName + "'...");
-              postMessage("setUpstream", { branch: currentBranch, upstream: branchName });
-            }, isAlreadyTrackingThis);
-          }
-          addItem("New Branch from '" + branchName + "'...", "", () => {
-            openCreateBranchDialog(branchName);
-          });
-          addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
-            postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
-          });
-          addDivider();
-          addItem("Compare with '" + (currentBranch || "HEAD") + "'", "", () => {
-            postMessage("compareBranch", { branch: branchName, withBranch: currentBranch });
-          });
-          addItem("Show Diff with Working Tree", "", () => {
-            postMessage("showDiff", { branch: branchName });
-          });
-          addDivider();
-          addItem("Rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'", "", () => {
-            postMessage("rebase", branchName);
-          });
-          addItem("Merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'", "", () => {
-            postMessage("mergeBranch", branchName);
-          });
-          addDivider();
-          addItem("Delete Remote Branch...", "", () => {
-            postMessage("deleteBranch", branchName);
-          });
-        } else {
-          addItem("Checkout", "", () => {
-            postMessage("checkout", branchName);
-          });
-          addItem("New Branch from '" + branchName + "'...", "", () => {
-            openCreateBranchDialog(branchName);
-          });
-          addItem("Checkout and Rebase onto '" + (currentBranch || "HEAD") + "'", "", () => {
-            postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch });
-          });
-          addDivider();
-          addItem("Compare with '" + (currentBranch || "HEAD") + "'", "", () => {
-            postMessage("compareBranch", { branch: branchName, withBranch: currentBranch });
-          });
-          addItem("Show Diff with Working Tree", "", () => {
-            postMessage("showDiff", { branch: branchName });
-          });
-          addDivider();
-          addItem("Rebase '" + (currentBranch || "HEAD") + "' onto '" + branchName + "'", "", () => {
-            postMessage("rebase", branchName);
-          });
-          addItem("Merge '" + branchName + "' into '" + (currentBranch || "HEAD") + "'", "", () => {
-            postMessage("mergeBranch", branchName);
-          });
-          addDivider();
-          addItem("Update", "", () => {
-            showToast("Updating '" + branchName + "'...");
-            postMessage("pull", branchName);
-          });
-          addItem("Push...", "", () => {
-            postMessage("push", branchName);
-          });
-          if (branchInfo && branchInfo.upstream) {
-            addItem("Unset Tracked Branch (" + branchInfo.upstream + ")", "", () => {
-              showToast("Unsetting tracked branch for '" + branchName + "'...");
-              postMessage("unsetUpstream", { branch: branchName });
-            });
-          }
-          addDivider();
-          addItem("Rename...", "F2", () => {
-            openRenameBranchDialog(branchName);
-          });
-          addItem("Delete", "", () => {
-            postMessage("deleteBranch", branchName);
-          });
-        }
-
-        document.body.appendChild(menu);
-        let x = e.clientX;
-        let y = e.clientY;
-        const rect = menu.getBoundingClientRect();
-        if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
-        if (y + rect.height > window.innerHeight - 8) {
-          const yAbove = e.clientY - rect.height;
-          if (yAbove >= 8) {
-            y = yAbove;
-          } else {
-            y = Math.max(4, window.innerHeight - rect.height - 8);
-          }
-        }
-        menu.style.left = Math.max(0, x) + "px";
-        menu.style.top = Math.max(0, y) + "px";
-      }
-
-      function showGeneralBranchContextMenu(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        closeBranchContextMenu();
-
-        const menu = document.createElement("div");
-        menu.className = "branch-context-menu";
-        menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
-        menu.addEventListener("contextmenu", (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-        });
-
-        function addItem(label, shortcut, onClick) {
-          const it = document.createElement("div");
-          it.className = "bcm-item";
-          it.innerHTML = '<span>' + label + '</span>' + (shortcut ? '<span class="bcm-shortcut">' + shortcut + '</span>' : '');
-          it.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            closeBranchContextMenu();
-            onClick();
-          });
-          menu.appendChild(it);
-        }
-
-        addItem("New Branch...", "", () => {
-          openCreateBranchDialog(currentBranch || "HEAD");
-        });
-        addItem("Refresh Branches", "", () => {
-          postMessage("refreshBranches");
-        });
-
-        document.body.appendChild(menu);
-        let x = e.clientX;
-        let y = e.clientY;
-        const rect = menu.getBoundingClientRect();
-        if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
-        if (y + rect.height > window.innerHeight - 8) {
-          const yAbove = e.clientY - rect.height;
-          if (yAbove >= 8) {
-            y = yAbove;
-          } else {
-            y = Math.max(4, window.innerHeight - rect.height - 8);
-          }
-        }
-        menu.style.left = Math.max(0, x) + "px";
-        menu.style.top = Math.max(0, y) + "px";
-      }
-
-      // 1. Tooltip system attached to document.body
-      let tooltipEl = document.querySelector(".app-tooltip");
-      if (!tooltipEl) {
-        tooltipEl = document.createElement("div");
-        tooltipEl.className = "app-tooltip";
-        document.body.appendChild(tooltipEl);
-      }
-
-      function updateTooltip(el, text, shortcut = "") {
-        el.dataset.tooltip = text;
-        if (shortcut) el.dataset.shortcut = shortcut;
-        el.title = text + (shortcut ? " (" + shortcut + ")" : "");
-      }
-
-      function attachTooltip(el, text, shortcut = "", side = "right") {
-        updateTooltip(el, text, shortcut);
-        let timer;
-        el.addEventListener("mouseenter", () => {
-          const currentText = el.dataset.tooltip || el.title;
-          const currentShortcut = el.dataset.shortcut || "";
-          if (!currentText) return;
-          timer = setTimeout(() => {
-            tooltipEl.innerHTML = currentText + (currentShortcut ? '<span class="tooltip-shortcut">' + currentShortcut + '</span>' : '');
-
-            tooltipEl.style.visibility = "hidden";
-            tooltipEl.style.display = "block";
-            tooltipEl.style.left = "-9999px";
-            tooltipEl.style.top = "-9999px";
-            tooltipEl.style.transform = "none";
-            tooltipEl.classList.add("visible");
-
-            const tipWidth = tooltipEl.offsetWidth || 100;
-            const tipHeight = tooltipEl.offsetHeight || 24;
-            const rect = el.getBoundingClientRect();
-            const pad = 6;
-            const viewWidth = window.innerWidth || document.documentElement.clientWidth;
-            const viewHeight = window.innerHeight || document.documentElement.clientHeight;
-
-            let tipLeft;
-            let tipTop;
-
-            if (side === "bottom") {
-              tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
-              tipTop = rect.bottom + 6;
-              if (tipTop + tipHeight > viewHeight - pad && rect.top - tipHeight - 6 >= pad) {
-                tipTop = rect.top - tipHeight - 6;
-                tooltipEl.classList.remove("side-bottom");
-                tooltipEl.classList.add("side-top");
-              } else {
-                tooltipEl.classList.remove("side-top");
-                tooltipEl.classList.add("side-bottom");
-              }
-            } else if (side === "right") {
-              tipLeft = rect.right + 7;
-              tipTop = rect.top + (rect.height / 2) - (tipHeight / 2);
-              if (tipLeft + tipWidth > viewWidth - pad && rect.left - tipWidth - 7 >= pad) {
-                tipLeft = rect.left - tipWidth - 7;
-                tooltipEl.classList.remove("side-right");
-                tooltipEl.classList.add("side-left");
-              } else {
-                tooltipEl.classList.remove("side-left");
-                tooltipEl.classList.add("side-right");
-              }
-            } else {
-              tipLeft = rect.left + (rect.width / 2) - (tipWidth / 2);
-              tipTop = rect.bottom + 6;
-            }
-
-            if (tipLeft < pad) {
-              tipLeft = pad;
-            } else if (tipLeft + tipWidth > viewWidth - pad) {
-              tipLeft = Math.max(pad, viewWidth - tipWidth - pad);
-            }
-
-            if (tipTop < pad) {
-              tipTop = pad;
-            } else if (tipTop + tipHeight > viewHeight - pad) {
-              tipTop = Math.max(pad, viewHeight - tipHeight - pad);
-            }
-
-            tooltipEl.style.left = Math.round(tipLeft) + "px";
-            tooltipEl.style.top = Math.round(tipTop) + "px";
-            tooltipEl.style.transform = "none";
-            tooltipEl.style.visibility = "visible";
-          }, 80);
-        });
-        el.addEventListener("mouseleave", () => {
-          clearTimeout(timer);
-          tooltipEl.classList.remove("visible");
-        });
-        el.addEventListener("click", () => {
-          clearTimeout(timer);
-          tooltipEl.classList.remove("visible");
-        });
-      }
-
-      let strip = container.querySelector(".sidebar-strip");
-      let mainArea = container.querySelector(".sidebar-main");
-      let sInput = container.querySelector(".branch-search-input");
-      let treeContent = container.querySelector(".branch-tree-content");
-
-      if (!container._repoFolderStates) {
-        container._repoFolderStates = new Map();
-      }
-      if (!container._sectionCollapseState) {
-        container._sectionCollapseState = new Map();
-      }
-      const sectionCollapseState = container._sectionCollapseState;
-
-      const svgArrowRight = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 3.5L10.5 8L6 12.5"/></svg>';
-      const svgArrowDown = '<svg class="tree-arrow-svg" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3.5 6L8 10.5L12.5 6"/></svg>';
-      const svgTagIcon = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;color:#dfe1e5;"><path d="M7.707 2.293L1.295 8.705C0.904 9.096 0.904 9.729 1.295 10.119L5.881 14.705C6.271 15.096 6.904 15.096 7.295 14.705L13.707 8.293C13.895 8.105 14 7.851 14 7.586V3C14 2.448 13.552 2 13 2H8.414C8.149 2 7.895 2.105 7.707 2.293Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="10.2" cy="5.8" r="1.3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
-      const svgCheckoutYellow = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.70708 2.29289L1.29497 8.705C0.904444 9.09553 0.904444 9.72869 1.29497 10.1192L5.88075 14.705C6.27128 15.0955 6.90444 15.0955 7.29497 14.705L13.7071 8.29289C13.8946 8.10536 14 7.851 14 7.58579V3C14 2.44772 13.5523 2 13 2H8.41418C8.14897 2 7.89461 2.10536 7.70708 2.29289ZM10 8C11.1046 8 12 7.10457 12 6C12 4.89543 11.1046 4 10 4C8.89543 4 8 4.89543 8 6C8 7.10457 8.89543 8 10 8Z" fill="#F2C55C"/></svg>';
-      const svgBranchWhite = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;color:#dfe1e5;"><circle cx="4.5" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="10.8" cy="6.2" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="4.5" y1="6.3" x2="4.5" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M4.5 9.8H9.3C10.13 9.8 10.8 9.13 10.8 8.3V8.0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
-
-      function populateTree(searchQuery) {
-        if (!treeContent) return;
-        treeContent.innerHTML = "";
-        const currentActive = (container._selectedTreeBranch !== undefined && container._selectedTreeBranch !== null) ? container._selectedTreeBranch : (get(activeBranch) || "");
-        const latestData = get(branchData) || {};
-        const branches = latestData.branches || [];
-        const tags = latestData.tags || [];
-        const currentBranch = latestData.currentBranch || "";
-        const currentRepoKey = latestData.repoPath || window.__GIT_REPO_PATH__ || "default_repo";
-
-        if (!container._repoFolderStates.has(currentRepoKey)) {
-          const repoMap = new Map();
-          try {
-            const raw = localStorage.getItem("intellij_git_folders_" + currentRepoKey);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              Object.keys(parsed).forEach(k => repoMap.set(k, parsed[k]));
-            }
-          } catch {}
-          container._repoFolderStates.set(currentRepoKey, repoMap);
-        }
-        const folderCollapseState = container._repoFolderStates.get(currentRepoKey);
-        const query = (searchQuery !== undefined ? searchQuery : (sInput ? sInput.value : "")).toLowerCase().trim();
-        const filterFn = (name) => {
-          if (query && !name.toLowerCase().includes(query)) return false;
-          return true;
-        };
-
-        function createSec(title, isOpenDefault = true) {
-          const sec = document.createElement("div");
-          sec.className = "tree-section";
-          const hdr = document.createElement("div");
-          hdr.className = "tree-section-header";
-          const isCollapsed = sectionCollapseState.has(title)
-            ? sectionCollapseState.get(title)
-            : !isOpenDefault;
-          hdr.innerHTML = '<span class="arrow">' + (isCollapsed ? svgArrowRight : svgArrowDown) + '</span> <span style="color:#ffffff;">' + title + '</span>';
-          const bdy = document.createElement("div");
-          bdy.className = "tree-section-body";
-          bdy.style.display = isCollapsed ? "none" : "block";
-          hdr.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const isNowCollapsed = bdy.style.display !== "none";
-            bdy.style.display = isNowCollapsed ? "none" : "block";
-            const arrow = hdr.querySelector(".arrow");
-            if (arrow) arrow.innerHTML = isNowCollapsed ? svgArrowRight : svgArrowDown;
-            sectionCollapseState.set(title, isNowCollapsed);
-          });
-          sec.appendChild(hdr);
-          sec.appendChild(bdy);
-          return { sec, bdy };
-        }
-
-        function selectBranch(name) {
-          container._selectedTreeBranch = name;
-          if (container._updateStarBtn) {
-            container._updateStarBtn();
-          }
-          populateTree();
-        }
-
-        function openBranchLog(name) {
-          container._selectedTreeBranch = name;
-          set(activeBranch, name, true);
-          onFilter({ branch: name });
-          if (container._updateStarBtn) {
-            container._updateStarBtn();
-          }
-          populateTree();
-        }
-
-        function getTrackingHtml(b) {
-          if (!b) return "";
-          let trackHtml = "";
-          if (b.behind || b.ahead) {
-            trackHtml = '<span class="branch-track" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:11px;font-family:var(--vscode-editor-font-family, monospace);">';
-            if (b.behind) {
-              const behindTxt = "Behind remote by " + b.behind + " commit" + (b.behind > 1 ? "s" : "");
-              trackHtml += '<span class="track-badge behind" style="color:#58a6ff;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + behindTxt + '" title="' + behindTxt + '">↙ ' + b.behind + '</span>';
-            }
-            if (b.ahead) {
-              const aheadTxt = "Ahead of remote by " + b.ahead + " commit" + (b.ahead > 1 ? "s" : "");
-              trackHtml += '<span class="track-badge ahead" style="color:#3fb950;display:inline-flex;align-items:center;gap:1px;cursor:default;" data-tooltip="' + aheadTxt + '" title="' + aheadTxt + '">↗ ' + b.ahead + '</span>';
-            }
-            trackHtml += '</span>';
-          }
-          return trackHtml;
-        }
-
-        if (currentBranch && (!query || currentBranch.toLowerCase().includes(query) || "head (current branch)".includes(query))) {
-          const headBox = document.createElement("div");
-          headBox.className = "head-branch-box" + (currentActive === "HEAD" ? " active" : "");
-          const curInfo = branches.find((b) => b.name === currentBranch);
-          headBox.innerHTML = '<span class="head-title" style="display:inline-flex;align-items:center;gap:4px;">HEAD (Current Branch)</span>';
-          headBox.title = "HEAD (" + currentBranch + ")";
-          headBox.addEventListener("click", () => selectBranch("HEAD"));
-          headBox.addEventListener("dblclick", () => openBranchLog("HEAD"));
-          headBox.addEventListener("contextmenu", (e) => {
-            selectBranch("HEAD");
-            showBranchContextMenu(e, currentBranch);
-          });
-          treeContent.appendChild(headBox);
-        }
-
-        function createTreeNode(name = "", fullPath = "") {
-          return { name, fullPath, folders: {}, branches: [] };
-        }
-
-        function insertBranchIntoTree(root, parts, branchObj) {
-          if (branchObj.name.startsWith("(") || branchObj.name.startsWith("HEAD")) {
-            root.branches.push({ ...branchObj, leafName: branchObj.name });
-            return;
-          }
-          let current = root;
-          for (let i = 0; i < parts.length - 1; i++) {
-            const part = parts[i];
-            if (!current.folders[part]) {
-              const nextPath = current.fullPath ? current.fullPath + "/" + part : part;
-              current.folders[part] = createTreeNode(part, nextPath);
-            }
-            current = current.folders[part];
-          }
-          const leafName = parts[parts.length - 1];
-          current.branches.push({ ...branchObj, leafName });
-        }
-
-        function hasCurrentBranchInNode(n) {
-          if (!n || !currentBranch) return false;
-          if (n.branches && n.branches.some(b => b.name === currentBranch)) return true;
-          if (n.folders) {
-            for (const k in n.folders) {
-              if (hasCurrentBranchInNode(n.folders[k])) return true;
-            }
-          }
-          return false;
-        }
-
-        function hasFavoriteInNode(n) {
-          if (!n) return false;
-          if (n.branches && n.branches.some(b => isBranchFavorite(b.name))) return true;
-          if (n.folders) {
-            for (const k in n.folders) {
-              if (hasFavoriteInNode(n.folders[k])) return true;
-            }
-          }
-          return false;
-        }
-
-        function renderTreeLevel(lvlContainer, node, isRemoteTree = false) {
-          const hasSiblingFolders = !!(node.folders && Object.keys(node.folders).length > 0);
-
-          function renderBranchItem(b) {
-            const item = document.createElement("div");
-            item.className = "tree-item" + (currentActive === b.name ? " active" : "") + (b.name === currentBranch ? " current-head" : "");
-
-            const isCur = (b.name === currentBranch);
-            const isFav = isBranchFavorite(b.name);
-            let icon = '';
-            if (isFav) {
-              icon = '<span class="tree-item-icon tree-item-star-slot is-fav" title="Favorite" style="cursor:pointer;color:#e5a50a;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;">★</span>';
-            } else if (isCur) {
-              icon = '<span class="tree-item-icon">' + svgCheckoutYellow + '</span>';
-            } else {
-              icon = '<span class="tree-item-icon">' + svgBranchWhite + '</span>';
-            }
-
-            const spacer = hasSiblingFolders ? '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;width:16px;height:16px;min-width:16px;display:inline-flex;flex-shrink:0;"></span>' : '';
-
-            const trackHtml = getTrackingHtml(b);
-            item.innerHTML = spacer + icon + '<span class="branch-name" style="' + (isCur ? 'font-weight:600;' : '') + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b.leafName + '</span>' + trackHtml;
-            item.title = b.name;
-            item.addEventListener("click", () => selectBranch(b.name));
-            item.addEventListener("dblclick", () => openBranchLog(b.name));
-            item.addEventListener("contextmenu", (e) => {
-              selectBranch(b.name);
-              showBranchContextMenu(e, b.name);
-            });
-
-            const starEl = item.querySelector(".tree-item-star-slot");
-            if (starEl) {
-              starEl.addEventListener("click", (e) => {
-                e.stopPropagation();
-                toggleBranchFavorite(b.name);
-                if (container && container._updateStarBtn) container._updateStarBtn();
-                populateTree();
-              });
-            }
-            lvlContainer.appendChild(item);
-          }
-
-          function renderFolderItem(fk) {
-            const subNode = node.folders[fk];
-            const fDiv = document.createElement("div");
-            fDiv.className = "tree-folder";
-
-            const fHdr = document.createElement("div");
-            fHdr.className = "tree-folder-header";
-            const folderIconSvg = '<span class="tree-item-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;"><path d="M8.10584 4.34613L8.25344 4.5H8.46667H13C13.8284 4.5 14.5 5.17157 14.5 6V12.1333C14.5 12.9529 13.932 13.5 13.3667 13.5H2.63333C2.06804 13.5 1.5 12.9529 1.5 12.1333V3.86667C1.5 3.04707 2.06804 2.5 2.63333 2.5H6.1217C6.25792 2.5 6.38824 2.55557 6.48253 2.65387L8.10584 4.34613Z" fill="#43454A" stroke="#FFFFFF" stroke-width="1.1"/></svg></span>';
-
-            const isFolderCollapsed = query ? false : (folderCollapseState.has(subNode.fullPath)
-              ? folderCollapseState.get(subNode.fullPath)
-              : !hasCurrentBranchInNode(subNode));
-
-            fHdr.innerHTML = '<span class="arrow">' + (isFolderCollapsed ? svgArrowRight : svgArrowDown) + '</span>' + folderIconSvg + '<span class="folder-name" style="color:#ffffff;">' + fk + '</span>';
-
-            const fBdy = document.createElement("div");
-            fBdy.className = "tree-folder-body";
-            fBdy.style.display = isFolderCollapsed ? "none" : "block";
-
-            fHdr.addEventListener("click", (e) => {
-              e.stopPropagation();
-              const isNowCollapsed = fBdy.style.display !== "none";
-              fBdy.style.display = isNowCollapsed ? "none" : "block";
-              const arrow = fHdr.querySelector(".arrow");
-              if (arrow) arrow.innerHTML = isNowCollapsed ? svgArrowRight : svgArrowDown;
-              folderCollapseState.set(subNode.fullPath, isNowCollapsed);
-              try {
-                const obj = {};
-                folderCollapseState.forEach((val, key) => { obj[key] = val; });
-                localStorage.setItem("intellij_git_folders_" + currentRepoKey, JSON.stringify(obj));
-              } catch {}
-            });
-
-            if (isRemoteTree) {
-              fHdr.addEventListener("contextmenu", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                closeBranchContextMenu();
-
-                const locals = branches.filter(b => !b.remote && !b.name.startsWith('('));
-                const slashIdx = subNode.fullPath.indexOf('/');
-                const isRootRemote = slashIdx === -1;
-                const remoteName = isRootRemote ? subNode.fullPath : subNode.fullPath.slice(0, slashIdx);
-                const folderSubPath = isRootRemote ? "" : subNode.fullPath.slice(slashIdx + 1);
-
-                const targetLocals = isRootRemote
-                  ? locals
-                  : locals.filter(b => b.name === folderSubPath || b.name.startsWith(folderSubPath + '/'));
-
-                const allTracked = targetLocals.length > 0 && targetLocals.every(b => {
-                  const expectedUpstream = remoteName + '/' + b.name;
-                  return b.upstream === expectedUpstream;
-                });
-
-                const menu = document.createElement("div");
-                menu.className = "branch-context-menu";
-                menu.setAttribute("data-vscode-context", JSON.stringify({ preventDefaultContextMenuItems: true }));
-                menu.addEventListener("contextmenu", (ev) => {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                });
-
-                if (isRootRemote) {
-                  const itFetch = document.createElement("div");
-                  itFetch.className = "bcm-item";
-                  itFetch.innerHTML = '<span>Fetch \'' + remoteName + '\'</span>';
-                  itFetch.addEventListener("click", (ev) => {
-                    ev.stopPropagation();
-                    closeBranchContextMenu();
-                    showToast("Fetching remote '" + remoteName + "'...");
-                    postMessage("fetchRemote", { remote: remoteName });
-                  });
-                  menu.appendChild(itFetch);
-                }
-
-                const itAll = document.createElement("div");
-                itAll.className = "bcm-item" + (allTracked ? " disabled" : "");
-                if (allTracked) {
-                  itAll.style.pointerEvents = "none";
-                  itAll.style.opacity = "0.45";
-                }
-                const labelText = isRootRemote
-                  ? "Track All Local Branches to '" + remoteName + "'"
-                  : "Track '" + subNode.fullPath + "' for '" + folderSubPath + "'";
-                itAll.innerHTML = '<span>' + labelText + (allTracked ? ' (already tracked)' : '') + '</span>';
-                itAll.addEventListener("click", (ev) => {
-                  if (allTracked) return;
-                  ev.stopPropagation();
-                  closeBranchContextMenu();
-                  showToast("Tracking " + (isRootRemote ? "all local branches" : "'" + folderSubPath + "'") + " to '" + remoteName + "'...");
-                  postMessage("trackAllBranchesToRemote", { remote: remoteName, prefix: folderSubPath || undefined });
-                });
-                menu.appendChild(itAll);
-
-                document.body.appendChild(menu);
-                let x = e.clientX;
-                let y = e.clientY;
-                const rect = menu.getBoundingClientRect();
-                if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
-                if (y + rect.height > window.innerHeight - 8) {
-                  const yAbove = e.clientY - rect.height;
-                  if (yAbove >= 8) y = yAbove;
-                  else y = Math.max(4, window.innerHeight - rect.height - 8);
-                }
-                menu.style.left = Math.max(0, x) + "px";
-                menu.style.top = Math.max(0, y) + "px";
-              });
-            }
-
-            fDiv.appendChild(fHdr);
-            renderTreeLevel(fBdy, subNode, isRemoteTree);
-            fDiv.appendChild(fBdy);
-            lvlContainer.appendChild(fDiv);
-          }
-
-          // 1. Nhánh đang checkout (HEAD) trực tiếp ưu tiên lên ĐẦU TIÊN (hơn cả favorite)
-          const curBranchObj = node.branches.find((b) => b.name === currentBranch);
-          if (curBranchObj) {
-            renderBranchItem(curBranchObj);
-          }
-
-          // 2. Thư mục chứa nhánh đang checkout -> ưu tiên lên đầu (hơn cả favorite)
-          const allFolderKeys = Object.keys(node.folders);
-          const curFolders = allFolderKeys
-            .filter((k) => hasCurrentBranchInNode(node.folders[k]))
-            .sort((a, b) => a.localeCompare(b));
-          for (const fk of curFolders) {
-            renderFolderItem(fk);
-          }
-
-          // 3. Tiếp theo là các nhánh Favorite còn lại
-          const favBranches = node.branches
-            .filter((b) => isBranchFavorite(b.name) && b.name !== currentBranch)
-            .sort((a, b) => a.leafName.localeCompare(b.leafName));
-          for (const b of favBranches) {
-            renderBranchItem(b);
-          }
-
-          // 4. Các thư mục chứa nhánh Favorite
-          const favFolders = allFolderKeys
-            .filter((k) => !hasCurrentBranchInNode(node.folders[k]) && hasFavoriteInNode(node.folders[k]))
-            .sort((a, b) => a.localeCompare(b));
-          for (const fk of favFolders) {
-            renderFolderItem(fk);
-          }
-
-          // 5. Các thư mục thường còn lại
-          const otherFolders = allFolderKeys
-            .filter((k) => !hasCurrentBranchInNode(node.folders[k]) && !hasFavoriteInNode(node.folders[k]))
-            .sort((a, b) => a.localeCompare(b));
-          for (const fk of otherFolders) {
-            renderFolderItem(fk);
-          }
-
-          // 6. Các nhánh thường còn lại (không phải checkout, không phải favorite)
-          const nonFavBranches = node.branches
-            .filter((b) => !isBranchFavorite(b.name) && b.name !== currentBranch)
-            .sort((a, b) => a.leafName.localeCompare(b.leafName));
-          for (const b of nonFavBranches) {
-            renderBranchItem(b);
-          }
-        }
-
-        const localList = branches.filter((b) => !b.remote && !b.name.startsWith("origin/") && !b.name.startsWith("(") && !b.name.includes("detached") && filterFn(b.name));
-        if (localList.length > 0) {
-          const localSec = createSec("Local", true);
-          const localTree = createTreeNode();
-          for (const b of localList) {
-            const parts = b.name.split("/");
-            insertBranchIntoTree(localTree, parts, b);
-          }
-          renderTreeLevel(localSec.bdy, localTree);
-          treeContent.appendChild(localSec.sec);
-        }
-
-        const configuredRemotes = latestData.remotes || [];
-        const remoteList = branches.filter((b) => (b.remote || b.name.startsWith("origin/") || configuredRemotes.some(r => b.name.startsWith(r + '/'))) && b.name.includes('/') && !b.name.endsWith('/HEAD')).filter((b) => filterFn(b.name));
-        if (remoteList.length > 0) {
-          const remoteSec = createSec("Remote", true);
-          const remoteTree = createTreeNode();
-          for (const b of remoteList) {
-            const parts = b.name.split("/");
-            insertBranchIntoTree(remoteTree, parts, { ...b, remote: true });
-          }
-          renderTreeLevel(remoteSec.bdy, remoteTree, true);
-          treeContent.appendChild(remoteSec.sec);
-        }
-
-        if (tags.length > 0) {
-          const tagSec = createSec("Tags", false);
-          for (const t of tags.filter((t) => filterFn(t.name))) {
-            const item = document.createElement("div");
-            item.className = "tree-item" + (currentActive === t.name ? " active" : "");
-            item.innerHTML = '<span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span><span class="tree-item-icon">' + svgTagIcon + '</span><span>' + t.name + '</span>';
-            item.addEventListener("click", () => selectBranch(t.name));
-            item.addEventListener("dblclick", () => openBranchLog(t.name));
-            tagSec.bdy.appendChild(item);
-          }
-          treeContent.appendChild(tagSec.sec);
-        }
-
-        if (localList.length === 0 && remoteList.length === 0 && (!tags || tags.filter(t => filterFn(t.name)).length === 0) && (!currentBranch || !filterFn(currentBranch))) {
-          const emptyEl = document.createElement("div");
-          emptyEl.style.cssText = "padding:16px 12px;text-align:center;color:var(--vscode-descriptionForeground);font-size:12px;";
-          emptyEl.textContent = query ? ('No branches matching "' + query + '"') : "No branches";
-          treeContent.appendChild(emptyEl);
-        }
-
-        treeContent.querySelectorAll(".track-badge").forEach((badge) => {
-          attachTooltip(badge, badge.dataset.tooltip || badge.title || "", "", "bottom");
-        });
-        if (container._updateStarBtn) container._updateStarBtn();
-        if (container._updateExitBtn) container._updateExitBtn();
-        container._populateTree = populateTree;
-      }
-
-      if (!strip || !mainArea || !sInput || !treeContent) {
-        container.innerHTML = "";
-
-        strip = document.createElement("div");
-        strip.className = "sidebar-strip";
-
-        function addStripBtn(iconSvg, title, onClick, extraClass = "", shortcut = "") {
-          const btn = document.createElement("button");
-          btn.className = "sidebar-strip-btn " + extraClass;
-          btn.innerHTML = iconSvg;
-          attachTooltip(btn, title, shortcut);
-          btn.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            onClick(btn);
-          });
-          strip.appendChild(btn);
-          return btn;
-        }
-
-        const collapseSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-        const expandSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-        const isCollapsed = container.classList.contains("collapsed");
-        const collapseBtn = addStripBtn(isCollapsed ? expandSvg : collapseSvg, isCollapsed ? "Expand Branches" : "Collapse Branches", (btn) => {
-          container.classList.toggle("collapsed");
-          const coll = container.classList.contains("collapsed");
-          btn.innerHTML = coll ? expandSvg : collapseSvg;
-          updateTooltip(btn, coll ? "Expand Branches" : "Collapse Branches");
-        });
-
-        // New branch (+)
-        addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>', "New Branch...", () => {
-          const base = container._selectedTreeBranch || get(activeBranch) || getCurrentBranchName() || "HEAD";
-          openCreateBranchDialog(base);
-        }, "", "+");
-
-        // Fetch / Update Selected Branch (↙)
-        addStripBtn('<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>', "Update Selected Branch", () => {
-          const target = container._selectedTreeBranch || get(activeBranch) || getCurrentBranchName();
-          if (target) {
-            showToast("Updating '" + target + "'...");
-            postMessage("pull", target);
-          }
-        }, "", "Fetch/Pull");
-
-        // Delete Selected Branch (🗑)
-        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>', "Delete Selected Branch", () => {
-          const target = container._selectedTreeBranch || get(activeBranch);
-          if (target && target !== getCurrentBranchName()) {
-            postMessage("deleteBranch", target);
-          }
-        }, "", "Delete");
-
-        // Compare with Current Branch (⇄)
-        addStripBtn('<svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.85355 8.14645C5.65829 7.95118 5.34171 7.95118 5.14645 8.14645C4.95118 8.34171 4.95118 8.65829 5.14645 8.85355L7.29289 11H0.5C0.223858 11 0 11.2239 0 11.5C0 11.7761 0.223858 12 0.5 12H7.29289L5.14645 14.1464C4.95118 14.3417 4.95118 14.6583 5.14645 14.8536C5.34171 15.0488 5.65829 15.0488 5.85355 14.8536L8.85355 11.8536L9.20711 11.5L8.85355 11.1464L5.85355 8.14645Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z" fill="currentColor"/></svg>', "Compare with Current Branch", () => {
-          const target = container._selectedTreeBranch || get(activeBranch);
-          const cur = getCurrentBranchName();
-          if (target) {
-            postMessage("compareBranch", { branch: target, withBranch: cur });
-          }
-        }, "", "Compare");
-
-        // Fetch All Remotes (Android Studio dashed arrow into corner bracket)
-        addStripBtn('<svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;"><path d="M12.8536 3.14645C13.0488 3.34171 13.0488 3.65829 12.8536 3.85355L11.4393 5.26777C11.2441 5.46303 10.9275 5.46303 10.7322 5.26777C10.537 5.0725 10.537 4.75592 10.7322 4.56066L12.1464 3.14645C12.3417 2.95118 12.6583 2.95118 12.8536 3.14645Z" fill="currentColor"/><path d="M10.0251 5.97487C10.2204 6.17014 10.2204 6.48672 10.0251 6.68198L8.61091 8.09619C8.41565 8.29146 8.09907 8.29146 7.90381 8.09619C7.70854 7.90093 7.70854 7.58435 7.90381 7.38909L9.31802 5.97487C9.51328 5.77961 9.82986 5.77961 10.0251 5.97487Z" fill="currentColor"/><path d="M7.1967 8.8033C7.39196 8.99856 7.39196 9.31515 7.1967 9.51041L5.78249 10.9246C5.58722 11.1199 5.27064 11.1199 5.07538 10.9246C4.88012 10.7294 4.88012 10.4128 5.07538 10.2175L6.48959 8.8033C6.68485 8.60804 7.00144 8.60804 7.1967 8.8033Z" fill="currentColor"/><path d="M3.5 5C3.77614 5 4 5.22386 4 5.5V7.5C4 7.77614 3.77614 8 3.5 8C3.22386 8 3 7.77614 3 7.5V5.5C3 5.22386 3.22386 5 3.5 5Z" fill="currentColor"/><path d="M3.5 9C3.77614 9 4 9.22386 4 9.5V12H6.5C6.77614 12 7 12.2239 7 12.5C7 12.7761 6.77614 13 6.5 13H3.5C3.22386 13 3 12.7761 3 12.5V9.5C3 9.22386 3.22386 9 3.5 9Z" fill="currentColor"/><path d="M8 12.5C8 12.2239 8.22386 12 8.5 12H10.5C10.7761 12 11 12.2239 11 12.5C11 12.7761 10.7761 13 10.5 13H8.5C8.22386 13 8 12.7761 8 12.5Z" fill="currentColor"/></svg>', "Fetch All Remotes", () => {
-          postMessage("fetchAll");
-        }, "", "git fetch --all");
-
-        // Search (Q)
-        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>', "Search Branches", () => {
-          if (container.classList.contains("collapsed")) {
-            container.classList.remove("collapsed");
-            collapseBtn.innerHTML = collapseSvg;
-            updateTooltip(collapseBtn, "Collapse Branches");
-          }
-          if (sInput) {
-            sInput.focus();
-            sInput.select();
-          }
-        }, "", "Search");
-
-        // Expand / Collapse all
-        addStripBtn('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>', "Expand / Collapse All Folders", () => {
-          const bodies = treeContent.querySelectorAll(".tree-section-body, .tree-folder-body");
-          let anyOpen = false;
-          bodies.forEach(b => { if (b.style.display !== "none") anyOpen = true; });
-          const shouldOpen = !anyOpen;
-          bodies.forEach(b => { b.style.display = shouldOpen ? "block" : "none"; });
-          treeContent.querySelectorAll(".arrow").forEach(a => { a.innerHTML = shouldOpen ? svgArrowDown : svgArrowRight; });
-          folderCollapseState.forEach((_, k) => folderCollapseState.set(k, !shouldOpen));
-          sectionCollapseState.forEach((_, k) => sectionCollapseState.set(k, !shouldOpen));
-        });
-
-        // Favorite / Unfavorite Selected Branch (★)
-        const starOutlineSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
-        const starFilledSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#e5a50a" stroke="#e5a50a" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
-
-        let starBtn = addStripBtn(starOutlineSvg, "Favorite / Unfavorite Selected Branch (★)", () => {
-          const sel = container._selectedTreeBranch || get(activeBranch);
-          const target = sel === "HEAD" ? getCurrentBranchName() : (sel || getCurrentBranchName());
-          if (!target) return;
-          toggleBranchFavorite(target);
-          updateStarBtn();
-          populateTree();
-        }, "", "Favorite");
-
-        function updateStarBtn() {
-          if (!starBtn) return;
-          const sel = container._selectedTreeBranch || get(activeBranch);
-          const target = sel === "HEAD" ? getCurrentBranchName() : (sel || getCurrentBranchName());
-          const fav = isBranchFavorite(target);
-          starBtn.innerHTML = fav ? starFilledSvg : starOutlineSvg;
-          starBtn.classList.toggle("active", fav);
-          if (target) {
-            updateTooltip(starBtn, fav ? ("Remove '" + target + "' from Favorites (★)") : ("Add '" + target + "' to Favorites (★)"));
-          } else {
-            updateTooltip(starBtn, "Favorite / Unfavorite Selected Branch (★)");
-          }
-        }
-        container._updateStarBtn = updateStarBtn;
-        updateStarBtn();
-
-        // Git Remote Credentials / Log In (Outlined Key Icon - Placed at the end)
-        const keyOutlinedSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 2.5 2.5"></path><path d="m18.5 4.5 2.5 2.5"></path><circle cx="7.5" cy="15.5" r="1.5"></circle></svg>';
-        addStripBtn(keyOutlinedSvg, "Git Remote Logins & Credentials", () => {
-          postMessage("openAuthDialog");
-        }, "", "Git Log In");
-
-        // Exit Sub-repo (Door Icon)
-        const exitDoorSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>';
-        const exitRepoBtn = addStripBtn(exitDoorSvg, "Exit Repository (Choose Another Repo)", () => {
-          postMessage("exitSubRepo");
-        }, "exit-subrepo-btn", "Exit");
-        exitRepoBtn.style.marginTop = "auto";
-
-        function updateExitBtn() {
-          if (!exitRepoBtn) return;
-          const latestData = get(branchData) || {};
-          const isSub = !!(latestData.isSubRepo || window.__IS_SUB_REPO__);
-          exitRepoBtn.style.display = isSub ? "flex" : "none";
-        }
-        container._updateExitBtn = updateExitBtn;
-        updateExitBtn();
-
-        container.appendChild(strip);
-
-        mainArea = document.createElement("div");
-        mainArea.className = "sidebar-main";
-
-        const searchBox = document.createElement("div");
-        searchBox.className = "branch-search-box";
-        sInput = document.createElement("input");
-        sInput.type = "text";
-        sInput.className = "branch-search-input";
-        sInput.placeholder = "Search branches...";
-        sInput.addEventListener("input", (e) => {
-          if (container._populateTree) {
-            container._populateTree(e.target.value);
-          } else {
-            populateTree(e.target.value);
-          }
-        });
-        searchBox.appendChild(sInput);
-        mainArea.appendChild(searchBox);
-
-        treeContent = document.createElement("div");
-        treeContent.className = "branch-tree-content";
-        treeContent.addEventListener("contextmenu", (e) => {
-          const item = e.target.closest(".tree-item, .head-branch-box");
-          if (!item) {
-            e.preventDefault();
-            e.stopPropagation();
-            showGeneralBranchContextMenu(e);
-          }
-        });
-        mainArea.appendChild(treeContent);
-        mainArea.addEventListener("contextmenu", (e) => {
-          const item = e.target.closest(".tree-item, .head-branch-box");
-          if (!item) {
-            e.preventDefault();
-            e.stopPropagation();
-            showGeneralBranchContextMenu(e);
-          }
-        });
-        container.appendChild(mainArea);
-      }
-
-      populateTree();
-    }
-
-    var div = root5();
+      };
+      get(detailSplitterEl).addEventListener("mousedown", onMouseDownDetail);
+      return () => {
+        get(detailSplitterEl)?.removeEventListener("mousedown", onMouseDownDetail);
+        window.removeEventListener("mousemove", onMouseMoveDetail);
+        window.removeEventListener("mouseup", onMouseUpDetail);
+      };
+    });
+    var div = root_6();
     var node = child(div);
     FilterBar(node, {
-      onFilter,
+      get activeBranch() {
+        return get(activeBranch);
+      },
       get branchData() {
         return get(branchData);
       },
       get commits() {
         return get(commits);
       },
-      get activeBranch() {
-        return get(activeBranch);
+      get selectedHash() {
+        return get(selectedHash);
       },
-      setActiveBranch(name) {
-        set(activeBranch, name, true);
-      }
+      onFilter: onFilter2,
+      onRefresh: () => postMessage("refresh")
     });
     var div_1 = sibling(node, 2);
-
-
-
     var div_2 = child(div_1);
-    var node_1 = child(div_2);
+    bind_this(div_2, ($$value) => set(branchSidebarEl, $$value), () => get(branchSidebarEl));
+    var div_3 = sibling(div_2, 2);
+    bind_this(div_3, ($$value) => set(branchSplitterEl, $$value), () => get(branchSplitterEl));
+    var div_4 = sibling(div_3, 2);
+    var node_1 = child(div_4);
     {
       var consequent = ($$anchor2) => {
-        document.querySelectorAll(".no-git-container").forEach(el => el.remove());
-        var div_3 = root_14();
-        append($$anchor2, div_3);
+        var div_5 = root6();
+        append($$anchor2, div_5);
       };
-      var consequent_1 = ($$anchor2) => {
-        document.querySelectorAll(".no-git-container").forEach(el => el.remove());
-        if (get(noGitData)) {
-          var div = document.createElement("div");
-          div.className = "no-git-container";
-          div.style.cssText = "position:absolute;top:0;left:0;right:0;bottom:0;background:var(--vscode-editor-background);z-index:50;display:flex;flex-direction:column;align-items:center;overflow-y:auto;overflow-x:hidden;height:100%;padding:32px 16px;text-align:center;color:var(--vscode-foreground);box-sizing:border-box;user-select:none;scrollbar-color:rgb(70, 62, 62) transparent;";
-          
-          var content = document.createElement("div");
-          content.style.cssText = "display:flex;flex-direction:column;align-items:center;width:100%;max-width:440px;margin:auto 0;padding:12px 0;flex-shrink:0;";
-          div.appendChild(content);
-
-          var icon = document.createElement("div");
-          icon.innerHTML = '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
-          content.appendChild(icon);
-
-          var title = document.createElement("div");
-          title.style.cssText = "font-size:16px;font-weight:600;margin:14px 0 6px;";
-          title.textContent = "No Git Repository Found";
-          content.appendChild(title);
-
-          var desc = document.createElement("div");
-          desc.style.cssText = "font-size:12px;color:var(--vscode-descriptionForeground);max-width:440px;line-height:1.5;margin-bottom:20px;";
-          const data = get(noGitData) || {};
-          desc.textContent = "The folder \"" + (data.currentPath || "") + "\" is not a Git repository.";
-          content.appendChild(desc);
-
-          if (data.subRepos && data.subRepos.length > 0) {
-            var subTitle = document.createElement("div");
-            subTitle.style.cssText = "font-size:12px;font-weight:600;margin-bottom:10px;color:var(--vscode-descriptionForeground);text-transform:uppercase;letter-spacing:0.5px;";
-            subTitle.textContent = "Detected Git repository in subfolder:";
-            content.appendChild(subTitle);
-
-            var list = document.createElement("div");
-            list.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-bottom:20px;width:100%;max-width:360px;";
-            data.subRepos.forEach(r => {
-              var btn = document.createElement("button");
-              btn.className = "no-git-btn primary";
-              btn.style.cssText = "display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;border-radius:4px;background:#2e436e;color:#ffffff;border:1px solid #3e5b94;font-size:12px;font-weight:500;cursor:pointer;width:100%;flex-shrink:0;";
-              btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> Open repository in \"' + r.name + '\"';
-              btn.addEventListener("click", () => {
+      var consequent_2 = ($$anchor2) => {
+        var div_6 = root_33();
+        var div_7 = child(div_6);
+        var div_8 = sibling(child(div_7), 4);
+        var text2 = only_child(div_8);
+        var node_2 = sibling(div_8, 2);
+        {
+          var consequent_1 = ($$anchor3) => {
+            var fragment = root_24();
+            var div_9 = sibling(first_child(fragment), 2);
+            each(div_9, 21, () => get(noGitData).subRepos, index, ($$anchor4, r2) => {
+              var button = root_15();
+              var text_1 = sibling(child(button));
+              reset(button);
+              template_effect(() => set_text(text_1, ` Open repository in "${get(r2).name ?? ""}"`));
+              delegated("click", button, () => {
                 window.__IS_SUB_REPO__ = true;
-                div.remove();
-                document.querySelectorAll(".no-git-container").forEach(el => el.remove());
-                set(noGitData, null, true);
+                set(noGitData, null);
                 set(loading, true);
-                postMessage("switchRepo", r.path);
+                postMessage("switchRepo", get(r2).path);
               });
-              list.appendChild(btn);
+              append($$anchor4, button);
             });
-            content.appendChild(list);
-          }
-
-          var initBtn = document.createElement("button");
-          initBtn.className = "no-git-btn secondary";
-          initBtn.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;background:var(--vscode-button-secondaryBackground, #3a3d41);color:var(--vscode-button-secondaryForeground, #ffffff);border:1px solid rgba(255,255,255,0.1);font-size:12px;cursor:pointer;flex-shrink:0;";
-          initBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Initialize Git Repository Here (git init)';
-          initBtn.addEventListener("click", () => {
-            div.remove();
-            document.querySelectorAll(".no-git-container").forEach(el => el.remove());
-            set(noGitData, null, true);
-            set(loading, true);
-            postMessage("initRepo");
+            reset(div_9);
+            append($$anchor3, fragment);
+          };
+          if_block(node_2, ($$render) => {
+            if (get(noGitData).subRepos && get(noGitData).subRepos.length > 0)
+              $$render(consequent_1);
           });
-          content.appendChild(initBtn);
-
-          append($$anchor2, div);
-        } else {
-          var div_4 = root_23();
-          append($$anchor2, div_4);
         }
+        var button_1 = sibling(node_2, 2);
+        reset(div_7);
+        reset(div_6);
+        template_effect(() => set_text(text2, `The folder "${(get(noGitData).currentPath || "") ?? ""}" is not a Git repository.`));
+        delegated("click", button_1, () => {
+          set(noGitData, null);
+          set(loading, true);
+          postMessage("initRepo");
+        });
+        append($$anchor2, div_6);
+      };
+      var consequent_3 = ($$anchor2) => {
+        var div_10 = root_43();
+        append($$anchor2, div_10);
       };
       var alternate = ($$anchor2) => {
-        document.querySelectorAll(".no-git-container").forEach(el => el.remove());
         CommitList($$anchor2, {
           get commits() {
             return get(commits);
@@ -10160,195 +10797,65 @@ ${component_stack}
           get selectedHash() {
             return get(selectedHash);
           },
-          onSelectCommit,
-          onLoadMore,
-          onRebaseFromHere,
           get scrollToIndex() {
             return get(scrollToIndex);
-          }
+          },
+          onSelectCommit,
+          onLoadMore,
+          onRebaseFromHere
         });
       };
       if_block(node_1, ($$render) => {
         if (get(loading) && get(commits).length === 0)
           $$render(consequent);
-        else if (get(noGitData) || (get(commits).length === 0 && !get(loading)))
-          $$render(consequent_1, 1);
+        else if (get(noGitData))
+          $$render(consequent_2, 1);
+        else if (get(commits).length === 0 && !get(loading))
+          $$render(consequent_3, 2);
         else
-          $$render(alternate, false);
+          $$render(alternate, -1);
       });
     }
-    reset(div_2);
-    var node_2 = sibling(div_2, 2);
+    reset(div_4);
+    var node_3 = sibling(div_4, 2);
     {
-      var consequent_2 = ($$anchor2) => {
-        var div_5 = root_43();
-        var node_3 = child(div_5);
-        {
-          let $0 = user_derived(() => get(commits).find((c) => c.hash === get(selectedHash)));
-          CommitDetail(node_3, {
-            get commit() {
-              return get($0);
-            },
-            get files() {
-              return get(selectedFiles);
-            }
-          });
-        }
-        reset(div_5);
-
-        // Close button inside detail panel
-        var closeBtn = document.createElement("button");
-        closeBtn.className = "detail-close-btn";
-        closeBtn.title = "Close Details (Esc)";
-        closeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1.5 1.5L10.5 10.5M1.5 10.5L10.5 1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-        closeBtn.addEventListener("click", () => {
-          set(selectedHash, null, true);
-        });
-        div_5.prepend(closeBtn);
-
-        // Resizable splitter for detail panel
-        var detail_splitter = document.createElement("div");
-        detail_splitter.className = "detail-splitter";
-
-        try {
-          const savedDW = localStorage.getItem("intellij_git_detail_panel_width");
-          if (savedDW) {
-            const dw = parseInt(savedDW, 10);
-            if (dw >= 180 && dw <= 800) {
-              div_5.style.width = dw + "px";
-              div_5.style.minWidth = dw + "px";
-            }
+      var consequent_4 = ($$anchor2) => {
+        var fragment_2 = root_52();
+        var div_11 = first_child(fragment_2);
+        bind_this(div_11, ($$value) => set(detailSplitterEl, $$value), () => get(detailSplitterEl));
+        var div_12 = sibling(div_11, 2);
+        var button_2 = child(div_12);
+        var node_4 = sibling(button_2, 2);
+        CommitDetail(node_4, {
+          get commit() {
+            return get(selectedCommit);
+          },
+          get files() {
+            return get(selectedFiles);
           }
-        } catch (e) {}
-
-        let isDraggingDetailSplitter = false;
-        let startXDetail = 0;
-        let startWidthDetail = 300;
-
-        const onMouseMoveDetail = (e) => {
-          if (!isDraggingDetailSplitter) return;
-          const dx = startXDetail - e.clientX;
-          const newWidth = Math.max(180, Math.min(800, startWidthDetail + dx));
-          div_5.style.width = newWidth + "px";
-          div_5.style.minWidth = newWidth + "px";
-          try {
-            localStorage.setItem("intellij_git_detail_panel_width", newWidth);
-          } catch (err) {}
-        };
-
-        const onMouseUpDetail = () => {
-          if (isDraggingDetailSplitter) {
-            isDraggingDetailSplitter = false;
-            detail_splitter.classList.remove("active");
-            document.body.style.cursor = "";
-            document.body.style.userSelect = "";
-            div_5.style.transition = "";
-            window.removeEventListener("mousemove", onMouseMoveDetail);
-            window.removeEventListener("mouseup", onMouseUpDetail);
-          }
-        };
-
-        detail_splitter.addEventListener("mousedown", (e) => {
-          isDraggingDetailSplitter = true;
-          startXDetail = e.clientX;
-          startWidthDetail = div_5.getBoundingClientRect().width;
-          detail_splitter.classList.add("active");
-          document.body.style.cursor = "col-resize";
-          document.body.style.userSelect = "none";
-          div_5.style.transition = "none";
-          window.addEventListener("mousemove", onMouseMoveDetail);
-          window.addEventListener("mouseup", onMouseUpDetail);
-          e.preventDefault();
         });
-
-        append($$anchor2, detail_splitter);
-        append($$anchor2, div_5);
+        reset(div_12);
+        bind_this(div_12, ($$value) => set(detailPanelEl, $$value), () => get(detailPanelEl));
+        delegated("click", button_2, () => {
+          set(selectedHash, null);
+        });
+        append($$anchor2, fragment_2);
       };
-      if_block(node_2, ($$render) => {
+      if_block(node_3, ($$render) => {
         if (get(selectedHash))
-          $$render(consequent_2);
+          $$render(consequent_4);
       });
     }
     reset(div_1);
-    var branch_sidebar = document.createElement("div");
-    branch_sidebar.className = "branch-sidebar svelte-1lrl78g";
-    div_1.prepend(branch_sidebar);
-
-    var branch_splitter = document.createElement("div");
-    branch_splitter.className = "branch-splitter";
-    branch_splitter.style.cssText = "width:1px;cursor:col-resize;flex-shrink:0;background:transparent !important;z-index:10;user-select:none;position:relative;border:none !important;box-shadow:none !important;outline:none !important;";
-    branch_sidebar.after(branch_splitter);
-
-    try {
-      const savedW = localStorage.getItem("intellij_git_branch_sidebar_width");
-      if (savedW) {
-        const w = parseInt(savedW, 10);
-        if (w >= 140 && w <= 700) {
-          branch_sidebar.style.width = w + "px";
-          branch_sidebar.style.minWidth = w + "px";
-        }
-      }
-    } catch (e) {}
-
-    let isDraggingBranchSplitter = false;
-    let startX = 0;
-    let startWidth = 260;
-
-    branch_splitter.addEventListener("mousedown", (e) => {
-      if (branch_sidebar.classList.contains("collapsed")) return;
-      isDraggingBranchSplitter = true;
-      startX = e.clientX;
-      startWidth = branch_sidebar.getBoundingClientRect().width;
-      branch_splitter.classList.add("active");
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-      branch_sidebar.style.transition = "none";
-      e.preventDefault();
-    });
-
-    window.addEventListener("mousemove", (e) => {
-      if (!isDraggingBranchSplitter) return;
-      const dx = e.clientX - startX;
-      const newWidth = Math.max(140, Math.min(700, startWidth + dx));
-      branch_sidebar.style.width = newWidth + "px";
-      branch_sidebar.style.minWidth = newWidth + "px";
-      try {
-        localStorage.setItem("intellij_git_branch_sidebar_width", newWidth);
-      } catch (err) {}
-    });
-
-    window.addEventListener("mouseup", () => {
-      if (isDraggingBranchSplitter) {
-        isDraggingBranchSplitter = false;
-        branch_splitter.classList.remove("active");
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        branch_sidebar.style.transition = "";
-      }
-    });
-
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && get(selectedHash)) {
-        set(selectedHash, null, true);
-      }
-    });
-
-    user_effect(() => {
-      if (get(noGitData)) {
-        branch_sidebar.style.display = "none";
-        branch_splitter.style.display = "none";
-      } else {
-        branch_sidebar.style.display = "";
-        branch_splitter.style.display = branch_sidebar.classList.contains("collapsed") ? "none" : "";
-        renderSidebarContent(branch_sidebar);
-      }
-    });
     reset(div);
     append($$anchor, div);
     pop();
   }
+  delegate(["click"]);
 
   // webview/graph/main.ts
-  var app = mount(App, { target: document.getElementById("app") });
+  var app = mount(App, {
+    target: document.getElementById("app")
+  });
   var main_default = app;
 })();

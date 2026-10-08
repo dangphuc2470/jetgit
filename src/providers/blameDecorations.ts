@@ -162,8 +162,6 @@ export class BlameDecorationProvider implements vscode.Disposable {
               backgroundColor: ageBackground(blameLine.authorDate),
               color: 'var(--vscode-editorLineNumber-foreground)',
               margin: '0 1.5em 0 0',
-              fontFamily: 'var(--vscode-editor-font-family)',
-              fontSize: 'var(--vscode-editor-font-size)',
             },
           },
         });

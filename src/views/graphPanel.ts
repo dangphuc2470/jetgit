@@ -330,7 +330,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
             this.extensionUri,
             this.gitService,
             filePath,
-            [{ path: filePath, name: filePath.split('/').pop() || filePath, dir: '', status: 'M' }],
+            [filePath],
             () => this.refresh(),
           );
         }
@@ -527,14 +527,18 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'graph', 'graph.js'),
     );
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'graph', 'graph.css'),
+    );
     const nonce = getNonce();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+    content="default-src 'none'; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="${styleUri}">
   <title>Git Log</title>
   <style>
     *::-webkit-scrollbar-track,

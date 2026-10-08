@@ -56,7 +56,8 @@
     postMessage("ready");
 
     const closeAllFloatingMenus = () => {
-      document.querySelectorAll('.commit-context-menu, .branch-context-menu, .filter-popup, .as-dropdown-menu').forEach(el => el.remove());
+      document.querySelectorAll('.commit-context-menu, .branch-context-menu').forEach(el => el.remove());
+      document.querySelectorAll<HTMLElement>('.filter-popup, .as-dropdown-menu').forEach(el => el.style.display = 'none');
     };
     window.addEventListener("blur", closeAllFloatingMenus);
     const visChangeHandler = () => {

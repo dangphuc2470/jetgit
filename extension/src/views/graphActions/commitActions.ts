@@ -2,7 +2,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitContentProvider } from '../../providers/gitContentProvider';
 import { GraphActionHost } from './types';
-import { handleMergeWithConflictResolution } from './conflictResolution';
+import {
+  handleMergeWithConflictResolution,
+  handleRebaseWithConflictResolution,
+  handleCherryPickWithConflictResolution,
+  handleRevertWithConflictResolution,
+} from './conflictResolution';
 
 export async function handleCommitAction(
   type: string,
@@ -14,13 +19,7 @@ export async function handleCommitAction(
   switch (type) {
     case 'rebase': {
       const branch = payload as string;
-      try {
-        await gitService.rebase(branch);
-        vscode.window.showInformationMessage(`Rebased onto ${branch}`);
-        host.loadInitialData();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Rebase failed: ${err.message}`);
-      }
+      await handleRebaseWithConflictResolution(gitService, branch, () => host.loadInitialData());
       return true;
     }
 
@@ -71,24 +70,16 @@ export async function handleCommitAction(
 
     case 'cherryPick': {
       const { hash } = payload || {};
-      try {
-        await gitService.cherryPick(hash);
-        vscode.window.showInformationMessage(`Cherry-picked ${hash.slice(0, 8)} successfully`);
-        host.loadInitialData();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Cherry-pick failed: ${err.message}`);
+      if (hash) {
+        await handleCherryPickWithConflictResolution(gitService, hash, () => host.loadInitialData());
       }
       return true;
     }
 
     case 'revertCommit': {
       const { hash } = payload || {};
-      try {
-        await gitService.revertCommit(hash);
-        vscode.window.showInformationMessage(`Reverted commit ${hash.slice(0, 8)}`);
-        host.loadInitialData();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Revert failed: ${err.message}`);
+      if (hash) {
+        await handleRevertWithConflictResolution(gitService, hash, () => host.loadInitialData());
       }
       return true;
     }

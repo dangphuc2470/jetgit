@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 import { GraphActionHost } from './types';
-import { handleCheckoutWithConflictResolution } from './conflictResolution';
+import {
+  handleCheckoutWithConflictResolution,
+  handleCheckoutAndRebaseWithConflictResolution,
+} from './conflictResolution';
 
 export async function handleBranchAction(
   type: string,
@@ -100,12 +103,8 @@ export async function handleBranchAction(
 
     case 'checkoutAndRebase': {
       const { branch, onto } = payload || {};
-      try {
-        await gitService.checkoutAndRebase(branch, onto);
-        vscode.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
-        host.loadInitialData();
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Checkout and rebase failed: ${err.message}`);
+      if (branch && onto) {
+        await handleCheckoutAndRebaseWithConflictResolution(gitService, branch, onto, () => host.loadInitialData());
       }
       return true;
     }

@@ -542,7 +542,19 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           await this.gitService.stashPop(idx);
           vscode.window.showInformationMessage(`Applied and dropped ${idx}`);
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+          const raw = err?.message || String(err);
+          if (raw.includes('CONFLICT') || raw.includes('conflict') || raw.includes('Merge conflict')) {
+            vscode.window.showWarningMessage(
+              `Stash applied with merge conflicts. Resolve them in the merge editor.`,
+              'Resolve Conflicts'
+            ).then(res => {
+              if (res === 'Resolve Conflicts') {
+                vscode.commands.executeCommand('intellij-git.resolveConflicts');
+              }
+            });
+          } else {
+            vscode.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+          }
         } finally {
           await this.refresh();
         }
@@ -554,7 +566,19 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           await this.gitService.stashApply(idx);
           vscode.window.showInformationMessage(`Applied ${idx}`);
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+          const raw = err?.message || String(err);
+          if (raw.includes('CONFLICT') || raw.includes('conflict') || raw.includes('Merge conflict')) {
+            vscode.window.showWarningMessage(
+              `Stash applied with merge conflicts. Resolve them in the merge editor.`,
+              'Resolve Conflicts'
+            ).then(res => {
+              if (res === 'Resolve Conflicts') {
+                vscode.commands.executeCommand('intellij-git.resolveConflicts');
+              }
+            });
+          } else {
+            vscode.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+          }
         } finally {
           await this.refresh();
         }

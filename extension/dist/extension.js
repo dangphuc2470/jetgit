@@ -2942,8 +2942,35 @@ async function withSmartStashOnConflict(gitService, actionLabel, targetRef, runA
     onSuccess();
   } catch (err) {
     const rawError = err?.message || String(err);
-    const isConflict = /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) || /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError);
+    const isConflict = /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) || /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError) || /cannot rebase: (?:You have unstaged changes|Your index contains uncommitted changes)/i.test(rawError) || /cannot pull with rebase: (?:You have unstaged changes|Your index contains uncommitted changes)/i.test(rawError) || /error: (?:cannot rebase|cannot cherry-pick|cannot revert):/i.test(rawError) || /error: Your local changes to the following files would be overwritten/i.test(rawError) || /Please commit or stash them before you (?:merge|rebase|cherry-pick|revert)/i.test(rawError);
+    const is3WayConflict = rawError.includes("CONFLICT") || rawError.includes("Automatic merge failed") || rawError.includes("fix conflicts") || rawError.includes("could not apply") || rawError.includes("could not revert") || rawError.includes("git rebase --continue");
+    let pastAction = `${actionLabel.toLowerCase()} '${targetRef}'`;
+    if (actionLabel === "Checkout") {
+      pastAction = `switching to '${targetRef}'`;
+    } else if (actionLabel === "Update") {
+      pastAction = `updating '${targetRef}'`;
+    } else if (actionLabel === "Merge") {
+      pastAction = `merging '${targetRef}' into current branch`;
+    } else if (actionLabel === "Rebase") {
+      pastAction = `rebasing onto '${targetRef}'`;
+    } else if (actionLabel === "Cherry-Pick") {
+      pastAction = `cherry-picking commit '${(targetRef || "").slice(0, 8)}'`;
+    } else if (actionLabel === "Revert") {
+      pastAction = `reverting commit '${(targetRef || "").slice(0, 8)}'`;
+    }
     if (!isConflict) {
+      if (is3WayConflict && (actionLabel === "Merge" || actionLabel === "Rebase" || actionLabel === "Cherry-Pick" || actionLabel === "Revert")) {
+        vscode5.window.showWarningMessage(
+          `${actionLabel} conflicts detected while ${pastAction}. Resolve them to complete the operation.`,
+          "Resolve Conflicts"
+        ).then((choice2) => {
+          if (choice2 === "Resolve Conflicts") {
+            vscode5.commands.executeCommand("intellij-git.resolveConflicts");
+          }
+        });
+        onSuccess();
+        return;
+      }
       vscode5.window.showErrorMessage(`${actionLabel} failed: ${rawError}`);
       return;
     }
@@ -2958,7 +2985,6 @@ async function withSmartStashOnConflict(gitService, actionLabel, targetRef, runA
     }
     const smartLabel = `Smart ${actionLabel}`;
     const stashLabel = `Stash & ${actionLabel}`;
-    const pastAction = actionLabel === "Checkout" ? `switching to '${targetRef}'` : "merging";
     const message = `${actionLabel} Failed: Your local changes would be overwritten by ${pastAction}.${filesText}
 
 IntelliJ Git can stash your changes, perform the ${actionLabel.toLowerCase()}, and optionally re-apply them.`;
@@ -2970,7 +2996,7 @@ IntelliJ Git can stash your changes, perform the ${actionLabel.toLowerCase()}, a
     );
     if (!choice)
       return;
-    const stashPrefix = actionLabel.toLowerCase();
+    const stashPrefix = actionLabel.toLowerCase().replace(/[^a-z0-9]/g, "");
     const stashName = `autostash-${stashPrefix}-${(targetRef || "HEAD").replace(/[^a-zA-Z0-9_-]/g, "_")}-${Date.now()}`;
     const stashArgs = isUntracked ? ["stash", "push", "-u", "-m", stashName] : ["stash", "push", "-m", stashName];
     let stashed = false;
@@ -2986,6 +3012,20 @@ IntelliJ Git can stash your changes, perform the ${actionLabel.toLowerCase()}, a
     try {
       await runAction();
     } catch (actionErr) {
+      const actMsg = actionErr?.message || String(actionErr);
+      const is3Way = actMsg.includes("CONFLICT") || actMsg.includes("Automatic merge failed") || actMsg.includes("fix conflicts") || actMsg.includes("could not apply") || actMsg.includes("could not revert") || actMsg.includes("git rebase --continue");
+      if (stashed && is3Way) {
+        vscode5.window.showWarningMessage(
+          `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`,
+          "Resolve Conflicts"
+        ).then((res) => {
+          if (res === "Resolve Conflicts") {
+            vscode5.commands.executeCommand("intellij-git.resolveConflicts");
+          }
+        });
+        onSuccess();
+        return;
+      }
       if (stashed) {
         try {
           await gitService.exec(["stash", "pop"]);
@@ -3023,6 +3063,66 @@ async function handleCheckoutWithConflictResolution(gitService, ref, onSuccess) 
     async () => {
       await gitService.checkout(ref);
       vscode5.window.showInformationMessage(`Checked out ${ref}`);
+    },
+    onSuccess
+  );
+}
+async function handleMergeWithConflictResolution(gitService, ref, onSuccess) {
+  await withSmartStashOnConflict(
+    gitService,
+    "Merge",
+    ref,
+    async () => {
+      await gitService.merge(ref);
+      vscode5.window.showInformationMessage(`Merged '${ref}' into current branch.`);
+    },
+    onSuccess
+  );
+}
+async function handleRebaseWithConflictResolution(gitService, ref, onSuccess) {
+  await withSmartStashOnConflict(
+    gitService,
+    "Rebase",
+    ref,
+    async () => {
+      await gitService.rebase(ref);
+      vscode5.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
+    },
+    onSuccess
+  );
+}
+async function handleCheckoutAndRebaseWithConflictResolution(gitService, branch, onto, onSuccess) {
+  await withSmartStashOnConflict(
+    gitService,
+    "Rebase",
+    onto,
+    async () => {
+      await gitService.checkoutAndRebase(branch, onto);
+      vscode5.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
+    },
+    onSuccess
+  );
+}
+async function handleCherryPickWithConflictResolution(gitService, hash, onSuccess) {
+  await withSmartStashOnConflict(
+    gitService,
+    "Cherry-Pick",
+    hash,
+    async () => {
+      await gitService.cherryPick(hash);
+      vscode5.window.showInformationMessage(`Cherry-picked ${hash.slice(0, 8)} successfully.`);
+    },
+    onSuccess
+  );
+}
+async function handleRevertWithConflictResolution(gitService, hash, onSuccess) {
+  await withSmartStashOnConflict(
+    gitService,
+    "Revert",
+    hash,
+    async () => {
+      await gitService.revertCommit(hash);
+      vscode5.window.showInformationMessage(`Reverted commit ${hash.slice(0, 8)}.`);
     },
     onSuccess
   );
@@ -3137,12 +3237,8 @@ async function handleBranchAction(type, payload, host) {
     }
     case "checkoutAndRebase": {
       const { branch, onto } = payload || {};
-      try {
-        await gitService.checkoutAndRebase(branch, onto);
-        vscode6.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
-        host.loadInitialData();
-      } catch (err) {
-        vscode6.window.showErrorMessage(`Checkout and rebase failed: ${err.message}`);
+      if (branch && onto) {
+        await handleCheckoutAndRebaseWithConflictResolution(gitService, branch, onto, () => host.loadInitialData());
       }
       return true;
     }
@@ -3525,13 +3621,7 @@ async function handleCommitAction(type, payload, host) {
   switch (type) {
     case "rebase": {
       const branch = payload;
-      try {
-        await gitService.rebase(branch);
-        vscode8.window.showInformationMessage(`Rebased onto ${branch}`);
-        host.loadInitialData();
-      } catch (err) {
-        vscode8.window.showErrorMessage(`Rebase failed: ${err.message}`);
-      }
+      await handleRebaseWithConflictResolution(gitService, branch, () => host.loadInitialData());
       return true;
     }
     case "showDiff": {
@@ -3564,62 +3654,7 @@ async function handleCommitAction(type, payload, host) {
     }
     case "mergeBranch": {
       const ref = payload;
-      try {
-        await gitService.merge(ref);
-        vscode8.window.showInformationMessage(`Merged '${ref}' successfully.`);
-        host.loadInitialData();
-      } catch (err) {
-        const errMsg = err.message || "";
-        const hasConflicts = errMsg.includes("CONFLICT") || errMsg.includes("conflict") || errMsg.includes("Automatic merge failed") || errMsg.includes("fix conflicts");
-        if (hasConflicts) {
-          host.loadInitialData();
-          try {
-            const conflictFiles = await gitService.getUnmergedFiles();
-            if (conflictFiles.length === 0) {
-              vscode8.window.showWarningMessage(`Merge has conflicts. Please resolve them and commit.`);
-              return true;
-            }
-            const items = conflictFiles.map((f) => ({
-              label: `$(git-merge) ${f}`,
-              description: "Conflict \u2014 click to open merge editor",
-              detail: f
-            }));
-            items.push({
-              label: "$(check-all) All conflicts resolved \u2014 open Commit panel",
-              description: "",
-              detail: "__commit__"
-            });
-            const chosen = await vscode8.window.showQuickPick(items, {
-              placeHolder: `${conflictFiles.length} file(s) with conflicts \u2014 select a file to resolve`,
-              canPickMany: false,
-              title: `Merge conflicts: '${ref}' into current branch`
-            });
-            if (chosen && chosen.detail && chosen.detail !== "__commit__") {
-              const fileUri = vscode8.Uri.joinPath(
-                vscode8.Uri.file(gitService.getCwd()),
-                chosen.detail
-              );
-              try {
-                await vscode8.commands.executeCommand("merge-conflict.accept.all-both");
-              } catch {
-              }
-              await vscode8.commands.executeCommand("vscode.open", fileUri);
-              try {
-                await vscode8.commands.executeCommand("git.openMergeEditor", fileUri);
-              } catch {
-              }
-            } else if (chosen && chosen.detail === "__commit__") {
-              await vscode8.commands.executeCommand("intellij-git.openCommit");
-            }
-          } catch {
-            vscode8.window.showWarningMessage(
-              `Merge has conflicts. Please resolve them in the editor and commit when done.`
-            );
-          }
-        } else {
-          vscode8.window.showErrorMessage(`Merge failed: ${errMsg}`);
-        }
-      }
+      await handleMergeWithConflictResolution(gitService, ref, () => host.loadInitialData());
       return true;
     }
     case "rebaseFromHere": {
@@ -3629,23 +3664,15 @@ async function handleCommitAction(type, payload, host) {
     }
     case "cherryPick": {
       const { hash } = payload || {};
-      try {
-        await gitService.cherryPick(hash);
-        vscode8.window.showInformationMessage(`Cherry-picked ${hash.slice(0, 8)} successfully`);
-        host.loadInitialData();
-      } catch (err) {
-        vscode8.window.showErrorMessage(`Cherry-pick failed: ${err.message}`);
+      if (hash) {
+        await handleCherryPickWithConflictResolution(gitService, hash, () => host.loadInitialData());
       }
       return true;
     }
     case "revertCommit": {
       const { hash } = payload || {};
-      try {
-        await gitService.revertCommit(hash);
-        vscode8.window.showInformationMessage(`Reverted commit ${hash.slice(0, 8)}`);
-        host.loadInitialData();
-      } catch (err) {
-        vscode8.window.showErrorMessage(`Revert failed: ${err.message}`);
+      if (hash) {
+        await handleRevertWithConflictResolution(gitService, hash, () => host.loadInitialData());
       }
       return true;
     }
@@ -6719,7 +6746,19 @@ var CommitViewProvider = class _CommitViewProvider {
           await this.gitService.stashPop(idx);
           vscode13.window.showInformationMessage(`Applied and dropped ${idx}`);
         } catch (err) {
-          vscode13.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+          const raw = err?.message || String(err);
+          if (raw.includes("CONFLICT") || raw.includes("conflict") || raw.includes("Merge conflict")) {
+            vscode13.window.showWarningMessage(
+              `Stash applied with merge conflicts. Resolve them in the merge editor.`,
+              "Resolve Conflicts"
+            ).then((res) => {
+              if (res === "Resolve Conflicts") {
+                vscode13.commands.executeCommand("intellij-git.resolveConflicts");
+              }
+            });
+          } else {
+            vscode13.window.showErrorMessage(`Stash pop failed: ${err.message}`);
+          }
         } finally {
           await this.refresh();
         }
@@ -6731,7 +6770,19 @@ var CommitViewProvider = class _CommitViewProvider {
           await this.gitService.stashApply(idx);
           vscode13.window.showInformationMessage(`Applied ${idx}`);
         } catch (err) {
-          vscode13.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+          const raw = err?.message || String(err);
+          if (raw.includes("CONFLICT") || raw.includes("conflict") || raw.includes("Merge conflict")) {
+            vscode13.window.showWarningMessage(
+              `Stash applied with merge conflicts. Resolve them in the merge editor.`,
+              "Resolve Conflicts"
+            ).then((res) => {
+              if (res === "Resolve Conflicts") {
+                vscode13.commands.executeCommand("intellij-git.resolveConflicts");
+              }
+            });
+          } else {
+            vscode13.window.showErrorMessage(`Stash apply failed: ${err.message}`);
+          }
         } finally {
           await this.refresh();
         }
@@ -7847,24 +7898,7 @@ function activate(context) {
       const ref = node?.ref;
       if (!ref)
         return;
-      try {
-        await gitService.merge(ref);
-        graphViewProvider.refresh();
-        vscode19.window.showInformationMessage(`Merged ${ref} into current branch.`);
-      } catch (err) {
-        if (err.message?.includes("CONFLICT")) {
-          vscode19.window.showWarningMessage(
-            `Merge conflicts detected. Resolve them to complete the merge.`,
-            "Resolve"
-          ).then((choice) => {
-            if (choice === "Resolve") {
-              vscode19.commands.executeCommand("intellij-git.resolveConflicts");
-            }
-          });
-        } else {
-          vscode19.window.showErrorMessage(`Merge failed: ${err.message}`);
-        }
-      }
+      await handleMergeWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
     })
   );
   context.subscriptions.push(
@@ -7872,13 +7906,7 @@ function activate(context) {
       const ref = node?.ref;
       if (!ref)
         return;
-      try {
-        await gitService.rebase(ref);
-        graphViewProvider.refresh();
-        vscode19.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
-      } catch (err) {
-        vscode19.window.showErrorMessage(`Rebase failed: ${err.message}`);
-      }
+      await handleRebaseWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
     })
   );
   context.subscriptions.push(

@@ -13,7 +13,11 @@ import { ChangelistTreeProvider } from './views/changelistTree';
 import { BlameDecorationProvider } from './providers/blameDecorations';
 import { MergeProvider } from './providers/mergeProvider';
 import { GitContentProvider } from './providers/gitContentProvider';
-import { handleCheckoutWithConflictResolution, handleMergeWithConflictResolution } from './views/graphActionHandlers';
+import {
+  handleCheckoutWithConflictResolution,
+  handleMergeWithConflictResolution,
+  handleRebaseWithConflictResolution,
+} from './views/graphActionHandlers';
 
 let log: vscode.OutputChannel;
 
@@ -213,13 +217,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('intellij-git.rebaseBranch', async (node: any) => {
       const ref = node?.ref;
       if (!ref) return;
-      try {
-        await gitService.rebase(ref);
-        graphViewProvider.refresh();
-        vscode.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Rebase failed: ${err.message}`);
-      }
+      await handleRebaseWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
     }),
   );
 

@@ -306,12 +306,6 @@
       if (viewOptionPopup) viewOptionPopup.style.display = "none";
     }
 
-    document.addEventListener("click", (e) => {
-      if (!bar.contains(e.target)) {
-        closeAllPopups();
-      }
-    });
-
     // 2. Branch Dropdown
     const branchContainer = document.createElement("div");
     branchContainer.style.position = "relative";
@@ -996,9 +990,35 @@
         pathLabel.innerHTML = '<span class="lbl-prefix">Paths</span> <span class="lbl-arrow">&#9662;</span>';
       }
     }
-    updateLabelsFn = updateLabels;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (branchPopup?.style.display === "flex" && !branchContainer.contains(target)) {
+        branchPopup.style.display = "none";
+      }
+      if (userPopup?.style.display === "flex" && !userContainer.contains(target)) {
+        userPopup.style.display = "none";
+      }
+      if (datePopup?.style.display === "flex" && !dateContainer.contains(target)) {
+        datePopup.style.display = "none";
+      }
+      if (pathPopup?.style.display === "flex" && !pathContainer.contains(target)) {
+        pathPopup.style.display = "none";
+      }
+      if (graphOptionPopup?.style.display === "flex" && !graphOptionContainer.contains(target)) {
+        graphOptionPopup.style.display = "none";
+      }
+      if (viewOptionPopup?.style.display === "flex" && !viewOptionContainer.contains(target)) {
+        viewOptionPopup.style.display = "none";
+      }
+    };
+    document.addEventListener("click", onDocClick);
 
+    updateLabelsFn = updateLabels;
     updateLabels();
+
+    return () => {
+      document.removeEventListener("click", onDocClick);
+    };
   });
 
   $effect(() => {

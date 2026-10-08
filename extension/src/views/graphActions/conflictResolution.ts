@@ -14,7 +14,10 @@ export async function withSmartStashOnConflict(
     await runAction();
     onSuccess();
   } catch (err: any) {
-    const rawError = err?.message || String(err);
+    const rawError = `${err?.message || ''}\n${err?.stdout || ''}\n${err?.stderr || ''}`.trim() || String(err);
+    const conflictInfo = await gitService.getConflictInfo().catch(() => null);
+    const hasActiveConflicts = Boolean(conflictInfo && conflictInfo.hasConflicts && conflictInfo.conflicts.length > 0);
+
     const isConflict =
       /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) ||
       /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError) ||
@@ -25,6 +28,7 @@ export async function withSmartStashOnConflict(
       /Please commit or stash them before you (?:merge|rebase|cherry-pick|revert)/i.test(rawError);
 
     const is3WayConflict =
+      hasActiveConflicts ||
       rawError.includes('CONFLICT') ||
       rawError.includes('Automatic merge failed') ||
       rawError.includes('fix conflicts') ||
@@ -49,18 +53,13 @@ export async function withSmartStashOnConflict(
 
     if (!isConflict) {
       if (is3WayConflict && (actionLabel === 'Merge' || actionLabel === 'Rebase' || actionLabel === 'Cherry-Pick' || actionLabel === 'Revert')) {
-        vscode.window.showWarningMessage(
-          `${actionLabel} conflicts detected while ${pastAction}. Resolve them to complete the operation.`,
-          'Resolve Conflicts'
-        ).then(choice => {
-          if (choice === 'Resolve Conflicts') {
-            vscode.commands.executeCommand('intellij-git.resolveConflicts');
-          }
-        });
+        vscode.commands.executeCommand('intellij-git.refreshCommit');
+        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
         onSuccess();
         return;
       }
-      vscode.window.showErrorMessage(`${actionLabel} failed: ${rawError}`);
+      const detailErr = (err?.stderr || err?.stdout || err?.message || rawError).trim();
+      vscode.window.showErrorMessage(`${actionLabel} failed: ${detailErr}`);
       return;
     }
 
@@ -110,8 +109,10 @@ export async function withSmartStashOnConflict(
     try {
       await runAction();
     } catch (actionErr: any) {
-      const actMsg = actionErr?.message || String(actionErr);
+      const actMsg = `${actionErr?.message || ''}\n${actionErr?.stdout || ''}\n${actionErr?.stderr || ''}`.trim() || String(actionErr);
+      const conflictInfoPost = await gitService.getConflictInfo().catch(() => null);
       const is3Way =
+        Boolean(conflictInfoPost && conflictInfoPost.hasConflicts && conflictInfoPost.conflicts.length > 0) ||
         actMsg.includes('CONFLICT') ||
         actMsg.includes('Automatic merge failed') ||
         actMsg.includes('fix conflicts') ||
@@ -120,14 +121,11 @@ export async function withSmartStashOnConflict(
         actMsg.includes('git rebase --continue');
 
       if (stashed && is3Way) {
+        vscode.commands.executeCommand('intellij-git.refreshCommit');
+        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
         vscode.window.showWarningMessage(
-          `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`,
-          'Resolve Conflicts'
-        ).then(res => {
-          if (res === 'Resolve Conflicts') {
-            vscode.commands.executeCommand('intellij-git.resolveConflicts');
-          }
-        });
+          `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`
+        );
         onSuccess();
         return;
       }
@@ -137,7 +135,8 @@ export async function withSmartStashOnConflict(
           await gitService.exec(['stash', 'pop']);
         } catch {}
       }
-      vscode.window.showErrorMessage(`${actionLabel} failed: ${actionErr.message}`);
+      const detailErr = (actionErr?.stderr || actionErr?.stdout || actionErr?.message || actMsg).trim();
+      vscode.window.showErrorMessage(`${actionLabel} failed: ${detailErr}`);
       return;
     }
 
@@ -146,14 +145,11 @@ export async function withSmartStashOnConflict(
         await gitService.exec(['stash', 'pop']);
         vscode.window.showInformationMessage(`${smartLabel} completed: Restored your changes.`);
       } catch (popErr: any) {
+        vscode.commands.executeCommand('intellij-git.refreshCommit');
+        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
         vscode.window.showWarningMessage(
-          `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`,
-          'Resolve Conflicts'
-        ).then(res => {
-          if (res === 'Resolve Conflicts') {
-            vscode.commands.executeCommand('intellij-git.resolveConflicts');
-          }
-        });
+          `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`
+        );
       }
     } else if (choice === stashLabel && stashed) {
       vscode.window.showInformationMessage(`${actionLabel} succeeded. Your changes were safely saved to Stash.`);

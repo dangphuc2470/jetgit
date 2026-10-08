@@ -2941,9 +2941,13 @@ async function withSmartStashOnConflict(gitService, actionLabel, targetRef, runA
     await runAction();
     onSuccess();
   } catch (err) {
-    const rawError = err?.message || String(err);
+    const rawError = `${err?.message || ""}
+${err?.stdout || ""}
+${err?.stderr || ""}`.trim() || String(err);
+    const conflictInfo = await gitService.getConflictInfo().catch(() => null);
+    const hasActiveConflicts = Boolean(conflictInfo && conflictInfo.hasConflicts && conflictInfo.conflicts.length > 0);
     const isConflict = /Your local changes to the following files would be overwritten by (merge|checkout)/i.test(rawError) || /The following untracked working tree files would be overwritten by (merge|checkout)/i.test(rawError) || /cannot rebase: (?:You have unstaged changes|Your index contains uncommitted changes)/i.test(rawError) || /cannot pull with rebase: (?:You have unstaged changes|Your index contains uncommitted changes)/i.test(rawError) || /error: (?:cannot rebase|cannot cherry-pick|cannot revert):/i.test(rawError) || /error: Your local changes to the following files would be overwritten/i.test(rawError) || /Please commit or stash them before you (?:merge|rebase|cherry-pick|revert)/i.test(rawError);
-    const is3WayConflict = rawError.includes("CONFLICT") || rawError.includes("Automatic merge failed") || rawError.includes("fix conflicts") || rawError.includes("could not apply") || rawError.includes("could not revert") || rawError.includes("git rebase --continue");
+    const is3WayConflict = hasActiveConflicts || rawError.includes("CONFLICT") || rawError.includes("Automatic merge failed") || rawError.includes("fix conflicts") || rawError.includes("could not apply") || rawError.includes("could not revert") || rawError.includes("git rebase --continue");
     let pastAction = `${actionLabel.toLowerCase()} '${targetRef}'`;
     if (actionLabel === "Checkout") {
       pastAction = `switching to '${targetRef}'`;
@@ -2960,18 +2964,13 @@ async function withSmartStashOnConflict(gitService, actionLabel, targetRef, runA
     }
     if (!isConflict) {
       if (is3WayConflict && (actionLabel === "Merge" || actionLabel === "Rebase" || actionLabel === "Cherry-Pick" || actionLabel === "Revert")) {
-        vscode5.window.showWarningMessage(
-          `${actionLabel} conflicts detected while ${pastAction}. Resolve them to complete the operation.`,
-          "Resolve Conflicts"
-        ).then((choice2) => {
-          if (choice2 === "Resolve Conflicts") {
-            vscode5.commands.executeCommand("intellij-git.resolveConflicts");
-          }
-        });
+        vscode5.commands.executeCommand("intellij-git.refreshCommit");
+        await vscode5.commands.executeCommand("intellij-git.resolveConflicts");
         onSuccess();
         return;
       }
-      vscode5.window.showErrorMessage(`${actionLabel} failed: ${rawError}`);
+      const detailErr = (err?.stderr || err?.stdout || err?.message || rawError).trim();
+      vscode5.window.showErrorMessage(`${actionLabel} failed: ${detailErr}`);
       return;
     }
     const isUntracked = /The following untracked working tree files would be overwritten/i.test(rawError);
@@ -3012,17 +3011,17 @@ IntelliJ Git can stash your changes, perform the ${actionLabel.toLowerCase()}, a
     try {
       await runAction();
     } catch (actionErr) {
-      const actMsg = actionErr?.message || String(actionErr);
-      const is3Way = actMsg.includes("CONFLICT") || actMsg.includes("Automatic merge failed") || actMsg.includes("fix conflicts") || actMsg.includes("could not apply") || actMsg.includes("could not revert") || actMsg.includes("git rebase --continue");
+      const actMsg = `${actionErr?.message || ""}
+${actionErr?.stdout || ""}
+${actionErr?.stderr || ""}`.trim() || String(actionErr);
+      const conflictInfoPost = await gitService.getConflictInfo().catch(() => null);
+      const is3Way = Boolean(conflictInfoPost && conflictInfoPost.hasConflicts && conflictInfoPost.conflicts.length > 0) || actMsg.includes("CONFLICT") || actMsg.includes("Automatic merge failed") || actMsg.includes("fix conflicts") || actMsg.includes("could not apply") || actMsg.includes("could not revert") || actMsg.includes("git rebase --continue");
       if (stashed && is3Way) {
+        vscode5.commands.executeCommand("intellij-git.refreshCommit");
+        await vscode5.commands.executeCommand("intellij-git.resolveConflicts");
         vscode5.window.showWarningMessage(
-          `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`,
-          "Resolve Conflicts"
-        ).then((res) => {
-          if (res === "Resolve Conflicts") {
-            vscode5.commands.executeCommand("intellij-git.resolveConflicts");
-          }
-        });
+          `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`
+        );
         onSuccess();
         return;
       }
@@ -3032,7 +3031,8 @@ IntelliJ Git can stash your changes, perform the ${actionLabel.toLowerCase()}, a
         } catch {
         }
       }
-      vscode5.window.showErrorMessage(`${actionLabel} failed: ${actionErr.message}`);
+      const detailErr = (actionErr?.stderr || actionErr?.stdout || actionErr?.message || actMsg).trim();
+      vscode5.window.showErrorMessage(`${actionLabel} failed: ${detailErr}`);
       return;
     }
     if (choice === smartLabel && stashed) {
@@ -3040,14 +3040,11 @@ IntelliJ Git can stash your changes, perform the ${actionLabel.toLowerCase()}, a
         await gitService.exec(["stash", "pop"]);
         vscode5.window.showInformationMessage(`${smartLabel} completed: Restored your changes.`);
       } catch (popErr) {
+        vscode5.commands.executeCommand("intellij-git.refreshCommit");
+        await vscode5.commands.executeCommand("intellij-git.resolveConflicts");
         vscode5.window.showWarningMessage(
-          `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`,
-          "Resolve Conflicts"
-        ).then((res) => {
-          if (res === "Resolve Conflicts") {
-            vscode5.commands.executeCommand("intellij-git.resolveConflicts");
-          }
-        });
+          `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`
+        );
       }
     } else if (choice === stashLabel && stashed) {
       vscode5.window.showInformationMessage(`${actionLabel} succeeded. Your changes were safely saved to Stash.`);

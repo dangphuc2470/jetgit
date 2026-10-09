@@ -51,7 +51,8 @@ export function detectInProgressOperation(rawError: string): InProgressOperation
   if (
     /MERGE_HEAD exists/i.test(rawError) ||
     /You have not concluded your merge/i.test(rawError) ||
-    /Cannot merge: You have not concluded your merge/i.test(rawError)
+    /Cannot merge: You have not concluded your merge/i.test(rawError) ||
+    /Automatic merge failed; fix conflicts/i.test(rawError)
   ) {
     return { type: 'merge', title: 'Merge' };
   }

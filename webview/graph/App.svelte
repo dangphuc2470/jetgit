@@ -10,7 +10,8 @@
     openPushDialog,
     activePushDialog,
     openGitAuthDialog,
-    activeAuthDialog
+    activeAuthDialog,
+    openCreateBranchDialog
   } from "$shared/vscodeApi";
 
   let commits = $state<any[]>([]);
@@ -95,6 +96,10 @@
         }
         case "showAuthDialog": {
           openGitAuthDialog(msg.payload);
+          break;
+        }
+        case "openCreateBranchDialog": {
+          openCreateBranchDialog(msg.payload?.startPoint);
           break;
         }
         case "authSuccess": {

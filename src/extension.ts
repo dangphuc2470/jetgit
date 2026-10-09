@@ -171,8 +171,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('intellij-git.createBranch', async (node: any) => {
+      const opened = graphViewProvider.openCreateBranchDialog(node?.ref);
+      if (opened) return;
+
       const name = await vscode.window.showInputBox({
-        prompt: 'New branch name',
+        prompt: `New branch name (from '${node?.ref || 'HEAD'}')`,
         placeHolder: 'feature/...',
       });
       if (!name) return;

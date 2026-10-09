@@ -97,9 +97,10 @@ export function openCreateBranchDialog(startPoint?: string): void {
   document.body.appendChild(overlay);
 
   const titleEl = card.querySelector('.as-cb-title') as HTMLElement;
-  titleEl.textContent = 'Create Branch from ' + displayBase;
+  titleEl.textContent = 'New Branch from \'' + displayBase + '\'';
   const nameInput = card.querySelector('#as-cb-name') as HTMLInputElement;
-  nameInput.value = baseName;
+  nameInput.value = '';
+  nameInput.placeholder = 'New branch name (e.g. feature/...)';
   const checkoutBox = card.querySelector('#as-cb-checkout') as HTMLInputElement;
   const overwriteBox = card.querySelector('#as-cb-overwrite') as HTMLInputElement;
   const btnCancel = card.querySelector('#as-cb-cancel') as HTMLElement;

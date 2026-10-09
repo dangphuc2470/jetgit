@@ -101,6 +101,18 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({ type: 'closeAllMenus' });
   }
 
+  openCreateBranchDialog(startPoint?: string): boolean {
+    if (this.view) {
+      this.view.show?.(true);
+      this.view.webview.postMessage({
+        type: 'openCreateBranchDialog',
+        payload: { startPoint },
+      });
+      return true;
+    }
+    return false;
+  }
+
   async loadInitialData(): Promise<void> {
     if (!this.initialWorkspaceRoot) {
       this.initialWorkspaceRoot = this.gitService.getCwd();

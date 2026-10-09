@@ -184,9 +184,14 @@ export async function withSmartStashOnConflict(
       if (stashed && is3Way) {
         vscode.commands.executeCommand('intellij-git.refreshCommit');
         await vscode.commands.executeCommand('intellij-git.resolveConflicts');
-        vscode.window.showWarningMessage(
-          `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`
+        const warnChoice = await vscode.window.showWarningMessage(
+          `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`,
+          'Resolve Conflicts'
         );
+        if (warnChoice === 'Resolve Conflicts') {
+          vscode.commands.executeCommand('intellij-git.refreshCommit');
+          await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+        }
         onSuccess();
         return;
       }
@@ -208,9 +213,24 @@ export async function withSmartStashOnConflict(
       } catch (popErr: any) {
         vscode.commands.executeCommand('intellij-git.refreshCommit');
         await vscode.commands.executeCommand('intellij-git.resolveConflicts');
-        vscode.window.showWarningMessage(
-          `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`
+        const warnChoice = await vscode.window.showWarningMessage(
+          `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`,
+          'Resolve Conflicts',
+          'Rollback Stash'
         );
+        if (warnChoice === 'Resolve Conflicts') {
+          vscode.commands.executeCommand('intellij-git.refreshCommit');
+          await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+        } else if (warnChoice === 'Rollback Stash') {
+          try {
+            await gitService.exec(['reset', '--hard', 'HEAD']);
+            vscode.window.showInformationMessage(`Rolled back working tree. Your changes remain safely stored in Stash.`);
+            vscode.commands.executeCommand('intellij-git.refreshCommit');
+            onSuccess();
+          } catch (rollbackErr: any) {
+            vscode.window.showErrorMessage(`Rollback failed: ${rollbackErr.message}`);
+          }
+        }
       }
     } else if (choice === stashLabel && stashed) {
       vscode.window.showInformationMessage(`${actionLabel} succeeded. Your changes were safely saved to Stash.`);

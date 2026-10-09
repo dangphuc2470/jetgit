@@ -101,24 +101,36 @@ export async function getCurrentBranch(ctx: BranchExecContext): Promise<string> 
 }
 
 export async function checkout(ctx: BranchExecContext, ref: string): Promise<void> {
+  let isRemoteBranch = false;
+  let targetRemote = '';
+  let localBranchName = '';
+
   try {
     const remotes = await ctx.getRemotes();
     for (const remote of remotes) {
       if (ref.startsWith(remote + '/')) {
-        const localBranchName = ref.slice(remote.length + 1);
-        try {
-          await ctx.exec(['fetch', remote, `refs/heads/${localBranchName}:refs/remotes/${remote}/${localBranchName}`]);
-        } catch {}
-        const branchCheck = await ctx.exec(['branch', '--list', localBranchName]);
-        if (branchCheck.trim()) {
-          await ctx.exec(['checkout', localBranchName]);
-        } else {
-          await ctx.exec(['checkout', '-b', localBranchName, '--track', ref]);
-        }
-        return;
+        isRemoteBranch = true;
+        targetRemote = remote;
+        localBranchName = ref.slice(remote.length + 1);
+        break;
       }
     }
   } catch {}
+
+  if (isRemoteBranch && targetRemote && localBranchName) {
+    try {
+      await ctx.exec(['fetch', targetRemote, `refs/heads/${localBranchName}:refs/remotes/${targetRemote}/${localBranchName}`]);
+    } catch {}
+
+    const branchCheck = await ctx.exec(['branch', '--list', localBranchName]);
+    if (branchCheck.trim()) {
+      await ctx.exec(['checkout', localBranchName]);
+    } else {
+      await ctx.exec(['checkout', '-b', localBranchName, '--track', ref]);
+    }
+    return;
+  }
+
   await ctx.exec(['checkout', ref]);
 }
 

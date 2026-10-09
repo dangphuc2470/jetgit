@@ -4,6 +4,7 @@ import {
   handleCheckoutWithConflictResolution,
   handleCheckoutAndRebaseWithConflictResolution,
 } from './conflictResolution';
+import { isBranchAlreadyExistsError } from '../../git/conflictUtils';
 
 export async function handleBranchAction(
   type: string,
@@ -67,6 +68,27 @@ export async function handleBranchAction(
         vscode.window.showInformationMessage(`Created branch ${name}`);
         host.loadInitialData();
       } catch (err: any) {
+        const rawErr = String(err?.message || err);
+        const branchExists = isBranchAlreadyExistsError(rawErr);
+        if (branchExists) {
+          const choice = await vscode.window.showErrorMessage(
+            `A branch named '${branchExists}' already exists.`,
+            `Checkout '${branchExists}'`,
+            'Force Recreate'
+          );
+          if (choice === `Checkout '${branchExists}'`) {
+            await handleCheckoutWithConflictResolution(gitService, branchExists, () => host.loadInitialData());
+          } else if (choice === 'Force Recreate') {
+            try {
+              await gitService.createBranch(branchExists, startPoint, checkout !== false, true);
+              vscode.window.showInformationMessage(`Recreated branch '${branchExists}'`);
+              host.loadInitialData();
+            } catch (createErr: any) {
+              vscode.window.showErrorMessage(`Force recreate failed: ${createErr.message}`);
+            }
+          }
+          return true;
+        }
         vscode.window.showErrorMessage(`Create branch failed: ${err.message}`);
       }
       return true;

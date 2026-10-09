@@ -133,6 +133,37 @@ export class GitService {
     return out.trim();
   }
 
+  async getGitDir(): Promise<string> {
+    try {
+      const out = await this.exec(['rev-parse', '--git-dir']);
+      const dir = out.trim();
+      if (path.isAbsolute(dir)) return dir;
+      const root = await this.getRepoRoot();
+      return path.resolve(root, dir);
+    } catch {
+      const root = await this.getRepoRoot();
+      return path.join(root, '.git');
+    }
+  }
+
+  async removeIndexLock(): Promise<boolean> {
+    try {
+      const gitDir = await this.getGitDir();
+      const lockPath = path.join(gitDir, 'index.lock');
+      if (fs.existsSync(lockPath)) {
+        await fs.promises.unlink(lockPath);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  async abortOperation(op: 'merge' | 'rebase' | 'cherry-pick' | 'revert'): Promise<void> {
+    await this.exec([op, '--abort']);
+  }
+
   async getCurrentUser(): Promise<{ name: string; email: string }> {
     let name = '';
     let email = '';

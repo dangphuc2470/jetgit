@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import { GraphActionHost } from './types';
-import { handlePullWithConflictResolution } from './conflictResolution';
+import {
+  handlePullWithConflictResolution,
+  withSmartStashOnConflict,
+} from './conflictResolution';
+import { isPushRejectedError } from '../../git/conflictUtils';
 
 export async function handleRemoteAction(
   type: string,
@@ -211,6 +215,58 @@ export async function handleRemoteAction(
             vscode.commands.executeCommand('intellij-git.refreshBranches');
             host.view?.webview.postMessage({ type: 'pushSuccess' });
           } catch (err: any) {
+            const rawErr = String(err?.message || err);
+            if (isPushRejectedError(rawErr)) {
+              host.view?.webview.postMessage({ type: 'pushError', payload: { error: err.message } });
+              const currentBranch = branch || await gitService.getCurrentBranch().catch(() => '');
+              const choice = await vscode.window.showErrorMessage(
+                `Push rejected: Remote repository has newer changes that you do not have locally. Update your branch first.`,
+                'Pull (Rebase)',
+                'Pull (Merge)'
+              );
+              if (choice === 'Pull (Rebase)') {
+                await vscode.window.withProgress(
+                  {
+                    location: vscode.ProgressLocation.Notification,
+                    title: `Pulling changes with rebase...`,
+                    cancellable: false,
+                  },
+                  async () => {
+                    await withSmartStashOnConflict(
+                      gitService,
+                      'Rebase',
+                      currentBranch,
+                      async () => {
+                        await gitService.exec(['pull', '--rebase']);
+                        vscode.window.showInformationMessage(`Pulled remote changes with rebase. You can now push your commits.`);
+                      },
+                      () => host.loadInitialData()
+                    );
+                  }
+                );
+              } else if (choice === 'Pull (Merge)') {
+                await vscode.window.withProgress(
+                  {
+                    location: vscode.ProgressLocation.Notification,
+                    title: `Pulling changes with merge...`,
+                    cancellable: false,
+                  },
+                  async () => {
+                    await withSmartStashOnConflict(
+                      gitService,
+                      'Merge',
+                      currentBranch,
+                      async () => {
+                        await gitService.exec(['pull', '--no-rebase']);
+                        vscode.window.showInformationMessage(`Merged remote changes into local branch. You can now push your commits.`);
+                      },
+                      () => host.loadInitialData()
+                    );
+                  }
+                );
+              }
+              return;
+            }
             vscode.window.showErrorMessage(`Push failed: ${err.message}`);
             host.view?.webview.postMessage({ type: 'pushError', payload: { error: err.message } });
           }

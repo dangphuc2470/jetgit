@@ -1,20 +1,27 @@
 import * as vscode from 'vscode';
 import { GitService } from '../../git/gitService';
 
-export {
-  type SmartActionLabel,
-  isDirtyTreeConflict,
-  isThreeWayConflict,
-  extractOverwrittenFiles,
-  makeStashName,
-} from '../../git/conflictUtils';
 import {
   type SmartActionLabel,
   isDirtyTreeConflict,
   isThreeWayConflict,
   extractOverwrittenFiles,
   makeStashName,
+  detectInProgressOperation,
+  isIndexLockError,
+  isBranchAlreadyExistsError,
 } from '../../git/conflictUtils';
+
+export {
+  type SmartActionLabel,
+  isDirtyTreeConflict,
+  isThreeWayConflict,
+  extractOverwrittenFiles,
+  makeStashName,
+  detectInProgressOperation,
+  isIndexLockError,
+  isBranchAlreadyExistsError,
+};
 
 export async function withSmartStashOnConflict(
   gitService: GitService,
@@ -30,6 +37,58 @@ export async function withSmartStashOnConflict(
     const rawError = `${err?.message || ''}\n${err?.stdout || ''}\n${err?.stderr || ''}`.trim() || String(err);
     const conflictInfo = await gitService.getConflictInfo().catch(() => null);
     const hasActiveConflicts = Boolean(conflictInfo && conflictInfo.hasConflicts && conflictInfo.conflicts.length > 0);
+
+    const inProgress = detectInProgressOperation(rawError);
+    if (inProgress) {
+      const choice = await vscode.window.showErrorMessage(
+        `Cannot ${actionLabel.toLowerCase()}: A ${inProgress.title} operation is currently in progress.`,
+        { modal: true },
+        'Resolve Conflicts',
+        `Abort ${inProgress.title}`
+      );
+      if (choice === 'Resolve Conflicts') {
+        vscode.commands.executeCommand('intellij-git.refreshCommit');
+        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+      } else if (choice === `Abort ${inProgress.title}`) {
+        try {
+          await gitService.abortOperation(inProgress.type);
+          vscode.window.showInformationMessage(`Aborted ${inProgress.title} successfully.`);
+          onSuccess();
+        } catch (abortErr: any) {
+          vscode.window.showErrorMessage(`Failed to abort ${inProgress.title}: ${abortErr.message}`);
+        }
+      }
+      return;
+    }
+
+    if (isIndexLockError(rawError)) {
+      const choice = await vscode.window.showErrorMessage(
+        `Git index is locked by another process (.git/index.lock). Would you like to remove the lock and retry?`,
+        'Unlock & Retry'
+      );
+      if (choice === 'Unlock & Retry') {
+        const unlocked = await gitService.removeIndexLock();
+        if (unlocked) {
+          vscode.window.showInformationMessage('Removed .git/index.lock. Retrying action...');
+          return withSmartStashOnConflict(gitService, actionLabel, targetRef, runAction, onSuccess);
+        } else {
+          vscode.window.showErrorMessage('Could not remove .git/index.lock. Please check if another Git process is still active.');
+        }
+      }
+      return;
+    }
+
+    const branchExists = isBranchAlreadyExistsError(rawError);
+    if (branchExists) {
+      const choice = await vscode.window.showErrorMessage(
+        `A branch named '${branchExists}' already exists.`,
+        `Switch to '${branchExists}'`
+      );
+      if (choice === `Switch to '${branchExists}'`) {
+        await handleCheckoutWithConflictResolution(gitService, branchExists, onSuccess);
+      }
+      return;
+    }
 
     const isConflict = isDirtyTreeConflict(rawError);
     const is3WayConflict = isThreeWayConflict(rawError, hasActiveConflicts);
@@ -57,6 +116,17 @@ export async function withSmartStashOnConflict(
         return;
       }
       const detailErr = (err?.stderr || err?.stdout || err?.message || rawError).trim();
+      if (is3WayConflict) {
+        const choice = await vscode.window.showErrorMessage(
+          `${actionLabel} resulted in conflicts: ${detailErr}`,
+          'Resolve Conflicts'
+        );
+        if (choice === 'Resolve Conflicts') {
+          vscode.commands.executeCommand('intellij-git.refreshCommit');
+          await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+        }
+        return;
+      }
       vscode.window.showErrorMessage(`${actionLabel} failed: ${detailErr}`);
       return;
     }

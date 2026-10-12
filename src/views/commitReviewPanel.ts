@@ -352,6 +352,9 @@ export class CommitReviewPanel {
     );
     const nonce = getNonce();
     const tokens = getThemeTokens();
+    const editorConfig = vscode.workspace.getConfiguration('editor');
+    const fontFamily = editorConfig.get<string>('fontFamily') || '"JetBrains Mono", Consolas, monospace';
+    const fontSize = editorConfig.get<number>('fontSize') || 13;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -363,6 +366,8 @@ export class CommitReviewPanel {
   <link rel="stylesheet" href="${styleUri}">
   <style id="dynamic-syntax-tokens">
     :root {
+      --vscode-editor-font-family: ${fontFamily} !important;
+      --vscode-editor-font-size: ${fontSize}px !important;
       --syn-kwd: ${tokens.kwd} !important;
       --syn-type: ${tokens.type} !important;
       --syn-fn: ${tokens.fn} !important;

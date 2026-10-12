@@ -257,13 +257,10 @@ function render(): void {
       }
     }
 
-    const isEditable = !state.readOnly;
-    const editableAttr = isEditable ? 'contenteditable="plaintext-only" spellcheck="false"' : '';
-
     rightHtml += `
-      <div class="${rowClass}" data-line="${lineNum}">
+      <div class="${rowClass} in-right" data-line="${lineNum}">
         <span class="gutter-num">${lineNum}</span>
-        <span class="line-content" ${editableAttr}>${contentHtml || '&nbsp;'}</span>
+        <span class="line-content" data-line="${lineNum}">${contentHtml || '&nbsp;'}</span>
       </div>
     `;
   });
@@ -277,39 +274,351 @@ function render(): void {
   });
   rightPane.innerHTML = `<div class="editor-lines-container">${rightHtml}${rightInsertionsHtml}</div>`;
 
+  let activeEditableSpan: HTMLElement | null = null;
+  let isMouseDragging = false;
+  let mouseDownPos = { x: 0, y: 0 };
+
+  function deactivateCurrentEditable(): void {
+    if (!activeEditableSpan) return;
+    const oldSpan = activeEditableSpan;
+    activeEditableSpan = null;
+    const lineRow = oldSpan.closest('.editor-line');
+    const lineNum = parseInt(lineRow?.getAttribute('data-line') || '1', 10);
+    const curText = (oldSpan.textContent || '').replace(/\u00A0/g, ' ');
+    if (state.currentLines[lineNum - 1] !== curText) {
+      pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
+      state.currentLines[lineNum - 1] = curText;
+      triggerSave(vscode);
+    }
+    oldSpan.removeAttribute('contenteditable');
+    oldSpan.classList.remove('active-editing');
+  }
+
+  function activateLineEditing(span: HTMLElement, clientX?: number, clientY?: number, explicitOffset?: number): void {
+    if (state.readOnly) return;
+    if (activeEditableSpan && activeEditableSpan !== span) {
+      deactivateCurrentEditable();
+    }
+    activeEditableSpan = span;
+    span.setAttribute('contenteditable', 'plaintext-only');
+    span.setAttribute('spellcheck', 'false');
+    span.classList.add('active-editing');
+    span.focus();
+
+    if (explicitOffset !== undefined) {
+      setCaretPosition(span, explicitOffset);
+    } else if (clientX !== undefined && clientY !== undefined) {
+      const docAny = document as any;
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(clientX, clientY);
+        if (range) {
+          const sel = window.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+      } else if (docAny.caretPositionFromPoint) {
+        const pos = docAny.caretPositionFromPoint(clientX, clientY);
+        if (pos) {
+          const range = document.createRange();
+          range.setStart(pos.offsetNode, pos.offset);
+          range.collapse(true);
+          const sel = window.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+      }
+    }
+  }
+
+  function getOffsetInSpan(span: HTMLElement, targetNode: Node, targetOffset: number): number {
+    if (targetNode === span) {
+      if (targetOffset === 0) return 0;
+      return (span.textContent || '').replace(/\u00A0/g, ' ').length;
+    }
+    let offset = 0;
+    let found = false;
+
+    function walk(node: Node): void {
+      if (found) return;
+      if (node === targetNode) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          offset += Math.min(targetOffset, (node.nodeValue || '').length);
+        }
+        found = true;
+        return;
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        offset += (node.nodeValue || '').length;
+      } else {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          walk(node.childNodes[i]);
+          if (found) return;
+        }
+      }
+    }
+
+    walk(span);
+    return offset;
+  }
+
+  interface SelectionInfo {
+    isMultiLine: boolean;
+    startLine: number;
+    startOffset: number;
+    endLine: number;
+    endOffset: number;
+    selectedText: string;
+  }
+
+  function getRightPaneSelection(): SelectionInfo | null {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    const range = sel.getRangeAt(0);
+
+    const startLineEl = (range.startContainer.nodeType === Node.ELEMENT_NODE
+      ? range.startContainer as HTMLElement
+      : range.startContainer.parentElement)?.closest('.editor-pane.right-pane .editor-line') as HTMLElement | null;
+
+    const endLineEl = (range.endContainer.nodeType === Node.ELEMENT_NODE
+      ? range.endContainer as HTMLElement
+      : range.endContainer.parentElement)?.closest('.editor-pane.right-pane .editor-line') as HTMLElement | null;
+
+    if (!startLineEl || !endLineEl) return null;
+
+    let startLine = parseInt(startLineEl.getAttribute('data-line') || '1', 10);
+    let endLine = parseInt(endLineEl.getAttribute('data-line') || '1', 10);
+
+    const startSpan = startLineEl.querySelector('.line-content') as HTMLElement | null;
+    const endSpan = endLineEl.querySelector('.line-content') as HTMLElement | null;
+    if (!startSpan || !endSpan) return null;
+
+    let startOffset = getOffsetInSpan(startSpan, range.startContainer, range.startOffset);
+    let endOffset = getOffsetInSpan(endSpan, range.endContainer, range.endOffset);
+
+    if (startLine > endLine || (startLine === endLine && startOffset > endOffset)) {
+      const tmpL = startLine; startLine = endLine; endLine = tmpL;
+      const tmpO = startOffset; startOffset = endOffset; endOffset = tmpO;
+    }
+
+    const selectedText = sel.toString();
+    if (!selectedText) return null;
+
+    return {
+      isMultiLine: startLine !== endLine,
+      startLine,
+      startOffset,
+      endLine,
+      endOffset,
+      selectedText
+    };
+  }
+
+  function deleteSelectionRange(selInfo: SelectionInfo): void {
+    pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
+    const startText = state.currentLines[selInfo.startLine - 1] || '';
+    const endText = state.currentLines[selInfo.endLine - 1] || '';
+    const before = startText.slice(0, Math.min(selInfo.startOffset, startText.length));
+    const after = endText.slice(Math.min(selInfo.endOffset, endText.length));
+    const combined = before + after;
+
+    state.currentLines[selInfo.startLine - 1] = combined;
+    const deleteCount = selInfo.endLine - selInfo.startLine;
+    if (deleteCount > 0) {
+      state.currentLines.splice(selInfo.startLine, deleteCount);
+    }
+    triggerSave(vscode, selInfo.startLine, selInfo.startOffset);
+  }
+
+  function replaceSelectionWithText(selInfo: SelectionInfo, insertedText: string): void {
+    pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
+    const startText = state.currentLines[selInfo.startLine - 1] || '';
+    const endText = state.currentLines[selInfo.endLine - 1] || '';
+    const before = startText.slice(0, Math.min(selInfo.startOffset, startText.length));
+    const after = endText.slice(Math.min(selInfo.endOffset, endText.length));
+
+    const insertLines = insertedText.split(/\r?\n/);
+    if (insertLines.length === 1) {
+      state.currentLines[selInfo.startLine - 1] = before + insertLines[0] + after;
+      const deleteCount = selInfo.endLine - selInfo.startLine;
+      if (deleteCount > 0) {
+        state.currentLines.splice(selInfo.startLine, deleteCount);
+      }
+      triggerSave(vscode, selInfo.startLine, selInfo.startOffset + insertLines[0].length);
+    } else {
+      const firstLine = before + insertLines[0];
+      const lastLine = insertLines[insertLines.length - 1] + after;
+      const middleLines = insertLines.slice(1, -1);
+      const newBlock = [firstLine, ...middleLines, lastLine];
+
+      const deleteCount = selInfo.endLine - selInfo.startLine + 1;
+      state.currentLines.splice(selInfo.startLine - 1, deleteCount, ...newBlock);
+      const targetLine = selInfo.startLine + insertLines.length - 1;
+      const targetOffset = insertLines[insertLines.length - 1].length;
+      triggerSave(vscode, targetLine, targetOffset);
+    }
+  }
+
+  function indentLines(fromLine: number, toLine: number, unindent: boolean): void {
+    pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
+    for (let l = fromLine; l <= toLine; l++) {
+      const idx = l - 1;
+      if (idx < 0 || idx >= state.currentLines.length) continue;
+      const line = state.currentLines[idx];
+      if (unindent) {
+        if (line.startsWith('  ')) {
+          state.currentLines[idx] = line.slice(2);
+        } else if (line.startsWith(' ')) {
+          state.currentLines[idx] = line.slice(1);
+        } else if (line.startsWith('\t')) {
+          state.currentLines[idx] = line.slice(1);
+        }
+      } else {
+        state.currentLines[idx] = '  ' + line;
+      }
+    }
+    triggerSave(vscode, fromLine, 0);
+  }
+
   // Inline editing events
   if (!state.readOnly) {
-    let isEditingSession = false;
+    rightPane.addEventListener('mousedown', (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button, input, .block-chk')) return;
+
+      isMouseDragging = false;
+      mouseDownPos = { x: e.clientX, y: e.clientY };
+
+      const targetLine = target.closest('.editor-line');
+      const targetSpan = targetLine?.querySelector('.line-content') as HTMLElement | null;
+
+      if (activeEditableSpan && activeEditableSpan !== targetSpan) {
+        deactivateCurrentEditable();
+      }
+    });
+
+    rightPane.addEventListener('mousemove', (e: MouseEvent) => {
+      if (e.buttons === 1) {
+        const dx = Math.abs(e.clientX - mouseDownPos.x);
+        const dy = Math.abs(e.clientY - mouseDownPos.y);
+        if (dx > 4 || dy > 4) {
+          if (!isMouseDragging) {
+            isMouseDragging = true;
+            if (activeEditableSpan) {
+              deactivateCurrentEditable();
+            }
+          }
+        }
+      }
+    });
+
+    rightPane.addEventListener('mouseup', (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button, input, .block-chk')) return;
+
+      const sel = window.getSelection();
+      const hasRange = sel && !sel.isCollapsed && sel.toString().length > 0;
+
+      if (!hasRange) {
+        const targetLine = target.closest('.editor-line');
+        const targetSpan = targetLine?.querySelector('.line-content') as HTMLElement | null;
+        if (targetSpan) {
+          activateLineEditing(targetSpan, e.clientX, e.clientY);
+        }
+      }
+      isMouseDragging = false;
+    });
+
+    rightPane.addEventListener('paste', (e: ClipboardEvent) => {
+      const selInfo = getRightPaneSelection();
+      if (selInfo) {
+        e.preventDefault();
+        const text = e.clipboardData?.getData('text') || '';
+        if (text) {
+          replaceSelectionWithText(selInfo, text);
+        }
+      }
+    });
+
+    rightPane.addEventListener('keydown', (e: KeyboardEvent) => {
+      const selInfo = getRightPaneSelection();
+      if (selInfo) {
+        const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z');
+        const isRedo = ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) ||
+                       ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y'));
+        if (isUndo) {
+          e.preventDefault();
+          performUndo(vscode);
+          return;
+        }
+        if (isRedo) {
+          e.preventDefault();
+          performRedo(vscode);
+          return;
+        }
+
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'x' || e.key === 'X')) {
+          e.preventDefault();
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(selInfo.selectedText).catch(() => {});
+          }
+          deleteSelectionRange(selInfo);
+          return;
+        }
+
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C' || e.key === 'a' || e.key === 'A')) {
+          return;
+        }
+
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+          e.preventDefault();
+          deleteSelectionRange(selInfo);
+          return;
+        }
+
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const startText = state.currentLines[selInfo.startLine - 1] || '';
+          const matchIndent = startText.slice(0, selInfo.startOffset).match(/^(\s*)/);
+          const indent = matchIndent ? matchIndent[1] : '';
+          replaceSelectionWithText(selInfo, '\n' + indent);
+          return;
+        }
+
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          if (selInfo.isMultiLine) {
+            indentLines(selInfo.startLine, selInfo.endLine, e.shiftKey);
+          } else {
+            replaceSelectionWithText(selInfo, '  ');
+          }
+          return;
+        }
+
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          replaceSelectionWithText(selInfo, e.key);
+          return;
+        }
+      }
+    });
 
     rightPane.querySelectorAll('.line-content').forEach(span => {
       const lineRow = span.closest('.editor-line');
       const lineNum = parseInt(lineRow?.getAttribute('data-line') || '1', 10);
 
-      span.addEventListener('focus', () => {
-        isEditingSession = false;
-      });
-
-      span.addEventListener('blur', () => {
-        isEditingSession = false;
-        const curText = (span.textContent || '').replace(/\u00A0/g, ' ');
-        if (state.currentLines[lineNum - 1] !== curText) {
-          pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
-          state.currentLines[lineNum - 1] = curText;
-          triggerSave(vscode);
-        }
-      });
-
       span.addEventListener('input', () => {
-        if (!isEditingSession) {
-          pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
-          isEditingSession = true;
-        }
         const curText = (span.textContent || '').replace(/\u00A0/g, ' ');
         state.currentLines[lineNum - 1] = curText;
         queueDebouncedSave(vscode, lineNum, getCaretOffset(span as HTMLElement));
       });
 
       span.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (getRightPaneSelection()) return;
+
         const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z');
         const isRedo = ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) ||
                        ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y'));
@@ -327,27 +636,20 @@ function render(): void {
         }
 
         if ((e.metaKey || e.ctrlKey) && (e.key === 'x' || e.key === 'X')) {
-          const sel = window.getSelection();
-          const selectedText = sel ? sel.toString() : '';
-          if (!selectedText) {
-            e.preventDefault();
-            pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
-            const lineText = state.currentLines[lineNum - 1] || '';
-
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(lineText + '\n').catch(() => {});
-            }
-
-            if (state.currentLines.length > 1) {
-              state.currentLines.splice(lineNum - 1, 1);
-            } else {
-              state.currentLines[0] = '';
-            }
-
-            const nextLine = Math.min(lineNum, state.currentLines.length);
-            triggerSave(vscode, nextLine, 0);
-            return;
+          e.preventDefault();
+          pushHistoryState(state.currentLines.join('\n'), rightPane.scrollTop);
+          const lineText = state.currentLines[lineNum - 1] || '';
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(lineText + '\n').catch(() => {});
           }
+          if (state.currentLines.length > 1) {
+            state.currentLines.splice(lineNum - 1, 1);
+          } else {
+            state.currentLines[0] = '';
+          }
+          const nextLine = Math.min(lineNum, state.currentLines.length);
+          triggerSave(vscode, nextLine, 0);
+          return;
         }
 
         if ((e.metaKey || e.ctrlKey) && (e.key === 's' || (e as any).keyCode === 83)) {
@@ -665,8 +967,7 @@ function render(): void {
     requestAnimationFrame(() => {
       const lineEl = rightPane.querySelector(`.editor-line[data-line="${target.focusLine}"] .line-content`) as HTMLElement | null;
       if (lineEl) {
-        lineEl.focus();
-        setCaretPosition(lineEl, target.focusOffset || 0);
+        activateLineEditing(lineEl, undefined, undefined, target.focusOffset || 0);
       }
     });
   }

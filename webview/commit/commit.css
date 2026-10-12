@@ -967,6 +967,12 @@ body, html {
   user-select: none !important;
 }
 
+.line-text,
+.line-text * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
 .line-text {
   flex: 1;
   padding-left: 4px;
@@ -1602,6 +1608,12 @@ body, html {
   user-select: text !important;
   -webkit-user-select: text !important;
   cursor: text !important;
+}
+
+.editor-line .line-content,
+.editor-line .line-content * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 /* Clean & seamless text selection across editor pane */

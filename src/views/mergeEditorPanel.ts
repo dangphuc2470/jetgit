@@ -4,7 +4,6 @@ import * as fs from 'fs';
 import { GitService } from '../git/gitService';
 import { ConflictsDialogPanel } from './conflictsDialogPanel';
 import { getThemeTokens, getNonce } from '../utils/themeTokens';
-import { getMergeEditorHtml } from './mergeEditorHtml';
 import { MergeToExtensionMessage, ExtensionToMergeMessage } from '../shared/protocol';
 
 interface ConflictHunk {
@@ -267,9 +266,25 @@ export class MergeEditorPanel {
   }
 
   private getHtml(): string {
+    const webview = this.panel.webview;
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'merge', 'merge.js'),
+    );
     const nonce = getNonce();
-    const tokens = getThemeTokens();
-    return getMergeEditorHtml(this.panel.webview.cspSource, nonce, tokens);
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3-Way Merge Editor</title>
+</head>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
+  <div id="app"></div>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
   }
 
   public dispose(): void {

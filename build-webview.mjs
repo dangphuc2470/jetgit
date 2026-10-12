@@ -11,6 +11,7 @@ const entries = [
   { input: 'webview/rebase/main.ts', outfile: 'dist/webview/rebase/rebase.js' },
   { input: 'webview/commit/main.ts', outfile: 'dist/webview/commit/commit.js' },
   { input: 'webview/review/main.ts', outfile: 'dist/webview/commit/review.js' },
+  { input: 'webview/merge/main.ts', outfile: 'dist/webview/merge/merge.js' },
 ];
 
 for (const entry of entries) {

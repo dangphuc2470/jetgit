@@ -169,6 +169,8 @@ export function jumpDiff(direction: number, vscode: any): void {
     if (direction > 0 && state.currentFileIndex < state.filesList.length - 1) {
       if (pendingNextFile) {
         hideDiffNavigationHint();
+        state.pendingJumpDirection = 1;
+        state.pendingFromFileList = true;
         vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex + 1 });
       } else {
         pendingNextFile = true;
@@ -195,6 +197,8 @@ export function jumpDiff(direction: number, vscode: any): void {
       if (hasNextFile) {
         if (pendingNextFile) {
           hideDiffNavigationHint();
+          state.pendingJumpDirection = 1;
+          state.pendingFromFileList = true;
           vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex + 1 });
         } else {
           pendingNextFile = true;
@@ -220,6 +224,8 @@ export function jumpDiff(direction: number, vscode: any): void {
       if (hasPrevFile) {
         if (pendingPrevFile) {
           hideDiffNavigationHint();
+          state.pendingJumpDirection = -1;
+          state.pendingFromFileList = true;
           vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex - 1 });
         } else {
           pendingPrevFile = true;

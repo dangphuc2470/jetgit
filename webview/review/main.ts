@@ -22,13 +22,17 @@ import {
 declare function acquireVsCodeApi(): any;
 const vscode = acquireVsCodeApi();
 
-const app = document.getElementById('app') as HTMLElement;
+let lastRenderedFilePath = '';
 
 function render(): void {
   if (!app) return;
+  const isSameFile = (lastRenderedFilePath === state.filePath && state.filePath !== '');
   const rPaneOld = document.querySelector('.editor-pane.right-pane') as HTMLElement | null;
-  if (rPaneOld) {
+  if (rPaneOld && isSameFile) {
     runtime.savedScrollTop = rPaneOld.scrollTop;
+  } else if (!isSameFile) {
+    runtime.savedScrollTop = null;
+    lastRenderedFilePath = state.filePath;
   }
 
   runtime.isRendering = true;
@@ -961,7 +965,15 @@ function render(): void {
       runtime.isRendering = false;
       updateRibbons();
       if (state.blocks && state.blocks.length > 0) {
-        jumpToBlock(0, false);
+        const targetDir = (state.pendingJumpDirection !== null && state.pendingJumpDirection !== undefined)
+          ? state.pendingJumpDirection
+          : 1;
+        state.pendingJumpDirection = null;
+        state.pendingFromFileList = null;
+        const targetIdx = targetDir > 0 ? 0 : state.blocks.length - 1;
+        jumpToBlock(targetIdx, false);
+        window.focus();
+        rightPane.focus();
       }
     }
   });
@@ -1003,12 +1015,16 @@ function attachToolbarEvents(toolbar: HTMLElement, vscode: any): void {
 
   toolbar.querySelector('#btn-prev-file')?.addEventListener('click', () => {
     if (state.currentFileIndex > 0) {
+      state.pendingJumpDirection = -1;
+      state.pendingFromFileList = true;
       vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex - 1 });
     }
   });
 
   toolbar.querySelector('#btn-next-file')?.addEventListener('click', () => {
     if (state.currentFileIndex < state.filesList.length - 1) {
+      state.pendingJumpDirection = 1;
+      state.pendingFromFileList = true;
       vscode.postMessage({ type: 'navigateFile', payload: state.currentFileIndex + 1 });
     }
   });
@@ -1143,6 +1159,7 @@ window.addEventListener('message', (event) => {
         runtime.isRendering = false;
         runtime.activeScroller = null;
         runtime.savedScrollTop = null;
+        lastRenderedFilePath = '';
         undoStack.length = 0;
         redoStack.length = 0;
       }

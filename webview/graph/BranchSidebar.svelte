@@ -59,6 +59,7 @@
   let searchQuery = $state("");
   let searchInputEl = $state<HTMLInputElement>();
   let folderCollapseMap = $state<Record<string, boolean>>({});
+  let searchFolderCollapseMap = $state<Record<string, boolean>>({});
   let sectionCollapseMap = $state<Record<string, boolean>>({
     Local: false,
     Remote: false,
@@ -163,6 +164,12 @@
   $effect(() => {
     if (currentRepoKey) {
       loadFolderStates(currentRepoKey);
+    }
+  });
+
+  $effect(() => {
+    if (!queryTrimmed) {
+      searchFolderCollapseMap = {};
     }
   });
 
@@ -607,7 +614,15 @@
   }
 
   function toggleFolder(fullPath: string, defaultCollapsed: boolean) {
-    const isCurrentlyCollapsed = queryTrimmed ? false : (fullPath in folderCollapseMap ? folderCollapseMap[fullPath] : defaultCollapsed);
+    if (queryTrimmed) {
+      const isCurrentlyCollapsed = searchFolderCollapseMap[fullPath] ?? false;
+      searchFolderCollapseMap = {
+        ...searchFolderCollapseMap,
+        [fullPath]: !isCurrentlyCollapsed
+      };
+      return;
+    }
+    const isCurrentlyCollapsed = fullPath in folderCollapseMap ? folderCollapseMap[fullPath] : defaultCollapsed;
     folderCollapseMap = {
       ...folderCollapseMap,
       [fullPath]: !isCurrentlyCollapsed
@@ -623,6 +638,29 @@
   }
 
   function expandOrCollapseAll() {
+    if (queryTrimmed) {
+      const visiblePaths: string[] = [];
+      const collectPaths = (node: TreeNode) => {
+        if (node.folders) {
+          for (const k in node.folders) {
+            const sub = node.folders[k];
+            visiblePaths.push(sub.fullPath);
+            collectPaths(sub);
+          }
+        }
+      };
+      collectPaths(localTreeData.root);
+      collectPaths(remoteTreeData.root);
+
+      const anyOpen = visiblePaths.some(p => !(searchFolderCollapseMap[p] ?? false));
+      const nextMap: Record<string, boolean> = {};
+      visiblePaths.forEach(p => {
+        nextMap[p] = anyOpen;
+      });
+      searchFolderCollapseMap = nextMap;
+      return;
+    }
+
     const anyOpen = Object.values(sectionCollapseMap).some(v => !v) || Object.values(folderCollapseMap).some(v => !v);
     const shouldCollapse = anyOpen;
     sectionCollapseMap = {
@@ -1158,7 +1196,9 @@
 <!-- SVELTE 5 FOLDER ITEM SNIPPET -->
 {#snippet renderFolderItem(subNode: TreeNode, fk: string, isRemoteTree: boolean)}
   {@const defaultCollapsed = !hasCurrentBranchInNode(subNode)}
-  {@const isCollapsed = queryTrimmed ? false : (subNode.fullPath in folderCollapseMap ? folderCollapseMap[subNode.fullPath] : defaultCollapsed)}
+  {@const isCollapsed = queryTrimmed
+    ? (searchFolderCollapseMap[subNode.fullPath] ?? false)
+    : (subNode.fullPath in folderCollapseMap ? folderCollapseMap[subNode.fullPath] : defaultCollapsed)}
 
   <div class="tree-folder">
     <div

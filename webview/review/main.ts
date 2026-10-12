@@ -339,6 +339,16 @@ function render(): void {
       if (targetOffset === 0) return 0;
       return (span.textContent || '').replace(/\u00A0/g, ' ').length;
     }
+    if (!span.contains(targetNode)) {
+      const line = span.closest('.editor-line');
+      if (line && line.contains(targetNode)) {
+        const gutter = line.querySelector('.gutter-num');
+        if (gutter && (gutter === targetNode || gutter.contains(targetNode))) {
+          return 0;
+        }
+      }
+      return 0;
+    }
     let offset = 0;
     let found = false;
 
@@ -379,13 +389,27 @@ function render(): void {
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
     const range = sel.getRangeAt(0);
 
-    const startLineEl = (range.startContainer.nodeType === Node.ELEMENT_NODE
+    let startLineEl = (range.startContainer.nodeType === Node.ELEMENT_NODE
       ? range.startContainer as HTMLElement
       : range.startContainer.parentElement)?.closest('.editor-pane.right-pane .editor-line') as HTMLElement | null;
 
-    const endLineEl = (range.endContainer.nodeType === Node.ELEMENT_NODE
+    let endLineEl = (range.endContainer.nodeType === Node.ELEMENT_NODE
       ? range.endContainer as HTMLElement
       : range.endContainer.parentElement)?.closest('.editor-pane.right-pane .editor-line') as HTMLElement | null;
+
+    if (!startLineEl && range.startContainer.nodeType === Node.ELEMENT_NODE) {
+      const el = range.startContainer as HTMLElement;
+      if (el.classList.contains('editor-lines-container')) {
+        startLineEl = (el.children[range.startOffset] as HTMLElement)?.closest('.editor-line') || null;
+      }
+    }
+    if (!endLineEl && range.endContainer.nodeType === Node.ELEMENT_NODE) {
+      const el = range.endContainer as HTMLElement;
+      if (el.classList.contains('editor-lines-container')) {
+        const idx = Math.max(0, range.endOffset - 1);
+        endLineEl = (el.children[idx] as HTMLElement)?.closest('.editor-line') || null;
+      }
+    }
 
     if (!startLineEl || !endLineEl) return null;
 

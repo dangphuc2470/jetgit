@@ -353,7 +353,19 @@ export class CommitReviewPanel {
     const nonce = getNonce();
     const tokens = getThemeTokens();
     const editorConfig = vscode.workspace.getConfiguration('editor');
-    const fontFamily = editorConfig.get<string>('fontFamily') || '"JetBrains Mono", Consolas, monospace';
+    const rawFontFamily = editorConfig.get<string>('fontFamily') || '"JetBrains Mono", Consolas, monospace';
+    const safeFontFamily = rawFontFamily
+      .split(',')
+      .map(f => {
+        const trimmed = f.trim();
+        if (!trimmed) return '';
+        if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+          return trimmed;
+        }
+        return `"${trimmed}"`;
+      })
+      .filter(Boolean)
+      .join(', ');
     const fontSize = editorConfig.get<number>('fontSize') || 13;
 
     return `<!DOCTYPE html>
@@ -366,7 +378,7 @@ export class CommitReviewPanel {
   <link rel="stylesheet" href="${styleUri}">
   <style id="dynamic-syntax-tokens">
     :root {
-      --vscode-editor-font-family: ${fontFamily} !important;
+      --vscode-editor-font-family: ${safeFontFamily} !important;
       --vscode-editor-font-size: ${fontSize}px !important;
       --syn-kwd: ${tokens.kwd} !important;
       --syn-type: ${tokens.type} !important;

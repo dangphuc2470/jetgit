@@ -345,7 +345,7 @@
   });
 </script>
 
-<div id="app">
+<div class="merge-editor-container">
   <!-- Top Toolbar -->
   <MergeToolbar
     {filePath}
@@ -503,7 +503,8 @@
     padding: 0;
   }
   :global(body),
-  :global(html) {
+  :global(html),
+  :global(#app) {
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -512,11 +513,12 @@
     font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
     font-size: 12px;
   }
-  #app {
+  .merge-editor-container {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .columns-header {
@@ -562,6 +564,7 @@
 
   .viewport-wrapper {
     flex: 1;
+    min-height: 0;
     display: flex;
     position: relative;
     overflow: hidden;
@@ -654,6 +657,7 @@
     width: 44px;
     min-width: 44px;
     max-width: 44px;
+    align-self: stretch;
     height: 100%;
     overflow: hidden;
     position: relative;

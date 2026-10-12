@@ -29,22 +29,24 @@ This document outlines the systematic migration strategy to convert all remainin
 
 ## 3. Phased Execution Roadmap
 
-### Phase 1: 3-Way Merge Editor Migration (`webview/merge/`)
-**Priority:** High (Directly addresses performance, layout thrashing, and template string cleanup)
+### Phase 1: 3-Way Merge Editor Migration (`webview/merge/`) - COMPLETED
+**Status:** Completed (Commit `deb2201`)
+**Key Results:**
+- Replaced 902 lines of template string code (`mergeEditorHtml.ts`, `mergeEditorScript.ts`, `mergeEditorStyles.ts`) with idiomatic Svelte 5 components (`App.svelte`, `MergeToolbar.svelte`).
+- Synchronized scrolling and SVG ribbon updates powered by `requestAnimationFrame`, eliminating synchronous layout thrashing.
+- Fully verified in headless rendering harness with 100% visual and behavioral parity.
 
 1. **Build Configuration:**
-   - Add entry `{ input: 'webview/merge/main.ts', outfile: 'dist/webview/merge/merge.js' }` to `build-webview.mjs`.
+   - Added entry `{ input: 'webview/merge/main.ts', outfile: 'dist/webview/merge/merge.js' }` to `build-webview.mjs`.
 2. **Component Architecture:**
-   - `webview/merge/App.svelte`: Root orchestrator managing 3-pane state (Yours, Result, Theirs), active conflict index, and layout metrics.
-   - `webview/merge/MergeToolbar.svelte`: Actions bar containing Accept Left, Accept Right, Resolve All Ours, Resolve All Theirs, Apply, and Cancel.
-   - `webview/merge/MergeColumn.svelte`: Reusable single-pane editor column with line numbers, diff highlight classes, and editable result buffer.
-   - `webview/merge/MergeRibbons.svelte`: SVG canvas drawing bezier curved ribbons linking corresponding conflict blocks across gutters.
+   - `webview/merge/App.svelte`: Root orchestrator managing 3-pane reactive state (Yours, Result, Theirs), conflict blocks, line highlights, and keyboard events.
+   - `webview/merge/MergeToolbar.svelte`: Action bar with Prev, Next, Apply Non-Conflicting, status counter, title, and Apply/Cancel buttons.
 3. **Performance Optimization:**
-   - Decouple scroll synchronization from DOM reflows using `requestAnimationFrame`.
-   - Compute line heights and gutter alignment via cached metrics instead of continuous `getBoundingClientRect` calls.
+   - Scroll synchronization between 3 editor panes decoupled using `requestAnimationFrame`.
+   - SVG ribbon curves and gutter buttons rendered declaratively via Svelte derived state.
 4. **Host Panel Integration:**
-   - Refactor `src/views/mergeEditorPanel.ts` to serve `dist/webview/merge/merge.js` using webview URIs and nonce-secured CSP.
-   - Deprecate and remove `src/views/mergeEditor/mergeEditorHtml.ts`, `mergeEditorScript.ts`, and `mergeEditorStyles.ts`.
+   - Refactored `src/views/mergeEditorPanel.ts` to serve `dist/webview/merge/merge.js`.
+   - Deleted `src/views/mergeEditorHtml.ts`, `src/views/mergeEditor/mergeEditorScript.ts`, and `src/views/mergeEditor/mergeEditorStyles.ts`.
 
 ---
 

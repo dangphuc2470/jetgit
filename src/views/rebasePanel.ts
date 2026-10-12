@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { GitService, type Commit } from '../git/gitService';
 import { RebaseHandler, type RebaseTodoItem } from '../git/rebaseHandler';
+import { RebaseToExtensionMessage, ExtensionToRebaseMessage } from '../shared/protocol';
 
 export class RebasePanel {
   public static currentPanel: RebasePanel | undefined;
@@ -74,7 +75,7 @@ export class RebasePanel {
     }
   }
 
-  private async handleMessage(msg: { type: string; payload?: any }): Promise<void> {
+  private async handleMessage(msg: RebaseToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'startRebase': {
         const todoItems: RebaseTodoItem[] = msg.payload;

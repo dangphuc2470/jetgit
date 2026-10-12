@@ -1,5 +1,6 @@
 import { escapeHtml } from '../shared/escape';
 import { highlightCode, computeWordDiff } from '../shared/syntaxHighlight';
+import type { ExtensionToReviewMessage, ReviewToExtensionMessage } from '../shared/protocol';
 import { LINE_HEIGHT, state, runtime, undoStack, redoStack } from './state';
 import { parseDiffData, mapLeftToRight, mapRightToLeft, buildStagedContent, isBlockStaged } from './diffParser';
 import {
@@ -1131,7 +1132,7 @@ window.addEventListener('keydown', (e: KeyboardEvent) => {
   }
 });
 
-window.addEventListener('message', (event) => {
+window.addEventListener('message', (event: MessageEvent<ExtensionToReviewMessage>) => {
   const msg = event.data;
   switch (msg.type) {
     case 'fileDiff': {

@@ -9,14 +9,23 @@ export function getVsCodeApi(): any {
   return api;
 }
 
-export function postMessage(type: string, payload?: any): void {
+import type { AnyWebviewToExtensionMessage, AnyExtensionToWebviewMessage } from './protocol';
+
+export function postMessage<M extends { type: string; payload?: any } = AnyWebviewToExtensionMessage>(
+  messageOrType: M | string,
+  payload?: any,
+): void {
   const vscode = getVsCodeApi();
   if (vscode) {
-    vscode.postMessage({ type, payload });
+    if (typeof messageOrType === 'object' && messageOrType !== null) {
+      vscode.postMessage(messageOrType);
+    } else {
+      vscode.postMessage({ type: messageOrType, payload });
+    }
   }
 }
 
-export function onMessage(handler: (data: any) => void): () => void {
+export function onMessage<M = AnyExtensionToWebviewMessage>(handler: (data: M) => void): () => void {
   const listener = (event: MessageEvent) => {
     handler(event.data);
   };

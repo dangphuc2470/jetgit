@@ -35,6 +35,7 @@ for (const entry of entries) {
     ],
     alias: {
       '$shared': path.resolve(__dirname, 'webview/shared'),
+      '$protocol': path.resolve(__dirname, 'src/shared/protocol.ts'),
     },
   });
 }

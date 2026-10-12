@@ -9,6 +9,7 @@ import { ConflictsDialogPanel } from './conflictsDialogPanel';
 import { MergeEditorPanel } from './mergeEditorPanel';
 import { generateAiCommitMessage } from '../utils/aiCommitGenerator';
 import { getNonce } from '../utils/themeTokens';
+import { CommitToExtensionMessage, ExtensionToCommitMessage } from '../shared/protocol';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
@@ -234,7 +235,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     return map;
   }
 
-  private async handleMessage(msg: { type: string; payload?: any }): Promise<void> {
+  private async handleMessage(msg: CommitToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
       case 'refresh': {

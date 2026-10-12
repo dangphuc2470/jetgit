@@ -5,6 +5,7 @@ import { GitService } from '../git/gitService';
 import { ConflictsDialogPanel } from './conflictsDialogPanel';
 import { getThemeTokens, getNonce } from '../utils/themeTokens';
 import { getMergeEditorHtml } from './mergeEditorHtml';
+import { MergeToExtensionMessage, ExtensionToMergeMessage } from '../shared/protocol';
 
 interface ConflictHunk {
   id: number;
@@ -223,7 +224,7 @@ export class MergeEditorPanel {
     }];
   }
 
-  private async handleMessage(msg: { type: string; payload?: any }): Promise<void> {
+  private async handleMessage(msg: MergeToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'ready': {
         this.sendThemeTokens();

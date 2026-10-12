@@ -6,6 +6,7 @@ import { PushDialogPanel } from './pushDialogPanel';
 import { CommitReviewPanel } from './commitReviewPanel';
 import { handleGraphAction } from './graphActionHandlers';
 import { getNonce } from '../utils/themeTokens';
+import { GraphToExtensionMessage, ExtensionToGraphMessage } from '../shared/protocol';
 
 export class GraphViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.logView';
@@ -258,7 +259,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async handleMessage(msg: { type: string; payload?: any }): Promise<void> {
+  private async handleMessage(msg: GraphToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'ready': {
         this.log.appendLine('Webview reported ready');
@@ -387,7 +388,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           before: before || undefined,
           path: filePath || undefined,
           query: query || undefined,
-          order: order || undefined,
+          order: (order === 'date' || order === 'topo') ? order : undefined,
           firstParent: firstParent || undefined,
           noMerges: noMerges || undefined,
           all: !branch,

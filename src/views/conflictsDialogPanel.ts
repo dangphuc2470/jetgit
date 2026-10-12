@@ -3,6 +3,7 @@ import * as path from 'path';
 import { GitService } from '../git/gitService';
 import { MergeEditorPanel } from './mergeEditorPanel';
 import { getConflictsDialogHtml } from './conflictsDialogHtml';
+import { ConflictsToExtensionMessage, ExtensionToConflictsMessage } from '../shared/protocol';
 
 export class ConflictsDialogPanel {
   public static currentPanel: ConflictsDialogPanel | undefined;
@@ -103,7 +104,7 @@ export class ConflictsDialogPanel {
     });
   }
 
-  private async handleMessage(msg: any): Promise<void> {
+  private async handleMessage(msg: ConflictsToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'close': {
         this.dispose();

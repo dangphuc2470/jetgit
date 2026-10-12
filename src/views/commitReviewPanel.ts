@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { GitService } from '../git/gitService';
 import { getThemeTokens, getNonce } from '../utils/themeTokens';
+import { ReviewToExtensionMessage, ExtensionToReviewMessage } from '../shared/protocol';
 
 export interface ReviewRevisions {
   baseRef?: string;
@@ -219,7 +220,7 @@ export class CommitReviewPanel {
     }
   }
 
-  private async handleMessage(msg: { type: string; payload?: any }): Promise<void> {
+  private async handleMessage(msg: ReviewToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'ready': {
         this.sendThemeTokens();

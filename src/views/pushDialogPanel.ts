@@ -3,6 +3,7 @@ import * as path from 'path';
 import { GitService } from '../git/gitService';
 import { CommitReviewPanel } from './commitReviewPanel';
 import { getPushDialogHtml } from './pushDialogHtml';
+import { PushToExtensionMessage, ExtensionToPushMessage } from '../shared/protocol';
 
 export class PushDialogPanel {
   public static currentPanel: PushDialogPanel | undefined;
@@ -89,7 +90,7 @@ export class PushDialogPanel {
     });
   }
 
-  private async handleMessage(msg: any): Promise<void> {
+  private async handleMessage(msg: PushToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'close': {
         this.dispose();
@@ -132,7 +133,7 @@ export class PushDialogPanel {
         break;
       }
       case 'executePush': {
-        const payload = msg.payload || {};
+        const payload = msg.payload;
         try {
           await this.gitService.push(
             payload.branch,

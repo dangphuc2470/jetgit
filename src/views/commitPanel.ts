@@ -42,10 +42,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getReviewFilesList(filePath: string): string[] {
-    if (this.unversionedFilePaths.includes(filePath)) {
-      return this.unversionedFilePaths;
+    let list = this.unversionedFilePaths.includes(filePath)
+      ? this.unversionedFilePaths
+      : this.changesFilePaths;
+    if (!list.includes(filePath)) {
+      list = this.allFilePaths.length > 0 ? this.allFilePaths : [filePath];
     }
-    return this.changesFilePaths;
+    return list;
   }
 
   resolveWebviewView(

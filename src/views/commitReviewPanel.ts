@@ -73,15 +73,17 @@ export class CommitReviewPanel {
       CommitReviewPanel.currentPanel.isReadOnly = readOnly;
       CommitReviewPanel.currentPanel.revisions = revisions;
       CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
-      CommitReviewPanel.currentPanel.panel.reveal(vscode.ViewColumn.Active, true);
-      CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
+      const targetCol = CommitReviewPanel.currentPanel.panel.viewColumn || vscode.ViewColumn.One;
+      CommitReviewPanel.currentPanel.panel.reveal(targetCol, false);
+      CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly, undefined, true);
       return CommitReviewPanel.currentPanel;
     }
 
+    const targetCol = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
     const panel = vscode.window.createWebviewPanel(
       CommitReviewPanel.viewType,
       `Diff: ${fileName}`,
-      vscode.ViewColumn.Active,
+      targetCol,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -99,12 +101,12 @@ export class CommitReviewPanel {
       readOnly,
       revisions,
     );
-    CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly);
+    CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly, undefined, true);
     return CommitReviewPanel.currentPanel;
   }
 
   public focusAndJumpDiff(direction = 1, fromFileList = false): void {
-    this.panel.reveal(vscode.ViewColumn.Active, false);
+    this.panel.reveal(this.panel.viewColumn || vscode.ViewColumn.One, false);
     this.panel.webview.postMessage({
       type: 'jumpDiff',
       payload: { direction, fromFileList },
@@ -116,6 +118,7 @@ export class CommitReviewPanel {
     filesList?: string[],
     readOnly?: boolean,
     focusTarget?: { focusLine: number; focusOffset: number },
+    force = false,
   ): Promise<void> {
     this.currentFilePath = filePath;
     if (filesList) this.filesList = filesList;
@@ -166,7 +169,7 @@ export class CommitReviewPanel {
         this.lastLoadedState!.readOnly === this.isReadOnly &&
         !focusTarget;
 
-      if (isUnchanged) {
+      if (!force && isUnchanged) {
         return;
       }
 
@@ -208,20 +211,20 @@ export class CommitReviewPanel {
       case 'ready': {
         this.sendThemeTokens();
         if (this.currentFilePath) {
-          this.loadFile(this.currentFilePath, this.filesList);
+          this.loadFile(this.currentFilePath, this.filesList, this.isReadOnly, undefined, true);
         }
         break;
       }
       case 'refreshDiff': {
         const filePath = msg.payload || this.currentFilePath;
-        this.loadFile(filePath, this.filesList);
+        this.loadFile(filePath, this.filesList, this.isReadOnly, undefined, true);
         break;
       }
       case 'navigateFile': {
         const newIndex = msg.payload as number;
         if (newIndex >= 0 && newIndex < this.filesList.length) {
           const newPath = this.filesList[newIndex];
-          this.loadFile(newPath, this.filesList);
+          this.loadFile(newPath, this.filesList, this.isReadOnly, undefined, true);
         }
         break;
       }

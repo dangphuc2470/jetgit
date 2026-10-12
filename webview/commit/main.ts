@@ -208,7 +208,6 @@ function render(): void {
     changesFiles,
     state.expandChanges,
     'toggleChanges',
-    'checkAllChanges',
     vscode,
     render
   );
@@ -220,7 +219,6 @@ function render(): void {
       unversionedFiles,
       state.expandUnversioned,
       'toggleUnversioned',
-      'checkAllUnversioned',
       vscode,
       render
     );

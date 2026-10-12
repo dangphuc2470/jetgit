@@ -38,6 +38,7 @@ export class CommitReviewPanel {
     private onStageChange?: () => void,
     readOnly = false,
     revisions?: ReviewRevisions,
+    private log?: vscode.OutputChannel,
   ) {
     this.panel = panel;
     this.isReadOnly = readOnly;
@@ -64,14 +65,19 @@ export class CommitReviewPanel {
     onStageChange?: () => void,
     readOnly = false,
     revisions?: ReviewRevisions,
+    log?: vscode.OutputChannel,
   ): CommitReviewPanel {
     const fileName = path.basename(filePath);
+    if (log) {
+      log.appendLine(`[CommitReviewPanel] createOrShow: ${filePath}, hasCurrentPanel=${Boolean(CommitReviewPanel.currentPanel)}`);
+    }
     if (CommitReviewPanel.currentPanel) {
       if (onStageChange) {
         CommitReviewPanel.currentPanel.onStageChange = onStageChange;
       }
       CommitReviewPanel.currentPanel.isReadOnly = readOnly;
       CommitReviewPanel.currentPanel.revisions = revisions;
+      CommitReviewPanel.currentPanel.log = log || CommitReviewPanel.currentPanel.log;
       CommitReviewPanel.currentPanel.panel.title = `Diff: ${fileName}`;
       const targetCol = CommitReviewPanel.currentPanel.panel.viewColumn || vscode.ViewColumn.One;
       CommitReviewPanel.currentPanel.panel.reveal(targetCol, false);
@@ -100,6 +106,7 @@ export class CommitReviewPanel {
       onStageChange,
       readOnly,
       revisions,
+      log,
     );
     CommitReviewPanel.currentPanel.loadFile(filePath, filesList, readOnly, undefined, true);
     return CommitReviewPanel.currentPanel;
@@ -201,7 +208,13 @@ export class CommitReviewPanel {
           focusTarget,
         },
       });
+      if (this.log) {
+        this.log.appendLine(`[CommitReviewPanel] postMessage fileDiff sent for ${filePath}`);
+      }
     } catch (err: any) {
+      if (this.log) {
+        this.log.appendLine(`[CommitReviewPanel] Failed to load diff: ${err.message}`);
+      }
       vscode.window.showErrorMessage(`Failed to load diff: ${err.message}`);
     }
   }

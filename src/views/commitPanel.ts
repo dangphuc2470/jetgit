@@ -247,16 +247,24 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const jumpDiff = typeof msg.payload === 'object' ? Boolean(msg.payload?.jumpDiff) : false;
         const fromFileList = typeof msg.payload === 'object' ? Boolean(msg.payload?.fromFileList) : false;
         const direction = typeof msg.payload === 'object' ? (msg.payload?.direction || 1) : 1;
+        this.log.appendLine(`[CommitPanel] openReviewInCenter for file: ${filePath}`);
         if (filePath) {
-          const panel = CommitReviewPanel.createOrShow(
-            this.extensionUri,
-            this.gitService,
-            filePath,
-            this.getReviewFilesList(filePath),
-            () => this.refresh(),
-          );
-          if (jumpDiff) {
-            panel.focusAndJumpDiff(direction, fromFileList);
+          try {
+            const panel = CommitReviewPanel.createOrShow(
+              this.extensionUri,
+              this.gitService,
+              filePath,
+              this.getReviewFilesList(filePath),
+              () => this.refresh(),
+              false,
+              undefined,
+              this.log,
+            );
+            if (jumpDiff) {
+              panel.focusAndJumpDiff(direction, fromFileList);
+            }
+          } catch (err: any) {
+            this.log.appendLine(`[CommitPanel] Error opening review panel: ${err.message}`);
           }
         }
         break;

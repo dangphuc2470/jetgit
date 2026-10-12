@@ -241,7 +241,7 @@ export function renderTreeFileItem(file: CommitFile, inTreeMode: boolean, vscode
   });
 
   itemEl.addEventListener('contextmenu', (e) => {
-    showFileContextMenu(e, file, vscode, state, onRender);
+    showFileContextMenu(e, file, vscode, onRender);
   });
 
   return itemEl;

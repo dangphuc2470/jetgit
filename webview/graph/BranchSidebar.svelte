@@ -181,11 +181,8 @@
 
     const closeMenu = () => {
       contextMenu.visible = false;
-      const old = document.querySelector(".branch-context-menu");
-      if (old) old.remove();
     };
 
-    window.addEventListener("blur", closeMenu);
     const visHandler = () => {
       if (document.hidden) closeMenu();
     };
@@ -194,11 +191,12 @@
       if (ev.data?.type === "closeAllMenus") closeMenu();
     };
     window.addEventListener("message", msgHandler);
+    window.addEventListener("closeAllGraphMenus", closeMenu);
 
     return () => {
-      window.removeEventListener("blur", closeMenu);
       document.removeEventListener("visibilitychange", visHandler);
       window.removeEventListener("message", msgHandler);
+      window.removeEventListener("closeAllGraphMenus", closeMenu);
     };
   });
 
@@ -323,6 +321,7 @@
   function showBranchContextMenu(e: MouseEvent, branchName: string) {
     e.preventDefault();
     e.stopPropagation();
+    window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
 
     const branches = branchData.branches || [];
     const isCurrent = branchName === currentBranch;
@@ -513,6 +512,7 @@
   function showGeneralBranchContextMenu(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
 
     const items = [
       {
@@ -547,6 +547,7 @@
   function showRemoteFolderContextMenu(e: MouseEvent, subNode: TreeNode) {
     e.preventDefault();
     e.stopPropagation();
+    window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
 
     const branches = branchData.branches || [];
     const locals = branches.filter(b => !b.remote && !b.name.startsWith("("));
@@ -1041,6 +1042,7 @@
   <div
     class="branch-context-menu"
     style="left:{contextMenu.x}px;top:{contextMenu.y}px;"
+    data-vscode-context={JSON.stringify({ preventDefaultContextMenuItems: true })}
     oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
   >
     {#each contextMenu.items as it}

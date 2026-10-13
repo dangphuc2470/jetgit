@@ -57,10 +57,9 @@
     postMessage("ready");
 
     const closeAllFloatingMenus = () => {
-      document.querySelectorAll('.commit-context-menu, .branch-context-menu').forEach(el => el.remove());
+      window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
       document.querySelectorAll<HTMLElement>('.filter-popup, .as-dropdown-menu').forEach(el => el.style.display = 'none');
     };
-    window.addEventListener("blur", closeAllFloatingMenus);
     const visChangeHandler = () => {
       if (document.hidden) closeAllFloatingMenus();
     };
@@ -281,6 +280,7 @@
 
     return () => {
       window.removeEventListener("keydown", onKeyEscape);
+      document.removeEventListener("visibilitychange", visChangeHandler);
     };
   });
 

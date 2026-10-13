@@ -136,8 +136,7 @@
   }
 
   function closeBranchContextMenu() {
-    const old = document.querySelector('.branch-context-menu');
-    if (old) old.remove();
+    window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
   }
 
   function openEditCommitMessageDialog(commit: any) {
@@ -235,9 +234,8 @@
   function showCommitContextMenu(e: MouseEvent, commit: any) {
     e.preventDefault();
     e.stopPropagation();
+    window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
     closeCommitContextMenu();
-    const oldBranch = document.querySelector('.branch-context-menu');
-    if (oldBranch) oldBranch.remove();
 
     const commitList = commits || [];
     const isHead = commitList.length > 0 && commitList[0].hash === commit.hash;
@@ -498,19 +496,18 @@
     const closeAllMenus = () => {
       closeContextMenu();
       closeCommitContextMenu();
-      closeBranchContextMenu();
     };
 
     const mousedownHandler = (ev: MouseEvent) => {
       const target = ev.target && (ev.target as HTMLElement).nodeType === 1 ? (ev.target as HTMLElement) : (ev.target as HTMLElement)?.parentElement;
       if (!target || (!target.closest?.('.commit-context-menu') && !target.closest?.('.branch-context-menu'))) {
-        closeAllMenus();
+        window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
       }
     };
 
     const keydownHandler = (ev: KeyboardEvent) => {
       if (ev.key === 'Escape') {
-        closeAllMenus();
+        window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
         return;
       }
       if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
@@ -543,7 +540,7 @@
 
     document.addEventListener('mousedown', mousedownHandler);
     window.addEventListener('keydown', keydownHandler);
-    window.addEventListener('blur', closeAllMenus);
+    window.addEventListener('closeAllGraphMenus', closeAllMenus);
     const visHandler = () => {
       if (document.hidden) closeAllMenus();
     };
@@ -556,7 +553,7 @@
     return () => {
       document.removeEventListener('mousedown', mousedownHandler);
       window.removeEventListener('keydown', keydownHandler);
-      window.removeEventListener('blur', closeAllMenus);
+      window.removeEventListener('closeAllGraphMenus', closeAllMenus);
       document.removeEventListener('visibilitychange', visHandler);
       window.removeEventListener('message', msgHandler);
     };

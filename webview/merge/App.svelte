@@ -24,12 +24,15 @@
   }
 
   interface RenderLine {
+    id: number;
     lineNo: number;
     text: string;
     extraClass: string;
     editable?: boolean;
     hunkId?: number;
   }
+
+  let lineIdCounter = 1;
 
   interface RibbonItem {
     id: number;
@@ -108,6 +111,7 @@
   });
 
   function rebuildLines() {
+    lineIdCounter = 1;
     const nextLeft: RenderLine[] = [];
     const nextCenter: RenderLine[] = [];
     const nextRight: RenderLine[] = [];
@@ -121,9 +125,9 @@
       if (hunk.type === "common") {
         const lines = hunk.commonLines || [];
         for (const text of lines) {
-          nextLeft.push({ lineNo: leftNo++, text, extraClass: "" });
-          nextCenter.push({ lineNo: centerNo++, text, extraClass: "", editable: true, hunkId: hunk.id });
-          nextRight.push({ lineNo: rightNo++, text, extraClass: "" });
+          nextLeft.push({ id: lineIdCounter++, lineNo: leftNo++, text, extraClass: "" });
+          nextCenter.push({ id: lineIdCounter++, lineNo: centerNo++, text, extraClass: "", editable: true, hunkId: hunk.id });
+          nextRight.push({ id: lineIdCounter++, lineNo: rightNo++, text, extraClass: "" });
         }
       } else if (hunk.type === "conflict") {
         const yLines = hunk.yoursLines || [];
@@ -131,13 +135,13 @@
 
         const leftStart = leftNo;
         for (const text of yLines) {
-          nextLeft.push({ lineNo: leftNo++, text, extraClass: "line-conflict" });
+          nextLeft.push({ id: lineIdCounter++, lineNo: leftNo++, text, extraClass: "line-conflict" });
         }
         const leftEnd = leftNo - 1;
 
         const rightStart = rightNo;
         for (const text of tLines) {
-          nextRight.push({ lineNo: rightNo++, text, extraClass: "line-conflict" });
+          nextRight.push({ id: lineIdCounter++, lineNo: rightNo++, text, extraClass: "line-conflict" });
         }
         const rightEnd = rightNo - 1;
 
@@ -146,6 +150,7 @@
         if (hunk.resolved && rLines.length > 0) {
           for (const text of rLines) {
             nextCenter.push({
+              id: lineIdCounter++,
               lineNo: centerNo++,
               text,
               extraClass: "line-conflict-resolved",
@@ -158,6 +163,7 @@
         } else {
           // Unresolved placeholder
           nextCenter.push({
+            id: lineIdCounter++,
             lineNo: centerNo++,
             text: `// Unresolved conflict #${hunk.id}`,
             extraClass: "line-placeholder",
@@ -257,6 +263,285 @@
 
   function handleCancel() {
     postMessage({ type: "cancelMerge" });
+  }
+
+  function getSelectionOffsets(element: HTMLElement): { start: number; end: number } {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return { start: 0, end: 0 };
+    const range = selection.getRangeAt(0);
+
+    const rStart = range.cloneRange();
+    rStart.selectNodeContents(element);
+    rStart.setEnd(range.startContainer, range.startOffset);
+    const start = rStart.toString().length;
+
+    const rEnd = range.cloneRange();
+    rEnd.selectNodeContents(element);
+    rEnd.setEnd(range.endContainer, range.endOffset);
+    const end = rEnd.toString().length;
+
+    return { start, end };
+  }
+
+  function setCaretPosition(element: HTMLElement, offset: number) {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    let currentOffset = 0;
+    let found = false;
+
+    function traverse(node: Node) {
+      if (found) return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const textLen = (node.textContent || "").length;
+        if (currentOffset + textLen >= offset) {
+          range.setStart(node, Math.min(offset - currentOffset, textLen));
+          range.collapse(true);
+          found = true;
+          return;
+        }
+        currentOffset += textLen;
+      } else {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          traverse(node.childNodes[i]);
+        }
+      }
+    }
+
+    traverse(element);
+    if (!found) {
+      range.selectNodeContents(element);
+      range.collapse(false);
+    }
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function updateConflictBlocksCenterRanges() {
+    for (const b of conflictBlocks) {
+      const matching = centerLines.filter((l) => l.hunkId === b.id);
+      if (matching.length > 0) {
+        b.centerStart = matching[0].lineNo;
+        b.centerEnd = matching[matching.length - 1].lineNo;
+      }
+    }
+    conflictBlocks = [...conflictBlocks];
+  }
+
+  function handleCenterKeyDown(e: KeyboardEvent, idx: number) {
+    const currentEl = e.currentTarget as HTMLElement;
+
+    if (e.key === "Enter") {
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+        return;
+      }
+      e.preventDefault();
+      const fullText = currentEl.textContent || "";
+      const { start, end } = getSelectionOffsets(currentEl);
+      const leftText = fullText.slice(0, start);
+      const rightText = fullText.slice(end);
+
+      const curLine = centerLines[idx];
+      const isPlaceholder = curLine.extraClass.includes("line-placeholder");
+
+      curLine.text = leftText;
+      currentEl.textContent = leftText;
+      if (isPlaceholder) {
+        curLine.extraClass = "line-conflict-resolved";
+      }
+
+      if (curLine.hunkId) {
+        const hunk = hunks.find((h) => h.id === curLine.hunkId);
+        if (hunk && !hunk.resolved) {
+          hunk.resolved = true;
+          hunk.chosen = "custom";
+        }
+        const b = conflictBlocks.find((cb) => cb.id === curLine.hunkId);
+        if (b && !b.resolved) {
+          b.resolved = true;
+          b.chosen = "custom";
+        }
+      }
+
+      const nextClass = isPlaceholder ? "line-conflict-resolved" : curLine.extraClass;
+      const newLine: RenderLine = {
+        id: lineIdCounter++,
+        lineNo: 0,
+        text: rightText,
+        extraClass: nextClass,
+        editable: true,
+        hunkId: curLine.hunkId,
+      };
+
+      centerLines.splice(idx + 1, 0, newLine);
+      centerLines.forEach((l, i) => (l.lineNo = i + 1));
+      centerLines = [...centerLines];
+      updateConflictBlocksCenterRanges();
+
+      tick().then(() => {
+        const contentEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+        if (contentEls && contentEls[idx + 1]) {
+          contentEls[idx + 1].focus();
+          setCaretPosition(contentEls[idx + 1], 0);
+        }
+      });
+      return;
+    }
+
+    if (e.key === "Backspace") {
+      const { start, end } = getSelectionOffsets(currentEl);
+      if (start === 0 && end === 0 && idx > 0) {
+        e.preventDefault();
+        const contentEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+        const prevEl = contentEls ? contentEls[idx - 1] : null;
+        const prevText = prevEl?.textContent ?? centerLines[idx - 1].text ?? "";
+        const curText = currentEl.textContent ?? centerLines[idx].text ?? "";
+        const mergeCol = prevText.length;
+
+        centerLines[idx - 1].text = prevText + curText;
+        if (prevEl) {
+          prevEl.textContent = prevText + curText;
+        }
+
+        centerLines.splice(idx, 1);
+        centerLines.forEach((l, i) => (l.lineNo = i + 1));
+        centerLines = [...centerLines];
+        updateConflictBlocksCenterRanges();
+
+        tick().then(() => {
+          const updatedEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+          if (updatedEls && updatedEls[idx - 1]) {
+            updatedEls[idx - 1].focus();
+            setCaretPosition(updatedEls[idx - 1], mergeCol);
+          }
+        });
+        return;
+      }
+    }
+
+    if (e.key === "Delete") {
+      const fullText = currentEl.textContent || "";
+      const { start, end } = getSelectionOffsets(currentEl);
+      if (start === fullText.length && end === fullText.length && idx < centerLines.length - 1) {
+        e.preventDefault();
+        const contentEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+        const nextEl = contentEls ? contentEls[idx + 1] : null;
+        const nextText = nextEl?.textContent ?? centerLines[idx + 1].text ?? "";
+
+        centerLines[idx].text = fullText + nextText;
+        currentEl.textContent = fullText + nextText;
+
+        centerLines.splice(idx + 1, 1);
+        centerLines.forEach((l, i) => (l.lineNo = i + 1));
+        centerLines = [...centerLines];
+        updateConflictBlocksCenterRanges();
+
+        tick().then(() => {
+          const updatedEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+          if (updatedEls && updatedEls[idx]) {
+            updatedEls[idx].focus();
+            setCaretPosition(updatedEls[idx], start);
+          }
+        });
+        return;
+      }
+    }
+
+    if (e.key === "ArrowUp") {
+      if (idx > 0) {
+        e.preventDefault();
+        const { start } = getSelectionOffsets(currentEl);
+        const contentEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+        if (contentEls && contentEls[idx - 1]) {
+          contentEls[idx - 1].focus();
+          setCaretPosition(contentEls[idx - 1], start);
+        }
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      if (idx < centerLines.length - 1) {
+        e.preventDefault();
+        const { start } = getSelectionOffsets(currentEl);
+        const contentEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+        if (contentEls && contentEls[idx + 1]) {
+          contentEls[idx + 1].focus();
+          setCaretPosition(contentEls[idx + 1], start);
+        }
+      }
+      return;
+    }
+  }
+
+  function handleCenterBlur(e: FocusEvent, idx: number) {
+    const currentEl = e.currentTarget as HTMLElement;
+    const text = currentEl.textContent || "";
+    if (centerLines[idx]) {
+      centerLines[idx].text = text;
+      if (centerLines[idx].extraClass.includes("line-placeholder") && !text.includes("// Unresolved conflict")) {
+        centerLines[idx].extraClass = "line-conflict-resolved";
+        if (centerLines[idx].hunkId) {
+          const hunk = hunks.find((h) => h.id === centerLines[idx].hunkId);
+          if (hunk) {
+            hunk.resolved = true;
+            hunk.chosen = "custom";
+          }
+          const b = conflictBlocks.find((cb) => cb.id === centerLines[idx].hunkId);
+          if (b) {
+            b.resolved = true;
+            b.chosen = "custom";
+          }
+          conflictBlocks = [...conflictBlocks];
+        }
+      }
+    }
+  }
+
+  function handleCenterPaste(e: ClipboardEvent, idx: number) {
+    const pasteText = e.clipboardData?.getData("text/plain");
+    if (!pasteText || !pasteText.includes("\n")) return;
+
+    e.preventDefault();
+    const currentEl = e.currentTarget as HTMLElement;
+    const fullText = currentEl.textContent || "";
+    const { start, end } = getSelectionOffsets(currentEl);
+    const leftText = fullText.slice(0, start);
+    const rightText = fullText.slice(end);
+
+    const pastedLines = pasteText.split(/\r?\n/);
+    centerLines[idx].text = leftText + pastedLines[0];
+    currentEl.textContent = centerLines[idx].text;
+
+    const curLine = centerLines[idx];
+    const newItems: RenderLine[] = [];
+    for (let p = 1; p < pastedLines.length; p++) {
+      const isLast = p === pastedLines.length - 1;
+      newItems.push({
+        id: lineIdCounter++,
+        lineNo: 0,
+        text: isLast ? pastedLines[p] + rightText : pastedLines[p],
+        extraClass: curLine.extraClass,
+        editable: true,
+        hunkId: curLine.hunkId,
+      });
+    }
+
+    centerLines.splice(idx + 1, 0, ...newItems);
+    centerLines.forEach((l, i) => (l.lineNo = i + 1));
+    centerLines = [...centerLines];
+    updateConflictBlocksCenterRanges();
+
+    const targetIdx = idx + pastedLines.length - 1;
+    const targetCol = pastedLines[pastedLines.length - 1].length;
+
+    tick().then(() => {
+      const contentEls = centerEditor?.querySelectorAll<HTMLElement>(".line-content");
+      if (contentEls && contentEls[targetIdx]) {
+        contentEls[targetIdx].focus();
+        setCaretPosition(contentEls[targetIdx], targetCol);
+      }
+    });
   }
 
   // Scroll Synchronization via RAF
@@ -379,7 +664,7 @@
       onwheel={(e) => leftEditor && handleWheel(leftEditor, e)}
     >
       <div class="lines-container">
-        {#each leftLines as line}
+        {#each leftLines as line (line.id)}
           <div class={`editor-line ${line.extraClass}`.trim()}>
             <div class="gutter-num">{line.lineNo}</div>
             <div class="line-content">{@html highlightCode(line.text)}</div>
@@ -429,13 +714,16 @@
       onwheel={(e) => centerEditor && handleWheel(centerEditor, e)}
     >
       <div class="lines-container">
-        {#each centerLines as line}
+        {#each centerLines as line, idx (line.id)}
           <div class={`editor-line ${line.extraClass}`.trim()} data-hunk-id={line.hunkId}>
             <div class="gutter-num">{line.lineNo}</div>
             <div
               class="line-content"
               contenteditable="plaintext-only"
               spellcheck="false"
+              onkeydown={(e) => handleCenterKeyDown(e, idx)}
+              onblur={(e) => handleCenterBlur(e, idx)}
+              onpaste={(e) => handleCenterPaste(e, idx)}
             >
               {@html highlightCode(line.text)}
             </div>
@@ -485,7 +773,7 @@
       onwheel={(e) => rightEditor && handleWheel(rightEditor, e)}
     >
       <div class="lines-container">
-        {#each rightLines as line}
+        {#each rightLines as line (line.id)}
           <div class={`editor-line ${line.extraClass}`.trim()}>
             <div class="gutter-num">{line.lineNo}</div>
             <div class="line-content">{@html highlightCode(line.text)}</div>

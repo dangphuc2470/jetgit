@@ -62,17 +62,15 @@ This document outlines the systematic migration strategy to convert all remainin
 
 ---
 
-### Phase 3: Review Diff Panel Migration (`webview/review/`)
-**Priority:** Medium (Preserve existing robust F7 navigation and text selection fixes)
-
-1. **Component Decomposition:**
-   - Keep calculation logic in `diffParser.ts`, `editorHistory.ts`, and `navigation.ts` intact.
-   - Implement `webview/review/App.svelte`: Global keydown handlers (`F7`, `Shift+F7`, `Ctrl+Z`, `Ctrl+Y`), file tabs, and state store.
-   - Implement `webview/review/DiffPane.svelte`: Left (Base) and Right (Working copy) synchronized text areas.
-   - Implement `webview/review/DiffRibbon.svelte`: Central gutter with chevron buttons (`>>`, `<<`) and staging checkboxes.
-2. **Regression Guards:**
-   - Maintain text selection styling (`user-select: text !important`) on all syntax spans.
-   - Maintain cross-file jump logic: trigger `jumpToBlock(0)` on initial file load when navigated from outside.
+### Phase 3: Review Diff Panel Migration (`webview/review/`) - COMPLETED
+**Status:** Completed
+**Key Results:**
+- Completely replaced 1367 lines of legacy imperative DOM construction in `webview/review/main.ts` with idiomatic Svelte 5 components.
+- Modularized architecture into `App.svelte`, `ReviewToolbar.svelte`, `DiffRibbon.svelte`, and `OverviewRuler.svelte`.
+- Preserved existing calculation algorithms and navigation in `diffParser.ts`, `editorHistory.ts`, and `navigation.ts`.
+- Declarative SVG diff ribbon rendering and synchronized scrolling powered by Svelte 5 runes (`$state`, `$derived`).
+- Preserved inline editing, multi-line selection editing, undo/redo, auto-indent, and keyboard shortcuts (F7/Shift+F7, F4, Ctrl+Z/Ctrl+Y, Alt+Left/Alt+Right).
+- Bundled into `dist/webview/commit/review.js` with 0 TypeScript errors.
 
 ---
 

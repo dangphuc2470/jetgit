@@ -3,6 +3,7 @@ import { state } from './state';
 import { CommitFile } from './types';
 
 let activeContextMenu: HTMLElement | null = null;
+let lastContextMenuOpenedAt = 0;
 
 export function closeContextMenu(): void {
   if (activeContextMenu) {
@@ -14,6 +15,7 @@ export function closeContextMenu(): void {
 export function showFileContextMenu(e: MouseEvent, file: CommitFile, vscode: any, onRender?: () => void): void {
   e.preventDefault();
   e.stopPropagation();
+  lastContextMenuOpenedAt = Date.now();
   closeContextMenu();
 
   state.selectedFile = file.path;
@@ -144,14 +146,20 @@ export function showFileContextMenu(e: MouseEvent, file: CommitFile, vscode: any
 
 export function registerGlobalContextMenuListeners(vscode: any, onRender?: () => void): void {
   window.addEventListener('click', closeContextMenu);
-  window.addEventListener('blur', closeContextMenu);
+  window.addEventListener('blur', () => {
+    if (Date.now() - lastContextMenuOpenedAt > 200) {
+      closeContextMenu();
+    }
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) closeContextMenu();
   });
   window.addEventListener('message', (e) => {
     if (e.data?.type === 'closeAllMenus') {
-      closeContextMenu();
-      document.querySelectorAll('.as-context-menu, .as-view-options-menu').forEach(el => el.remove());
+      if (Date.now() - lastContextMenuOpenedAt > 200) {
+        closeContextMenu();
+        document.querySelectorAll('.as-context-menu, .as-view-options-menu').forEach(el => el.remove());
+      }
     }
   });
   window.addEventListener('keydown', (e: KeyboardEvent) => {

@@ -183,17 +183,29 @@
       contextMenu.visible = false;
     };
 
+    const blurHandler = () => {
+      if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
+        closeMenu();
+      }
+    };
+    window.addEventListener("blur", blurHandler);
+
     const visHandler = () => {
       if (document.hidden) closeMenu();
     };
     document.addEventListener("visibilitychange", visHandler);
     const msgHandler = (ev: MessageEvent) => {
-      if (ev.data?.type === "closeAllMenus") closeMenu();
+      if (ev.data?.type === "closeAllMenus") {
+        if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
+          closeMenu();
+        }
+      }
     };
     window.addEventListener("message", msgHandler);
     window.addEventListener("closeAllGraphMenus", closeMenu);
 
     return () => {
+      window.removeEventListener("blur", blurHandler);
       document.removeEventListener("visibilitychange", visHandler);
       window.removeEventListener("message", msgHandler);
       window.removeEventListener("closeAllGraphMenus", closeMenu);
@@ -321,6 +333,7 @@
   function showBranchContextMenu(e: MouseEvent, branchName: string) {
     e.preventDefault();
     e.stopPropagation();
+    (window as any).__lastGraphMenuOpenedAt = Date.now();
     window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
 
     const branches = branchData.branches || [];
@@ -512,6 +525,7 @@
   function showGeneralBranchContextMenu(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    (window as any).__lastGraphMenuOpenedAt = Date.now();
     window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
 
     const items = [
@@ -547,6 +561,7 @@
   function showRemoteFolderContextMenu(e: MouseEvent, subNode: TreeNode) {
     e.preventDefault();
     e.stopPropagation();
+    (window as any).__lastGraphMenuOpenedAt = Date.now();
     window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
 
     const branches = branchData.branches || [];

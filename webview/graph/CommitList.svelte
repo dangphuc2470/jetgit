@@ -234,6 +234,7 @@
   function showCommitContextMenu(e: MouseEvent, commit: any) {
     e.preventDefault();
     e.stopPropagation();
+    (window as any).__lastGraphMenuOpenedAt = Date.now();
     window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
     closeCommitContextMenu();
 
@@ -541,12 +542,24 @@
     document.addEventListener('mousedown', mousedownHandler);
     window.addEventListener('keydown', keydownHandler);
     window.addEventListener('closeAllGraphMenus', closeAllMenus);
+
+    const blurHandler = () => {
+      if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
+        closeAllMenus();
+      }
+    };
+    window.addEventListener('blur', blurHandler);
+
     const visHandler = () => {
       if (document.hidden) closeAllMenus();
     };
     document.addEventListener('visibilitychange', visHandler);
     const msgHandler = (ev: MessageEvent) => {
-      if (ev.data?.type === 'closeAllMenus') closeAllMenus();
+      if (ev.data?.type === 'closeAllMenus') {
+        if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
+          closeAllMenus();
+        }
+      }
     };
     window.addEventListener('message', msgHandler);
 
@@ -554,6 +567,7 @@
       document.removeEventListener('mousedown', mousedownHandler);
       window.removeEventListener('keydown', keydownHandler);
       window.removeEventListener('closeAllGraphMenus', closeAllMenus);
+      window.removeEventListener('blur', blurHandler);
       document.removeEventListener('visibilitychange', visHandler);
       window.removeEventListener('message', msgHandler);
     };

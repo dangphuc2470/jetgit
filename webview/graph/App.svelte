@@ -63,12 +63,20 @@
     const visChangeHandler = () => {
       if (document.hidden) closeAllFloatingMenus();
     };
+    const blurHandler = () => {
+      if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
+        closeAllFloatingMenus();
+      }
+    };
     document.addEventListener("visibilitychange", visChangeHandler);
+    window.addEventListener("blur", blurHandler);
 
     unsubscribe = onMessage((msg: any) => {
       switch (msg.type) {
         case "closeAllMenus": {
-          closeAllFloatingMenus();
+          if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
+            closeAllFloatingMenus();
+          }
           break;
         }
         case "noGitRepo": {
@@ -281,6 +289,7 @@
     return () => {
       window.removeEventListener("keydown", onKeyEscape);
       document.removeEventListener("visibilitychange", visChangeHandler);
+      window.removeEventListener("blur", blurHandler);
     };
   });
 

@@ -56,6 +56,7 @@
   let centerLines = $state<RenderLine[]>([]);
   let rightLines = $state<RenderLine[]>([]);
   let conflictBlocks = $state<ComputedBlock[]>([]);
+  let isAppendMode = $state(false);
 
   let leftEditor: HTMLElement | null = $state(null);
   let centerEditor: HTMLElement | null = $state(null);
@@ -196,18 +197,26 @@
     conflictBlocks = nextBlocks;
   }
 
-  function acceptConflict(id: number, choice: "yours" | "theirs" | "ignored") {
+  function acceptConflict(id: number, choice: "yours" | "theirs" | "ignored", append = false) {
     const hunk = hunks.find((h) => h.id === id);
     if (!hunk) return;
 
-    hunk.resolved = true;
-    hunk.chosen = choice;
-    if (choice === "yours") {
-      hunk.resultLines = [...(hunk.yoursLines || [])];
-    } else if (choice === "theirs") {
-      hunk.resultLines = [...(hunk.theirsLines || [])];
-    } else if (choice === "ignored") {
+    if (choice === "ignored") {
+      hunk.resolved = true;
+      hunk.chosen = "ignored";
       hunk.resultLines = [];
+    } else if (append && hunk.resolved && (hunk.resultLines || []).length > 0) {
+      const additional = choice === "yours" ? (hunk.yoursLines || []) : (hunk.theirsLines || []);
+      hunk.resultLines = [...(hunk.resultLines || []), ...additional];
+      hunk.chosen = "custom";
+    } else {
+      hunk.resolved = true;
+      hunk.chosen = choice;
+      if (choice === "yours") {
+        hunk.resultLines = [...(hunk.yoursLines || [])];
+      } else if (choice === "theirs") {
+        hunk.resultLines = [...(hunk.theirsLines || [])];
+      }
     }
 
     rebuildLines();
@@ -617,14 +626,27 @@
       }
     };
 
+    const updateModifierState = (e: KeyboardEvent | MouseEvent) => {
+      isAppendMode = Boolean(e.ctrlKey || e.metaKey || e.altKey);
+    };
+    const handleWindowBlur = () => {
+      isAppendMode = false;
+    };
+
     window.addEventListener("message", messageListener);
     window.addEventListener("keydown", keyListener);
+    window.addEventListener("keydown", updateModifierState);
+    window.addEventListener("keyup", updateModifierState);
+    window.addEventListener("blur", handleWindowBlur);
 
     postMessage({ type: "ready" });
 
     return () => {
       window.removeEventListener("message", messageListener);
       window.removeEventListener("keydown", keyListener);
+      window.removeEventListener("keydown", updateModifierState);
+      window.removeEventListener("keyup", updateModifierState);
+      window.removeEventListener("blur", handleWindowBlur);
       if (rafId) cancelAnimationFrame(rafId);
     };
   });
@@ -683,14 +705,20 @@
       <div class="gutter-controls">
         {#each ribbons as ribbon}
           <button
-            class={`block-btn accept-left-btn ${ribbon.leftAcceptActive ? "active-accepted" : ""}`.trim()}
+            class={`block-btn accept-left-btn ${ribbon.leftAcceptActive ? "active-accepted" : ""} ${isAppendMode ? "append-mode" : ""}`.trim()}
             style={`top: ${ribbon.leftBtnY}px; left: 4px;`}
-            title="Accept Yours (Left)"
-            onclick={() => acceptConflict(ribbon.id, "yours")}
+            title={isAppendMode ? "Append Yours (Left)" : "Accept Yours (Left) [Hold Ctrl/Cmd/Alt to Append]"}
+            onclick={(e) => acceptConflict(ribbon.id, "yours", isAppendMode || e.ctrlKey || e.metaKey || e.altKey)}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            {#if isAppendMode}
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M5 2V8M2 5H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            {:else}
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            {/if}
           </button>
           <button
             class="block-btn btn-ignore ignore-left-btn"
@@ -752,14 +780,20 @@
             </svg>
           </button>
           <button
-            class={`block-btn accept-right-btn ${ribbon.rightAcceptActive ? "active-accepted" : ""}`.trim()}
+            class={`block-btn accept-right-btn ${ribbon.rightAcceptActive ? "active-accepted" : ""} ${isAppendMode ? "append-mode" : ""}`.trim()}
             style={`top: ${ribbon.rightBtnY}px; left: 22px;`}
-            title="Accept Theirs (Right)"
-            onclick={() => acceptConflict(ribbon.id, "theirs")}
+            title={isAppendMode ? "Append Theirs (Right)" : "Accept Theirs (Right) [Hold Ctrl/Cmd/Alt to Append]"}
+            onclick={(e) => acceptConflict(ribbon.id, "theirs", isAppendMode || e.ctrlKey || e.metaKey || e.altKey)}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M8.5 2L5 5L8.5 8M5 2L1.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            {#if isAppendMode}
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M5 2V8M2 5H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            {:else}
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M8.5 2L5 5L8.5 8M5 2L1.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            {/if}
           </button>
         {/each}
       </div>
@@ -1020,6 +1054,14 @@
   .block-btn.active-accepted {
     background: #2ea043;
     border-color: #2ea043;
+    color: #ffffff;
+  }
+  .block-btn.append-mode {
+    border-color: #3574f0;
+    color: #58a6ff;
+  }
+  .block-btn.append-mode:hover {
+    background: #3574f0;
     color: #ffffff;
   }
 

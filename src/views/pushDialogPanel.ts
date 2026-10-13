@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitService } from '../git/gitService';
 import { CommitReviewPanel } from './commitReviewPanel';
-import { getPushDialogHtml } from './pushDialogHtml';
+import { getNonce } from '../utils/themeTokens';
 import { PushToExtensionMessage, ExtensionToPushMessage } from '../shared/protocol';
 
 export class PushDialogPanel {
@@ -90,8 +90,15 @@ export class PushDialogPanel {
     });
   }
 
-  private async handleMessage(msg: PushToExtensionMessage): Promise<void> {
+  private async handleMessage(msg: any): Promise<void> {
     switch (msg.type) {
+      case 'ready': {
+        this.panel.webview.postMessage({
+          type: 'updatePushInfo',
+          payload: this.pushInfo,
+        });
+        break;
+      }
       case 'close': {
         this.dispose();
         break;
@@ -171,7 +178,24 @@ export class PushDialogPanel {
   }
 
   private getHtml(): string {
-    const rawPushInfo = JSON.stringify(this.pushInfo);
-    return getPushDialogHtml(rawPushInfo);
+    const webview = this.panel.webview;
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'push', 'push.js'),
+    );
+    const nonce = getNonce();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Push Commits</title>
+</head>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
+  <div id="app"></div>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
   }
 }

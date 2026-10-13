@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitService } from '../git/gitService';
 import { MergeEditorPanel } from './mergeEditorPanel';
-import { getConflictsDialogHtml } from './conflictsDialogHtml';
+import { getNonce } from '../utils/themeTokens';
 import { ConflictsToExtensionMessage, ExtensionToConflictsMessage } from '../shared/protocol';
 
 export class ConflictsDialogPanel {
@@ -104,8 +104,15 @@ export class ConflictsDialogPanel {
     });
   }
 
-  private async handleMessage(msg: ConflictsToExtensionMessage): Promise<void> {
+  private async handleMessage(msg: any): Promise<void> {
     switch (msg.type) {
+      case 'ready': {
+        this.panel.webview.postMessage({
+          type: 'updateConflictInfo',
+          payload: this.conflictInfo,
+        });
+        break;
+      }
       case 'close': {
         this.dispose();
         break;
@@ -162,7 +169,24 @@ export class ConflictsDialogPanel {
   }
 
   private getHtml(): string {
-    const rawConflictInfo = JSON.stringify(this.conflictInfo);
-    return getConflictsDialogHtml(rawConflictInfo);
+    const webview = this.panel.webview;
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'conflicts', 'conflicts.js'),
+    );
+    const nonce = getNonce();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resolve Conflicts</title>
+</head>
+<body data-vscode-context='{"preventDefaultContextMenuItems": true}'>
+  <div id="app"></div>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
   }
 }

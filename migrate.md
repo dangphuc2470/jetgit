@@ -19,9 +19,9 @@ This document outlines the systematic migration strategy to convert all remainin
 | :--- | :--- | :--- | :--- |
 | **Git Graph** | Svelte 5 | `webview/graph/App.svelte`, `CommitList.svelte`, `FilterBar.svelte`, `BranchSidebar.svelte` | Maintained (Reference implementation) |
 | **Interactive Rebase** | Svelte 5 | `webview/rebase/App.svelte`, `CommitRow.svelte` | Maintained (Reference implementation) |
-| **3-Way Merge Editor** | Template strings + Vanilla JS | `src/views/mergeEditor/mergeEditorHtml.ts`, `mergeEditorScript.ts`, `mergeEditorStyles.ts` | `webview/merge/App.svelte`, `MergeColumn.svelte`, `MergeRibbons.svelte`, `MergeToolbar.svelte` |
-| **Conflicts Dialog** | Template strings + Vanilla JS | `src/views/conflictsDialogHtml.ts`, `src/views/dialogs/conflictsDialogScript.ts`, `conflictsDialogStyles.ts` | `webview/conflicts/App.svelte`, `ConflictItem.svelte` |
-| **Push Dialog** | Template strings + Vanilla JS | `src/views/pushDialogHtml.ts`, `src/views/dialogs/pushDialogScript.ts`, `pushDialogStyles.ts` | `webview/push/App.svelte`, `PushBranchSelect.svelte`, `PushCommitList.svelte` |
+| **3-Way Merge Editor** | Svelte 5 | `webview/merge/App.svelte`, `MergeToolbar.svelte` | Migrated (Phase 1 Completed) |
+| **Conflicts Dialog** | Svelte 5 | `webview/conflicts/App.svelte` | Migrated (Phase 2 Completed) |
+| **Push Dialog** | Svelte 5 | `webview/push/App.svelte` | Migrated (Phase 2 Completed) |
 | **Review Diff** | Vanilla TS DOM manipulation | `webview/review/main.ts` (52 KB), `diffParser.ts`, `editorHistory.ts`, `navigation.ts` | `webview/review/App.svelte`, `DiffPane.svelte`, `DiffGutter.svelte`, `ReviewToolbar.svelte` |
 | **Commit Tool Window** | Vanilla TS DOM manipulation | `webview/commit/main.ts` (29 KB), `treeView.ts`, `dialogs.ts`, `diffViewer.ts`, `commit.css` | `webview/commit/App.svelte`, `ChangesTree.svelte`, `CommitBox.svelte` |
 
@@ -50,19 +50,15 @@ This document outlines the systematic migration strategy to convert all remainin
 
 ---
 
-### Phase 2: Standalone Dialogs Migration (Conflicts & Push)
-**Priority:** High (Clean eradication of `src/views/dialogs/`)
-
-1. **Conflicts Dialog (`webview/conflicts/`):**
-   - Create `webview/conflicts/App.svelte`: Conflict files table with status indicators (modified/deleted), action buttons (Accept Yours, Accept Theirs, Merge), and file counts.
-   - Add bundle entry in `build-webview.mjs`.
-   - Update `src/views/conflictsDialogPanel.ts` to load Svelte bundle.
-   - Remove `conflictsDialogHtml.ts`, `conflictsDialogScript.ts`, and `conflictsDialogStyles.ts`.
-2. **Push Dialog (`webview/push/`):**
-   - Create `webview/push/App.svelte`: Branch target picker, commit list preview with checkboxes, Force Push toggle, and Push button.
-   - Add bundle entry in `build-webview.mjs`.
-   - Update `src/views/pushDialogPanel.ts` to load Svelte bundle.
-   - Remove `pushDialogHtml.ts`, `pushDialogScript.ts`, and `pushDialogStyles.ts`.
+### Phase 2: Standalone Dialogs Migration (Conflicts & Push) - COMPLETED
+**Status:** Completed
+**Key Results:**
+- Completely eliminated template string dialogs and eradicated `src/views/dialogs/`.
+- Migrated Conflicts Dialog to idiomatic Svelte 5 (`webview/conflicts/App.svelte` and `main.ts`).
+- Migrated Push Dialog to Svelte 5 (`webview/push/App.svelte` and `main.ts`) featuring smooth resizable splitters, inline remote branch editing, and commit-filtered file lists.
+- Added bundles `dist/webview/conflicts/conflicts.js` and `dist/webview/push/push.js` in `build-webview.mjs`.
+- Refactored `src/views/conflictsDialogPanel.ts` and `src/views/pushDialogPanel.ts` to load Svelte bundles with nonce-secured CSP.
+- Verified with 0 TypeScript compiler errors and successful build generation.
 
 ---
 

@@ -12,6 +12,8 @@ const entries = [
   { input: 'webview/commit/main.ts', outfile: 'dist/webview/commit/commit.js' },
   { input: 'webview/review/main.ts', outfile: 'dist/webview/commit/review.js' },
   { input: 'webview/merge/main.ts', outfile: 'dist/webview/merge/merge.js' },
+  { input: 'webview/conflicts/main.ts', outfile: 'dist/webview/conflicts/conflicts.js' },
+  { input: 'webview/push/main.ts', outfile: 'dist/webview/push/push.js' },
 ];
 
 for (const entry of entries) {

@@ -74,15 +74,15 @@ This document outlines the systematic migration strategy to convert all remainin
 
 ---
 
-### Phase 4: Commit Panel Migration (`webview/commit/`)
-**Priority:** Low / Final Polish
-
-1. **Component Decomposition:**
-   - Implement `webview/commit/App.svelte`.
-   - Implement `webview/commit/ChangesTree.svelte`: Changelists, Staged Changes, Unstaged Changes with IntelliJ-style checkboxes and context menus.
-   - Implement `webview/commit/CommitBox.svelte`: Commit message textarea, Amend checkbox, AI commit generator trigger, Commit and Commit & Push buttons.
-2. **Host Integration:**
-   - Update `src/views/commitPanel.ts` to load Svelte bundle.
+### Phase 4: Commit Panel Migration (`webview/commit/`) - COMPLETED
+**Status:** Completed
+**Key Results:**
+- Completely replaced 722 lines of legacy DOM string-based construction in `webview/commit/main.ts` with idiomatic Svelte 5 components.
+- Modularized architecture into `App.svelte`, `ChangesTree.svelte`, and `CommitBox.svelte`.
+- Preserved all changelists, unversioned files, flat mode, directory grouping (^P), module grouping, and IntelliJ-style tri-state checkbox semantics.
+- Preserved amend commit, recent commit messages dropdown, before-commit settings, AI commit message generator, shelf tab, and stash tab management.
+- Seamlessly integrated with standalone Conflicts and Push dialogs.
+- Bundled into `dist/webview/commit/commit.js` with 0 TypeScript compiler errors.
 
 ---
 

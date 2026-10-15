@@ -1032,7 +1032,7 @@
     cursor: pointer;
     padding: 0;
     box-sizing: border-box;
-    transition: all 0.12s ease;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
   }
   .block-btn:hover {
     background: #3574f0;

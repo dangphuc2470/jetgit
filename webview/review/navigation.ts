@@ -187,11 +187,30 @@ export function jumpDiff(direction: number, vscode: any): void {
     return b.isRightEmpty ? mapLeftToRight((b.leftStart - 1) * LINE_HEIGHT) : (b.rightStart - 1) * LINE_HEIGHT;
   };
 
+  // Re-anchor currentDiffIndex if user manually scrolled significantly away
+  if (state.currentDiffIndex >= 0 && state.currentDiffIndex < state.blocks.length) {
+    const curBlockY = getBlockY(state.blocks[state.currentDiffIndex]);
+    if (Math.abs(currentScroll - (curBlockY - 60)) > 250) {
+      let nearestIdx = 0;
+      let minDist = Infinity;
+      state.blocks.forEach((b, idx) => {
+        const dist = Math.abs(getBlockY(b) - currentScroll - 60);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestIdx = idx;
+        }
+      });
+      state.currentDiffIndex = nearestIdx;
+    }
+  } else {
+    state.currentDiffIndex = 0;
+  }
+
   if (direction > 0) {
-    let targetIdx = state.blocks.findIndex(b => getBlockY(b) > currentScroll + 70);
-    if (targetIdx !== -1) {
+    const nextIdx = state.currentDiffIndex + 1;
+    if (nextIdx < state.blocks.length) {
       hideDiffNavigationHint();
-      jumpToBlock(targetIdx, true);
+      jumpToBlock(nextIdx, true);
     } else {
       const hasNextFile = state.currentFileIndex < state.filesList.length - 1;
       if (hasNextFile) {
@@ -209,16 +228,10 @@ export function jumpDiff(direction: number, vscode: any): void {
       }
     }
   } else {
-    let targetIdx = -1;
-    for (let i = state.blocks.length - 1; i >= 0; i--) {
-      if (getBlockY(state.blocks[i]) < currentScroll + 50) {
-        targetIdx = i;
-        break;
-      }
-    }
-    if (targetIdx !== -1) {
+    const prevIdx = state.currentDiffIndex - 1;
+    if (prevIdx >= 0) {
       hideDiffNavigationHint();
-      jumpToBlock(targetIdx, true);
+      jumpToBlock(prevIdx, true);
     } else {
       const hasPrevFile = state.currentFileIndex > 0;
       if (hasPrevFile) {
@@ -236,4 +249,7 @@ export function jumpDiff(direction: number, vscode: any): void {
       }
     }
   }
+
+  window.focus();
+  if (rightPane) rightPane.focus();
 }

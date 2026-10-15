@@ -1553,6 +1553,7 @@ body, html {
   position: relative;
   user-select: text !important;
   -webkit-user-select: text !important;
+  padding-bottom: 250px;
 }
 
 .editor-line {

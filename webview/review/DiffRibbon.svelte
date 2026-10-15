@@ -9,6 +9,7 @@
     sRight: number;
     viewH: number;
     readOnly: boolean;
+    activeBlockId?: number | null;
     onRevertBlock: (block: DiffBlock) => void;
     onToggleStageBlock: (block: DiffBlock, checked: boolean) => void;
   }
@@ -20,6 +21,7 @@
     sRight,
     viewH,
     readOnly,
+    activeBlockId = null,
     onRevertBlock,
     onToggleStageBlock,
   }: Props = $props();
@@ -85,7 +87,11 @@
 <div class="middle-gutter" bind:this={gutterEl}>
   <svg class="gutter-ribbon-svg" width="54" height="100%">
     {#each computedRibbons as r (r.block.id)}
-      <path d={r.d} class={`diff-ribbon ${r.fillClass}`} data-block-id={r.block.id} />
+      <path
+        d={r.d}
+        class={`diff-ribbon ${r.fillClass} ${activeBlockId === r.block.id ? 'diff-ribbon-active' : ''}`}
+        data-block-id={r.block.id}
+      />
     {/each}
   </svg>
 

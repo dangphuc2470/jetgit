@@ -42,16 +42,44 @@ export function showDiffNavigationHint(kbdText: string, messageText: string, dur
   }, duration);
 }
 
+let highlightTimer: any = null;
+
 export function highlightActiveBlock(blockId: number): void {
-  const svgEl = document.querySelector('.gutter-ribbon-svg');
-  if (!svgEl) return;
-  const ribbon = svgEl.querySelector(`[data-block-id="${blockId}"]`);
-  if (ribbon) {
-    ribbon.classList.add('diff-ribbon-active');
-    setTimeout(() => {
-      ribbon.classList.remove('diff-ribbon-active');
-    }, 700);
+  if (highlightTimer) {
+    clearTimeout(highlightTimer);
+    highlightTimer = null;
   }
+
+  state.activeBlockId = blockId;
+  if (runtime.setActiveBlockId) {
+    runtime.setActiveBlockId(blockId);
+  }
+
+  const applyDomHighlight = () => {
+    const svgEl = document.querySelector('.gutter-ribbon-svg');
+    if (!svgEl) return;
+    const ribbon = svgEl.querySelector(`[data-block-id="${blockId}"]`);
+    if (ribbon) {
+      ribbon.classList.add('diff-ribbon-active');
+    }
+  };
+
+  applyDomHighlight();
+  setTimeout(applyDomHighlight, 50);
+
+  highlightTimer = setTimeout(() => {
+    state.activeBlockId = null;
+    if (runtime.setActiveBlockId) {
+      runtime.setActiveBlockId(null);
+    }
+    const svgEl = document.querySelector('.gutter-ribbon-svg');
+    if (svgEl) {
+      const ribbon = svgEl.querySelector(`[data-block-id="${blockId}"]`);
+      if (ribbon) {
+        ribbon.classList.remove('diff-ribbon-active');
+      }
+    }
+  }, 750);
 }
 
 export function smoothScrollBoth(

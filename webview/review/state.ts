@@ -25,6 +25,7 @@ export const state: ReviewState = {
   targetTitle: '',
   pendingJumpDirection: null,
   pendingFromFileList: null,
+  activeBlockId: null,
 };
 
 export const runtime = {
@@ -35,6 +36,7 @@ export const runtime = {
   scrollerTimeout: null as any,
   scrollAnimId: null as number | null,
   updateRibbonsFn: null as (() => void) | null,
+  setActiveBlockId: null as ((id: number | null) => void) | null,
 };
 
 export const undoStack: HistoryState[] = [];

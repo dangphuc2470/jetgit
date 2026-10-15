@@ -27,6 +27,7 @@
     jumpDiff,
     jumpFirstOrLastDiff,
     hideDiffNavigationHint,
+    highlightActiveBlock,
   } from "./navigation";
   import ReviewToolbar from "./ReviewToolbar.svelte";
   import DiffRibbon from "./DiffRibbon.svelte";
@@ -54,6 +55,7 @@
   let sLeft = $state(0);
   let sRight = $state(0);
   let viewH = $state(800);
+  let activeBlockId = $state<number | null>(null);
 
   let leftPaneEl: HTMLDivElement | null = $state(null);
   let rightPaneEl: HTMLDivElement | null = $state(null);
@@ -864,6 +866,7 @@
               reviewState.pendingFromFileList = null;
               const targetIdx = targetDir > 0 ? 0 : blocks.length - 1;
               jumpToBlock(targetIdx, false);
+              highlightActiveBlock(blocks[targetIdx].id);
               window.focus();
               rightPaneEl?.focus();
             }
@@ -1035,6 +1038,9 @@
 
   onMount(() => {
     runtime.updateRibbonsFn = updateScrollPositions;
+    runtime.setActiveBlockId = (id: number | null) => {
+      activeBlockId = id;
+    };
     window.addEventListener("message", handleMessage);
     window.addEventListener("keydown", handleGlobalKeyDown);
 
@@ -1046,6 +1052,7 @@
     return () => {
       window.removeEventListener("message", handleMessage);
       window.removeEventListener("keydown", handleGlobalKeyDown);
+      runtime.setActiveBlockId = null;
       cleanupTooltips();
     };
   });
@@ -1138,6 +1145,7 @@
       {sRight}
       {viewH}
       {readOnly}
+      {activeBlockId}
       onRevertBlock={handleRevertBlock}
       onToggleStageBlock={handleToggleStageBlock}
     />

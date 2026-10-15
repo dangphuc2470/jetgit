@@ -53,4 +53,5 @@ export interface ReviewState {
   targetTitle?: string;
   pendingJumpDirection?: number | null;
   pendingFromFileList?: boolean | null;
+  activeBlockId?: number | null;
 }

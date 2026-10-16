@@ -440,7 +440,7 @@ body, html {
 /* Horizontal Splitter */
 .h-splitter {
   height: 2px;
-  background: #000000;
+  background: #0000006b;
   cursor: row-resize;
   flex-shrink: 0;
   user-select: none;

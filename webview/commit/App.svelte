@@ -796,9 +796,7 @@
           onmousedown={handleSplitterMouseDown}
           role="separator"
           tabindex="0"
-        >
-          <div class="splitter-line"></div>
-        </div>
+        ></div>
 
         <div style={`flex: ${1 - splitRatio}; display: flex; flex-direction: column; min-height: 80px; overflow: hidden;`}>
           <CommitBox

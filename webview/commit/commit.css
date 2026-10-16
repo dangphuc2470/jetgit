@@ -245,10 +245,13 @@ body, html {
 
 /* File Tree */
 .file-tree-container {
+  flex: 1;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 4px 0;
-  min-height: 80px;
+  min-height: 60px;
+  box-sizing: border-box;
 }
 
 .tree-group {
@@ -436,22 +439,34 @@ body, html {
 
 /* Horizontal Splitter */
 .h-splitter {
-  height: 5px;
-  background: #2b2d30;
-  border-top: 1px solid #393b40;
-  border-bottom: 1px solid #393b40;
+  height: 1px;
+  background: var(--vscode-sideBarSectionHeader-border, #393b40);
   cursor: row-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
+  user-select: none;
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.h-splitter::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  bottom: -3px;
+  cursor: row-resize;
+  z-index: 1;
+}
+
+.h-splitter:hover,
+body.resizing-h .h-splitter {
+  background: var(--vscode-focusBorder, #3574f0) !important;
 }
 
 .splitter-line {
-  width: 28px;
-  height: 2px;
-  background: #4e5157;
-  border-radius: 1px;
+  display: none;
 }
 
 .resizing-h {
@@ -460,12 +475,15 @@ body, html {
 
 /* Commit Box */
 .commit-box {
+  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 8px 10px;
   background: var(--vscode-sideBar-background, #1e1f22);
   overflow: hidden;
-  min-height: 120px;
+  min-height: 80px;
+  box-sizing: border-box;
 }
 
 .commit-options-bar {
@@ -582,6 +600,7 @@ body, html {
 
 .commit-input-wrapper {
   flex: 1;
+  min-height: 50px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -591,7 +610,8 @@ body, html {
 #commit-message-input {
   width: 100%;
   height: 100%;
-  min-height: 60px;
+  flex: 1;
+  min-height: 50px;
   background: var(--vscode-input-background, #1e1f22);
   border: 1px solid var(--vscode-input-border, #393b40);
   border-radius: 4px;
@@ -601,6 +621,7 @@ body, html {
   padding: 6px 8px;
   resize: none;
   outline: none;
+  box-sizing: border-box;
 }
 
 #commit-message-input:focus {

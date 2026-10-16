@@ -289,7 +289,7 @@
   </div>
 {/snippet}
 
-<div class="file-tree-container">
+<div class="file-tree-container" style="flex: 1; height: 100%;">
   {@render fileGroup('Changes', changesFiles, expandChanges, onToggleExpandChanges)}
 
   {#if showIgnoredFiles !== false}

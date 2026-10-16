@@ -46,7 +46,7 @@
   }
 </script>
 
-<div class="commit-box">
+<div class="commit-box" style="flex: 1; height: 100%;">
   <div class="commit-options-bar">
     <div class="amend-tools-group">
       <label class="checkbox-label amend-label" title="Amend previous commit" data-tooltip="Amend previous commit">

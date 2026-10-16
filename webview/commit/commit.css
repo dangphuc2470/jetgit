@@ -439,8 +439,8 @@ body, html {
 
 /* Horizontal Splitter */
 .h-splitter {
-  height: 1px;
-  background: var(--vscode-sideBarSectionHeader-border, #393b40);
+  height: 2px;
+  background: #000000;
   cursor: row-resize;
   flex-shrink: 0;
   user-select: none;

@@ -86,6 +86,16 @@ This document outlines the systematic migration strategy to convert all remainin
 
 ---
 
+### Phase 5: Legacy Code Cleanup (`webview/commit/`) - COMPLETED
+**Status:** Completed
+**Key Results:**
+- Deleted obsolete `webview/commit/dialogs.ts` (628 lines, ~31 KB) and `webview/commit/dropdowns.ts` (65 lines, ~2.8 KB) left over from the pre-Svelte architecture.
+- Pruned `webview/commit/treeView.ts` from 418 lines down to 105 lines, removing all legacy DOM rendering methods (`renderTreeView`, `renderFolderNode`, etc.) while retaining pure tree construction logic (`buildDirectoryTree`, `isFolderExpanded`, `toggleFolder`).
+- Decoupled `webview/commit/App.svelte` from legacy modal dialog helpers, routing Push dialog requests directly via typed IPC to the standalone Svelte `PushDialogPanel`.
+- Verified 0 TypeScript compiler errors with `npx tsc --noEmit` and clean build with `npm run build`.
+
+---
+
 ## 4. Architectural Standards & Design Rules
 
 1. **State Management:**

@@ -7,13 +7,6 @@
   import { state as commitState } from './state';
   import { renderDiffViewer } from './diffViewer';
   import { showFileContextMenu, closeContextMenu } from './contextMenu';
-  import {
-    openConflictsDialog,
-    openPushDialog,
-    updateConflictsDialog,
-    closePushDialog,
-    handlePushError,
-  } from './dialogs';
   import ChangesTree from './ChangesTree.svelte';
   import CommitBox from './CommitBox.svelte';
 
@@ -274,15 +267,13 @@
 
     switch (msg.type) {
       case 'showPushDialog': {
-        openPushDialog(msg.payload, vscode);
+        vscode.postMessage({ type: 'openPushDialog', payload: msg.payload });
         break;
       }
       case 'pushSuccess': {
-        closePushDialog();
         break;
       }
       case 'pushError': {
-        handlePushError();
         break;
       }
       case 'init':
@@ -300,8 +291,6 @@
           theirsBranch: '',
           conflicts: [],
         };
-
-        updateConflictsDialog();
 
         const newChecked = new Set<string>();
         files.forEach((f) => {

@@ -379,6 +379,13 @@
       }
 
       addSubItem('Checkout', () => postMessage('checkout', cleanBranch));
+      addSubItem('Merge into Current', () => postMessage('mergeBranch', cleanBranch));
+      addSubItem('Rebase Current onto Selected', () => postMessage('rebase', cleanBranch));
+      addSubItem('Compare with Current', () => {
+        const headCommit = (commits || []).find((c: any) => (c.refs || []).some((r: string) => r.startsWith('HEAD')));
+        const activeBranch = headCommit?.refs?.find((r: string) => r.startsWith('HEAD -> '))?.replace('HEAD -> ', '') || 'HEAD';
+        postMessage('compareBranch', { branch: cleanBranch, withBranch: activeBranch });
+      });
       addSubItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanBranch }));
       addSubItem('Update', () => {
         showToast("Updating '" + cleanBranch + "'...");
@@ -448,6 +455,67 @@
     });
 
     document.body.appendChild(menu);
+    let x = e.clientX;
+    let y = e.clientY;
+    const rect = menu.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+    if (y + rect.height > window.innerHeight - 8) {
+      const yAbove = e.clientY - rect.height;
+      if (yAbove >= 8) {
+        y = yAbove;
+      } else {
+        y = Math.max(4, window.innerHeight - rect.height - 8);
+      }
+    }
+    menu.style.left = Math.max(0, x) + 'px';
+    menu.style.top = Math.max(0, y) + 'px';
+  }
+
+  function showBranchLabelContextMenu(e: MouseEvent, branchName: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    (window as any).__lastGraphMenuOpenedAt = Date.now();
+    window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
+    closeCommitContextMenu();
+
+    const cleanBranch = branchName.replace(/^refs\/(heads|remotes)\//, '').replace(/^HEAD -> /, '');
+    const headCommit = (commits || []).find((c: any) => (c.refs || []).some((r: string) => r.startsWith('HEAD')));
+    const activeBranch = headCommit?.refs?.find((r: string) => r.startsWith('HEAD -> '))?.replace('HEAD -> ', '') || 'HEAD';
+
+    const menu = document.createElement('div');
+    menu.className = 'commit-context-menu branch-context-menu';
+    menu.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+    menu.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+
+    function addBranchItem(label: string, onClick: () => void) {
+      const it = document.createElement('div');
+      it.className = 'ccm-item';
+      it.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">${label}</span>`;
+      it.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        closeCommitContextMenu();
+        onClick();
+      });
+      menu.appendChild(it);
+    }
+
+    addBranchItem(`Checkout '${cleanBranch}'`, () => postMessage('checkout', cleanBranch));
+    addBranchItem(`Merge '${cleanBranch}' into '${activeBranch}'`, () => postMessage('mergeBranch', cleanBranch));
+    addBranchItem(`Rebase '${activeBranch}' onto '${cleanBranch}'`, () => postMessage('rebase', cleanBranch));
+    addBranchItem(`Compare with Current (${activeBranch})`, () => postMessage('compareBranch', { branch: cleanBranch, withBranch: activeBranch }));
+    addBranchItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanBranch }));
+    addBranchItem('Update', () => {
+      showToast("Updating '" + cleanBranch + "'...");
+      postMessage('pull', cleanBranch);
+    });
+    addBranchItem('Push...', () => postMessage('push', cleanBranch));
+    addBranchItem('Rename...', () => openRenameBranchDialog(cleanBranch));
+
+    document.body.appendChild(menu);
+
     let x = e.clientX;
     let y = e.clientY;
     const rect = menu.getBoundingClientRect();
@@ -623,6 +691,7 @@
         {#each visibleCommits as commit (commit.hash)}
           {@const isMerge = (commit.parents && commit.parents.length > 1) || (commit.subject && commit.subject.startsWith('Merge '))}
           {@const isCur = commit.isCurrentBranch !== false}
+          {@const isHead = commit.refs && commit.refs.some((r: string) => r === 'HEAD' || r.startsWith('HEAD -> '))}
           {@const isMy = isMyCommit(commit)}
           {@const gw = computeGraphWidth(commit)}
           <div
@@ -631,6 +700,7 @@
             class="commit-row"
             class:is-merge={isMerge}
             class:is-current-branch={isCur}
+            class:is-head={isHead}
             class:selected={commit.hash === selectedHash}
             style="height: 25px;"
             onclick={() => onSelectCommit(commit.hash)}
@@ -639,7 +709,11 @@
           >
             <span class="hash" style="width: {gw}px; min-width: {gw}px;"></span>
             {#if commit.refs && commit.refs.length > 0}
-              <BranchLabels refs={commit.refs} />
+              <BranchLabels
+                refs={commit.refs}
+                onBranchContextMenu={showBranchLabelContextMenu}
+                onBranchCheckout={(name) => postMessage('checkout', name.replace(/^refs\/(heads|remotes)\//, '').replace(/^HEAD -> /, ''))}
+              />
             {/if}
             <span class="subject" title={commit.subject}>{commit.subject}</span>
             <span class="author" class:is-my-commit={isMy}>{commit.author}</span>
@@ -780,6 +854,10 @@
     white-space: nowrap;
     color: #dfe1e5;
     font-size: 0.92em;
+  }
+  .commit-row.is-head .subject {
+    font-weight: 600;
+    color: #ffffff;
   }
   :global(body.hl-my-commits) .author.is-my-commit {
     font-weight: 700 !important;

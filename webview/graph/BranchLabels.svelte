@@ -1,36 +1,71 @@
 <script lang="ts">
+  import { parseRef, type ParsedRef } from '$labelUtils';
+
   interface Props {
     refs: string[];
+    onBranchContextMenu?: (e: MouseEvent, branchName: string) => void;
+    onBranchCheckout?: (branchName: string) => void;
   }
 
-  let { refs = [] }: Props = $props();
+  let { refs = [], onBranchContextMenu, onBranchCheckout }: Props = $props();
 
-  function labelClass(ref: string): string {
-    if (ref.startsWith('tag: ')) return 'label tag';
-    if (ref.startsWith('HEAD') || ref === 'HEAD') return 'label head';
-    if (ref.includes('/')) return 'label remote';
-    return 'label branch';
-  }
-
-  function labelText(ref: string): string {
-    if (ref.startsWith('HEAD -> ')) return ref.slice(8);
-    if (ref.startsWith('tag: ')) return ref.slice(5);
-    return ref;
-  }
-
-  function labelIcon(ref: string): string {
-    if (ref.startsWith('tag: ')) {
-      return '<span class="label-icon"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.70708 2.29289L1.29497 8.705C0.904444 9.09553 0.904444 9.72869 1.29497 10.1192L5.88075 14.705C6.27128 15.0955 6.90444 15.0955 7.29497 14.705L13.7071 8.29289C13.8946 8.10536 14 7.851 14 7.58579V3C14 2.44772 13.5523 2 13 2H8.41418C8.14897 2 7.89461 2.10536 7.70708 2.29289ZM10 8C11.1046 8 12 7.10457 12 6C12 4.89543 11.1046 4 10 4C8.89543 4 8 4.89543 8 6C8 7.10457 8.89543 8 10 8Z" fill="#F2C55C"/></svg></span>';
-    }
-    return '<span class="label-icon"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="4.5" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="10.8" cy="6.2" r="1.8" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="4.5" y1="6.3" x2="4.5" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M4.5 9.8H9.3C10.13 9.8 10.8 9.13 10.8 8.3V8.0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></span>';
-  }
+  let parsedRefs: ParsedRef[] = $derived(refs.map(parseRef));
 </script>
 
 <span class="labels">
-  {#each refs as ref}
-    <span class={labelClass(ref)}>
-      {@html labelIcon(ref)}
-      <span>{labelText(ref)}</span>
+  {#each parsedRefs as item}
+    <span
+      class="label {item.type}"
+      title={item.displayName}
+      role="button"
+      tabindex="0"
+      oncontextmenu={(e) => {
+        if (onBranchContextMenu && item.type !== 'head') {
+          e.preventDefault();
+          e.stopPropagation();
+          onBranchContextMenu(e, item.displayName);
+        }
+      }}
+      ondblclick={(e) => {
+        if (onBranchCheckout && (item.type === 'branch' || item.type === 'remote')) {
+          e.stopPropagation();
+          onBranchCheckout(item.displayName);
+        }
+      }}
+      onkeydown={(e) => {
+        if (e.key === 'Enter' && onBranchCheckout && (item.type === 'branch' || item.type === 'remote')) {
+          onBranchCheckout(item.displayName);
+        }
+      }}
+    >
+      <span class="label-icon">
+        {#if item.type === 'head'}
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 1a7 7 0 1 0 7 7A7 7 0 0 0 8 1zm3.1 5.3l-3.8 4.2a.8.8 0 0 1-1.2 0l-1.9-2a.8.8 0 1 1 1.1-1.1l1.3 1.4 3.3-3.6a.8.8 0 0 1 1.2 1.1z"/>
+          </svg>
+        {:else if item.type === 'tag'}
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M7.707 2.293L1.295 8.705a2 2 0 0 0 0 2.828l4.586 4.586a2 2 0 0 0 2.828 0l6.412-6.412A2 2 0 0 0 15.707 8.3V3a1 1 0 0 0-1-1H9.414a2 2 0 0 0-1.707.293z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            <circle cx="11.5" cy="5.5" r="1.5" fill="currentColor"/>
+          </svg>
+        {:else if item.type === 'remote'}
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+            <circle cx="4.5" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <circle cx="11.5" cy="11.5" r="1.8" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <line x1="4.5" y1="6.3" x2="4.5" y2="11.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M4.5 9H9.5C10.5 9 11.5 9.8 11.5 10.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+            <path d="M8 4.5H13M10.5 2L13 4.5L10.5 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {:else}
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+            <circle cx="4.5" cy="4.5" r="1.8" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <circle cx="11.5" cy="6.5" r="1.8" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <line x1="4.5" y1="6.3" x2="4.5" y2="14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M4.5 9.8H9.7C10.6 9.8 11.5 9.0 11.5 8.1V8.0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        {/if}
+      </span>
+      <span class="label-text">{item.shortName}</span>
     </span>
   {/each}
 </span>
@@ -38,11 +73,11 @@
 <style>
   .labels {
     order: 5;
-    margin-left: 16px;
+    margin-left: 12px;
     display: inline-flex;
     gap: 5px;
     flex-shrink: 0;
-    padding-right: 16px;
+    padding-right: 12px;
     min-width: max-content;
     overflow: visible;
     align-items: center;
@@ -51,36 +86,46 @@
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    padding: 0 5px;
-    border-radius: 3px;
-    font-size: 0.8em;
+    padding: 1px 5px 2px 5px;
+    border-radius: 6px;
+    font-size: 11px;
     font-weight: 500;
-    line-height: 1.3;
+    line-height: 14px;
     white-space: nowrap;
     flex-shrink: 0;
-    background: transparent;
+    box-sizing: border-box;
+    cursor: default;
+    user-select: none;
   }
-  :global(.label-icon) {
+  .label-icon {
     display: inline-flex;
     align-items: center;
-    vertical-align: -1px;
-    margin-right: 2px;
+    justify-content: center;
+    line-height: 0;
+    margin-right: 1px;
+  }
+  .label-text {
+    display: inline-block;
   }
   .branch {
-    color: #3fb950;
-    border: 1px solid #238636;
+    color: #57ab5a;
+    background: rgba(87, 171, 90, 0.12);
+    border: 1px solid rgba(87, 171, 90, 0.45);
   }
   .remote {
-    color: #bc8cff;
-    border: 1px solid #8957e5;
+    color: #b392f0;
+    background: rgba(179, 146, 240, 0.12);
+    border: 1px solid rgba(179, 146, 240, 0.45);
   }
   .tag {
-    color: #d29922;
-    border: 1px solid #9e6a03;
+    color: #e5a50a;
+    background: rgba(229, 165, 10, 0.12);
+    border: 1px solid rgba(229, 165, 10, 0.45);
   }
   .head {
-    color: #e5a50a;
-    border: 1px solid #e5a50a;
+    color: #e5c07b;
+    background: rgba(229, 192, 123, 0.18);
+    border: 1px solid rgba(229, 192, 123, 0.65);
     font-weight: 600;
   }
 </style>

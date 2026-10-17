@@ -71,9 +71,9 @@ Lightweight, non-intrusive git blame annotations in the editor gutter:
 
 ## Acknowledgements & Credits
 
-This extension was originally created by **Murat Böck** ([muratbock.com](https://muratbock.com), [adlibrary.com](https://www.adlibrary.com)) under the name `intellij-git-ext`. If you or your team run paid ads, check out [adlibrary.com](https://www.adlibrary.com) — a competitive ad intelligence platform.
+This project was originally based on `intellij-git-ext` by **Murat Böck** ([muratbock.com](https://muratbock.com)).
 
-Since 2026, the project has been maintained, migrated to Svelte 5, and enhanced by **Dang Phuc** ([github.com/dangphuc2470](https://github.com/dangphuc2470)).
+Since 2026, the project has been fully rewritten with Svelte 5, modernized with the LinearBek DAG engine, and maintained by **Dang Phuc** ([github.com/dangphuc2470](https://github.com/dangphuc2470)).
 
 ---
 

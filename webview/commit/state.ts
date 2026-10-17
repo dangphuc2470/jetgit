@@ -1,4 +1,4 @@
-import { CommitState } from './types';
+import type { CommitState } from './types.ts';
 
 export const state: CommitState = {
   activeTab: 'commit',

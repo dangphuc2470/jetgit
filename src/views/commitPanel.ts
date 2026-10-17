@@ -18,6 +18,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private changelistTree?: ChangelistTreeProvider;
   private graphViewProvider?: { refresh: () => void | Promise<void> };
+  private fileRepoMap = new Map<string, { relativePath: string; repoPath: string; repoName: string; gitService: GitService }>();
   private changesFilePaths: string[] = [];
   private unversionedFilePaths: string[] = [];
   private allFilePaths: string[] = [];
@@ -97,6 +98,64 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({ type: 'closeAllMenus' });
   }
 
+  private async discoverRepositories(): Promise<{ name: string; path: string; gitService: GitService }[]> {
+    const repos: { name: string; path: string; gitService: GitService }[] = [];
+    const seenPaths = new Set<string>();
+
+    const checkAndAdd = async (name: string, folderPath: string) => {
+      const normalized = path.resolve(folderPath);
+      if (seenPaths.has(normalized)) return;
+      try {
+        const gitPath = path.join(normalized, '.git');
+        if (fs.existsSync(gitPath)) {
+          seenPaths.add(normalized);
+          const gs = normalized === path.resolve(this.gitService.getCwd())
+            ? this.gitService
+            : new GitService(normalized);
+          repos.push({ name, path: normalized, gitService: gs });
+        }
+      } catch {}
+    };
+
+    const folders = vscode.workspace.workspaceFolders || [];
+    for (const folder of folders) {
+      await checkAndAdd(folder.name, folder.uri.fsPath);
+
+      try {
+        const entries = fs.readdirSync(folder.uri.fsPath, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+            const subPath = path.join(folder.uri.fsPath, entry.name);
+            await checkAndAdd(entry.name, subPath);
+          }
+        }
+      } catch {}
+    }
+
+    if (repos.length === 0) {
+      const rootPath = path.resolve(this.gitService.getCwd());
+      const isRepo = await this.gitService.isGitRepo();
+      if (isRepo) {
+        await checkAndAdd(path.basename(rootPath) || 'Project', rootPath);
+      }
+      try {
+        const sub = await this.gitService.findSubRepos();
+        for (const s of sub) {
+          await checkAndAdd(s.name, s.path);
+        }
+      } catch {}
+    } else if (repos.length === 1) {
+      try {
+        const sub = await repos[0].gitService.findSubRepos();
+        for (const s of sub) {
+          await checkAndAdd(s.name, s.path);
+        }
+      } catch {}
+    }
+
+    return repos;
+  }
+
   async refresh(): Promise<void> {
     if (!this.view || !this.view.visible) return;
     if (this.isRefreshing) {
@@ -106,10 +165,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     this.isRefreshing = true;
 
     try {
-      const isRepo = await this.gitService.isGitRepo();
+      const repos = await this.discoverRepositories();
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      const repoName = workspaceFolder ? workspaceFolder.name : (path.basename(this.gitService.getCwd()) || 'Project');
-      if (!isRepo) {
+      const defaultRepoName = repos.length === 1 ? repos[0].name : (workspaceFolder ? workspaceFolder.name : (path.basename(this.gitService.getCwd()) || 'Project'));
+
+      if (repos.length === 0) {
+        this.fileRepoMap.clear();
         this.view.webview.postMessage({
           type: 'status',
           payload: {
@@ -118,63 +179,139 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             unversionedCount: 0,
             recentMessages: [],
             stashes: [],
-            repoName,
+            repoName: defaultRepoName,
+            repos: [],
           },
         });
         return;
       }
 
-      await this.gitService.unmaskAllAssumeUnchanged();
+      this.fileRepoMap.clear();
+      const isMultiRepo = repos.length > 1;
 
-      const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff, conflictInfo] = await Promise.all([
-        this.gitService.getStatus(),
-        this.gitService.getMergeMessage(),
-        this.gitService.getRecentCommitMessages(20),
-        this.gitService.getStashes(),
-        this.gitService.exec(['diff', 'HEAD']).catch(() => ''),
-        this.gitService.exec(['diff', '--cached']).catch(() => ''),
-        this.gitService.getConflictInfo().catch(() => ({
-          hasConflicts: false,
-          isMerging: false,
-          isRebasing: false,
-          yoursBranch: '',
-          theirsBranch: '',
-          conflicts: [],
-        })),
-      ]);
+      const repoResults = await Promise.all(
+        repos.map(async (repo) => {
+          try {
+            await repo.gitService.unmaskAllAssumeUnchanged();
+            const [statusEntries, mergeMsg, recentMsgs, stashes, totalDiff, cachedDiff, conflictInfo] = await Promise.all([
+              repo.gitService.getStatus(),
+              repo.gitService.getMergeMessage().catch(() => ''),
+              repo.gitService.getRecentCommitMessages(10).catch(() => []),
+              repo.gitService.getStashes().catch(() => []),
+              repo.gitService.exec(['diff', 'HEAD']).catch(() => ''),
+              repo.gitService.exec(['diff', '--cached']).catch(() => ''),
+              repo.gitService.getConflictInfo().catch(() => ({
+                hasConflicts: false,
+                isMerging: false,
+                isRebasing: false,
+                yoursBranch: '',
+                theirsBranch: '',
+                conflicts: [],
+              })),
+            ]);
 
-      const totalChangesMap = this.parseChangesPerFile(totalDiff);
-      const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
+            const totalChangesMap = this.parseChangesPerFile(totalDiff);
+            const stagedChangesMap = this.parseChangesPerFile(cachedDiff);
 
-      const files = statusEntries.map(entry => {
-        const filePath = entry.path;
-        const fileName = path.basename(filePath);
-        const fileDir = path.dirname(filePath);
-        const isUntracked = entry.x === '?' && entry.y === '?';
-        const isStaged = entry.x !== ' ' && entry.x !== '?';
-        const totalChanges = totalChangesMap.get(filePath) || 0;
-        const stagedChanges = stagedChangesMap.get(filePath) || 0;
-        const isPartiallyStaged = totalChanges > 0 && stagedChanges > 0 && stagedChanges < totalChanges;
+            const files = statusEntries.map(entry => {
+              const relativePath = entry.path;
+              const fileName = path.basename(relativePath);
+              const fileDir = path.dirname(relativePath);
+              const isUntracked = entry.x === '?' && entry.y === '?';
+              const isStaged = entry.x !== ' ' && entry.x !== '?';
+              const totalChanges = totalChangesMap.get(relativePath) || 0;
+              const stagedChanges = stagedChangesMap.get(relativePath) || 0;
+              const isPartiallyStaged = totalChanges > 0 && stagedChanges > 0 && stagedChanges < totalChanges;
+              const uniquePath = isMultiRepo ? `${repo.name}/${relativePath}` : relativePath;
 
-        return {
-          path: filePath,
-          name: fileName,
-          dir: fileDir === '.' ? '' : fileDir,
-          status: entry.y !== ' ' ? entry.y : entry.x,
-          staged: isStaged,
-          isUntracked,
-          totalChanges,
-          stagedChanges,
-          partiallyStaged: isPartiallyStaged,
-        };
-      });
+              return {
+                path: uniquePath,
+                relativePath,
+                repoName: repo.name,
+                repoPath: repo.path,
+                name: fileName,
+                dir: fileDir === '.' ? '' : fileDir,
+                status: entry.y !== ' ' ? entry.y : entry.x,
+                staged: isStaged,
+                isUntracked,
+                totalChanges,
+                stagedChanges,
+                partiallyStaged: isPartiallyStaged,
+                gitService: repo.gitService,
+              };
+            });
 
-      const changesFiles = files
+            return {
+              repo,
+              files,
+              mergeMsg,
+              recentMsgs,
+              stashes,
+              conflictInfo,
+            };
+          } catch (err: any) {
+            this.log.appendLine(`Commit panel status fetch failed for ${repo.name}: ${err.message}`);
+            return {
+              repo,
+              files: [],
+              mergeMsg: '',
+              recentMsgs: [],
+              stashes: [],
+              conflictInfo: {
+                hasConflicts: false,
+                isMerging: false,
+                isRebasing: false,
+                yoursBranch: '',
+                theirsBranch: '',
+                conflicts: [],
+              },
+            };
+          }
+        })
+      );
+
+      const allFiles: any[] = [];
+      const allRecentMessages: string[] = [];
+      const allStashes: any[] = [];
+      let defaultCommitMessage = '';
+      let combinedConflictInfo: any = null;
+
+      for (const res of repoResults) {
+        for (const file of res.files) {
+          allFiles.push(file);
+          this.fileRepoMap.set(file.path, {
+            relativePath: file.relativePath,
+            repoPath: file.repoPath,
+            repoName: file.repoName,
+            gitService: file.gitService,
+          });
+        }
+        if (!defaultCommitMessage && res.mergeMsg) {
+          defaultCommitMessage = res.mergeMsg;
+        }
+        for (const msg of res.recentMsgs) {
+          if (!allRecentMessages.includes(msg)) allRecentMessages.push(msg);
+        }
+        allStashes.push(...res.stashes);
+        if (res.conflictInfo && (res.conflictInfo.hasConflicts || res.conflictInfo.isMerging || res.conflictInfo.isRebasing)) {
+          if (!combinedConflictInfo) {
+            combinedConflictInfo = { ...res.conflictInfo };
+          } else {
+            combinedConflictInfo.conflicts = [
+              ...(combinedConflictInfo.conflicts || []),
+              ...(res.conflictInfo.conflicts || []),
+            ];
+            combinedConflictInfo.hasConflicts = combinedConflictInfo.conflicts.length > 0;
+          }
+        }
+      }
+
+      const changesFiles = allFiles
         .filter(f => !f.isUntracked)
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
-      const unversionedFiles = files
+        .sort((a, b) => (a.repoName || '').localeCompare(b.repoName || '') || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
+      const unversionedFiles = allFiles
         .filter(f => f.isUntracked)
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
+        .sort((a, b) => (a.repoName || '').localeCompare(b.repoName || '') || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
       const sortedFiles = [...changesFiles, ...unversionedFiles];
 
       const changesCount = changesFiles.length;
@@ -191,11 +328,20 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           files: sortedFiles,
           changesCount,
           unversionedCount,
-          defaultCommitMessage: mergeMsg || '',
-          recentMessages,
-          stashes,
-          conflictInfo,
-          repoName,
+          defaultCommitMessage: defaultCommitMessage || '',
+          recentMessages: allRecentMessages.slice(0, 20),
+          stashes: allStashes,
+          conflictInfo: combinedConflictInfo || {
+            hasConflicts: false,
+            isMerging: false,
+            isRebasing: false,
+            yoursBranch: '',
+            theirsBranch: '',
+            conflicts: [],
+          },
+          repoName: defaultRepoName,
+          repos: repos.map(r => ({ name: r.name, path: r.path })),
+          isMultiRepo,
           changelists: this.changelistTree ? this.changelistTree.getData().changelists : [],
           activeChangelist: this.changelistTree ? this.changelistTree.getData().active : 'Default',
         },
@@ -332,11 +478,20 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         this.log.appendLine(`[CommitPanel] openReviewInCenter for file: ${filePath}`);
         if (filePath) {
           try {
+            const mapped = this.fileRepoMap.get(filePath);
+            const targetService = mapped ? mapped.gitService : this.gitService;
+            const targetPath = mapped ? mapped.relativePath : filePath;
+            const repoReviewList = mapped
+              ? this.allFilePaths
+                  .filter(p => this.fileRepoMap.get(p)?.repoPath === mapped.repoPath)
+                  .map(p => this.fileRepoMap.get(p)?.relativePath || p)
+              : this.getReviewFilesList(filePath);
+
             const panel = CommitReviewPanel.createOrShow(
               this.extensionUri,
-              this.gitService,
-              filePath,
-              this.getReviewFilesList(filePath),
+              targetService,
+              targetPath,
+              repoReviewList.length > 0 ? repoReviewList : [targetPath],
               () => this.refresh(),
               false,
               undefined,
@@ -354,9 +509,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'stageFile': {
         const filePath = msg.payload as string;
         try {
-          await this.gitService.stageFile(filePath);
-          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
-            await CommitReviewPanel.currentPanel.loadFile(filePath, this.getReviewFilesList(filePath));
+          const mapped = this.fileRepoMap.get(filePath);
+          const targetService = mapped ? mapped.gitService : this.gitService;
+          const targetPath = mapped ? mapped.relativePath : filePath;
+          await targetService.stageFile(targetPath);
+          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === targetPath) {
+            await CommitReviewPanel.currentPanel.loadFile(targetPath, this.getReviewFilesList(filePath));
           }
           await this.refresh();
         } catch (err: any) {
@@ -368,11 +526,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const filePaths = msg.payload as string[];
         if (!filePaths || filePaths.length === 0) return;
         try {
-          await this.gitService.stageFiles(filePaths);
+          const groups = new Map<GitService, string[]>();
+          for (const p of filePaths) {
+            const mapped = this.fileRepoMap.get(p);
+            const gs = mapped ? mapped.gitService : this.gitService;
+            const rel = mapped ? mapped.relativePath : p;
+            if (!groups.has(gs)) groups.set(gs, []);
+            groups.get(gs)!.push(rel);
+          }
+          for (const [gs, paths] of groups) {
+            await gs.stageFiles(paths);
+          }
           if (CommitReviewPanel.currentPanel) {
             const current = CommitReviewPanel.currentPanel.getCurrentFilePath();
-            if (current && filePaths.includes(current)) {
-              await CommitReviewPanel.currentPanel.loadFile(current, this.getReviewFilesList(current));
+            if (current && filePaths.some(p => (this.fileRepoMap.get(p)?.relativePath || p) === current)) {
+              await CommitReviewPanel.currentPanel.loadFile(current, [current]);
             }
           }
           await this.refresh();
@@ -384,9 +552,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'unstageFile': {
         const filePath = msg.payload as string;
         try {
-          await this.gitService.unstageFile(filePath);
-          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === filePath) {
-            await CommitReviewPanel.currentPanel.loadFile(filePath, this.getReviewFilesList(filePath));
+          const mapped = this.fileRepoMap.get(filePath);
+          const targetService = mapped ? mapped.gitService : this.gitService;
+          const targetPath = mapped ? mapped.relativePath : filePath;
+          await targetService.unstageFile(targetPath);
+          if (CommitReviewPanel.currentPanel && CommitReviewPanel.currentPanel.getCurrentFilePath() === targetPath) {
+            await CommitReviewPanel.currentPanel.loadFile(targetPath, this.getReviewFilesList(filePath));
           }
           await this.refresh();
         } catch (err: any) {
@@ -398,11 +569,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const filePaths = msg.payload as string[];
         if (!filePaths || filePaths.length === 0) return;
         try {
-          await this.gitService.unstageFiles(filePaths);
+          const groups = new Map<GitService, string[]>();
+          for (const p of filePaths) {
+            const mapped = this.fileRepoMap.get(p);
+            const gs = mapped ? mapped.gitService : this.gitService;
+            const rel = mapped ? mapped.relativePath : p;
+            if (!groups.has(gs)) groups.set(gs, []);
+            groups.get(gs)!.push(rel);
+          }
+          for (const [gs, paths] of groups) {
+            await gs.unstageFiles(paths);
+          }
           if (CommitReviewPanel.currentPanel) {
             const current = CommitReviewPanel.currentPanel.getCurrentFilePath();
-            if (current && filePaths.includes(current)) {
-              await CommitReviewPanel.currentPanel.loadFile(current, this.getReviewFilesList(current));
+            if (current && filePaths.some(p => (this.fileRepoMap.get(p)?.relativePath || p) === current)) {
+              await CommitReviewPanel.currentPanel.loadFile(current, [current]);
             }
           }
           await this.refresh();
@@ -421,7 +602,17 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         );
         if (confirm !== 'Rollback') return;
         try {
-          await this.gitService.rollbackFiles(filePaths);
+          const groups = new Map<GitService, string[]>();
+          for (const p of filePaths) {
+            const mapped = this.fileRepoMap.get(p);
+            const gs = mapped ? mapped.gitService : this.gitService;
+            const rel = mapped ? mapped.relativePath : p;
+            if (!groups.has(gs)) groups.set(gs, []);
+            groups.get(gs)!.push(rel);
+          }
+          for (const [gs, paths] of groups) {
+            await gs.rollbackFiles(paths);
+          }
           vscode.window.showInformationMessage(`Rolled back ${filePaths.length} file(s).`);
           await this.refresh();
         } catch (err: any) {
@@ -432,7 +623,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'jumpToSource': {
         const filePath = msg.payload as string;
         if (filePath) {
-          const fullPath = path.join(this.gitService.getCwd(), filePath);
+          const mapped = this.fileRepoMap.get(filePath);
+          const fullPath = mapped
+            ? path.join(mapped.repoPath, mapped.relativePath)
+            : path.join(this.gitService.getCwd(), filePath);
           if (fs.existsSync(fullPath)) {
             vscode.commands.executeCommand('vscode.open', vscode.Uri.file(fullPath));
           }
@@ -442,7 +636,11 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'deleteFile': {
         const filePath = msg.payload as string;
         if (!filePath) return;
-        const fileName = path.basename(filePath);
+        const mapped = this.fileRepoMap.get(filePath);
+        const fullPath = mapped
+          ? path.join(mapped.repoPath, mapped.relativePath)
+          : path.join(this.gitService.getCwd(), filePath);
+        const fileName = path.basename(fullPath);
         const confirm = await vscode.window.showWarningMessage(
           `Are you sure you want to delete "${fileName}"?`,
           { modal: true },
@@ -450,7 +648,6 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         );
         if (confirm !== 'Delete') return;
         try {
-          const fullPath = path.join(this.gitService.getCwd(), filePath);
           if (fs.existsSync(fullPath)) {
             if (fs.statSync(fullPath).isDirectory()) {
               fs.rmSync(fullPath, { recursive: true, force: true });
@@ -458,7 +655,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
               fs.unlinkSync(fullPath);
             }
           }
-          await this.gitService.exec(['rm', '-f', '--cached', filePath]).catch(() => {});
+          const gs = mapped ? mapped.gitService : this.gitService;
+          const rel = mapped ? mapped.relativePath : filePath;
+          await gs.exec(['rm', '-f', '--cached', rel]).catch(() => {});
           await this.refresh();
           vscode.window.showInformationMessage(`Deleted ${fileName}`);
         } catch (err: any) {
@@ -469,7 +668,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       case 'getFileDiff': {
         const filePath = msg.payload as string;
         try {
-          const diff = await this.gitService.getFileDiff(filePath);
+          const mapped = this.fileRepoMap.get(filePath);
+          const gs = mapped ? mapped.gitService : this.gitService;
+          const rel = mapped ? mapped.relativePath : filePath;
+          const diff = await gs.getFileDiff(rel);
           this.view?.webview.postMessage({
             type: 'fileDiff',
             payload: { path: filePath, diff },
@@ -490,9 +692,24 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'commit': {
-        const { message, files, amend } = msg.payload;
+        const { message, files: targetFiles, amend } = msg.payload;
         try {
-          await this.gitService.commitFiles(message, files, amend);
+          const groups = new Map<GitService, string[]>();
+          if (targetFiles && targetFiles.length > 0) {
+            for (const filePath of targetFiles) {
+              const mapped = this.fileRepoMap.get(filePath);
+              const gs = mapped ? mapped.gitService : this.gitService;
+              const rel = mapped ? mapped.relativePath : filePath;
+              if (!groups.has(gs)) groups.set(gs, []);
+              groups.get(gs)!.push(rel);
+            }
+          } else {
+            groups.set(this.gitService, []);
+          }
+
+          for (const [gs, paths] of groups) {
+            await gs.commitFiles(message, paths.length > 0 ? paths : undefined, amend);
+          }
           vscode.window.showInformationMessage('Committed successfully.');
           this.view?.webview.postMessage({ type: 'commitSuccess' });
           await this.refresh();
@@ -506,9 +723,24 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'commitAndPush': {
-        const { message, files, amend } = msg.payload;
+        const { message, files: targetFiles, amend } = msg.payload;
         try {
-          await this.gitService.commitFiles(message, files, amend);
+          const groups = new Map<GitService, string[]>();
+          if (targetFiles && targetFiles.length > 0) {
+            for (const filePath of targetFiles) {
+              const mapped = this.fileRepoMap.get(filePath);
+              const gs = mapped ? mapped.gitService : this.gitService;
+              const rel = mapped ? mapped.relativePath : filePath;
+              if (!groups.has(gs)) groups.set(gs, []);
+              groups.get(gs)!.push(rel);
+            }
+          } else {
+            groups.set(this.gitService, []);
+          }
+
+          for (const [gs, paths] of groups) {
+            await gs.commitFiles(message, paths.length > 0 ? paths : undefined, amend);
+          }
           vscode.window.showInformationMessage('Committed successfully.');
           this.view?.webview.postMessage({ type: 'commitSuccess' });
           await this.refresh();

@@ -1,11 +1,16 @@
 export interface CommitFile {
   path: string;
+  relativePath?: string;
+  repoName?: string;
+  repoPath?: string;
   name: string;
   dir: string;
   status: string;
   staged?: boolean;
   isUntracked?: boolean;
   partiallyStaged?: boolean;
+  totalChanges?: number;
+  stagedChanges?: number;
 }
 
 export interface HunkLine {
@@ -84,4 +89,5 @@ export interface CommitState {
   splitRatio: number;
   changelists: ChangelistInfo[];
   activeChangelist: string;
+  repos?: { name: string; path: string }[];
 }

@@ -129,6 +129,16 @@
       indeterminate: someChecked && !allChecked,
     };
   }
+
+  function getRepoGroups(filesList: CommitFile[]): { name: string; files: CommitFile[] }[] {
+    const map = new Map<string, CommitFile[]>();
+    for (const f of filesList) {
+      const rName = f.repoName || repoName || 'Project';
+      if (!map.has(rName)) map.set(rName, []);
+      map.get(rName)!.push(f);
+    }
+    return Array.from(map.entries()).map(([name, groupList]) => ({ name, files: groupList }));
+  }
 </script>
 
 {#snippet fileItem(file: CommitFile, inTree: boolean)}
@@ -230,6 +240,87 @@
   </div>
 {/snippet}
 
+{#snippet groupBody(groupFiles: CommitFile[], groupTitle: string)}
+  {@const repoGroups = getRepoGroups(groupFiles)}
+  {@const isMultiRepo = repoGroups.length > 1}
+  {@const shouldGroupByRepo = Boolean(groupByModule || isMultiRepo)}
+  {@const isTreeMode = Boolean(groupByDirectory || shouldGroupByRepo)}
+  <div class={`group-items ${isTreeMode ? 'group-tree-mode' : ''}`}>
+    {#if shouldGroupByRepo}
+      {#each repoGroups as rg (rg.name)}
+        {@const repoFiles = rg.files}
+        {@const repoCheckState = getGroupCheckState(repoFiles)}
+        {@const repoFolderKey = `__repo__:${groupTitle}:${rg.name}`}
+        {@const isRepoExpanded = isFolderOpen(repoFolderKey, true)}
+        <div class="tree-folder-node module-folder-node repo-folder-node">
+          <div
+            class="tree-folder-header module-header repo-header"
+            data-folder-path={repoFolderKey}
+            onclick={() => onToggleFolder(repoFolderKey, true)}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleFolder(repoFolderKey, true); }}
+          >
+            <span class={`tree-arrow ${isRepoExpanded ? 'expanded' : ''}`}>
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
+              </svg>
+            </span>
+            <input
+              type="checkbox"
+              class="file-chk tree-chk group-chk repo-chk"
+              checked={repoCheckState.checked}
+              indeterminate={repoCheckState.indeterminate}
+              onclick={(e) => e.stopPropagation()}
+              onchange={(e) => {
+                e.stopPropagation();
+                onToggleStageFiles(repoFiles, (e.target as HTMLInputElement).checked);
+              }}
+            />
+            <span class="tree-folder-icon repo-icon">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M1.5 3.5C1.5 2.67157 2.17157 2 3 2H6.08579C6.48362 2 6.86514 2.15804 7.14645 2.43934L8.70711 4H13C13.8284 4 14.5 4.67157 14.5 5.5V12.5C14.5 13.3284 13.8284 14 13 14H3C2.17157 14 1.5 13.3284 1.5 12.5V3.5Z" stroke="#8C8C8C" stroke-width="1.2" fill="none"/>
+              </svg>
+            </span>
+            <span class="tree-folder-name repo-name">{rg.name}</span>
+            <span class="tree-folder-count">{repoFiles.length} {repoFiles.length === 1 ? 'file' : 'files'}</span>
+          </div>
+
+          {#if isRepoExpanded}
+            <div class="tree-folder-children module-children repo-children">
+              {#if groupByDirectory}
+                {@const treeRoot = buildDirectoryTree(repoFiles)}
+                {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
+                  {@render folderNode(sub, 1, `${groupTitle}:${rg.name}`)}
+                {/each}
+                {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
+                  {@render fileItem(file, true)}
+                {/each}
+              {:else}
+                {#each repoFiles as file (file.path)}
+                  {@render fileItem(file, false)}
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/each}
+    {:else if groupByDirectory}
+      {@const treeRoot = buildDirectoryTree(groupFiles)}
+      {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
+        {@render folderNode(sub, 0, groupTitle)}
+      {/each}
+      {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
+        {@render fileItem(file, true)}
+      {/each}
+    {:else}
+      {#each groupFiles as file (file.path)}
+        {@render fileItem(file, false)}
+      {/each}
+    {/if}
+  </div>
+{/snippet}
+
 {#snippet fileGroup(title: string, groupFiles: CommitFile[], expanded: boolean, onToggleExpand: () => void)}
   {@const checkState = getGroupCheckState(groupFiles)}
   <div class="tree-group">
@@ -261,78 +352,7 @@
     </div>
 
     {#if expanded && groupFiles.length > 0}
-      {@const isTreeMode = Boolean(groupByDirectory || groupByModule)}
-      <div class={`group-items ${isTreeMode ? 'group-tree-mode' : ''}`}>
-        {#if groupByModule}
-          {@const moduleName = repoName || 'Project'}
-          {@const modulePath = `__module__:${title}:${moduleName}`}
-          {@const isModuleExpanded = isFolderOpen(modulePath, true)}
-          <div class="tree-folder-node module-folder-node">
-            <div
-              class="tree-folder-header module-header"
-              data-folder-path={modulePath}
-              onclick={() => onToggleFolder(modulePath, true)}
-              role="button"
-              tabindex="0"
-              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleFolder(modulePath, true); }}
-            >
-              <span class={`tree-arrow ${isModuleExpanded ? 'expanded' : ''}`}>
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
-                  <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
-                </svg>
-              </span>
-              <input
-                type="checkbox"
-                class="file-chk tree-chk group-chk"
-                checked={checkState.checked}
-                indeterminate={checkState.indeterminate}
-                onclick={(e) => e.stopPropagation()}
-                onchange={(e) => {
-                  e.stopPropagation();
-                  onToggleStageFiles(groupFiles, (e.target as HTMLInputElement).checked);
-                }}
-              />
-              <span class="tree-folder-icon">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path d="M1.5 3.5C1.5 2.67157 2.17157 2 3 2H6.08579C6.48362 2 6.86514 2.15804 7.14645 2.43934L8.70711 4H13C13.8284 4 14.5 4.67157 14.5 5.5V12.5C14.5 13.3284 13.8284 14 13 14H3C2.17157 14 1.5 13.3284 1.5 12.5V3.5Z" stroke="#8C8C8C" stroke-width="1.2" fill="none"/>
-                </svg>
-              </span>
-              <span class="tree-folder-name">{moduleName}</span>
-              <span class="tree-folder-count">{groupFiles.length} {groupFiles.length === 1 ? 'file' : 'files'}</span>
-            </div>
-
-            {#if isModuleExpanded}
-              <div class="tree-folder-children module-children">
-                {#if groupByDirectory}
-                  {@const treeRoot = buildDirectoryTree(groupFiles)}
-                  {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
-                    {@render folderNode(sub, 1, title)}
-                  {/each}
-                  {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
-                    {@render fileItem(file, true)}
-                  {/each}
-                {:else}
-                  {#each groupFiles as file (file.path)}
-                    {@render fileItem(file, false)}
-                  {/each}
-                {/if}
-              </div>
-            {/if}
-          </div>
-        {:else if groupByDirectory}
-          {@const treeRoot = buildDirectoryTree(groupFiles)}
-          {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
-            {@render folderNode(sub, 0, title)}
-          {/each}
-          {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
-            {@render fileItem(file, true)}
-          {/each}
-        {:else}
-          {#each groupFiles as file (file.path)}
-            {@render fileItem(file, false)}
-          {/each}
-        {/if}
-      </div>
+      {@render groupBody(groupFiles, title)}
     {/if}
   </div>
 {/snippet}
@@ -393,78 +413,7 @@
     </div>
 
     {#if expanded && groupFiles.length > 0}
-      {@const isTreeMode = Boolean(groupByDirectory || groupByModule)}
-      <div class={`group-items ${isTreeMode ? 'group-tree-mode' : ''}`}>
-        {#if groupByModule}
-          {@const moduleName = repoName || 'Project'}
-          {@const modulePath = `__module__:${name}:${moduleName}`}
-          {@const isModuleExpanded = isFolderOpen(modulePath, true)}
-          <div class="tree-folder-node module-folder-node">
-            <div
-              class="tree-folder-header module-header"
-              data-folder-path={modulePath}
-              onclick={() => onToggleFolder(modulePath, true)}
-              role="button"
-              tabindex="0"
-              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleFolder(modulePath, true); }}
-            >
-              <span class={`tree-arrow ${isModuleExpanded ? 'expanded' : ''}`}>
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
-                  <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
-                </svg>
-              </span>
-              <input
-                type="checkbox"
-                class="file-chk tree-chk group-chk"
-                checked={checkState.checked}
-                indeterminate={checkState.indeterminate}
-                onclick={(e) => e.stopPropagation()}
-                onchange={(e) => {
-                  e.stopPropagation();
-                  onToggleStageFiles(groupFiles, (e.target as HTMLInputElement).checked);
-                }}
-              />
-              <span class="tree-folder-icon">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path d="M1.5 3.5C1.5 2.67157 2.17157 2 3 2H6.08579C6.48362 2 6.86514 2.15804 7.14645 2.43934L8.70711 4H13C13.8284 4 14.5 4.67157 14.5 5.5V12.5C14.5 13.3284 13.8284 14 13 14H3C2.17157 14 1.5 13.3284 1.5 12.5V3.5Z" stroke="#8C8C8C" stroke-width="1.2" fill="none"/>
-                </svg>
-              </span>
-              <span class="tree-folder-name">{moduleName}</span>
-              <span class="tree-folder-count">{groupFiles.length} {groupFiles.length === 1 ? 'file' : 'files'}</span>
-            </div>
-
-            {#if isModuleExpanded}
-              <div class="tree-folder-children module-children">
-                {#if groupByDirectory}
-                  {@const treeRoot = buildDirectoryTree(groupFiles)}
-                  {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
-                    {@render folderNode(sub, 1, name)}
-                  {/each}
-                  {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
-                    {@render fileItem(file, true)}
-                  {/each}
-                {:else}
-                  {#each groupFiles as file (file.path)}
-                    {@render fileItem(file, false)}
-                  {/each}
-                {/if}
-              </div>
-            {/if}
-          </div>
-        {:else if groupByDirectory}
-          {@const treeRoot = buildDirectoryTree(groupFiles)}
-          {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
-            {@render folderNode(sub, 0, name)}
-          {/each}
-          {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
-            {@render fileItem(file, true)}
-          {/each}
-        {:else}
-          {#each groupFiles as file (file.path)}
-            {@render fileItem(file, false)}
-          {/each}
-        {/if}
-      </div>
+      {@render groupBody(groupFiles, name)}
     {/if}
   </div>
 {/snippet}

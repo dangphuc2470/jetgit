@@ -1,5 +1,5 @@
-import { state } from './state';
-import { CommitFile } from './types';
+import { state } from './state.ts';
+import type { CommitFile } from './types.ts';
 
 export function isFolderExpanded(folderPath: string, isModule?: boolean): boolean {
   if (state.expandAllFolders === true) {
@@ -36,7 +36,8 @@ export function buildDirectoryTree(files: CommitFile[]): any {
   };
 
   for (const file of files) {
-    const normalized = (file.path || '').replace(/\\/g, '/');
+    const pathToUse = file.relativePath || file.path;
+    const normalized = (pathToUse || '').replace(/\\/g, '/');
     const parts = normalized.split('/').filter(Boolean);
     if (parts.length === 0) continue;
     parts.pop(); // remove file name, keep directory parts

@@ -40,6 +40,7 @@
   let currentTargetBranch = $state<string>("");
   let isEditingTargetBranch = $state(false);
   let targetBranchInputVal = $state("");
+  let branchInputEl = $state<HTMLInputElement | undefined>();
   let showRemoteDropdown = $state(false);
   let showPushMenu = $state(false);
   let isPushing = $state(false);
@@ -87,16 +88,28 @@
     setUpstream = Boolean(info.isNew || currentTargetBranch !== info.currentBranch);
   }
 
-  function startEditBranch(e: MouseEvent) {
-    e.stopPropagation();
+  function startEditBranch(e?: MouseEvent) {
+    e?.stopPropagation();
     isEditingTargetBranch = true;
     targetBranchInputVal = currentTargetBranch;
+    requestAnimationFrame(() => {
+      if (branchInputEl) {
+        branchInputEl.focus();
+        branchInputEl.select();
+      }
+    });
   }
 
   function commitBranchEdit() {
+    if (!isEditingTargetBranch) return;
     const val = targetBranchInputVal.trim();
     if (val) {
       currentTargetBranch = val;
+      if (currentTargetBranch !== pushInfo.currentBranch) {
+        setUpstream = true;
+      }
+    } else {
+      targetBranchInputVal = currentTargetBranch;
     }
     isEditingTargetBranch = false;
   }
@@ -122,6 +135,9 @@
 
   function doPush(force = false) {
     if (isPushing) return;
+    if (isEditingTargetBranch) {
+      commitBranchEdit();
+    }
     isPushing = true;
     postMessage("executePush", {
       branch: pushInfo.currentBranch,
@@ -194,20 +210,47 @@
       }
     };
 
-    const onGlobalClick = () => {
+    const onGlobalPointerDown = (e: MouseEvent | PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (isEditingTargetBranch && target && !target.closest(".target-branch-input")) {
+        commitBranchEdit();
+      }
+      if (showRemoteDropdown && target && !target.closest(".remote-selector-wrapper")) {
+        showRemoteDropdown = false;
+      }
+      if (showPushMenu && target && !target.closest(".push-btn-group") && !target.closest(".push-dropdown")) {
+        showPushMenu = false;
+      }
+    };
+
+    const onWindowBlur = () => {
+      if (isEditingTargetBranch) {
+        commitBranchEdit();
+      }
+    };
+
+    const onGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (isEditingTargetBranch && target && !target.closest(".target-branch-input")) {
+        commitBranchEdit();
+      }
       showRemoteDropdown = false;
       showPushMenu = false;
     };
 
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", onGlobalPointerDown, true);
     window.addEventListener("click", onGlobalClick);
+    window.addEventListener("blur", onWindowBlur);
 
     postMessage("ready");
 
     return () => {
       unsubscribe();
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onGlobalPointerDown, true);
       window.removeEventListener("click", onGlobalClick);
+      window.removeEventListener("blur", onWindowBlur);
     };
   });
 </script>
@@ -280,6 +323,7 @@
           <input
             type="text"
             class="target-branch-input"
+            bind:this={branchInputEl}
             bind:value={targetBranchInputVal}
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
@@ -307,8 +351,7 @@
             <div
               class="as-commit-item"
               class:selected={isSelected}
-              onclick={(e) => {
-                e.stopPropagation();
+              onclick={() => {
                 selectedCommitHash = c.hash;
               }}
               role="row"

@@ -1,119 +1,88 @@
-# IntelliJ Git — Free GitLens Alternative with Visual Commit Graph
+# JetGit — IntelliJ & JetBrains Style Git Client for VS Code
 
-A free, lightweight alternative to GitLens that brings IntelliJ IDEA's Git integration to Visual Studio Code, Cursor, Windsurf, Antigravity, and other VS Code-based editors.
+A fast, lightweight, and modern Git client bringing JetBrains IntelliJ IDEA's Git workflow to Visual Studio Code, Cursor, Windsurf, Antigravity, and other VS Code-based editors.
 
-If you've ever missed IntelliJ's visual commit graph, inline blame, or changelists after switching to VS Code — this extension is for you. No paid tiers, no feature gating — everything is free and open source.
+Powered by **Svelte 5** and featuring the **LinearBek DAG graph layout engine**, JetGit delivers 60fps-120fps responsive scrolling, seamless 3-way merge conflict resolution, and intuitive branch management without paywalls or telemetry bloat.
 
-## Features
+---
 
-### Visual Commit Graph
+## Key Features
 
-A full commit history with colored branch lines (DAG), just like IntelliJ's Git Log. Lives in the bottom panel for quick access.
+### 1. Visual Commit Graph (DAG) with LinearBek Engine
+A full interactive commit history with colored branch lines (DAG), mirroring IntelliJ IDEA's Git Log window:
+- **LinearBek Graph Layout:** Clusters feature branches contiguous to their merge heads, preventing criss-crossing lines and maintaining an uninterrupted column-0 trunk.
+- **Clean Git Query:** Directly queries `HEAD`, local branches, remote tracking branches, and tags, filtering out `refs/stash` and internal notes noise.
+- **Detailed Commit Details:** Inspect all affected files per commit with side-by-side diff review.
+- **Keyboard Shortcut:** `Cmd+9` (macOS) / `Ctrl+Shift+9` (Windows/Linux).
 
-- Colored branch lines showing merges, forks, and parallel development
-- Branch and tag labels on commits
-- Filter by branch, author, date range, or file path
-- Click a commit to see all changed files
-- Click a file to open a **side-by-side diff** view
-- Right-click a commit to start an interactive rebase
-- Infinite scroll — loads more commits as you scroll down
-- Keyboard shortcut: `Cmd+9` (macOS) / `Ctrl+Shift+9` (Windows/Linux)
+### 2. Svelte 5 Powered 3-Way Merge Tool
+A dedicated IntelliJ-style 3-pane merge window:
+- **Yours (Left), Result (Center), Theirs (Right)** with synchronized scrolling decoupled via `requestAnimationFrame`.
+- **Declarative SVG Ribbon:** Smooth gutter connectors visually mapping conflict chunks across panes.
+- **One-Click Resolvers:** Quick resolve buttons (`>>` Apply Yours, `<<` Apply Theirs).
+- **Non-Conflicting Merges:** Bulk auto-resolution of non-overlapping changes.
 
-### Inline Blame Annotations
+### 3. Interactive Rebase Tool
+A visual interface for interactive Git rebase operations:
+- Easily reorder, squash, fixup, reword, edit, or drop commits.
+- Drag-and-drop commit sequence reordering.
+- Triggered directly from Git Log via "Interactively Rebase from Here...".
 
-Toggle per-line blame annotations in the editor gutter, showing who last changed each line and when.
+### 4. IntelliJ Commit Tool Window & Changelists
+Bring JetBrains changelists and granular staging to VS Code:
+- Group uncommitted changes into custom named lists.
+- Track active changelists and commit changes selectively.
+- Tri-state directory tree and flat views (`^P`).
+- Amend commit, recent commit message history, and AI-assisted commit message generation.
+- Keyboard Shortcut: `Cmd+K` (macOS) / `Ctrl+K` (Windows/Linux).
 
-- Age-based coloring: recent changes are highlighted, older ones fade out
-- Compact format: date + author name in the left gutter
-- Hover for full commit details (message, hash, email)
-- Click an annotation to jump to that commit in the Git Log
-- Silently skips untracked files (no annoying popups)
-- Keyboard shortcut: `Option+B` (macOS) / `Alt+B` (Windows/Linux)
+### 5. Inline Blame Annotations
+Lightweight, non-intrusive git blame annotations in the editor gutter:
+- Age-based subtle color highlights (fades smoothly for older changes).
+- Hover to view full author, commit message, and hash.
+- Click to reveal the commit immediately in the Git Log.
+- Keyboard Shortcut: `Option+B` (macOS) / `Alt+B` (Windows/Linux).
 
-### Branch Manager
+### 6. Branch Manager & Standalone Push/Conflicts Dialogs
+- Sidebar branch explorer: Local branches, Remote branches, and Tags.
+- Standalone Svelte-powered Push Dialog with branch tracking and force-push safety.
+- Dedicated standalone Conflicts Dialog.
 
-A tree view in the Source Control sidebar showing all your branches organized by category.
-
-- **HEAD** — current branch with star icon
-- **Local** — all local branches
-- **Remote** — remote branches grouped by remote name (origin, upstream, etc.)
-- **Tags** — all tags
-- Right-click context menu: Checkout, Create Branch, Merge, Rebase, Compare, Delete
-
-### Changelists
-
-Group your uncommitted changes into named lists — just like IntelliJ's changelists.
-
-- Create multiple changelists to organize work-in-progress
-- Set an active changelist (new changes go here)
-- Commit individual changelists separately
-- Stored per-workspace in `.vscode/changelists.json`
-- Keyboard shortcut: `Cmd+K` (macOS) / `Ctrl+K` (Windows/Linux) to commit active changelist
-
-### Interactive Rebase
-
-A visual dialog for interactive rebase — reorder, squash, fixup, reword, edit, or drop commits.
-
-- Drag-and-drop commit reordering
-- Dropdown per commit: Pick, Squash, Fixup, Reword, Edit, Drop
-- Trigger from the Git Log context menu: "Interactively Rebase from Here..."
-
-### Merge Conflict Detection
-
-Automatic detection of merge conflicts with quick resolution options.
-
-- Status bar indicator showing conflict count
-- "Resolve Conflicts" command opens VS Code's built-in merge editor
-- "Accept All Non-Conflicting" for bulk resolution of trivial conflicts
+---
 
 ## Keyboard Shortcuts
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| Open Git Log | `Cmd+9` | `Ctrl+Shift+9` |
-| Toggle Blame | `Option+B` | `Alt+B` |
-| Commit Active Changelist | `Cmd+K` | `Ctrl+K` |
+| Action | macOS | Windows / Linux |
+| :--- | :--- | :--- |
+| **Open Git Log** | `Cmd+9` | `Ctrl+Shift+9` |
+| **Toggle Inline Blame** | `Option+B` | `Alt+B` |
+| **Commit Tool Window** | `Cmd+K` | `Ctrl+K` |
+| **Jump to Next Diff Chunk** | `F7` | `F7` |
+| **Jump to Previous Diff Chunk** | `Shift+F7` | `Shift+F7` |
 
-## Commands
-
-Open the Command Palette (`Cmd+Shift+P`) and type "IntelliJ Git" to see all available commands:
-
-- **Open Git Log** — Focus the commit graph panel
-- **Toggle Blame Annotations** — Show/hide inline blame
-- **Interactive Rebase...** — Start an interactive rebase
-- **New Changelist...** — Create a new changelist
-- **Resolve Merge Conflicts** — Open conflict resolution
-- **Refresh Branches** — Refresh the branch tree
-- And more...
+---
 
 ## Requirements
 
-- VS Code 1.85+ (or any compatible editor: Cursor, Windsurf, Antigravity, Void, etc.)
-- Git 2.0+ installed and available in PATH
+- VS Code `^1.85.0` or compatible editors (Cursor, Windsurf, Antigravity, Void, VSCodium).
+- Git `2.0+` installed and available in your system `PATH`.
 
-## Why This Extension?
+---
 
-VS Code has good basic Git support, but lacks the cohesive, visual Git experience that JetBrains IDEs provide. GitLens is powerful but many features are locked behind a paid tier. **IntelliJ Git** is a completely free alternative that focuses on what IntelliJ/WebStorm/PyCharm users actually miss:
+## Acknowledgements & Credits
 
-- A proper visual git graph with colored branch lines (not just a flat list)
-- Git blame annotations that stay out of your way until you need them
-- Changelists for organizing uncommitted work (just like JetBrains)
-- Side-by-side diff viewer for any commit
-- Git history and git timeline visualization
-- Everything integrated into the existing VS Code UI — no extra sidebars or clutter
+This extension was originally created by **Murat Böck** ([muratbock.com](https://muratbock.com), [adlibrary.com](https://www.adlibrary.com)) under the name `intellij-git-ext`. If you or your team run paid ads, check out [adlibrary.com](https://www.adlibrary.com) — a competitive ad intelligence platform.
 
-**Switching from GitLens?** IntelliJ Git covers the core features — commit graph, blame, diff, branch management — without the complexity. It's fast, free, and designed for developers who prefer the JetBrains workflow.
+Since 2026, the project has been maintained, migrated to Svelte 5, and enhanced by **Dang Phuc** ([github.com/dangphuc2470](https://github.com/dangphuc2470)).
 
-## Support the Developer
+---
 
-This extension is free and open source. If you find it useful, you can support the developer by checking out [adlibrary.com](https://www.adlibrary.com) — a competitive ad intelligence platform for performance marketers. If you or your team run paid ads, give it a try!
+## Disclaimer
 
-Need help with web development or scraping projects? Visit [muratbock.com](https://muratbock.com).
+JetGit is an independent open-source extension and is not affiliated with, endorsed by, or sponsored by JetBrains s.r.o. "IntelliJ", "IntelliJ IDEA", "WebStorm", "PyCharm", "Android Studio", and "JetBrains" are registered trademarks of JetBrains s.r.o.
 
-## Feedback & Issues
-
-Found a bug or have a feature request? Open an issue on [GitHub](https://github.com/intellij-git-ext/intellij-git-ext/issues).
+---
 
 ## License
 
-MIT
+[MIT License](LICENSE) — Copyright (c) 2024 Murat Böck, Copyright (c) 2026 Dang Phuc.

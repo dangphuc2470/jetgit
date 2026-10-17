@@ -1,0 +1,13 @@
+.vscode/**
+.git/**
+.gitignore
+src/**
+test/**
+webview/**
+build-webview.mjs
+tsconfig.json
+vite.config.mts
+svelte.config.mjs
+migrate.md
+plan.md
+*.vsix

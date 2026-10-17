@@ -1,18 +1,18 @@
 {
-  "name": "intellij-git-ext",
-  "displayName": "IntelliJ Git",
-  "description": "IntelliJ-style Git integration for VS Code — visual commit graph, colored branch lines, inline blame annotations, interactive rebase, changelists, and side-by-side diff viewer. Bring the best of JetBrains Git tooling to your editor.",
-  "version": "0.1.1",
-  "publisher": "WMBGmbH",
+  "name": "jetgit",
+  "displayName": "JetGit - IntelliJ & JetBrains Style Git Client",
+  "description": "JetBrains IntelliJ-style Git integration for VS Code — visual commit graph, colored branch lines, inline blame annotations, interactive rebase, changelists, 3-way merge, and side-by-side diff viewer. Fast, reactive, and powered by Svelte 5.",
+  "version": "0.1.2",
+  "publisher": "dangphuc2470",
   "icon": "icon.png",
   "license": "MIT",
-  "homepage": "https://github.com/intellij-git-ext/intellij-git-ext#readme",
+  "homepage": "https://github.com/dangphuc2470/jetgit#readme",
   "bugs": {
-    "url": "https://github.com/intellij-git-ext/intellij-git-ext/issues"
+    "url": "https://github.com/dangphuc2470/jetgit/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/intellij-git-ext/intellij-git-ext"
+    "url": "https://github.com/dangphuc2470/jetgit"
   },
   "keywords": [
     "git",

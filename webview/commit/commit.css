@@ -2030,6 +2030,28 @@ body.resizing-h .h-splitter {
   color: var(--vscode-menu-foreground, #dfe1e5);
   user-select: none;
   box-sizing: border-box;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(70, 62, 62) transparent;
+}
+
+.as-context-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.as-context-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.as-context-menu::-webkit-scrollbar-thumb {
+  background: #4e5157;
+  border-radius: 3px;
+}
+
+.as-context-menu::-webkit-scrollbar-thumb:hover {
+  background: #60636a;
 }
 
 .as-menu-item {

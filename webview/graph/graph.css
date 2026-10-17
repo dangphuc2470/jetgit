@@ -570,13 +570,37 @@ html, body {
   padding: 4px;
   z-index: 2000;
   min-width: 270px;
-  max-height: none;
-  overflow: visible;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 12px;
   user-select: none;
   color: var(--vscode-menu-foreground, #dfe1e5);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(70, 62, 62) transparent;
+}
+
+.branch-context-menu::-webkit-scrollbar,
+.commit-context-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.branch-context-menu::-webkit-scrollbar-track,
+.commit-context-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.branch-context-menu::-webkit-scrollbar-thumb,
+.commit-context-menu::-webkit-scrollbar-thumb {
+  background: #4e5157;
+  border-radius: 3px;
+}
+
+.branch-context-menu::-webkit-scrollbar-thumb:hover,
+.commit-context-menu::-webkit-scrollbar-thumb:hover {
+  background: #60636a;
 }
 
 .bcm-item,

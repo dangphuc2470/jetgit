@@ -231,6 +231,38 @@
     }, 50);
   }
 
+  function positionContextMenu(menu: HTMLElement, targetX: number, targetY: number) {
+    const margin = 8;
+    const maxAvailHeight = Math.max(80, window.innerHeight - margin * 2);
+    menu.style.maxHeight = `${maxAvailHeight}px`;
+    menu.style.overflowY = 'auto';
+
+    const rect = menu.getBoundingClientRect();
+    let x = targetX;
+    let y = targetY;
+
+    if (x + rect.width > window.innerWidth - margin) {
+      x = Math.max(margin, window.innerWidth - rect.width - margin);
+    }
+
+    if (rect.height >= maxAvailHeight) {
+      y = margin;
+    } else {
+      const spaceBelow = window.innerHeight - targetY - margin;
+      const spaceAbove = targetY - margin;
+      if (spaceBelow >= rect.height) {
+        y = targetY;
+      } else if (spaceAbove >= rect.height) {
+        y = targetY - rect.height;
+      } else {
+        y = Math.max(margin, window.innerHeight - rect.height - margin);
+      }
+    }
+
+    menu.style.left = Math.max(0, Math.round(x)) + 'px';
+    menu.style.top = Math.max(0, Math.round(y)) + 'px';
+  }
+
   function showCommitContextMenu(e: MouseEvent, commit: any) {
     e.preventDefault();
     e.stopPropagation();
@@ -407,18 +439,29 @@
         clearTimeout(subMenuTimer);
         document.body.appendChild(subMenu);
         subMenu.style.display = 'block';
+
+        const margin = 8;
+        const maxAvailHeight = Math.max(80, window.innerHeight - margin * 2);
+        subMenu.style.maxHeight = `${maxAvailHeight}px`;
+        subMenu.style.overflowY = 'auto';
+
         const bRect = branchItem.getBoundingClientRect();
         let sx = bRect.right + 2;
         let sy = bRect.top;
         const sRect = subMenu.getBoundingClientRect();
-        if (sx + sRect.width > window.innerWidth) {
-          sx = bRect.left - sRect.width - 2;
+
+        if (sx + sRect.width > window.innerWidth - margin) {
+          sx = Math.max(margin, bRect.left - sRect.width - 2);
         }
-        if (sy + sRect.height > window.innerHeight) {
-          sy = window.innerHeight - sRect.height - 8;
+
+        if (sRect.height >= maxAvailHeight) {
+          sy = margin;
+        } else if (sy + sRect.height > window.innerHeight - margin) {
+          sy = Math.max(margin, window.innerHeight - sRect.height - margin);
         }
-        subMenu.style.left = Math.max(0, sx) + 'px';
-        subMenu.style.top = Math.max(0, sy) + 'px';
+
+        subMenu.style.left = Math.max(0, Math.round(sx)) + 'px';
+        subMenu.style.top = Math.max(0, Math.round(sy)) + 'px';
       }
 
       branchItem.addEventListener('mouseenter', showSubMenu);
@@ -455,20 +498,7 @@
     });
 
     document.body.appendChild(menu);
-    let x = e.clientX;
-    let y = e.clientY;
-    const rect = menu.getBoundingClientRect();
-    if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
-    if (y + rect.height > window.innerHeight - 8) {
-      const yAbove = e.clientY - rect.height;
-      if (yAbove >= 8) {
-        y = yAbove;
-      } else {
-        y = Math.max(4, window.innerHeight - rect.height - 8);
-      }
-    }
-    menu.style.left = Math.max(0, x) + 'px';
-    menu.style.top = Math.max(0, y) + 'px';
+    positionContextMenu(menu, e.clientX, e.clientY);
   }
 
   function showBranchLabelContextMenu(e: MouseEvent, branchName: string) {
@@ -515,21 +545,7 @@
     addBranchItem('Rename...', () => openRenameBranchDialog(cleanBranch));
 
     document.body.appendChild(menu);
-
-    let x = e.clientX;
-    let y = e.clientY;
-    const rect = menu.getBoundingClientRect();
-    if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
-    if (y + rect.height > window.innerHeight - 8) {
-      const yAbove = e.clientY - rect.height;
-      if (yAbove >= 8) {
-        y = yAbove;
-      } else {
-        y = Math.max(4, window.innerHeight - rect.height - 8);
-      }
-    }
-    menu.style.left = Math.max(0, x) + 'px';
-    menu.style.top = Math.max(0, y) + 'px';
+    positionContextMenu(menu, e.clientX, e.clientY);
   }
 
   function onContextMenu(e: MouseEvent, commit: any) {

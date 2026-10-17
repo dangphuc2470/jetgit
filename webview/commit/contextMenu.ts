@@ -149,18 +149,39 @@ export function showFileContextMenu(e: MouseEvent, file: CommitFile, vscode: any
   });
 
   document.body.appendChild(menu);
+  positionAsContextMenu(menu, e.clientX, e.clientY);
+}
 
-  let posX = e.clientX;
-  let posY = e.clientY;
+function positionAsContextMenu(menu: HTMLElement, clientX: number, clientY: number): void {
+  const margin = 8;
+  const maxAvailHeight = Math.max(80, window.innerHeight - margin * 2);
+  menu.style.maxHeight = `${maxAvailHeight}px`;
+  menu.style.overflowY = 'auto';
+
   const menuRect = menu.getBoundingClientRect();
-  if (posX + menuRect.width > window.innerWidth) {
-    posX = Math.max(8, window.innerWidth - menuRect.width - 8);
+  let posX = clientX;
+  let posY = clientY;
+
+  if (posX + menuRect.width > window.innerWidth - margin) {
+    posX = Math.max(margin, window.innerWidth - menuRect.width - margin);
   }
-  if (posY + menuRect.height > window.innerHeight) {
-    posY = Math.max(8, window.innerHeight - menuRect.height - 8);
+
+  if (menuRect.height >= maxAvailHeight) {
+    posY = margin;
+  } else {
+    const spaceBelow = window.innerHeight - clientY - margin;
+    const spaceAbove = clientY - margin;
+    if (spaceBelow >= menuRect.height) {
+      posY = clientY;
+    } else if (spaceAbove >= menuRect.height) {
+      posY = clientY - menuRect.height;
+    } else {
+      posY = Math.max(margin, window.innerHeight - menuRect.height - margin);
+    }
   }
-  menu.style.left = `${posX}px`;
-  menu.style.top = `${posY}px`;
+
+  menu.style.left = `${Math.max(0, Math.round(posX))}px`;
+  menu.style.top = `${Math.max(0, Math.round(posY))}px`;
 }
 
 export function registerGlobalContextMenuListeners(vscode: any, onRender?: () => void): void {
@@ -316,16 +337,5 @@ export function showChangelistContextMenu(
   });
 
   document.body.appendChild(menu);
-
-  let posX = e.clientX;
-  let posY = e.clientY;
-  const menuRect = menu.getBoundingClientRect();
-  if (posX + menuRect.width > window.innerWidth) {
-    posX = Math.max(8, window.innerWidth - menuRect.width - 8);
-  }
-  if (posY + menuRect.height > window.innerHeight) {
-    posY = Math.max(8, window.innerHeight - menuRect.height - 8);
-  }
-  menu.style.left = `${posX}px`;
-  menu.style.top = `${posY}px`;
+  positionAsContextMenu(menu, e.clientX, e.clientY);
 }

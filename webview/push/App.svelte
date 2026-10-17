@@ -45,6 +45,8 @@
   let isPushing = $state(false);
   let pushTags = $state(false);
   let pushTagsOption = $state<"all" | "current">("all");
+  let setUpstream = $state(false);
+  let showForcePushConfirm = $state(false);
 
   // Resizable splitter
   let leftColWidth = $state<number>(340);
@@ -82,6 +84,7 @@
     currentTargetBranch = info.remoteBranch || info.currentBranch || "";
     targetBranchInputVal = currentTargetBranch;
     selectedCommitHash = "ALL";
+    setUpstream = Boolean(info.isNew || currentTargetBranch !== info.currentBranch);
   }
 
   function startEditBranch(e: MouseEvent) {
@@ -124,7 +127,7 @@
       branch: pushInfo.currentBranch,
       targetBranch: currentTargetBranch,
       force,
-      setUpstream: !!(pushInfo.isNew || currentTargetBranch !== pushInfo.currentBranch),
+      setUpstream,
       remote: currentRemote,
       tags: pushTags
     });
@@ -392,6 +395,10 @@
         <option value="all">All</option>
         <option value="current">Current branch</option>
       </select>
+      <label class="tags-checkbox-label" style="margin-left: 12px;" title="Set remote tracking branch (-u / --set-upstream)">
+        <input type="checkbox" bind:checked={setUpstream} class="as-checkbox" />
+        <span>Set upstream (-u)</span>
+      </label>
     </div>
 
     <div class="as-footer-right">
@@ -414,7 +421,9 @@
           }}
           title="Push Options"
         >
-          ▼
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+            <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+          </svg>
         </button>
       </div>
 
@@ -424,23 +433,45 @@
             class="as-dropdown-item"
             onclick={() => {
               showPushMenu = false;
-              doPush(true);
+              showForcePushConfirm = true;
             }}
             role="menuitem"
             tabindex="0"
             onkeydown={(e) => {
               if (e.key === 'Enter') {
                 showPushMenu = false;
-                doPush(true);
+                showForcePushConfirm = true;
               }
             }}
           >
-            Force Push (no-verify)...
+            Force Push (with lease)...
           </div>
         </div>
       {/if}
     </div>
   </div>
+
+  {#if showForcePushConfirm}
+    <div class="modal-backdrop" onclick={() => { showForcePushConfirm = false; }} role="dialog" aria-modal="true" tabindex="-1">
+      <div class="modal-dialog" onclick={(e) => e.stopPropagation()} role="document" tabindex="0">
+        <div class="modal-header">
+          <span class="modal-title">Force Push Confirmation</span>
+        </div>
+        <div class="modal-body">
+          <p class="modal-p">
+            Are you sure you want to <strong>Force Push</strong> branch <code>{pushInfo.currentBranch}</code> to <code>{currentRemote}/{currentTargetBranch}</code>?
+          </p>
+          <p class="modal-note">
+            This operation will use <code>--force-with-lease</code> to prevent overwriting commits that you have not yet seen, but it can rewrite remote repository history.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="as-btn" onclick={() => { showForcePushConfirm = false; }}>Cancel</button>
+          <button class="as-btn-danger" onclick={() => { showForcePushConfirm = false; doPush(true); }}>Force Push</button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -901,5 +932,97 @@
   .as-dropdown-item:hover {
     background: var(--vscode-menu-selectionBackground, #3574f0);
     color: var(--vscode-menu-selectionForeground, #ffffff);
+  }
+
+  /* Modal Backdrop and Dialog (Anti-AI-Slop, Flat IntelliJ Design) */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-dialog {
+    background: var(--vscode-editor-background, #2b2d30);
+    border: 1px solid var(--vscode-widget-border, #43454a);
+    border-radius: 4px;
+    width: 440px;
+    max-width: 90vw;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    height: 36px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--vscode-widget-border, #393b40);
+    background: var(--vscode-sideBar-background, #212224);
+  }
+
+  .modal-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vscode-foreground, #dfe1e5);
+  }
+
+  .modal-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 12.5px;
+    color: var(--vscode-foreground, #dfe1e5);
+    line-height: 1.45;
+  }
+
+  .modal-p {
+    margin: 0;
+  }
+
+  .modal-note {
+    font-size: 11.5px;
+    color: var(--vscode-descriptionForeground, #9da0a8);
+    margin: 0;
+  }
+
+  .modal-body code {
+    background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.08));
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 11.5px;
+  }
+
+  .modal-footer {
+    padding: 10px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--vscode-widget-border, #393b40);
+    background: var(--vscode-sideBar-background, #212224);
+  }
+
+  .as-btn-danger {
+    background: #e55353;
+    color: #ffffff;
+    border: none;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+
+  .as-btn-danger:hover {
+    background: #d63939;
   }
 </style>

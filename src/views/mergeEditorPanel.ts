@@ -5,17 +5,7 @@ import { GitService } from '../git/gitService';
 import { ConflictsDialogPanel } from './conflictsDialogPanel';
 import { getThemeTokens, getNonce } from '../utils/themeTokens';
 import { MergeToExtensionMessage, ExtensionToMergeMessage } from '../shared/protocol';
-
-interface ConflictHunk {
-  id: number;
-  type: 'common' | 'conflict';
-  commonLines?: string[];
-  yoursLines?: string[];
-  theirsLines?: string[];
-  resolved?: boolean;
-  chosen?: 'yours' | 'theirs' | 'custom' | 'ignored' | null;
-  resultLines?: string[];
-}
+import { parseConflictHunksFromText, type ConflictHunk } from '../shared/mergeResolveUtil';
 
 export class MergeEditorPanel {
   public static currentPanel: MergeEditorPanel | undefined;
@@ -110,7 +100,7 @@ export class MergeEditorPanel {
         theirsBranch: 'Incoming',
       }));
 
-      const hunks = this.parseConflictHunks(fileOnDisk, yoursContent, theirsContent, baseContent);
+      const hunks = parseConflictHunksFromText(fileOnDisk, yoursContent, theirsContent, baseContent);
 
       this.panel.webview.postMessage({
         type: 'loadMergeData',
@@ -128,99 +118,6 @@ export class MergeEditorPanel {
     } catch (err: any) {
       vscode.window.showErrorMessage(`Failed to load merge conflict data: ${err.message || err}`);
     }
-  }
-
-  private parseConflictHunks(
-    fileOnDisk: string,
-    yoursContent: string,
-    theirsContent: string,
-    baseContent: string,
-  ): ConflictHunk[] {
-    const hunks: ConflictHunk[] = [];
-    let hunkId = 1;
-
-    // Check if working copy on disk has conflict markers
-    if (fileOnDisk.includes('<<<<<<<') && fileOnDisk.includes('=======')) {
-      const lines = fileOnDisk.split(/\r?\n/);
-      let currentCommon: string[] = [];
-      let currentYours: string[] = [];
-      let currentTheirs: string[] = [];
-      let inOurs = false;
-      let inTheirs = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.startsWith('<<<<<<<')) {
-          if (currentCommon.length > 0) {
-            hunks.push({
-              id: hunkId++,
-              type: 'common',
-              commonLines: currentCommon,
-            });
-            currentCommon = [];
-          }
-          inOurs = true;
-          inTheirs = false;
-          currentYours = [];
-        } else if (inOurs && line.startsWith('=======')) {
-          inOurs = false;
-          inTheirs = true;
-          currentTheirs = [];
-        } else if (inTheirs && line.startsWith('>>>>>>>')) {
-          inTheirs = false;
-          hunks.push({
-            id: hunkId++,
-            type: 'conflict',
-            yoursLines: currentYours,
-            theirsLines: currentTheirs,
-            resolved: false,
-            chosen: null,
-            resultLines: [],
-          });
-          currentYours = [];
-          currentTheirs = [];
-        } else {
-          if (inOurs) {
-            currentYours.push(line);
-          } else if (inTheirs) {
-            currentTheirs.push(line);
-          } else {
-            currentCommon.push(line);
-          }
-        }
-      }
-
-      if (currentCommon.length > 0) {
-        hunks.push({
-          id: hunkId++,
-          type: 'common',
-          commonLines: currentCommon,
-        });
-      }
-      return hunks;
-    }
-
-    // Fallback: If both added or no markers, create a single conflict hunk if different
-    const yLines = yoursContent ? yoursContent.split(/\r?\n/) : [];
-    const tLines = theirsContent ? theirsContent.split(/\r?\n/) : [];
-
-    if (yoursContent === theirsContent && yoursContent.length > 0) {
-      return [{
-        id: 1,
-        type: 'common',
-        commonLines: yLines,
-      }];
-    }
-
-    return [{
-      id: 1,
-      type: 'conflict',
-      yoursLines: yLines,
-      theirsLines: tLines,
-      resolved: false,
-      chosen: null,
-      resultLines: [],
-    }];
   }
 
   private async handleMessage(msg: MergeToExtensionMessage): Promise<void> {

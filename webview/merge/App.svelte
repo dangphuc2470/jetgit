@@ -3,6 +3,7 @@
   import { highlightCode } from "$shared/syntaxHighlight";
   import { postMessage } from "$shared/vscodeApi";
   import type { ConflictHunk, ExtensionToMergeMessage } from "$shared/protocol";
+  import { applyAllNonConflicting } from "$mergeResolveUtil";
   import MergeToolbar from "./MergeToolbar.svelte";
 
   const LINE_HEIGHT = 20;
@@ -223,20 +224,19 @@
   }
 
   function handleApplyNonConflicting() {
-    for (const h of hunks) {
-      if (h.type === "conflict" && !h.resolved) {
-        if ((h.yoursLines || []).length === 0 && (h.theirsLines || []).length > 0) {
-          h.resolved = true;
-          h.chosen = "theirs";
-          h.resultLines = [...h.theirsLines];
-        } else if ((h.theirsLines || []).length === 0 && (h.yoursLines || []).length > 0) {
-          h.resolved = true;
-          h.chosen = "yours";
-          h.resultLines = [...h.yoursLines];
+    const { resolvedCount } = applyAllNonConflicting(hunks);
+    rebuildLines();
+    if (resolvedCount > 0) {
+      const firstUnresolved = conflictBlocks.findIndex((b) => !b.resolved);
+      if (firstUnresolved !== -1) {
+        currentConflictIndex = firstUnresolved;
+        const target = conflictBlocks[currentConflictIndex];
+        if (target && centerEditor) {
+          const targetY = Math.max(0, (target.centerStart - 4) * LINE_HEIGHT);
+          centerEditor.scrollTo({ top: targetY, behavior: "smooth" });
         }
       }
     }
-    rebuildLines();
   }
 
   function jumpConflict(direction: number) {
@@ -260,6 +260,12 @@
   }
 
   function handleApply() {
+    if (remainingConflicts > 0) {
+      const confirmed = window.confirm(
+        `There are ${remainingConflicts} unresolved conflict${remainingConflicts > 1 ? "s" : ""} remaining.\nDo you want to apply the merged content anyway?`
+      );
+      if (!confirmed) return;
+    }
     const content = getMergedContent();
     postMessage({
       type: "applyMerge",
@@ -271,6 +277,11 @@
   }
 
   function handleCancel() {
+    const hasModifications = conflictBlocks.some((b) => b.resolved);
+    if (hasModifications) {
+      const confirmed = window.confirm("Discard all merge resolutions and close?");
+      if (!confirmed) return;
+    }
     postMessage({ type: "cancelMerge" });
   }
 

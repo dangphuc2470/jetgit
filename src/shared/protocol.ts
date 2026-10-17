@@ -297,14 +297,18 @@ export type RebaseToExtensionMessage =
 
 export interface ConflictHunk {
   id: number;
-  baseStart: number;
-  baseLines: string[];
-  yoursStart: number;
-  yoursLines: string[];
-  theirsStart: number;
-  theirsLines: string[];
-  resolved: boolean;
+  type?: 'common' | 'conflict';
+  commonLines?: string[];
+  baseStart?: number;
+  baseLines?: string[];
+  yoursStart?: number;
+  yoursLines?: string[];
+  theirsStart?: number;
+  theirsLines?: string[];
+  resolved?: boolean;
+  chosen?: 'yours' | 'theirs' | 'custom' | 'ignored' | null;
   chosenSide?: 'yours' | 'theirs' | 'both' | 'custom';
+  resultLines?: string[];
 }
 
 export interface LoadMergeDataPayload {

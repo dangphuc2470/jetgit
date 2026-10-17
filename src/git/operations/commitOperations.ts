@@ -51,8 +51,13 @@ export async function getLog(
     args.push('--no-merges');
   }
 
+  // JetBrains IntelliJ Git standard:
+  // Instead of '--all' (which exposes internal refs/stash and refs/notes as dangling commits),
+  // query HEAD, --branches, --remotes, and --tags explicitly.
+  const LOG_ALL = ['HEAD', '--branches', '--remotes', '--tags'];
+
   if (options.all === true || (!options.branch && options.all !== false)) {
-    args.push('--all');
+    args.push(...LOG_ALL);
   }
   args.push('--decorate=full');
 
@@ -86,8 +91,8 @@ export async function getLog(
     }
     if (branchExists) {
       args.push(options.branch);
-    } else if (!args.includes('--all')) {
-      args.push('--all');
+    } else if (!args.includes('--branches')) {
+      args.push(...LOG_ALL);
     }
   }
   if (options.path) {

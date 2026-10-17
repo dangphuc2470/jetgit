@@ -46,6 +46,8 @@ export function showFileContextMenu(e: MouseEvent, file: CommitFile, vscode: any
   const svgAddVcs = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.5 2C7.77614 2 8 2.22386 8 2.5V7.5H13C13.2761 7.5 13.5 7.72386 13.5 8C13.5 8.27614 13.2761 8.5 13 8.5H8V13.5C8 13.7761 7.77614 14 7.5 14C7.22386 14 7 13.7761 7 13.5V8.5H2C1.72386 8.5 1.5 8.27614 1.5 8C1.5 7.72386 1.72386 7.5 2 7.5H7V2.5C7 2.22386 7.22386 2 7.5 2Z"/></svg>`;
   const svgUnstage = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M2 7.5C2 7.22386 2.22386 7 2.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H2.5C2.22386 8 2 7.77614 2 7.5Z"/></svg>`;
   const svgRefresh = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M2.5 9V8C2.5 4.96243 4.96243 2.5 8 2.5C9.10679 2.5 10.1372 2.82692 11 3.38947" stroke-linecap="round"/><path d="M5 12.6105C5.86278 13.1731 6.89321 13.5 8 13.5C11.0376 13.5 13.5 11.0376 13.5 8V7" stroke-linecap="round"/><path d="M0.5 7.5L2.5 9.5L4.5 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.5 8.5L13.5 6.5L15.5 8.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgChangelist = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M5,5 H11 V6 H5 Z M5,7 H11 V8 H5 Z M5,9 H11 V10 H5 Z"/></svg>`;
+  const svgNewChangelist = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M7.5,5 H8.5 V7.5 H11 V8.5 H8.5 V11 H7.5 V8.5 H5 V7.5 H7.5 Z"/></svg>`;
 
   interface MenuItemDef {
     label?: string;
@@ -73,6 +75,23 @@ export function showFileContextMenu(e: MouseEvent, file: CommitFile, vscode: any
       shortcut: 'F4',
       icon: svgJumpToSource,
       action: () => vscode.postMessage({ type: 'jumpToSource', payload: file.path })
+    },
+    { separator: true },
+    {
+      label: 'Move to Another Changelist...',
+      shortcut: 'F6',
+      icon: svgChangelist,
+      action: () => {
+        const selected = state.checkedFiles.has(file.path) && state.checkedFiles.size > 1
+          ? Array.from(state.checkedFiles)
+          : [file.path];
+        vscode.postMessage({ type: 'promptMoveToChangelist', payload: { files: selected } });
+      }
+    },
+    {
+      label: 'New Changelist...',
+      icon: svgNewChangelist,
+      action: () => vscode.postMessage({ type: 'newChangelist' })
     },
     { separator: true },
     {
@@ -179,6 +198,12 @@ export function registerGlobalContextMenuListeners(vscode: any, onRender?: () =>
       if (e.key === 'F4') {
         e.preventDefault();
         vscode.postMessage({ type: 'jumpToSource', payload: state.selectedFile });
+      } else if (e.key === 'F6') {
+        e.preventDefault();
+        const selected = state.checkedFiles.has(state.selectedFile) && state.checkedFiles.size > 1
+          ? Array.from(state.checkedFiles)
+          : [state.selectedFile];
+        vscode.postMessage({ type: 'promptMoveToChangelist', payload: { files: selected } });
       } else if (cmdOrCtrl && (e.key === 'd' || e.key === 'D')) {
         e.preventDefault();
         vscode.postMessage({ type: 'openReviewInCenter', payload: state.selectedFile });
@@ -207,4 +232,100 @@ export function registerGlobalContextMenuListeners(vscode: any, onRender?: () =>
       }
     }
   });
+}
+
+export function showChangelistContextMenu(
+  e: MouseEvent,
+  clName: string,
+  isActive: boolean,
+  vscode: any,
+): void {
+  e.preventDefault();
+  e.stopPropagation();
+  lastContextMenuOpenedAt = Date.now();
+  closeContextMenu();
+
+  const menu = document.createElement('div');
+  menu.className = 'as-context-menu';
+  menu.setAttribute('data-vscode-context', JSON.stringify({ preventDefaultContextMenuItems: true }));
+  menu.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+  });
+  activeContextMenu = menu;
+
+  const svgChangelist = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M5,5 H11 V6 H5 Z M5,7 H11 V8 H5 Z M5,9 H11 V10 H5 Z"/></svg>`;
+  const svgNewChangelist = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M7.5,5 H8.5 V7.5 H11 V8.5 H8.5 V11 H7.5 V8.5 H5 V7.5 H7.5 Z"/></svg>`;
+  const svgDelete = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M7 2H9C9.55228 2 10 2.44772 10 3H6C6 2.44772 6.44772 2 7 2ZM5 3C5 1.89543 5.89543 1 7 1H9C10.1046 1 11 1.89543 11 3H13C13.5523 3 14 3.44772 14 4V5V6H13V13C13 14.1046 12.1046 15 11 15H5C3.89543 15 3 14.1046 3 13V6H2V5V4C2 3.44772 2.44772 3 3 3H5ZM11 4H10H6H5H3V5H4H12H13V4H11ZM4 6H12V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V6ZM6.5 7C6.22386 7 6 7.22386 6 7.5V11.5C6 11.7761 6.22386 12 6.5 12C6.77614 12 7 11.7761 7 11.5V7.5C7 7.22386 6.77614 7 6.5 7ZM9 7.5C9 7.22386 9.22386 7 9.5 7C9.77614 7 10 7.22386 10 7.5V11.5C10 11.7761 9.77614 12 9.5 12C9.22386 12 9 11.7761 9 11.5V7.5Z"/></svg>`;
+
+  interface MenuItemDef {
+    label?: string;
+    shortcut?: string;
+    icon?: string;
+    action?: () => void;
+    separator?: boolean;
+  }
+
+  const items: MenuItemDef[] = [];
+  if (!isActive) {
+    items.push({
+      label: 'Set as Active Changelist',
+      icon: svgChangelist,
+      action: () => vscode.postMessage({ type: 'setActiveChangelist', payload: clName }),
+    });
+  }
+  items.push({
+    label: 'New Changelist...',
+    icon: svgNewChangelist,
+    action: () => vscode.postMessage({ type: 'newChangelist' }),
+  });
+  if (clName !== 'Default') {
+    items.push({ separator: true });
+    items.push({
+      label: 'Delete Changelist',
+      icon: svgDelete,
+      action: () => vscode.postMessage({ type: 'deleteChangelist', payload: clName }),
+    });
+  }
+
+  items.forEach(it => {
+    if (it.separator) {
+      const sep = document.createElement('div');
+      sep.className = 'as-menu-separator';
+      menu.appendChild(sep);
+      return;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'as-menu-item';
+    row.innerHTML = `
+      <div class="as-menu-item-left">
+        <span class="as-menu-icon">${it.icon || ''}</span>
+        <span class="as-menu-label">${escapeHtml(it.label || '')}</span>
+      </div>
+      ${it.shortcut ? `<span class="as-menu-shortcut">${it.shortcut}</span>` : ''}
+    `;
+
+    row.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      closeContextMenu();
+      if (it.action) it.action();
+    });
+
+    menu.appendChild(row);
+  });
+
+  document.body.appendChild(menu);
+
+  let posX = e.clientX;
+  let posY = e.clientY;
+  const menuRect = menu.getBoundingClientRect();
+  if (posX + menuRect.width > window.innerWidth) {
+    posX = Math.max(8, window.innerWidth - menuRect.width - 8);
+  }
+  if (posY + menuRect.height > window.innerHeight) {
+    posY = Math.max(8, window.innerHeight - menuRect.height - 8);
+  }
+  menu.style.left = `${posX}px`;
+  menu.style.top = `${posY}px`;
 }

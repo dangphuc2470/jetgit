@@ -306,6 +306,26 @@ body, html {
   flex-shrink: 0;
 }
 
+.changelist-header.drag-over {
+  background: var(--vscode-list-dropBackground, rgba(58, 61, 65, 0.6)) !important;
+}
+
+.changelist-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8c8c8c;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.changelist-active-badge {
+  font-size: 11px;
+  color: #73c991;
+  font-weight: normal;
+  flex-shrink: 0;
+}
+
 .group-items {
   display: flex;
   flex-direction: column;

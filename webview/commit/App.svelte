@@ -6,7 +6,7 @@
   import type { CommitFile, DiffData } from './types';
   import { state as commitState } from './state';
   import { renderDiffViewer } from './diffViewer';
-  import { showFileContextMenu, closeContextMenu } from './contextMenu';
+  import { showFileContextMenu, showChangelistContextMenu, closeContextMenu } from './contextMenu';
   import ChangesTree from './ChangesTree.svelte';
   import CommitBox from './CommitBox.svelte';
 
@@ -38,6 +38,9 @@
   let isGeneratingAi = $state(false);
   let conflictInfo = $state<any>(null);
   let splitRatio = $state(0.6);
+  let changelists = $state<{ name: string; files: string[] }[]>([]);
+  let activeChangelist = $state<string>('Default');
+  let expandedChangelists = $state<Set<string>>(new Set(['Default']));
 
   let commitBoxRef: any = $state(null);
   let leftPanelEl: HTMLDivElement | null = $state(null);
@@ -72,6 +75,8 @@
     commitState.isGeneratingAi = isGeneratingAi;
     commitState.conflictInfo = conflictInfo;
     commitState.splitRatio = splitRatio;
+    commitState.changelists = changelists;
+    commitState.activeChangelist = activeChangelist;
   }
 
   $effect(() => {
@@ -163,6 +168,26 @@
     showFileContextMenu(e, file, vscode, () => {
       // Re-render callback
       files = [...files];
+    });
+  }
+
+  function handleToggleChangelist(name: string) {
+    if (expandedChangelists.has(name)) {
+      expandedChangelists.delete(name);
+    } else {
+      expandedChangelists.add(name);
+    }
+    expandedChangelists = new Set(expandedChangelists);
+  }
+
+  function handleChangelistContextMenu(e: MouseEvent, name: string, isActive: boolean) {
+    showChangelistContextMenu(e, name, isActive, vscode);
+  }
+
+  function handleMoveFilesToChangelist(paths: string[], targetChangelist: string) {
+    vscode.postMessage({
+      type: 'moveFilesToChangelist',
+      payload: { files: paths, changelist: targetChangelist },
     });
   }
 
@@ -283,6 +308,18 @@
         files = data.files || [];
         recentMessages = data.recentMessages || [];
         stashes = data.stashes || [];
+        if (data.changelists && Array.isArray(data.changelists)) {
+          changelists = data.changelists;
+          for (const cl of changelists) {
+            if (!expandedChangelists.has(cl.name)) {
+              expandedChangelists.add(cl.name);
+            }
+          }
+          expandedChangelists = new Set(expandedChangelists);
+        }
+        if (data.activeChangelist) {
+          activeChangelist = data.activeChangelist;
+        }
         conflictInfo = data.conflictInfo || {
           hasConflicts: false,
           isMerging: false,
@@ -769,6 +806,9 @@
             {expandedFolders}
             {collapsedFolders}
             {expandAllFolders}
+            {changelists}
+            {activeChangelist}
+            {expandedChangelists}
             onSelectFile={handleSelectFile}
             onOpenFileDiff={handleOpenFileDiff}
             onToggleStageFile={handleToggleStageFile}
@@ -777,6 +817,9 @@
             onToggleExpandChanges={() => { expandChanges = !expandChanges; }}
             onToggleExpandUnversioned={() => { expandUnversioned = !expandUnversioned; }}
             onContextMenu={handleContextMenu}
+            onToggleChangelist={handleToggleChangelist}
+            onChangelistContextMenu={handleChangelistContextMenu}
+            onMoveFilesToChangelist={handleMoveFilesToChangelist}
           />
         </div>
 

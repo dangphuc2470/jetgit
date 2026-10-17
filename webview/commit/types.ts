@@ -47,6 +47,11 @@ export interface DiffData {
   binary?: boolean;
 }
 
+export interface ChangelistInfo {
+  name: string;
+  files: string[];
+}
+
 export interface CommitState {
   activeTab: 'commit' | 'shelf' | 'stash';
   files: CommitFile[];
@@ -77,4 +82,6 @@ export interface CommitState {
   isGeneratingAi: boolean;
   conflictInfo: any;
   splitRatio: number;
+  changelists: ChangelistInfo[];
+  activeChangelist: string;
 }

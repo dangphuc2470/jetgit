@@ -176,6 +176,7 @@ export type CommitToExtensionMessage =
         changelist: string;
       };
     }
+  | { type: 'promptMoveToChangelist'; payload?: { files?: string[]; filePath?: string } }
   | { type: 'openFile'; payload: string }
   | { type: 'rollbackFiles'; payload: string[] }
   | { type: 'jumpToSource'; payload: string }

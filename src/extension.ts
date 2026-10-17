@@ -88,6 +88,7 @@ export function activate(context: vscode.ExtensionContext): void {
     showCollapseAll: true,
   });
   changelistTree.setTreeView(changelistTreeView);
+  commitViewProvider.setChangelistTree(changelistTree);
   context.subscriptions.push(changelistTreeView);
 
   // --- Blame Decorations ---

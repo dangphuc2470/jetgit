@@ -18,6 +18,9 @@
     expandedFolders: Set<string>;
     collapsedFolders: Set<string>;
     expandAllFolders: boolean | null;
+    changelists?: { name: string; files: string[] }[];
+    activeChangelist?: string;
+    expandedChangelists?: Set<string>;
     onSelectFile: (file: CommitFile) => void;
     onOpenFileDiff: (file: CommitFile) => void;
     onToggleStageFile: (file: CommitFile, checked: boolean) => void;
@@ -26,6 +29,9 @@
     onToggleExpandChanges: () => void;
     onToggleExpandUnversioned: () => void;
     onContextMenu: (e: MouseEvent, file: CommitFile) => void;
+    onToggleChangelist?: (name: string) => void;
+    onChangelistContextMenu?: (e: MouseEvent, name: string, isActive: boolean) => void;
+    onMoveFilesToChangelist?: (files: string[], changelist: string) => void;
   }
 
   let {
@@ -42,6 +48,9 @@
     expandedFolders,
     collapsedFolders,
     expandAllFolders,
+    changelists,
+    activeChangelist,
+    expandedChangelists,
     onSelectFile,
     onOpenFileDiff,
     onToggleStageFile,
@@ -50,6 +59,9 @@
     onToggleExpandChanges,
     onToggleExpandUnversioned,
     onContextMenu,
+    onToggleChangelist,
+    onChangelistContextMenu,
+    onMoveFilesToChangelist,
   }: Props = $props();
 
   let changesFiles = $derived(
@@ -57,6 +69,37 @@
       .filter((f) => !f.isUntracked)
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path))
   );
+
+  let changelistFilesMap = $derived.by(() => {
+    const map = new Map<string, CommitFile[]>();
+    const effectiveLists = (changelists && changelists.length > 0)
+      ? changelists
+      : [{ name: 'Default', files: [] }];
+    for (const cl of effectiveLists) {
+      map.set(cl.name, []);
+    }
+    const assigned = new Set<string>();
+    for (const cl of effectiveLists) {
+      const set = new Set(cl.files);
+      const list: CommitFile[] = [];
+      for (const f of changesFiles) {
+        if (set.has(f.path)) {
+          list.push(f);
+          assigned.add(f.path);
+        }
+      }
+      map.set(cl.name, list);
+    }
+    const activeName = activeChangelist || effectiveLists[0]?.name || 'Default';
+    const activeList = map.get(activeName) || [];
+    for (const f of changesFiles) {
+      if (!assigned.has(f.path)) {
+        activeList.push(f);
+      }
+    }
+    map.set(activeName, activeList);
+    return map;
+  });
 
   let unversionedFiles = $derived(
     files
@@ -96,6 +139,11 @@
   <div
     class={`file-item tree-file-item ${inTree ? 'in-tree' : 'in-flat'} ${isSelected ? 'selected' : ''}`}
     data-path={file.path}
+    draggable="true"
+    ondragstart={(e) => {
+      e.dataTransfer?.setData('text/plain', file.path);
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    }}
     onclick={() => onSelectFile(file)}
     ondblclick={() => onOpenFileDiff(file)}
     oncontextmenu={(e) => onContextMenu(e, file)}
@@ -289,8 +337,149 @@
   </div>
 {/snippet}
 
+{#snippet changelistGroup(name: string, groupFiles: CommitFile[], expanded: boolean, isActive: boolean)}
+  {@const checkState = getGroupCheckState(groupFiles)}
+  <div class="tree-group changelist-group" data-changelist={name}>
+    <div
+      class={`group-header changelist-header ${isActive ? 'is-active' : ''}`}
+      onclick={() => onToggleChangelist ? onToggleChangelist(name) : null}
+      oncontextmenu={(e) => onChangelistContextMenu ? onChangelistContextMenu(e, name, isActive) : null}
+      ondragover={(e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        (e.currentTarget as HTMLElement).classList.add('drag-over');
+      }}
+      ondragleave={(e) => {
+        (e.currentTarget as HTMLElement).classList.remove('drag-over');
+      }}
+      ondrop={(e) => {
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).classList.remove('drag-over');
+        const filePath = e.dataTransfer?.getData('text/plain');
+        if (filePath && onMoveFilesToChangelist) {
+          onMoveFilesToChangelist([filePath], name);
+        }
+      }}
+      role="button"
+      tabindex="0"
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleChangelist?.(name); }}
+    >
+      <span class={`group-arrow ${expanded ? 'expanded' : ''}`}>
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
+        </svg>
+      </span>
+      <input
+        type="checkbox"
+        class="group-chk"
+        checked={checkState.checked}
+        indeterminate={checkState.indeterminate}
+        onclick={(e) => e.stopPropagation()}
+        onchange={(e) => {
+          e.stopPropagation();
+          onToggleStageFiles(groupFiles, (e.target as HTMLInputElement).checked);
+        }}
+      />
+      <span class="changelist-icon">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M5,5 H11 V6 H5 Z M5,7 H11 V8 H5 Z M5,9 H11 V10 H5 Z"/>
+        </svg>
+      </span>
+      <span class="group-title changelist-name">{name}</span>
+      {#if isActive}
+        <span class="changelist-active-badge">(active)</span>
+      {/if}
+      <span class="group-count">{groupFiles.length} {groupFiles.length === 1 ? 'file' : 'files'}</span>
+    </div>
+
+    {#if expanded && groupFiles.length > 0}
+      {@const isTreeMode = Boolean(groupByDirectory || groupByModule)}
+      <div class={`group-items ${isTreeMode ? 'group-tree-mode' : ''}`}>
+        {#if groupByModule}
+          {@const moduleName = repoName || 'Project'}
+          {@const modulePath = `__module__:${name}:${moduleName}`}
+          {@const isModuleExpanded = isFolderOpen(modulePath, true)}
+          <div class="tree-folder-node module-folder-node">
+            <div
+              class="tree-folder-header module-header"
+              data-folder-path={modulePath}
+              onclick={() => onToggleFolder(modulePath, true)}
+              role="button"
+              tabindex="0"
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleFolder(modulePath, true); }}
+            >
+              <span class={`tree-arrow ${isModuleExpanded ? 'expanded' : ''}`}>
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
+                </svg>
+              </span>
+              <input
+                type="checkbox"
+                class="file-chk tree-chk group-chk"
+                checked={checkState.checked}
+                indeterminate={checkState.indeterminate}
+                onclick={(e) => e.stopPropagation()}
+                onchange={(e) => {
+                  e.stopPropagation();
+                  onToggleStageFiles(groupFiles, (e.target as HTMLInputElement).checked);
+                }}
+              />
+              <span class="tree-folder-icon">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M1.5 3.5C1.5 2.67157 2.17157 2 3 2H6.08579C6.48362 2 6.86514 2.15804 7.14645 2.43934L8.70711 4H13C13.8284 4 14.5 4.67157 14.5 5.5V12.5C14.5 13.3284 13.8284 14 13 14H3C2.17157 14 1.5 13.3284 1.5 12.5V3.5Z" stroke="#8C8C8C" stroke-width="1.2" fill="none"/>
+                </svg>
+              </span>
+              <span class="tree-folder-name">{moduleName}</span>
+              <span class="tree-folder-count">{groupFiles.length} {groupFiles.length === 1 ? 'file' : 'files'}</span>
+            </div>
+
+            {#if isModuleExpanded}
+              <div class="tree-folder-children module-children">
+                {#if groupByDirectory}
+                  {@const treeRoot = buildDirectoryTree(groupFiles)}
+                  {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
+                    {@render folderNode(sub, 1, name)}
+                  {/each}
+                  {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
+                    {@render fileItem(file, true)}
+                  {/each}
+                {:else}
+                  {#each groupFiles as file (file.path)}
+                    {@render fileItem(file, false)}
+                  {/each}
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {:else if groupByDirectory}
+          {@const treeRoot = buildDirectoryTree(groupFiles)}
+          {#each Array.from(treeRoot.children.values()).sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as sub (sub.path || sub.name)}
+            {@render folderNode(sub, 0, name)}
+          {/each}
+          {#each [...treeRoot.files].sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) as file (file.path)}
+            {@render fileItem(file, true)}
+          {/each}
+        {:else}
+          {#each groupFiles as file (file.path)}
+            {@render fileItem(file, false)}
+          {/each}
+        {/if}
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
 <div class="file-tree-container" style="flex: 1; height: 100%;">
-  {@render fileGroup('Changes', changesFiles, expandChanges, onToggleExpandChanges)}
+  {#if changelists && changelists.length > 0}
+    {#each changelists as cl (cl.name)}
+      {@const clFiles = changelistFilesMap.get(cl.name) || []}
+      {@const isClExpanded = expandedChangelists ? expandedChangelists.has(cl.name) : true}
+      {@const isClActive = cl.name === activeChangelist}
+      {@render changelistGroup(cl.name, clFiles, isClExpanded, isClActive)}
+    {/each}
+  {:else}
+    {@render fileGroup('Changes', changesFiles, expandChanges, onToggleExpandChanges)}
+  {/if}
 
   {#if showIgnoredFiles !== false}
     {@render fileGroup('Unversioned Files', unversionedFiles, expandUnversioned, onToggleExpandUnversioned)}

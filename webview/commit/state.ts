@@ -30,4 +30,6 @@ export const state: CommitState = {
   isGeneratingAi: false,
   conflictInfo: null,
   splitRatio: 0.6,
+  changelists: [],
+  activeChangelist: 'Default',
 };

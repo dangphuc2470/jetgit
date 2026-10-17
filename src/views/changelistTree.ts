@@ -175,6 +175,26 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
     this._onDidChangeTreeData.fire(undefined);
   }
 
+  moveFiles(filePaths: string[], targetChangelist: string): void {
+    const target = this.data.changelists.find(c => c.name === targetChangelist);
+    if (!target) return;
+
+    for (const f of filePaths) {
+      for (const cl of this.data.changelists) {
+        cl.files = cl.files.filter(file => file !== f);
+      }
+      if (!target.files.includes(f)) {
+        target.files.push(f);
+      }
+    }
+    this.save();
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  getData(): ChangelistData {
+    return this.data;
+  }
+
   async commitChangelist(name?: string): Promise<void> {
     const clName = name || this.data.active;
     const cl = this.data.changelists.find(c => c.name === clName);

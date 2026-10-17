@@ -10,11 +10,13 @@ import { MergeEditorPanel } from './mergeEditorPanel';
 import { generateAiCommitMessage } from '../utils/aiCommitGenerator';
 import { getNonce } from '../utils/themeTokens';
 import { CommitToExtensionMessage, ExtensionToCommitMessage } from '../shared/protocol';
+import { ChangelistTreeProvider } from './changelistTree';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.commitView';
   public static currentProvider?: CommitViewProvider;
   private view?: vscode.WebviewView;
+  private changelistTree?: ChangelistTreeProvider;
   private changesFilePaths: string[] = [];
   private unversionedFilePaths: string[] = [];
   private allFilePaths: string[] = [];
@@ -31,6 +33,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     CommitReviewPanel.onFileNavigateListener = (filePath: string) => {
       this.selectFile(filePath);
     };
+  }
+
+  public setChangelistTree(changelistTree: ChangelistTreeProvider): void {
+    this.changelistTree = changelistTree;
   }
 
   public selectFile(filePath: string): void {
@@ -118,7 +124,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       const [statusEntries, mergeMsg, recentMessages, stashes, totalDiff, cachedDiff, conflictInfo] = await Promise.all([
         this.gitService.getStatus(),
         this.gitService.getMergeMessage(),
-        this.gitService.getRecentCommitMessages(10),
+        this.gitService.getRecentCommitMessages(20),
         this.gitService.getStashes(),
         this.gitService.exec(['diff', 'HEAD']).catch(() => ''),
         this.gitService.exec(['diff', '--cached']).catch(() => ''),
@@ -185,6 +191,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           stashes,
           conflictInfo,
           repoName,
+          changelists: this.changelistTree ? this.changelistTree.getData().changelists : [],
+          activeChangelist: this.changelistTree ? this.changelistTree.getData().active : 'Default',
         },
       });
     } catch (err: any) {
@@ -239,6 +247,74 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     switch (msg.type) {
       case 'ready':
       case 'refresh': {
+        await this.refresh();
+        break;
+      }
+      case 'newChangelist': {
+        const name = (msg as any).payload?.name;
+        if (this.changelistTree) {
+          await this.changelistTree.createChangelist(name);
+          await this.refresh();
+        }
+        break;
+      }
+      case 'deleteChangelist': {
+        const name = (msg as any).payload;
+        if (this.changelistTree && typeof name === 'string') {
+          await this.changelistTree.deleteChangelist(name);
+          await this.refresh();
+        }
+        break;
+      }
+      case 'setActiveChangelist': {
+        const name = (msg as any).payload;
+        if (this.changelistTree && typeof name === 'string') {
+          this.changelistTree.setActive(name);
+          await this.refresh();
+        }
+        break;
+      }
+      case 'moveFilesToChangelist': {
+        const { files, changelist } = (msg as any).payload || {};
+        if (this.changelistTree && Array.isArray(files) && changelist) {
+          this.changelistTree.moveFiles(files, changelist);
+          await this.refresh();
+        }
+        break;
+      }
+      case 'promptMoveToChangelist': {
+        const payload = (msg as any).payload || {};
+        const files: string[] = Array.isArray(payload.files)
+          ? payload.files
+          : (payload.filePath ? [payload.filePath] : []);
+        if (!this.changelistTree || files.length === 0) return;
+
+        const currentData = this.changelistTree.getData();
+        const items = currentData.changelists.map(c => ({
+          label: c.name,
+          description: c.name === currentData.active ? '(active)' : undefined,
+        }));
+        items.push({
+          label: '+ New Changelist...',
+          description: 'Create a new changelist and move selected files',
+        });
+
+        const picked = await vscode.window.showQuickPick(items, {
+          placeHolder: `Move ${files.length} file(s) to changelist`,
+        });
+        if (!picked) return;
+
+        if (picked.label === '+ New Changelist...') {
+          const newName = await vscode.window.showInputBox({
+            prompt: 'New changelist name',
+            placeHolder: 'Feature: ...',
+          });
+          if (!newName) return;
+          await this.changelistTree.createChangelist(newName);
+          this.changelistTree.moveFiles(files, newName);
+        } else {
+          this.changelistTree.moveFiles(files, picked.label);
+        }
         await this.refresh();
         break;
       }

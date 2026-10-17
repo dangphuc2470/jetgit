@@ -534,24 +534,34 @@
   border-top: 1px solid var(--vscode-panel-border, #333333);
 }
 .btn {
-  padding: 5px 14px;
-  border-radius: 3px;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 4px;
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  box-sizing: border-box;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 .btn-primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background, #3574f0);
+  color: var(--vscode-button-foreground, #ffffff);
+  border: 1px solid var(--vscode-button-background, #3574f0);
 }
 .btn-primary:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--vscode-button-hoverBackground, #3068d9);
+  border-color: var(--vscode-button-hoverBackground, #3068d9);
 }
 .btn-secondary {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground, #2b2d30);
+  color: var(--vscode-button-secondaryForeground, #dfe1e5);
+  border: 1px solid var(--vscode-widget-border, var(--vscode-input-border, #4e5157));
 }
 .btn-secondary:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--vscode-button-secondaryHoverBackground, #35373c);
 }
 </style>

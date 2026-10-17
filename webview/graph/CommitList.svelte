@@ -914,4 +914,122 @@
     background: var(--vscode-menu-selectionBackground, #094771);
     color: var(--vscode-menu-selectionForeground, #fff);
   }
+
+  :global(.as-dialog-overlay) {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    backdrop-filter: blur(1px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  :global(.as-dialog-card) {
+    background: var(--vscode-editorWidget-background, var(--vscode-editor-background, #1e1f22));
+    border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, #393b40));
+    border-radius: 6px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+    width: 480px;
+    max-width: 92vw;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--vscode-editor-foreground, #dfe1e5);
+  }
+  :global(.as-dialog-header) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--vscode-sideBar-background, var(--vscode-editorWidget-background, #2b2d30));
+    border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, #393b40));
+    font-weight: 600;
+    font-size: 13px;
+    user-select: none;
+  }
+  :global(.as-dialog-close) {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  :global(.as-dialog-close:hover) {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  :global(.as-dialog-body) {
+    padding: 16px 20px 12px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  :global(.as-dialog-field-label) {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground, #8c9199);
+  }
+  :global(.as-dialog-input),
+  :global(.as-dialog-textarea) {
+    background: var(--vscode-input-background, #1e1f22);
+    color: var(--vscode-input-foreground, #dfe1e5);
+    border: 1px solid var(--vscode-input-border, #4e5157);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  :global(.as-dialog-input:focus),
+  :global(.as-dialog-textarea:focus) {
+    border-color: var(--vscode-focusBorder, #3574f0);
+  }
+  :global(.as-dialog-textarea) {
+    height: 90px;
+    resize: vertical;
+  }
+  :global(.as-dialog-footer) {
+    padding: 10px 20px 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    background: var(--vscode-editorWidget-background, var(--vscode-editor-background, #1e1f22));
+    border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, #393b40));
+  }
+  :global(.as-dialog-btn) {
+    height: 28px;
+    padding: 0 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    box-sizing: border-box;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  :global(.as-dialog-btn-secondary) {
+    background: var(--vscode-button-secondaryBackground, #2b2d30);
+    color: var(--vscode-button-secondaryForeground, #dfe1e5);
+    border: 1px solid var(--vscode-widget-border, var(--vscode-input-border, #4e5157));
+  }
+  :global(.as-dialog-btn-secondary:hover) {
+    background: var(--vscode-button-secondaryHoverBackground, #35373c);
+  }
+  :global(.as-dialog-btn-primary) {
+    background: var(--vscode-button-background, #3574f0);
+    color: var(--vscode-button-foreground, #ffffff);
+    border: 1px solid var(--vscode-button-background, #3574f0);
+  }
+  :global(.as-dialog-btn-primary:hover) {
+    background: var(--vscode-button-hoverBackground, #3068d9);
+    border-color: var(--vscode-button-hoverBackground, #3068d9);
+  }
 </style>

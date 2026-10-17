@@ -55,7 +55,13 @@
   }: Props = $props();
 
   // Internal reactive states
-  let selectedTreeBranch = $state("");
+  let selectedTreeBranch = $state(activeBranch || "");
+
+  $effect(() => {
+    if (activeBranch && !selectedTreeBranch) {
+      selectedTreeBranch = activeBranch;
+    }
+  });
   let searchQuery = $state("");
   let searchInputEl = $state<HTMLInputElement>();
   let folderCollapseMap = $state<Record<string, boolean>>({});

@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { GitService } from './git/gitService';
 import { RebaseHandler } from './git/rebaseHandler';
 import { GraphViewProvider } from './views/graphPanel';
@@ -89,6 +91,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   changelistTree.setTreeView(changelistTreeView);
   commitViewProvider.setChangelistTree(changelistTree);
+  commitViewProvider.setGraphViewProvider(graphViewProvider);
   context.subscriptions.push(changelistTreeView);
 
   // --- Blame Decorations ---
@@ -296,13 +299,19 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('intellij-git.refreshGraph', () => {
+      graphViewProvider.refresh();
+    }),
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand('intellij-git.refreshChangelists', () => {
       changelistTree.refresh();
     }),
   );
 
   // Helper for debouncing frequent events
-  function debounce(fn: (...args: any[]) => void, delay = 600): (...args: any[]) => void {
+  function debounce(fn: (...args: any[]) => void, delay = 300): (...args: any[]) => void {
     let timer: NodeJS.Timeout | undefined;
     return (...args: any[]) => {
       if (timer) clearTimeout(timer);
@@ -311,10 +320,6 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   // 1. Watch for git changes (commits, branches, index, tags, logs, conflicts) in real-time
-  // Narrow down pattern from .git/** to HEAD, refs, and packed-refs to prevent triggering on transient lock files
-  const gitWatcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(workspaceRoot, '.git/{HEAD,refs/**,packed-refs}'),
-  );
   const onGitChange = debounce(() => {
     log.appendLine('Git change detected — refreshing views...');
     branchTree.refresh();
@@ -324,7 +329,12 @@ export function activate(context: vscode.ExtensionContext): void {
     if (CommitReviewPanel.currentPanel) {
       CommitReviewPanel.currentPanel.refresh();
     }
-  }, 600);
+  }, 300);
+
+  // VS Code workspace watcher
+  const gitWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(workspaceRoot, '.git/{HEAD,refs/**,packed-refs}'),
+  );
 
   const handleGitFsEvent = (uri: vscode.Uri) => {
     const fsPath = uri?.fsPath || uri?.path || '';
@@ -344,19 +354,73 @@ export function activate(context: vscode.ExtensionContext): void {
   gitWatcher.onDidDelete(handleGitFsEvent);
   context.subscriptions.push(gitWatcher);
 
+  // Reliable native Node.js fs.watch directly on .git folder (bypasses VS Code files.watcherExclude)
+  gitService.getGitDir().then(gitDir => {
+    if (!fs.existsSync(gitDir)) return;
+    try {
+      const isRecursiveSupported = process.platform === 'darwin' || process.platform === 'win32';
+      if (isRecursiveSupported) {
+        const nativeWatcher = fs.watch(gitDir, { recursive: true }, (_eventType, filename) => {
+          if (!filename) {
+            onGitChange();
+            return;
+          }
+          const fn = filename.toString();
+          if (fn.endsWith('.lock') || fn.includes('objects') || fn.endsWith('COMMIT_EDITMSG')) {
+            return;
+          }
+          if (
+            fn === 'HEAD' ||
+            fn.startsWith('refs') ||
+            fn === 'index' ||
+            fn === 'packed-refs' ||
+            fn.startsWith('logs')
+          ) {
+            onGitChange();
+          }
+        });
+        context.subscriptions.push({ dispose: () => nativeWatcher.close() });
+      } else {
+        const headPath = path.join(gitDir, 'HEAD');
+        if (fs.existsSync(headPath)) {
+          const w = fs.watch(headPath, () => onGitChange());
+          context.subscriptions.push({ dispose: () => w.close() });
+        }
+        const packedPath = path.join(gitDir, 'packed-refs');
+        if (fs.existsSync(packedPath)) {
+          const w = fs.watch(packedPath, () => onGitChange());
+          context.subscriptions.push({ dispose: () => w.close() });
+        }
+        const refsPath = path.join(gitDir, 'refs');
+        if (fs.existsSync(refsPath)) {
+          const w = fs.watch(refsPath, () => onGitChange());
+          context.subscriptions.push({ dispose: () => w.close() });
+        }
+      }
+    } catch (err: any) {
+      log.appendLine(`Native git fs.watch notice: ${err.message}`);
+    }
+  }).catch(() => {});
+
   // Hook into built-in vscode.git extension for guaranteed instant git state changes
-  // Note: vscode.git already handles .gitignore rules and working tree file watching without CPU overhead
   try {
     const gitExt = vscode.extensions.getExtension('vscode.git');
     if (gitExt) {
-      const gitApi = gitExt.exports.getAPI?.(1);
-      if (gitApi) {
-        gitApi.repositories.forEach((repo: any) => {
-          repo.state.onDidChange(onGitChange);
-        });
-        gitApi.onDidOpenRepository((repo: any) => {
-          repo.state.onDidChange(onGitChange);
-        });
+      const hookRepoEvents = (ext: vscode.Extension<any>) => {
+        const gitApi = ext.exports?.getAPI?.(1);
+        if (gitApi) {
+          gitApi.repositories.forEach((repo: any) => {
+            repo.state.onDidChange(onGitChange);
+          });
+          gitApi.onDidOpenRepository((repo: any) => {
+            repo.state.onDidChange(onGitChange);
+          });
+        }
+      };
+      if (!gitExt.isActive) {
+        Promise.resolve(gitExt.activate()).then(() => hookRepoEvents(gitExt)).catch(() => {});
+      } else {
+        hookRepoEvents(gitExt);
       }
     }
   } catch (err: any) {

@@ -163,9 +163,13 @@
           let anchorHash: string | null = null;
           let anchorOffset = 0;
           const curSelected = selectedHash;
+          const curScrollTop = cEl ? cEl.scrollTop : 0;
+          const isAtTop = curScrollTop <= 10;
 
-          if (cEl && oldCommits.length > 0) {
-            const curScrollTop = cEl.scrollTop;
+          // Only anchor to past commit row if the user was scrolled down reading older commits.
+          // If the user was at the top (viewing HEAD / latest commits), keep them at the top (scrollTop = 0)
+          // so newly committed commits appear immediately in view without requiring manual scrolling or reload.
+          if (!isAtTop && cEl && oldCommits.length > 0) {
             const anchorRow = Math.max(0, Math.floor(curScrollTop / ROW_HEIGHT));
             if (oldCommits[anchorRow]) {
               anchorHash = oldCommits[anchorRow].hash;
@@ -177,7 +181,7 @@
           if (anchorHash) {
             newIndex = unique.findIndex((c) => c.hash === anchorHash);
           }
-          if (newIndex === -1 && curSelected) {
+          if (newIndex === -1 && curSelected && !isAtTop) {
             newIndex = unique.findIndex((c) => c.hash === curSelected);
             anchorOffset = 0;
           }
@@ -188,7 +192,12 @@
           loading = false;
 
           if (cEl && unique.length > 0) {
-            if (newIndex !== -1) {
+            if (isAtTop) {
+              cEl.scrollTop = 0;
+              if ((window as any).__commitListSetScrollTop__) {
+                (window as any).__commitListSetScrollTop__(0);
+              }
+            } else if (newIndex !== -1) {
               const targetScrollTop = newIndex * ROW_HEIGHT + anchorOffset;
               cEl.scrollTop = targetScrollTop;
               if ((window as any).__commitListSetScrollTop__) {

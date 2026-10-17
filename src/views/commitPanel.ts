@@ -17,6 +17,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static currentProvider?: CommitViewProvider;
   private view?: vscode.WebviewView;
   private changelistTree?: ChangelistTreeProvider;
+  private graphViewProvider?: { refresh: () => void | Promise<void> };
   private changesFilePaths: string[] = [];
   private unversionedFilePaths: string[] = [];
   private allFilePaths: string[] = [];
@@ -33,6 +34,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     CommitReviewPanel.onFileNavigateListener = (filePath: string) => {
       this.selectFile(filePath);
     };
+  }
+
+  public setGraphViewProvider(graphViewProvider: { refresh: () => void | Promise<void> }): void {
+    this.graphViewProvider = graphViewProvider;
   }
 
   public setChangelistTree(changelistTree: ChangelistTreeProvider): void {
@@ -491,7 +496,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           vscode.window.showInformationMessage('Committed successfully.');
           this.view?.webview.postMessage({ type: 'commitSuccess' });
           await this.refresh();
-          vscode.commands.executeCommand('intellij-git.refreshBranches');
+          this.graphViewProvider?.refresh();
+          this.changelistTree?.syncChangelists();
+          vscode.commands.executeCommand('intellij-git.refreshGraph');
+          vscode.commands.executeCommand('intellij-git.refreshChangelists');
         } catch (err: any) {
           vscode.window.showErrorMessage(`Commit failed: ${err.message}`);
         }
@@ -504,7 +512,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           vscode.window.showInformationMessage('Committed successfully.');
           this.view?.webview.postMessage({ type: 'commitSuccess' });
           await this.refresh();
-          vscode.commands.executeCommand('intellij-git.refreshBranches');
+          this.graphViewProvider?.refresh();
+          this.changelistTree?.syncChangelists();
+          vscode.commands.executeCommand('intellij-git.refreshGraph');
+          vscode.commands.executeCommand('intellij-git.refreshChangelists');
           await this.openPushDialog();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Commit failed: ${err.message}`);
@@ -521,7 +532,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           await this.gitService.push(branch, force, setUpstream, remote, tags, targetBranch);
           vscode.window.showInformationMessage(`Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`);
           await this.refresh();
-          vscode.commands.executeCommand('intellij-git.refreshBranches');
+          this.graphViewProvider?.refresh();
+          vscode.commands.executeCommand('intellij-git.refreshGraph');
           this.view?.webview.postMessage({ type: 'pushSuccess' });
         } catch (err: any) {
           vscode.window.showErrorMessage(`Push failed: ${err.message}`);

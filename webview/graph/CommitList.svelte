@@ -391,7 +391,7 @@
     });
 
     addItem('Fixup...', '', '', () => {
-      postMessage('rebaseFromHere', commit.hash);
+      postMessage('fixupCommit', { hash: commit.hash });
     });
 
     addItem('Squash Into...', '', '', () => {

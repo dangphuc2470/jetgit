@@ -68,6 +68,33 @@ export async function handleCommitAction(
       return true;
     }
 
+    case 'fixupCommit': {
+      const { hash } = payload || {};
+      if (!hash) return true;
+      try {
+        const status = await gitService.getStatus();
+        if (!status || status.length === 0) {
+          vscode.window.showInformationMessage(
+            `No local changes to fixup into commit ${hash.slice(0, 8)}. Opening Interactive Rebase...`
+          );
+          await vscode.commands.executeCommand('intellij-git.interactiveRebase', hash);
+          return true;
+        }
+
+        const hasStaged = status.some(s => s.x !== ' ' && s.x !== '?');
+        if (!hasStaged) {
+          await gitService.exec(['add', '-A']);
+        }
+
+        await gitService.exec(['commit', `--fixup=${hash}`]);
+        vscode.window.showInformationMessage(`Created fixup commit for ${hash.slice(0, 8)}`);
+        host.loadInitialData();
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Fixup failed: ${err.message}`);
+      }
+      return true;
+    }
+
     case 'cherryPick': {
       const { hash } = payload || {};
       if (hash) {

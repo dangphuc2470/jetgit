@@ -263,6 +263,31 @@
     menu.style.top = Math.max(0, Math.round(y)) + 'px';
   }
 
+  function positionSubMenu(anchorItem: HTMLElement, subMenu: HTMLElement) {
+    const margin = 8;
+    const maxAvailHeight = Math.max(80, window.innerHeight - margin * 2);
+    subMenu.style.maxHeight = `${maxAvailHeight}px`;
+    subMenu.style.overflowY = 'auto';
+
+    const bRect = anchorItem.getBoundingClientRect();
+    let sx = bRect.right + 2;
+    let sy = bRect.top;
+    const sRect = subMenu.getBoundingClientRect();
+
+    if (sx + sRect.width > window.innerWidth - margin) {
+      sx = Math.max(margin, bRect.left - sRect.width - 2);
+    }
+
+    if (sRect.height >= maxAvailHeight) {
+      sy = margin;
+    } else if (sy + sRect.height > window.innerHeight - margin) {
+      sy = Math.max(margin, window.innerHeight - sRect.height - margin);
+    }
+
+    subMenu.style.left = Math.max(0, Math.round(sx)) + 'px';
+    subMenu.style.top = Math.max(0, Math.round(sy)) + 'px';
+  }
+
   function showCommitContextMenu(e: MouseEvent, commit: any) {
     e.preventDefault();
     e.stopPropagation();
@@ -388,9 +413,13 @@
 
     addDivider();
 
-    const branchRef = (commit.refs || []).find((r: string) => !r.startsWith('tag: ') && r !== 'HEAD') || (commit.refs && commit.refs[0]);
+    const headCommit = (commits || []).find((c: any) => (c.refs || []).some((r: string) => r.startsWith('HEAD')));
+    const activeBranch = headCommit?.refs?.find((r: string) => r.startsWith('HEAD -> '))?.replace('HEAD -> ', '') || 'HEAD';
+
+    const branchRef = (commit.refs || []).find((r: string) => !r.startsWith('tag: ') && r !== 'HEAD') || (commit.refs && commit.refs[0] && !commit.refs[0].startsWith('tag: ') ? commit.refs[0] : null);
     if (branchRef) {
       const cleanBranch = branchRef.replace(/^HEAD -> /, '');
+      const isCur = cleanBranch === activeBranch;
       const branchItem = document.createElement('div');
       branchItem.className = 'ccm-item has-submenu';
       branchItem.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">Branch '${cleanBranch}'</span><span class="ccm-arrow">›</span>`;
@@ -410,65 +439,97 @@
         subMenu.appendChild(it);
       }
 
-      addSubItem('Checkout', () => postMessage('checkout', cleanBranch));
-      addSubItem('Merge into Current', () => postMessage('mergeBranch', cleanBranch));
-      addSubItem('Rebase Current onto Selected', () => postMessage('rebase', cleanBranch));
-      addSubItem('Compare with Current', () => {
-        const headCommit = (commits || []).find((c: any) => (c.refs || []).some((r: string) => r.startsWith('HEAD')));
-        const activeBranch = headCommit?.refs?.find((r: string) => r.startsWith('HEAD -> '))?.replace('HEAD -> ', '') || 'HEAD';
-        postMessage('compareBranch', { branch: cleanBranch, withBranch: activeBranch });
-      });
-      addSubItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanBranch }));
-      addSubItem('Update', () => {
-        showToast("Updating '" + cleanBranch + "'...");
-        postMessage('pull', cleanBranch);
-      });
-      addSubItem('Push...', () => postMessage('push', cleanBranch));
-      addSubItem('Rename...', () => {
-        openRenameBranchDialog(cleanBranch);
-      });
+      if (isCur) {
+        addSubItem(`New Branch from '${cleanBranch}'...`, () => openCreateBranchDialog(cleanBranch));
+        addSubItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanBranch }));
+        addSubItem('Update', () => {
+          showToast("Updating '" + cleanBranch + "'...");
+          postMessage('pull', cleanBranch);
+        });
+        addSubItem('Push...', () => postMessage('push', cleanBranch));
+        addSubItem('Rename...', () => openRenameBranchDialog(cleanBranch));
+      } else {
+        addSubItem('Checkout', () => postMessage('checkout', cleanBranch));
+        addSubItem(`New Branch from '${cleanBranch}'...`, () => openCreateBranchDialog(cleanBranch));
+        addSubItem('Merge into Current', () => postMessage('mergeBranch', cleanBranch));
+        addSubItem('Rebase Current onto Selected', () => postMessage('rebase', cleanBranch));
+        addSubItem('Compare with Current', () => {
+          postMessage('compareBranch', { branch: cleanBranch, withBranch: activeBranch });
+        });
+        addSubItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanBranch }));
+        addSubItem('Update', () => {
+          showToast("Updating '" + cleanBranch + "'...");
+          postMessage('pull', cleanBranch);
+        });
+        addSubItem('Push...', () => postMessage('push', cleanBranch));
+        addSubItem('Rename...', () => openRenameBranchDialog(cleanBranch));
+      }
 
       let subMenuTimer: any;
-      function hideSubMenu() {
-        clearTimeout(subMenuTimer);
-        subMenuTimer = setTimeout(() => {
-          subMenu.remove();
-        }, 150);
-      }
-      function showSubMenu() {
+      branchItem.addEventListener('mouseenter', () => {
         clearTimeout(subMenuTimer);
         document.body.appendChild(subMenu);
         subMenu.style.display = 'block';
+        positionSubMenu(branchItem, subMenu);
+      });
+      branchItem.addEventListener('mouseleave', () => {
+        clearTimeout(subMenuTimer);
+        subMenuTimer = setTimeout(() => subMenu.remove(), 150);
+      });
+      subMenu.addEventListener('mouseenter', () => clearTimeout(subMenuTimer));
+      subMenu.addEventListener('mouseleave', () => {
+        clearTimeout(subMenuTimer);
+        subMenuTimer = setTimeout(() => subMenu.remove(), 150);
+      });
+      menu.appendChild(branchItem);
+    }
 
-        const margin = 8;
-        const maxAvailHeight = Math.max(80, window.innerHeight - margin * 2);
-        subMenu.style.maxHeight = `${maxAvailHeight}px`;
-        subMenu.style.overflowY = 'auto';
+    const tagRef = (commit.refs || []).find((r: string) => r.startsWith('tag: '));
+    if (tagRef) {
+      const cleanTag = tagRef.replace(/^tag: /, '');
+      const tagItem = document.createElement('div');
+      tagItem.className = 'ccm-item has-submenu';
+      tagItem.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">Tag '${cleanTag}'</span><span class="ccm-arrow">›</span>`;
 
-        const bRect = branchItem.getBoundingClientRect();
-        let sx = bRect.right + 2;
-        let sy = bRect.top;
-        const sRect = subMenu.getBoundingClientRect();
+      const tagSubMenu = document.createElement('div');
+      tagSubMenu.className = 'commit-context-menu ccm-submenu';
 
-        if (sx + sRect.width > window.innerWidth - margin) {
-          sx = Math.max(margin, bRect.left - sRect.width - 2);
-        }
-
-        if (sRect.height >= maxAvailHeight) {
-          sy = margin;
-        } else if (sy + sRect.height > window.innerHeight - margin) {
-          sy = Math.max(margin, window.innerHeight - sRect.height - margin);
-        }
-
-        subMenu.style.left = Math.max(0, Math.round(sx)) + 'px';
-        subMenu.style.top = Math.max(0, Math.round(sy)) + 'px';
+      function addTagSubItem(label: string, onClick: () => void) {
+        const it = document.createElement('div');
+        it.className = 'ccm-item';
+        it.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">${label}</span>`;
+        it.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          closeCommitContextMenu();
+          onClick();
+        });
+        tagSubMenu.appendChild(it);
       }
 
-      branchItem.addEventListener('mouseenter', showSubMenu);
-      branchItem.addEventListener('mouseleave', hideSubMenu);
-      subMenu.addEventListener('mouseenter', () => clearTimeout(subMenuTimer));
-      subMenu.addEventListener('mouseleave', hideSubMenu);
-      menu.appendChild(branchItem);
+      addTagSubItem(`Checkout Tag '${cleanTag}'`, () => postMessage('checkout', cleanTag));
+      addTagSubItem(`New Branch from '${cleanTag}'...`, () => openCreateBranchDialog(cleanTag));
+      addTagSubItem(`Compare with Current`, () => postMessage('compareBranch', { branch: cleanTag, withBranch: activeBranch }));
+      addTagSubItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanTag }));
+      addTagSubItem(`Push Tag '${cleanTag}'`, () => postMessage('pushTag', cleanTag));
+      addTagSubItem(`Delete Tag '${cleanTag}'`, () => postMessage('deleteTag', cleanTag));
+
+      let tagTimer: any;
+      tagItem.addEventListener('mouseenter', () => {
+        clearTimeout(tagTimer);
+        document.body.appendChild(tagSubMenu);
+        tagSubMenu.style.display = 'block';
+        positionSubMenu(tagItem, tagSubMenu);
+      });
+      tagItem.addEventListener('mouseleave', () => {
+        clearTimeout(tagTimer);
+        tagTimer = setTimeout(() => tagSubMenu.remove(), 150);
+      });
+      tagSubMenu.addEventListener('mouseenter', () => clearTimeout(tagTimer));
+      tagSubMenu.addEventListener('mouseleave', () => {
+        clearTimeout(tagTimer);
+        tagTimer = setTimeout(() => tagSubMenu.remove(), 150);
+      });
+      menu.appendChild(tagItem);
     }
 
     addItem('New Branch...', '⌥⌘N', '', () => {
@@ -508,7 +569,8 @@
     window.dispatchEvent(new CustomEvent('closeAllGraphMenus'));
     closeCommitContextMenu();
 
-    const cleanBranch = branchName.replace(/^refs\/(heads|remotes)\//, '').replace(/^HEAD -> /, '');
+    const isTag = branchName.startsWith('tag: ');
+    const cleanName = branchName.replace(/^refs\/(heads|remotes)\//, '').replace(/^HEAD -> /, '').replace(/^tag: /, '');
     const headCommit = (commits || []).find((c: any) => (c.refs || []).some((r: string) => r.startsWith('HEAD')));
     const activeBranch = headCommit?.refs?.find((r: string) => r.startsWith('HEAD -> '))?.replace('HEAD -> ', '') || 'HEAD';
 
@@ -520,29 +582,69 @@
       ev.stopPropagation();
     });
 
-    function addBranchItem(label: string, onClick: () => void) {
+    function addMenuItem(label: string, onClick: () => void, disabled = false) {
       const it = document.createElement('div');
-      it.className = 'ccm-item';
+      it.className = 'ccm-item' + (disabled ? ' disabled' : '');
       it.innerHTML = `<span class="ccm-icon"></span><span class="ccm-label">${label}</span>`;
-      it.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        closeCommitContextMenu();
-        onClick();
-      });
+      if (!disabled && onClick) {
+        it.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          closeCommitContextMenu();
+          onClick();
+        });
+      }
       menu.appendChild(it);
     }
 
-    addBranchItem(`Checkout '${cleanBranch}'`, () => postMessage('checkout', cleanBranch));
-    addBranchItem(`Merge '${cleanBranch}' into '${activeBranch}'`, () => postMessage('mergeBranch', cleanBranch));
-    addBranchItem(`Rebase '${activeBranch}' onto '${cleanBranch}'`, () => postMessage('rebase', cleanBranch));
-    addBranchItem(`Compare with Current (${activeBranch})`, () => postMessage('compareBranch', { branch: cleanBranch, withBranch: activeBranch }));
-    addBranchItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanBranch }));
-    addBranchItem('Update', () => {
-      showToast("Updating '" + cleanBranch + "'...");
-      postMessage('pull', cleanBranch);
-    });
-    addBranchItem('Push...', () => postMessage('push', cleanBranch));
-    addBranchItem('Rename...', () => openRenameBranchDialog(cleanBranch));
+    function addDivider() {
+      const d = document.createElement('div');
+      d.className = 'ccm-divider';
+      menu.appendChild(d);
+    }
+
+    if (isTag) {
+      addMenuItem(`Checkout Tag '${cleanName}'`, () => postMessage('checkout', cleanName));
+      addMenuItem(`New Branch from '${cleanName}'...`, () => openCreateBranchDialog(cleanName));
+      addDivider();
+      addMenuItem(`Compare with Current (${activeBranch})`, () => postMessage('compareBranch', { branch: cleanName, withBranch: activeBranch }));
+      addMenuItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanName }));
+      addDivider();
+      addMenuItem(`Push Tag '${cleanName}'`, () => postMessage('pushTag', cleanName));
+      addMenuItem(`Delete Tag '${cleanName}'`, () => postMessage('deleteTag', cleanName));
+    } else {
+      const isCurrent = cleanName === activeBranch;
+      if (isCurrent) {
+        addMenuItem(`New Branch from '${cleanName}'...`, () => openCreateBranchDialog(cleanName));
+        addMenuItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanName }));
+        addDivider();
+        addMenuItem('Update', () => {
+          showToast("Updating '" + cleanName + "'...");
+          postMessage('pull', cleanName);
+        });
+        addMenuItem('Push...', () => postMessage('push', cleanName));
+        addDivider();
+        addMenuItem('Rename...', () => openRenameBranchDialog(cleanName));
+      } else {
+        addMenuItem(`Checkout '${cleanName}'`, () => postMessage('checkout', cleanName));
+        addMenuItem(`New Branch from '${cleanName}'...`, () => openCreateBranchDialog(cleanName));
+        addMenuItem(`Checkout and Rebase onto '${activeBranch}'`, () => postMessage('checkoutAndRebase', { branch: cleanName, onto: activeBranch }));
+        addDivider();
+        addMenuItem(`Compare with Current (${activeBranch})`, () => postMessage('compareBranch', { branch: cleanName, withBranch: activeBranch }));
+        addMenuItem('Show Diff with Working Tree', () => postMessage('showDiff', { branch: cleanName }));
+        addDivider();
+        addMenuItem(`Rebase '${activeBranch}' onto '${cleanName}'`, () => postMessage('rebase', cleanName));
+        addMenuItem(`Merge '${cleanName}' into '${activeBranch}'`, () => postMessage('mergeBranch', cleanName));
+        addDivider();
+        addMenuItem('Update', () => {
+          showToast("Updating '" + cleanName + "'...");
+          postMessage('pull', cleanName);
+        });
+        addMenuItem('Push...', () => postMessage('push', cleanName));
+        addDivider();
+        addMenuItem('Rename...', () => openRenameBranchDialog(cleanName));
+        addMenuItem('Delete', () => postMessage('deleteBranch', cleanName));
+      }
+    }
 
     document.body.appendChild(menu);
     positionContextMenu(menu, e.clientX, e.clientY);

@@ -175,6 +175,35 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
     this._onDidChangeTreeData.fire(undefined);
   }
 
+  async renameChangelist(oldName: string, newName?: string): Promise<void> {
+    if (oldName === 'Default') {
+      vscode.window.showWarningMessage('Cannot rename the Default changelist.');
+      return;
+    }
+    if (!newName) {
+      newName = await vscode.window.showInputBox({
+        prompt: `Rename changelist '${oldName}' to:`,
+        value: oldName,
+      });
+    }
+    if (!newName || newName === oldName) return;
+
+    if (this.data.changelists.some(c => c.name === newName)) {
+      vscode.window.showWarningMessage(`Changelist "${newName}" already exists.`);
+      return;
+    }
+
+    const cl = this.data.changelists.find(c => c.name === oldName);
+    if (!cl) return;
+
+    cl.name = newName;
+    if (this.data.active === oldName) {
+      this.data.active = newName;
+    }
+    this.save();
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
   moveFiles(filePaths: string[], targetChangelist: string): void {
     const target = this.data.changelists.find(c => c.name === targetChangelist);
     if (!target) return;

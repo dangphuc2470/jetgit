@@ -336,6 +336,88 @@
   });
 
   // Context menu builder
+  function setContextMenu(clientX: number, clientY: number, items: any[], approxWidth = 270) {
+    const estHeight = items.length * 26 + 16;
+    const margin = 8;
+    const maxAvailHeight = Math.max(80, window.innerHeight - margin * 2);
+    let menuX = clientX;
+    let menuY = clientY;
+
+    if (menuX + approxWidth > window.innerWidth - margin) {
+      menuX = Math.max(margin, window.innerWidth - approxWidth - margin);
+    }
+
+    if (estHeight >= maxAvailHeight) {
+      menuY = margin;
+    } else {
+      const spaceBelow = window.innerHeight - clientY - margin;
+      const spaceAbove = clientY - margin;
+      if (spaceBelow >= estHeight) {
+        menuY = clientY;
+      } else if (spaceAbove >= estHeight) {
+        menuY = clientY - estHeight;
+      } else {
+        menuY = Math.max(margin, window.innerHeight - estHeight - margin);
+      }
+    }
+
+    contextMenu = {
+      visible: true,
+      x: Math.max(0, Math.round(menuX)),
+      y: Math.max(0, Math.round(menuY)),
+      items
+    };
+  }
+
+  function showTagContextMenu(e: MouseEvent, tagName: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    (window as any).__lastGraphMenuOpenedAt = Date.now();
+    window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
+
+    const items: Array<{
+      label: string;
+      shortcut?: string;
+      onClick?: () => void;
+      isDivider?: boolean;
+      disabled?: boolean;
+    }> = [];
+
+    const closeAndRun = (action: () => void) => {
+      contextMenu.visible = false;
+      action();
+    };
+
+    items.push({
+      label: `Checkout Tag '${tagName}'`,
+      onClick: () => closeAndRun(() => postMessage("checkout", tagName))
+    });
+    items.push({
+      label: `New Branch from '${tagName}'...`,
+      onClick: () => closeAndRun(() => openCreateBranchDialog(tagName))
+    });
+    items.push({ isDivider: true, label: "" });
+    items.push({
+      label: `Compare with '${currentBranch || "HEAD"}'`,
+      onClick: () => closeAndRun(() => postMessage("compareBranch", { branch: tagName, withBranch: currentBranch }))
+    });
+    items.push({
+      label: "Show Diff with Working Tree",
+      onClick: () => closeAndRun(() => postMessage("showDiff", { branch: tagName }))
+    });
+    items.push({ isDivider: true, label: "" });
+    items.push({
+      label: `Push Tag '${tagName}'`,
+      onClick: () => closeAndRun(() => postMessage("pushTag", tagName))
+    });
+    items.push({
+      label: `Delete Tag '${tagName}'...`,
+      onClick: () => closeAndRun(() => postMessage("deleteTag", tagName))
+    });
+
+    setContextMenu(e.clientX, e.clientY, items);
+  }
+
   function showBranchContextMenu(e: MouseEvent, branchName: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -515,17 +597,7 @@
       });
     }
 
-    let menuX = e.clientX;
-    let menuY = e.clientY;
-    if (menuX + 270 > window.innerWidth - 8) menuX = Math.max(8, window.innerWidth - 278);
-    if (menuY + 300 > window.innerHeight - 8) menuY = Math.max(8, window.innerHeight - 308);
-
-    contextMenu = {
-      visible: true,
-      x: menuX,
-      y: menuY,
-      items
-    };
+    setContextMenu(e.clientX, e.clientY, items);
   }
 
   function showGeneralBranchContextMenu(e: MouseEvent) {
@@ -551,17 +623,7 @@
       }
     ];
 
-    let menuX = e.clientX;
-    let menuY = e.clientY;
-    if (menuX + 220 > window.innerWidth - 8) menuX = Math.max(8, window.innerWidth - 228);
-    if (menuY + 120 > window.innerHeight - 8) menuY = Math.max(8, window.innerHeight - 128);
-
-    contextMenu = {
-      visible: true,
-      x: menuX,
-      y: menuY,
-      items
-    };
+    setContextMenu(e.clientX, e.clientY, items, 220);
   }
 
   function showRemoteFolderContextMenu(e: MouseEvent, subNode: TreeNode) {
@@ -622,17 +684,7 @@
       })
     });
 
-    let menuX = e.clientX;
-    let menuY = e.clientY;
-    if (menuX + 270 > window.innerWidth - 8) menuX = Math.max(8, window.innerWidth - 278);
-    if (menuY + 160 > window.innerHeight - 8) menuY = Math.max(8, window.innerHeight - 168);
-
-    contextMenu = {
-      visible: true,
-      x: menuX,
-      y: menuY,
-      items
-    };
+    setContextMenu(e.clientX, e.clientY, items);
   }
 
   function toggleFolder(fullPath: string, defaultCollapsed: boolean) {
@@ -1032,6 +1084,7 @@
                   title={t.name}
                   onclick={() => selectBranch(t.name)}
                   ondblclick={() => openBranchLog(t.name)}
+                  oncontextmenu={(e) => showTagContextMenu(e, t.name)}
                 >
                   <span class="arrow spacer" style="visibility:hidden;pointer-events:none;"></span>
                   <span class="tree-item-icon">

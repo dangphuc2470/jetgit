@@ -287,7 +287,21 @@ export function showChangelistContextMenu(
     separator?: boolean;
   }
 
+  const clObj = state.changelists.find(c => c.name === clName);
+  const clFiles = (clObj?.files && clObj.files.length > 0)
+    ? clObj.files
+    : state.files.filter(f => (f as any).changelist === clName).map(f => f.path);
+
   const items: MenuItemDef[] = [];
+  if (clFiles.length > 0) {
+    items.push({
+      label: `Rollback All (${clFiles.length})...`,
+      icon: svgRollback,
+      action: () => vscode.postMessage({ type: 'rollbackFiles', payload: clFiles }),
+    });
+    items.push({ separator: true });
+  }
+
   if (!isActive) {
     items.push({
       label: 'Set as Active Changelist',
@@ -301,6 +315,11 @@ export function showChangelistContextMenu(
     action: () => vscode.postMessage({ type: 'newChangelist' }),
   });
   if (clName !== 'Default') {
+    items.push({
+      label: 'Rename Changelist...',
+      shortcut: 'F2',
+      action: () => vscode.postMessage({ type: 'renameChangelist', payload: clName }),
+    });
     items.push({ separator: true });
     items.push({
       label: 'Delete Changelist',

@@ -417,6 +417,16 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'renameChangelist': {
+        const payload = (msg as any).payload;
+        const oldName = typeof payload === 'string' ? payload : payload?.oldName;
+        const newName = typeof payload === 'object' ? payload?.newName : undefined;
+        if (this.changelistTree && typeof oldName === 'string') {
+          await this.changelistTree.renameChangelist(oldName, newName);
+          await this.refresh();
+        }
+        break;
+      }
       case 'setActiveChangelist': {
         const name = (msg as any).payload;
         if (this.changelistTree && typeof name === 'string') {

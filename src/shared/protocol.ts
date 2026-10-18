@@ -168,6 +168,7 @@ export type CommitToExtensionMessage =
   | { type: 'generateCommitMessage'; payload?: { files?: string[] } }
   | { type: 'newChangelist'; payload?: { name: string; comment?: string } }
   | { type: 'deleteChangelist'; payload: string }
+  | { type: 'renameChangelist'; payload: string | { oldName: string; newName?: string } }
   | { type: 'setActiveChangelist'; payload: string }
   | {
       type: 'moveFilesToChangelist';

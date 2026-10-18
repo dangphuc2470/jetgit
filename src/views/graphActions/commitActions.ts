@@ -141,6 +141,47 @@ export async function handleCommitAction(
       return true;
     }
 
+    case 'deleteTag': {
+      const tag = (typeof payload === 'string' ? payload : payload?.name) as string;
+      if (!tag) return true;
+      const confirm = await vscode.window.showWarningMessage(
+        `Are you sure you want to delete tag '${tag}'?`,
+        { modal: true },
+        'Delete'
+      );
+      if (confirm === 'Delete') {
+        try {
+          await gitService.deleteTag(tag);
+          vscode.window.showInformationMessage(`Deleted tag '${tag}'`);
+          host.loadInitialData();
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Delete tag failed: ${err.message}`);
+        }
+      }
+      return true;
+    }
+
+    case 'pushTag': {
+      const tag = (typeof payload === 'string' ? payload : payload?.name) as string;
+      if (!tag) return true;
+      try {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Pushing tag '${tag}' to origin...`,
+            cancellable: false,
+          },
+          async () => {
+            await gitService.exec(['push', 'origin', tag]);
+            vscode.window.showInformationMessage(`Pushed tag '${tag}' successfully.`);
+          }
+        );
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Push tag failed: ${err.message}`);
+      }
+      return true;
+    }
+
     case 'createPatch': {
       const { hash } = payload || {};
       try {

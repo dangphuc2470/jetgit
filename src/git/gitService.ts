@@ -560,6 +560,10 @@ export class GitService {
     await this.exec(args);
   }
 
+  async deleteTag(name: string): Promise<void> {
+    await this.exec(['tag', '-d', name]);
+  }
+
   async createPatch(hash: string): Promise<string> {
     return this.exec(['format-patch', '-1', hash, '--stdout']);
   }

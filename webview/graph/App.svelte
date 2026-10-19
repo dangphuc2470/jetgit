@@ -405,7 +405,8 @@
 
 <div class="app">
   <FilterBar
-    {activeBranch}
+    bind:activeBranch
+    setActiveBranch={(b) => { activeBranch = b; }}
     {branchData}
     {commits}
     {selectedHash}

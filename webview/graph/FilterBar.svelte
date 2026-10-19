@@ -13,7 +13,7 @@
   }
 
   let {
-    activeBranch = "",
+    activeBranch = $bindable(""),
     branchData = { branches: [], currentBranch: "" },
     commits = [],
     selectedHash = null,
@@ -163,6 +163,13 @@
       firstParent: isFirstParent,
       noMerges: isNoMerges
     });
+  }
+
+  function changeBranch(newBranch: string) {
+    curBranch = newBranch;
+    activeBranch = newBranch;
+    if (setActiveBranch) setActiveBranch(newBranch);
+    applyFilter();
   }
 
   function togglePopup(name: PopupName, e?: MouseEvent) {
@@ -353,9 +360,7 @@
           title="Clear"
           onclick={(e) => {
             e.stopPropagation();
-            curBranch = "";
-            if (setActiveBranch) setActiveBranch("");
-            applyFilter();
+            changeBranch("");
           }}>&times;</span
         >
       {:else}
@@ -378,10 +383,8 @@
             class="filter-popup-item"
             class:selected={!curBranch}
             onclick={() => {
-              curBranch = "";
-              if (setActiveBranch) setActiveBranch("");
+              changeBranch("");
               closeAllPopups();
-              applyFilter();
             }}
           >
             All Branches
@@ -392,10 +395,8 @@
               class="filter-popup-item"
               class:selected={curBranch === "HEAD"}
               onclick={() => {
-                curBranch = "HEAD";
-                if (setActiveBranch) setActiveBranch("HEAD");
+                changeBranch("HEAD");
                 closeAllPopups();
-                applyFilter();
               }}
             >
               <span>HEAD ({branchData.currentBranch})</span>
@@ -409,10 +410,8 @@
                 class="filter-popup-item"
                 class:selected={curBranch === b.name}
                 onclick={() => {
-                  curBranch = b.name;
-                  if (setActiveBranch) setActiveBranch(b.name);
+                  changeBranch(b.name);
                   closeAllPopups();
-                  applyFilter();
                 }}
               >
                 {b.name}
@@ -427,10 +426,8 @@
                 class="filter-popup-item"
                 class:selected={curBranch === b.name}
                 onclick={() => {
-                  curBranch = b.name;
-                  if (setActiveBranch) setActiveBranch(b.name);
+                  changeBranch(b.name);
                   closeAllPopups();
-                  applyFilter();
                 }}
               >
                 {b.name}

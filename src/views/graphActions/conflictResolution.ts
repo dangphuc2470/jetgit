@@ -245,15 +245,78 @@ export async function handleCheckoutWithConflictResolution(
   ref: string,
   onSuccess: () => void
 ): Promise<void> {
+  let isRemote = false;
+  let remoteName = '';
+  let localBranchName = '';
+  try {
+    const remotes = await gitService.getRemotes();
+    for (const r of remotes) {
+      if (ref.startsWith(r + '/')) {
+        isRemote = true;
+        remoteName = r;
+        localBranchName = ref.slice(r.length + 1);
+        break;
+      }
+    }
+  } catch {}
+
+  let doUpdate = false;
+  if (isRemote && localBranchName) {
+    try {
+      await gitService.fetchSingleBranch(remoteName, localBranchName);
+    } catch {}
+
+    const branchCheck = (await gitService.exec(['branch', '--list', localBranchName]).catch(() => '')).trim();
+    if (branchCheck) {
+      const currentUpstream = (await gitService.exec(['rev-parse', '--abbrev-ref', `${localBranchName}@{upstream}`]).catch(() => '')).trim();
+      if (!currentUpstream) {
+        await gitService.exec(['branch', '--set-upstream-to', ref, localBranchName]).catch(() => {});
+      }
+
+      const revCount = (await gitService.exec(['rev-list', '--left-right', '--count', `${localBranchName}...${ref}`]).catch(() => '')).trim();
+      const [aheadStr, behindStr] = revCount.split(/\s+/);
+      const ahead = parseInt(aheadStr, 10) || 0;
+      const behind = parseInt(behindStr, 10) || 0;
+
+      if (behind > 0) {
+        const plural = behind === 1 ? 'commit' : 'commits';
+        const aheadText = ahead > 0 ? ` (and local has ${ahead} unpushed ${ahead === 1 ? 'commit' : 'commits'})` : '';
+        const choice = await vscode.window.showInformationMessage(
+          `Local branch '${localBranchName}' is behind '${ref}' by ${behind} ${plural}${aheadText}.`,
+          'Update and Checkout',
+          'Checkout Only'
+        );
+        if (!choice) {
+          return;
+        }
+        if (choice === 'Update and Checkout') {
+          doUpdate = true;
+        }
+      }
+    }
+  }
+
   await withSmartStashOnConflict(
     gitService,
     'Checkout',
     ref,
     async () => {
       await gitService.checkout(ref);
-      vscode.window.showInformationMessage(`Checked out ${ref}`);
+      if (doUpdate && localBranchName) {
+        try {
+          await gitService.exec(['merge', '--ff-only', ref]);
+          vscode.window.showInformationMessage(`Checked out and updated '${localBranchName}' to '${ref}'.`);
+        } catch (mergeErr: any) {
+          vscode.window.showWarningMessage(`Checked out '${localBranchName}', but fast-forward failed: ${mergeErr.message}. You can update manually using Merge or Rebase.`);
+        }
+      } else {
+        vscode.window.showInformationMessage(`Checked out ${ref}`);
+      }
     },
-    onSuccess
+    async () => {
+      onSuccess();
+      vscode.commands.executeCommand('intellij-git.refreshBranches');
+    }
   );
 }
 

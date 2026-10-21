@@ -125,6 +125,10 @@ export async function checkout(ctx: BranchExecContext, ref: string): Promise<voi
     const branchCheck = await ctx.exec(['branch', '--list', localBranchName]);
     if (branchCheck.trim()) {
       await ctx.exec(['checkout', localBranchName]);
+      const upstream = await ctx.exec(['rev-parse', '--abbrev-ref', `${localBranchName}@{upstream}`]).catch(() => '');
+      if (!upstream.trim()) {
+        await ctx.exec(['branch', '--set-upstream-to', ref, localBranchName]).catch(() => {});
+      }
     } else {
       await ctx.exec(['checkout', '-b', localBranchName, '--track', ref]);
     }

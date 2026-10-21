@@ -457,12 +457,13 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidRenameFiles(() => onWorkspaceFileChange()),
   );
 
-  // 4. Auto-sync on window focus (IntelliJ frame activation sync)
+  // 4. Auto-sync on window focus (IntelliJ frame activation sync - local state only, no network fetch)
   context.subscriptions.push(
     vscode.window.onDidChangeWindowState(e => {
       if (e.focused) {
         commitViewProvider.refresh();
         branchTree.refresh();
+        graphViewProvider.refresh();
         mergeProvider.refresh();
       } else {
         graphViewProvider.closeAllMenus();

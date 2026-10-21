@@ -244,12 +244,15 @@
           if (msg.payload && msg.payload.repoPath) {
             (window as any).__GIT_REPO_PATH__ = msg.payload.repoPath;
           }
+          const prevCurrentBranch = branchData?.currentBranch;
           branchData = msg.payload;
           if (!hasInitializedActiveBranch) {
             hasInitializedActiveBranch = true;
             if (msg.payload && msg.payload.activeBranch) {
               activeBranch = msg.payload.activeBranch;
             }
+          } else if (prevCurrentBranch && msg.payload?.currentBranch && prevCurrentBranch !== msg.payload.currentBranch) {
+            activeBranch = msg.payload.currentBranch;
           }
           const sideEl = document.querySelector(".branch-sidebar") as any;
           if (sideEl && sideEl._updateExitBtn) sideEl._updateExitBtn();

@@ -427,6 +427,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         try {
           await this.gitService.refreshRemoteBranchNames();
           await this.refresh();
+          vscode.commands.executeCommand('intellij-git.refreshBranches');
           vscode.window.showInformationMessage('Branches refreshed.');
         } catch (err: any) {
           vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);

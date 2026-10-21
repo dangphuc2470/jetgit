@@ -58,7 +58,7 @@
   let selectedTreeBranch = $state(activeBranch || "");
 
   $effect(() => {
-    if (activeBranch && !selectedTreeBranch) {
+    if (activeBranch && selectedTreeBranch !== activeBranch) {
       selectedTreeBranch = activeBranch;
     }
   });

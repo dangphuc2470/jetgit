@@ -300,19 +300,19 @@ html, body {
   background: var(--vscode-list-hoverBackground);
 }
 
-.tree-item.current-head:not(.active) {
+.tree-item.current-head:not(.selected) {
   color: var(--vscode-foreground, #dfe1e5);
   font-weight: 600;
 }
 
-.tree-item.active {
+.tree-item.selected {
   background: var(--vscode-list-activeSelectionBackground) !important;
-  color: var(--vscode-list-activeSelectionForeground) !important;
-  font-weight: 600;
 }
 
-.tree-item.active .branch-name {
-  color: var(--vscode-list-activeSelectionForeground) !important;
+.tree-item.filtered,
+.tree-item.filtered .branch-name {
+  color: var(--vscode-list-activeSelectionForeground, #ffffff) !important;
+  font-weight: 600;
 }
 
 .head-branch-box {
@@ -335,9 +335,13 @@ html, body {
   background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.08));
 }
 
-.head-branch-box.active {
+.head-branch-box.selected {
   background: var(--vscode-list-activeSelectionBackground, #04395e);
+}
+
+.head-branch-box.filtered {
   color: var(--vscode-list-activeSelectionForeground, #ffffff);
+  font-weight: 600;
 }
 
 .branch-icon {

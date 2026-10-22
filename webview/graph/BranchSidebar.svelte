@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import {
     postMessage,
     openCreateBranchDialog,
@@ -58,9 +58,12 @@
   let selectedTreeBranch = $state(activeBranch || "");
 
   $effect(() => {
-    if (activeBranch && selectedTreeBranch !== activeBranch) {
-      selectedTreeBranch = activeBranch;
-    }
+    const ab = activeBranch;
+    untrack(() => {
+      if (ab !== undefined) {
+        selectedTreeBranch = ab || "";
+      }
+    });
   });
   let searchQuery = $state("");
   let searchInputEl = $state<HTMLInputElement>();
@@ -224,8 +227,8 @@
 
   function openBranchLog(name: string) {
     selectedTreeBranch = name;
-    onSelectActiveBranch(name);
-    onFilter({ branch: name });
+    if (onSelectActiveBranch) onSelectActiveBranch(name);
+    if (onFilter) onFilter({ branch: name });
   }
 
   // Svelte action for attaching tooltips
@@ -463,15 +466,6 @@
         label: "Push...",
         onClick: () => closeAndRun(() => postMessage("push", branchName))
       });
-      if (branchInfo && branchInfo.upstream) {
-        items.push({
-          label: `Unset Tracked Branch (${branchInfo.upstream})`,
-          onClick: () => closeAndRun(() => {
-            showToast(`Unsetting tracked branch for '${branchName}'...`);
-            postMessage("unsetUpstream", { branch: branchName });
-          })
-        });
-      }
       items.push({ isDivider: true, label: "" });
       items.push({
         label: "Rename...",
@@ -576,15 +570,6 @@
         label: "Push...",
         onClick: () => closeAndRun(() => postMessage("push", branchName))
       });
-      if (branchInfo && branchInfo.upstream) {
-        items.push({
-          label: `Unset Tracked Branch (${branchInfo.upstream})`,
-          onClick: () => closeAndRun(() => {
-            showToast(`Unsetting tracked branch for '${branchName}'...`);
-            postMessage("unsetUpstream", { branch: branchName });
-          })
-        });
-      }
       items.push({ isDivider: true, label: "" });
       items.push({
         label: "Rename...",
@@ -990,7 +975,8 @@
       {#if currentBranch && (!queryTrimmed || currentBranch.toLowerCase().includes(queryTrimmed) || "head (current branch)".includes(queryTrimmed))}
         <div
           class="head-branch-box"
-          class:active={selectedTreeBranch === "HEAD"}
+          class:selected={selectedTreeBranch === "HEAD"}
+          class:filtered={activeBranch === "HEAD" || activeBranch === currentBranch}
           title={`HEAD (${currentBranch})`}
           onclick={() => selectBranch("HEAD")}
           ondblclick={() => openBranchLog("HEAD")}
@@ -1080,7 +1066,8 @@
               {#each filteredTags as t}
                 <div
                   class="tree-item"
-                  class:active={selectedTreeBranch === t.name}
+                  class:selected={selectedTreeBranch === t.name}
+                  class:filtered={activeBranch === t.name}
                   title={t.name}
                   onclick={() => selectBranch(t.name)}
                   ondblclick={() => openBranchLog(t.name)}
@@ -1189,10 +1176,12 @@
   {@const isCur = b.name === currentBranch}
   {@const isFav = isBranchFavorite(b.name)}
   {@const isSelected = selectedTreeBranch === b.name}
+  {@const isFiltered = activeBranch === b.name}
 
   <div
     class="tree-item"
-    class:active={isSelected}
+    class:selected={isSelected}
+    class:filtered={isFiltered}
     class:current-head={isCur && !isSelected}
     title={b.name}
     onclick={() => selectBranch(b.name)}

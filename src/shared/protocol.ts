@@ -116,11 +116,13 @@ export type ExtensionToCommitMessage =
   | { type: 'setCommitMessage'; payload: { message: string } }
   | { type: 'generateAiError' }
   | { type: 'fileDiff'; payload: { path: string; diff: string } }
-  | { type: 'themeTokens'; payload: Record<string, string> };
+  | { type: 'themeTokens'; payload: Record<string, string> }
+  | { type: 'skippedFiles'; payload: { files: any[] } };
 
 export type CommitToExtensionMessage =
   | { type: 'ready' }
   | { type: 'refresh' }
+  | { type: 'getSkippedFiles'; payload?: { force?: boolean } }
   | {
       type: 'selectFile';
       payload:
@@ -208,7 +210,9 @@ export type CommitToExtensionMessage =
   | { type: 'stashApply'; payload: string }
   | { type: 'stashDrop'; payload: string }
   | { type: 'openLog' }
-  | { type: 'collapseView' };
+  | { type: 'collapseView' }
+  | { type: 'unskipFile'; payload: string }
+  | { type: 'skipFile'; payload: string };
 
 
 // ============================================================================
@@ -245,6 +249,7 @@ export type ExtensionToGraphMessage =
   | { type: 'fetchError'; payload: { error: string } }
   | { type: 'authSuccess'; payload: { remote: string } }
   | { type: 'scrollToCommit'; payload: string }
+  | { type: 'openCheckoutBranchDialog'; payload: { remoteRef: string; defaultName?: string } }
   | { type: 'themeTokens'; payload: Record<string, string> };
 
 export type GraphToExtensionMessage =
@@ -259,7 +264,7 @@ export type GraphToExtensionMessage =
   | { type: 'switchRepo'; payload: string }
   | { type: 'exitSubRepo' }
   | { type: 'initRepo' }
-  | { type: 'checkout'; payload: { branch: string } }
+  | { type: 'checkout'; payload: string | { branch: string; name?: string; force?: boolean } }
   | { type: 'checkoutCommit'; payload: { hash: string } }
   | { type: 'createBranch'; payload: { name: string; target?: string; checkout?: boolean } }
   | { type: 'deleteBranch'; payload: { branch: string; force?: boolean } }

@@ -1,11 +1,15 @@
 <script lang="ts">
   import { escapeHtml } from '../shared/escape';
   import { getFileIcon } from '../shared/fileIcons';
-  import type { CommitFile } from './types';
+  import type { CommitFile, SkippedFile } from './types';
   import { isFolderExpanded, buildDirectoryTree } from './treeView';
 
   interface Props {
     files: CommitFile[];
+    skippedFiles?: SkippedFile[];
+    expandSkipped?: boolean;
+    isLoadingSkipped?: boolean;
+    hasLoadedSkipped?: boolean;
     selectedFile: string | null;
     checkedFiles: Set<string>;
     expandChanges: boolean;
@@ -15,6 +19,8 @@
     groupByModule: boolean;
     repoName: string;
     showIgnoredFiles: boolean;
+    showSkippedWorktree?: boolean;
+    checkedSkippedFiles?: Set<string>;
     expandedFolders: Set<string>;
     collapsedFolders: Set<string>;
     expandAllFolders: boolean | null;
@@ -28,7 +34,12 @@
     onToggleFolder: (folderPath: string, isModule?: boolean) => void;
     onToggleExpandChanges: () => void;
     onToggleExpandUnversioned: () => void;
+    onToggleExpandSkipped?: () => void;
     onContextMenu: (e: MouseEvent, file: CommitFile) => void;
+    onSkippedContextMenu?: (e: MouseEvent, file: SkippedFile) => void;
+    onSelectSkippedFile?: (file: SkippedFile) => void;
+    onToggleSkippedFileChecked?: (path: string, checked: boolean) => void;
+    onToggleAllSkipped?: (items: SkippedFile[], checked: boolean) => void;
     onToggleChangelist?: (name: string) => void;
     onChangelistContextMenu?: (e: MouseEvent, name: string, isActive: boolean) => void;
     onMoveFilesToChangelist?: (files: string[], changelist: string) => void;
@@ -36,6 +47,10 @@
 
   let {
     files,
+    skippedFiles = [],
+    expandSkipped = false,
+    isLoadingSkipped = false,
+    hasLoadedSkipped = false,
     selectedFile,
     checkedFiles,
     expandChanges,
@@ -45,6 +60,8 @@
     groupByModule,
     repoName,
     showIgnoredFiles,
+    showSkippedWorktree = false,
+    checkedSkippedFiles = new Set(),
     expandedFolders,
     collapsedFolders,
     expandAllFolders,
@@ -58,7 +75,12 @@
     onToggleFolder,
     onToggleExpandChanges,
     onToggleExpandUnversioned,
+    onToggleExpandSkipped,
     onContextMenu,
+    onSkippedContextMenu,
+    onSelectSkippedFile,
+    onToggleSkippedFileChecked,
+    onToggleAllSkipped,
     onToggleChangelist,
     onChangelistContextMenu,
     onMoveFilesToChangelist,
@@ -74,7 +96,7 @@
     const map = new Map<string, CommitFile[]>();
     const effectiveLists = (changelists && changelists.length > 0)
       ? changelists
-      : [{ name: 'Default', files: [] }];
+      : [{ name: 'Changes', files: [] }];
     for (const cl of effectiveLists) {
       map.set(cl.name, []);
     }
@@ -90,7 +112,7 @@
       }
       map.set(cl.name, list);
     }
-    const activeName = activeChangelist || effectiveLists[0]?.name || 'Default';
+    const activeName = activeChangelist || effectiveLists[0]?.name || 'Changes';
     const activeList = map.get(activeName) || [];
     for (const f of changesFiles) {
       if (!assigned.has(f.path)) {
@@ -359,6 +381,8 @@
 
 {#snippet changelistGroup(name: string, groupFiles: CommitFile[], expanded: boolean, isActive: boolean)}
   {@const checkState = getGroupCheckState(groupFiles)}
+  {@const isSingleList = !changelists || changelists.length <= 1}
+  {@const displayName = isSingleList ? 'Changes' : (name === 'Default' ? 'Changes' : name)}
   <div class="tree-group changelist-group" data-changelist={name}>
     <div
       class={`group-header changelist-header ${isActive ? 'is-active' : ''}`}
@@ -400,13 +424,15 @@
           onToggleStageFiles(groupFiles, (e.target as HTMLInputElement).checked);
         }}
       />
-      <span class="changelist-icon">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-          <path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M5,5 H11 V6 H5 Z M5,7 H11 V8 H5 Z M5,9 H11 V10 H5 Z"/>
-        </svg>
-      </span>
-      <span class="group-title changelist-name">{name}</span>
-      {#if isActive}
+      {#if !isSingleList}
+        <span class="changelist-icon">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M5,5 H11 V6 H5 Z M5,7 H11 V8 H5 Z M5,9 H11 V10 H5 Z"/>
+          </svg>
+        </span>
+      {/if}
+      <span class="group-title changelist-name">{displayName}</span>
+      {#if !isSingleList && isActive}
         <span class="changelist-active-badge">(active)</span>
       {/if}
       <span class="group-count">{groupFiles.length} {groupFiles.length === 1 ? 'file' : 'files'}</span>
@@ -414,6 +440,94 @@
 
     {#if expanded && groupFiles.length > 0}
       {@render groupBody(groupFiles, name)}
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet skippedItem(file: SkippedFile)}
+  {@const isSelected = selectedFile === file.path}
+  {@const isChecked = checkedSkippedFiles.has(file.path)}
+  <div
+    class={`file-item tree-file-item ${isSelected ? 'selected' : ''}`}
+    data-path={file.path}
+    onclick={() => onSelectSkippedFile ? onSelectSkippedFile(file) : null}
+    ondblclick={() => onSelectSkippedFile ? onSelectSkippedFile(file) : null}
+    oncontextmenu={(e) => onSkippedContextMenu ? onSkippedContextMenu(e, file) : null}
+    role="button"
+    tabindex="0"
+    onkeydown={(e) => {
+      if (e.key === 'Enter') onSelectSkippedFile?.(file);
+    }}
+  >
+    <input
+      type="checkbox"
+      class="file-chk tree-chk"
+      checked={isChecked}
+      onclick={(e) => e.stopPropagation()}
+      onchange={(e) => {
+        e.stopPropagation();
+        onToggleSkippedFileChecked?.(file.path, (e.target as HTMLInputElement).checked);
+      }}
+    />
+    <span class="file-icon">{@html getFileIcon(file.name)}</span>
+    <span class={`file-name name-skipped ${file.hasLocalChanges ? 'has-local-changes' : ''}`}>{file.name}</span>
+    {#if showPaths && file.dir}
+      <span class="file-dir">{file.dir}</span>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet skippedGroup(items: SkippedFile[], expanded: boolean, onToggle: (() => void) | undefined)}
+  {@const allChecked = items.length > 0 && items.every((f) => checkedSkippedFiles.has(f.path))}
+  {@const someChecked = items.length > 0 && items.some((f) => checkedSkippedFiles.has(f.path))}
+  <div class="tree-group skipped-group">
+    <div
+      class="group-header"
+      onclick={() => onToggle?.()}
+      role="button"
+      tabindex="0"
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle?.(); }}
+    >
+      <span class={`group-arrow ${expanded ? 'expanded' : ''}`}>
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M6 3.5L10.5 8L6 12.5L5 11.5L8.5 8L5 4.5L6 3.5Z"/>
+        </svg>
+      </span>
+      <input
+        type="checkbox"
+        class="group-chk"
+        checked={allChecked}
+        indeterminate={someChecked && !allChecked}
+        onclick={(e) => e.stopPropagation()}
+        onchange={(e) => {
+          e.stopPropagation();
+          onToggleAllSkipped?.(items, (e.target as HTMLInputElement).checked);
+        }}
+      />
+      <span class="group-title">Skipped Worktree</span>
+      {#if isLoadingSkipped}
+        <span class="skipped-loading-spinner" title="Scanning skipped files...">
+          <svg class="spin-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+            <circle cx="8" cy="8" r="6" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/>
+          </svg>
+        </span>
+      {:else if hasLoadedSkipped}
+        <span class="group-count">{items.length} {items.length === 1 ? 'file' : 'files'}</span>
+      {/if}
+    </div>
+
+    {#if expanded}
+      <div class="group-items">
+        {#if isLoadingSkipped}
+          <div class="skipped-loading-hint">Loading skipped files...</div>
+        {:else if items.length > 0}
+          {#each items as file (file.path)}
+            {@render skippedItem(file)}
+          {/each}
+        {:else if hasLoadedSkipped}
+          <div class="skipped-empty-hint">No files skipped (skip-worktree or assume-unchanged)</div>
+        {/if}
+      </div>
     {/if}
   </div>
 {/snippet}
@@ -432,5 +546,9 @@
 
   {#if showIgnoredFiles !== false}
     {@render fileGroup('Unversioned Files', unversionedFiles, expandUnversioned, onToggleExpandUnversioned)}
+  {/if}
+
+  {#if showSkippedWorktree}
+    {@render skippedGroup(skippedFiles, expandSkipped ?? false, onToggleExpandSkipped)}
   {/if}
 </div>

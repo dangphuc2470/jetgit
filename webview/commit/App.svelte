@@ -3,10 +3,10 @@
   import { escapeHtml } from '../shared/escape';
   import { attachTooltip } from '../shared/tooltip';
   import { getVsCodeApi } from '$shared/vscodeApi';
-  import type { CommitFile, DiffData } from './types';
+  import type { CommitFile, DiffData, SkippedFile } from './types';
   import { state as commitState } from './state';
   import { renderDiffViewer } from './diffViewer';
-  import { showFileContextMenu, showChangelistContextMenu, closeContextMenu } from './contextMenu';
+  import { showFileContextMenu, showChangelistContextMenu, showSkippedFileContextMenu, closeContextMenu } from './contextMenu';
   import ChangesTree from './ChangesTree.svelte';
   import CommitBox from './CommitBox.svelte';
 
@@ -14,6 +14,7 @@
 
   let activeTab = $state<'commit' | 'shelf' | 'stash'>('commit');
   let files = $state<CommitFile[]>([]);
+  let skippedFiles = $state<SkippedFile[]>([]);
   let selectedFile = $state<string | null>(null);
   let checkedFiles = $state<Set<string>>(new Set());
   let showDiff = $state(false);
@@ -24,6 +25,9 @@
   let stashes = $state<any[]>([]);
   let expandChanges = $state(true);
   let expandUnversioned = $state(true);
+  let expandSkipped = $state(false);
+  let isLoadingSkipped = $state(false);
+  let hasLoadedSkipped = $state(false);
   let showPaths = $state(true);
   let viewOptionsOpen = $state(false);
   let groupByDirectory = $state(false);
@@ -32,15 +36,17 @@
   let expandedFolders = $state<Set<string>>(new Set());
   let collapsedFolders = $state<Set<string>>(new Set());
   let expandAllFolders = $state<boolean | null>(null);
-  let showIgnoredFiles = $state(false);
+  let showIgnoredFiles = $state(true);
+  let showSkippedWorktree = $state(false);
+  let checkedSkippedFiles = $state<Set<string>>(new Set());
   let commitOptionsOpen = $state(false);
   let recentOpen = $state(false);
   let isGeneratingAi = $state(false);
   let conflictInfo = $state<any>(null);
   let splitRatio = $state(0.6);
   let changelists = $state<{ name: string; files: string[] }[]>([]);
-  let activeChangelist = $state<string>('Default');
-  let expandedChangelists = $state<Set<string>>(new Set(['Default']));
+  let activeChangelist = $state<string>('Changes');
+  let expandedChangelists = $state<Set<string>>(new Set(['Changes', 'Default']));
 
   let commitBoxRef: any = $state(null);
   let leftPanelEl: HTMLDivElement | null = $state(null);
@@ -51,6 +57,8 @@
   function syncToSingleton() {
     commitState.activeTab = activeTab;
     commitState.files = files;
+    commitState.skippedFiles = skippedFiles;
+    commitState.skippedCount = skippedFiles.length;
     commitState.selectedFile = selectedFile;
     commitState.checkedFiles = checkedFiles;
     commitState.showDiff = showDiff;
@@ -70,6 +78,7 @@
     commitState.collapsedFolders = collapsedFolders;
     commitState.expandAllFolders = expandAllFolders;
     commitState.showIgnoredFiles = showIgnoredFiles;
+    commitState.showSkippedWorktree = showSkippedWorktree;
     commitState.commitOptionsOpen = commitOptionsOpen;
     commitState.recentOpen = recentOpen;
     commitState.isGeneratingAi = isGeneratingAi;
@@ -77,6 +86,24 @@
     commitState.splitRatio = splitRatio;
     commitState.changelists = changelists;
     commitState.activeChangelist = activeChangelist;
+  }
+
+  function handleToggleSkippedFileChecked(filePath: string, checked: boolean) {
+    if (checked) {
+      checkedSkippedFiles.add(filePath);
+    } else {
+      checkedSkippedFiles.delete(filePath);
+    }
+    checkedSkippedFiles = new Set(checkedSkippedFiles);
+  }
+
+  function handleToggleAllSkipped(items: SkippedFile[], checked: boolean) {
+    if (checked) {
+      for (const item of items) checkedSkippedFiles.add(item.path);
+    } else {
+      checkedSkippedFiles.clear();
+    }
+    checkedSkippedFiles = new Set(checkedSkippedFiles);
   }
 
   $effect(() => {
@@ -171,6 +198,18 @@
     });
   }
 
+  function handleSkippedContextMenu(e: MouseEvent, file: SkippedFile) {
+    showSkippedFileContextMenu(e, file, vscode);
+  }
+
+  function handleSelectSkippedFile(file: SkippedFile) {
+    selectedFile = file.path;
+    vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
+    if (showDiff) {
+      vscode.postMessage({ type: 'getFileDiff', payload: file.path });
+    }
+  }
+
   function handleToggleChangelist(name: string) {
     if (expandedChangelists.has(name)) {
       expandedChangelists.delete(name);
@@ -191,9 +230,28 @@
     });
   }
 
+  function triggerScanSkipped() {
+    if (!hasLoadedSkipped && !isLoadingSkipped) {
+      isLoadingSkipped = true;
+      vscode.postMessage({ type: 'getSkippedFiles' });
+    }
+  }
+
+  function handleToggleExpandSkipped() {
+    expandSkipped = !expandSkipped;
+    if (expandSkipped && !hasLoadedSkipped) {
+      isLoadingSkipped = true;
+      vscode.postMessage({ type: 'getSkippedFiles' });
+    }
+  }
+
   // Toolbar Actions
   function handleRefresh() {
     vscode.postMessage({ type: 'refresh' });
+    if (expandSkipped) {
+      isLoadingSkipped = true;
+      vscode.postMessage({ type: 'getSkippedFiles', payload: { force: true } });
+    }
   }
 
   function handleRollback() {
@@ -301,11 +359,24 @@
       case 'pushError': {
         break;
       }
+      case 'skippedFiles': {
+        const incoming = msg.payload?.files;
+        if (Array.isArray(incoming)) {
+          skippedFiles = incoming;
+        }
+        hasLoadedSkipped = true;
+        isLoadingSkipped = false;
+        break;
+      }
       case 'init':
       case 'status': {
         const data = msg.payload || {};
         if (data.repoName) repoName = data.repoName;
         files = data.files || [];
+        if (data.skippedFiles && Array.isArray(data.skippedFiles) && data.skippedFiles.length > 0) {
+          skippedFiles = data.skippedFiles;
+          hasLoadedSkipped = true;
+        }
         recentMessages = data.recentMessages || [];
         stashes = data.stashes || [];
         if (data.changelists && Array.isArray(data.changelists)) {
@@ -484,23 +555,17 @@
         type="button"
         class={`tab-btn ${activeTab === 'commit' ? 'active' : ''}`}
         onclick={() => { activeTab = 'commit'; }}
-      >
-        Commit
-      </button>
+      ><span>Commit</span></button>
       <button
         type="button"
         class={`tab-btn ${activeTab === 'shelf' ? 'active' : ''}`}
         onclick={() => { activeTab = 'shelf'; }}
-      >
-        Shelf
-      </button>
+      ><span>Shelf</span></button>
       <button
         type="button"
         class={`tab-btn ${activeTab === 'stash' ? 'active' : ''}`}
         onclick={() => { activeTab = 'stash'; }}
-      >
-        Stash
-      </button>
+      ><span>Stash</span></button>
     </div>
     <div class="tab-actions">
       <button
@@ -756,6 +821,32 @@
                   <span class="as-menu-label">Ignored Files</span>
                 </div>
               </div>
+              <div
+                class={`as-menu-item ${showSkippedWorktree ? 'active' : ''}`}
+                data-action="toggle-skipped"
+                onclick={(e) => {
+                  e.stopPropagation();
+                  showSkippedWorktree = !showSkippedWorktree;
+                  if (showSkippedWorktree && !hasLoadedSkipped && !isLoadingSkipped) {
+                    triggerScanSkipped();
+                  }
+                }}
+                role="button"
+                tabindex="0"
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') {
+                    showSkippedWorktree = !showSkippedWorktree;
+                    if (showSkippedWorktree && !hasLoadedSkipped && !isLoadingSkipped) {
+                      triggerScanSkipped();
+                    }
+                  }
+                }}
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">{showSkippedWorktree ? '✓' : ''}</span>
+                  <span class="as-menu-label">Skipped Worktree</span>
+                </div>
+              </div>
             </div>
           {/if}
         </div>
@@ -794,6 +885,10 @@
         <div style={`flex: ${splitRatio}; display: flex; flex-direction: column; min-height: 80px; overflow: hidden;`}>
           <ChangesTree
             {files}
+            {skippedFiles}
+            {expandSkipped}
+            {isLoadingSkipped}
+            {hasLoadedSkipped}
             {selectedFile}
             {checkedFiles}
             {expandChanges}
@@ -803,6 +898,8 @@
             {groupByModule}
             {repoName}
             {showIgnoredFiles}
+            {showSkippedWorktree}
+            {checkedSkippedFiles}
             {expandedFolders}
             {collapsedFolders}
             {expandAllFolders}
@@ -810,13 +907,18 @@
             {activeChangelist}
             {expandedChangelists}
             onSelectFile={handleSelectFile}
+            onSelectSkippedFile={handleSelectSkippedFile}
             onOpenFileDiff={handleOpenFileDiff}
             onToggleStageFile={handleToggleStageFile}
             onToggleStageFiles={handleToggleStageFiles}
             onToggleFolder={handleToggleFolder}
             onToggleExpandChanges={() => { expandChanges = !expandChanges; }}
             onToggleExpandUnversioned={() => { expandUnversioned = !expandUnversioned; }}
+            onToggleExpandSkipped={handleToggleExpandSkipped}
+            onToggleSkippedFileChecked={handleToggleSkippedFileChecked}
+            onToggleAllSkipped={handleToggleAllSkipped}
             onContextMenu={handleContextMenu}
+            onSkippedContextMenu={handleSkippedContextMenu}
             onToggleChangelist={handleToggleChangelist}
             onChangelistContextMenu={handleChangelistContextMenu}
             onMoveFilesToChangelist={handleMoveFilesToChangelist}

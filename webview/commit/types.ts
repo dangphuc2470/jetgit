@@ -52,6 +52,16 @@ export interface DiffData {
   binary?: boolean;
 }
 
+export interface SkippedFile {
+  path: string;
+  name: string;
+  dir: string;
+  mode: 'skip-worktree' | 'assume-unchanged';
+  hasLocalChanges: boolean;
+  repoName?: string;
+  repoPath?: string;
+}
+
 export interface ChangelistInfo {
   name: string;
   files: string[];
@@ -60,8 +70,10 @@ export interface ChangelistInfo {
 export interface CommitState {
   activeTab: 'commit' | 'shelf' | 'stash';
   files: CommitFile[];
+  skippedFiles?: SkippedFile[];
   changesCount: number;
   unversionedCount: number;
+  skippedCount?: number;
   selectedFile: string | null;
   checkedFiles: Set<string>;
   showDiff: boolean;
@@ -82,6 +94,7 @@ export interface CommitState {
   collapsedFolders: Set<string>;
   expandAllFolders: boolean | null;
   showIgnoredFiles: boolean;
+  showSkippedWorktree: boolean;
   commitOptionsOpen: boolean;
   recentOpen: boolean;
   isGeneratingAi: boolean;

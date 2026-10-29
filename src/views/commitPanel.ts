@@ -25,6 +25,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   private lastStatusHash = '';
   private isRefreshing = false;
   private queuedRefresh = false;
+  private skippedFilesCache: { files: any[]; timestamp: number } | null = null;
+  private skippedCacheValid = false;
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -241,9 +243,14 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
               };
             });
 
+            const formattedSkipped = (this.skippedCacheValid && this.skippedFilesCache)
+              ? this.skippedFilesCache.files.filter(f => f.repoName === repo.name || !f.repoName)
+              : [];
+
             return {
               repo,
               files,
+              skippedFiles: formattedSkipped,
               mergeMsg,
               recentMsgs,
               stashes,
@@ -254,6 +261,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             return {
               repo,
               files: [],
+              skippedFiles: [],
               mergeMsg: '',
               recentMsgs: [],
               stashes: [],
@@ -271,12 +279,22 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       );
 
       const allFiles: any[] = [];
+      const allSkippedFiles: any[] = [];
       const allRecentMessages: string[] = [];
       const allStashes: any[] = [];
       let defaultCommitMessage = '';
       let combinedConflictInfo: any = null;
 
       for (const res of repoResults) {
+        for (const sf of (res.skippedFiles || [])) {
+          allSkippedFiles.push(sf);
+          this.fileRepoMap.set(sf.path, {
+            relativePath: sf.relativePath,
+            repoPath: sf.repoPath,
+            repoName: sf.repoName,
+            gitService: res.repo.gitService,
+          });
+        }
         for (const file of res.files) {
           allFiles.push(file);
           this.fileRepoMap.set(file.path, {
@@ -326,8 +344,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         type: 'status',
         payload: {
           files: sortedFiles,
+          skippedFiles: allSkippedFiles,
           changesCount,
           unversionedCount,
+          skippedCount: allSkippedFiles.length,
           defaultCommitMessage: defaultCommitMessage || '',
           recentMessages: allRecentMessages.slice(0, 20),
           stashes: allStashes,
@@ -343,7 +363,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           repos: repos.map(r => ({ name: r.name, path: r.path })),
           isMultiRepo,
           changelists: this.changelistTree ? this.changelistTree.getData().changelists : [],
-          activeChangelist: this.changelistTree ? this.changelistTree.getData().active : 'Default',
+          activeChangelist: this.changelistTree ? this.changelistTree.getData().active : 'Changes',
         },
       });
     } catch (err: any) {
@@ -398,7 +418,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     switch (msg.type) {
       case 'ready':
       case 'refresh': {
+        this.skippedCacheValid = false;
         await this.refresh();
+        break;
+      }
+      case 'getSkippedFiles': {
+        const force = (msg as any).payload?.force ?? false;
+        await this.handleGetSkippedFiles(force);
         break;
       }
       case 'newChangelist': {
@@ -599,6 +625,42 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           await this.refresh();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Unstage failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'unskipFile': {
+        const filePath = msg.payload as string;
+        try {
+          const mapped = this.fileRepoMap.get(filePath);
+          const targetService = mapped ? mapped.gitService : this.gitService;
+          const targetPath = mapped ? mapped.relativePath : filePath;
+          await targetService.unskipFile(targetPath);
+          vscode.window.showInformationMessage(`Tracked '${path.basename(targetPath)}' again.`);
+          this.skippedCacheValid = false;
+          await Promise.all([
+            this.refresh(),
+            this.handleGetSkippedFiles(true),
+          ]);
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Unskip failed: ${err.message}`);
+        }
+        break;
+      }
+      case 'skipFile': {
+        const filePath = msg.payload as string;
+        try {
+          const mapped = this.fileRepoMap.get(filePath);
+          const targetService = mapped ? mapped.gitService : this.gitService;
+          const targetPath = mapped ? mapped.relativePath : filePath;
+          await targetService.skipFile(targetPath);
+          vscode.window.showInformationMessage(`Skipped '${path.basename(targetPath)}' (skip-worktree).`);
+          this.skippedCacheValid = false;
+          await Promise.all([
+            this.refresh(),
+            this.handleGetSkippedFiles(true),
+          ]);
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Skip failed: ${err.message}`);
         }
         break;
       }
@@ -990,6 +1052,65 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
+  }
+
+  private async handleGetSkippedFiles(force = false): Promise<void> {
+    const now = Date.now();
+    if (!force && this.skippedCacheValid && this.skippedFilesCache && (now - this.skippedFilesCache.timestamp < 10000)) {
+      if (this.view) {
+        this.view.webview.postMessage({
+          type: 'skippedFiles',
+          payload: { files: this.skippedFilesCache.files },
+        });
+      }
+      return;
+    }
+
+    try {
+      const repos = await this.discoverRepositories();
+      const isMultiRepo = repos.length > 1;
+      const skippedLists = await Promise.all(
+        repos.map(async (repo) => {
+          try {
+            const skipped = await repo.gitService.getSkippedFiles(repo.name, repo.path);
+            return skipped.map(sf => {
+              const uniquePath = isMultiRepo ? `${repo.name}/${sf.path}` : sf.path;
+              return {
+                ...sf,
+                path: uniquePath,
+                relativePath: sf.path,
+                repoName: repo.name,
+                repoPath: repo.path,
+              };
+            });
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      const allSkipped = skippedLists.flat();
+      this.skippedFilesCache = {
+        files: allSkipped,
+        timestamp: Date.now(),
+      };
+      this.skippedCacheValid = true;
+
+      if (this.view) {
+        this.view.webview.postMessage({
+          type: 'skippedFiles',
+          payload: { files: allSkipped },
+        });
+      }
+    } catch (err: any) {
+      this.log.appendLine(`Failed to get skipped files: ${err.message}`);
+      if (this.view) {
+        this.view.webview.postMessage({
+          type: 'skippedFiles',
+          payload: { files: [] },
+        });
+      }
+    }
   }
 
   async openConflictsDialog(): Promise<void> {

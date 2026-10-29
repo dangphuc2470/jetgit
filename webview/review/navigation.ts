@@ -150,16 +150,10 @@ export function jumpToBlock(index: number, smooth = false): void {
   const rightPane = document.querySelector('.editor-pane.right-pane') as HTMLElement | null;
   if (!leftPane || !rightPane) return;
 
-  let targetLeft = 0;
-  let targetRight = 0;
-
-  if (b.isRightEmpty) {
-    targetLeft = Math.max(0, (b.leftStart - 1) * LINE_HEIGHT - 60);
-    targetRight = mapLeftToRight(targetLeft);
-  } else {
-    targetRight = Math.max(0, (b.rightStart - 1) * LINE_HEIGHT - 60);
-    targetLeft = mapRightToLeft(targetRight);
-  }
+  const vStart = (b as any).visualStart || (b.isRightEmpty ? b.leftStart : b.rightStart);
+  const targetY = Math.max(0, (vStart - 1) * LINE_HEIGHT - 60);
+  const targetLeft = targetY;
+  const targetRight = targetY;
 
   if (smooth) {
     smoothScrollBoth(leftPane, rightPane, targetLeft, targetRight, 240, () => {
@@ -212,7 +206,8 @@ export function jumpDiff(direction: number, vscode: any): void {
   const currentScroll = rightPane ? rightPane.scrollTop : 0;
 
   const getBlockY = (b: any): number => {
-    return b.isRightEmpty ? mapLeftToRight((b.leftStart - 1) * LINE_HEIGHT) : (b.rightStart - 1) * LINE_HEIGHT;
+    const vStart = b.visualStart || (b.isRightEmpty ? b.leftStart : b.rightStart);
+    return (vStart - 1) * LINE_HEIGHT;
   };
 
   // Re-anchor currentDiffIndex if user manually scrolled significantly away

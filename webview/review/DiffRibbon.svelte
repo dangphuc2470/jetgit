@@ -44,17 +44,17 @@
     const height = viewH || 800;
 
     for (const b of blocks) {
-      const y1 = (b.leftStart - 1) * LINE_HEIGHT - sLeft;
-      const y2 = b.isLeftEmpty ? y1 : (b.leftEnd * LINE_HEIGHT - sLeft);
+      const vStart = b.visualStart || (b.isRightEmpty ? b.leftStart : b.rightStart);
+      const vEnd = b.visualEnd || (b.isRightEmpty ? b.leftEnd : b.rightEnd);
 
-      const y3 = (b.rightStart - 1) * LINE_HEIGHT - sRight;
-      const y4 = b.isRightEmpty ? y3 : (b.rightEnd * LINE_HEIGHT - sRight);
+      const y1 = (vStart - 1) * LINE_HEIGHT - sLeft;
+      const y2 = vEnd * LINE_HEIGHT - sLeft;
 
-      if (Math.max(y2, y4) < -20 || Math.min(y1, y3) > height + 20) {
+      if (y2 < -20 || y1 > height + 20) {
         continue;
       }
 
-      const d = `M 0,${y1} L ${flat},${y1} C ${flat + 10},${y1} ${W - flat - 10},${y3} ${W - flat},${y3} L ${W},${y3} L ${W},${y4} L ${W - flat},${y4} C ${W - flat - 10},${y4} ${flat + 10},${y2} ${flat},${y2} L 0,${y2} Z`;
+      const d = `M 0,${y1} L ${W},${y1} L ${W},${y2} L 0,${y2} Z`;
       const fillClass = `ribbon-${b.type}`;
 
       let showRevert = false;
@@ -63,8 +63,8 @@
       let checkY = 0;
 
       if (!readOnly) {
-        checkY = b.isRightEmpty ? (y3 - 7) : (y3 + 3);
-        revertY = b.isLeftEmpty ? (y1 - 7) : (y1 + 3);
+        checkY = y1 + 3;
+        revertY = y1 + 3;
         showRevert = revertY >= -15 && revertY <= height + 15;
         showCheck = checkY >= -15 && checkY <= height + 15;
       }

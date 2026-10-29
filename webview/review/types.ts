@@ -11,6 +11,8 @@ export interface DiffBlock {
   addCount?: number;
   staged: boolean;
   patchContent: string;
+  visualStart?: number;
+  visualEnd?: number;
 }
 
 export interface ScrollSegment {

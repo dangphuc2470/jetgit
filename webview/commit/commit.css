@@ -1791,6 +1791,25 @@ body.resizing-h .h-splitter {
   stroke: none !important;
 }
 
+.editor-line.line-spacer {
+  background: rgba(120, 120, 120, 0.05);
+  cursor: default !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  pointer-events: none;
+}
+
+.editor-line.line-spacer .gutter-num {
+  background: transparent !important;
+  border: none;
+}
+
+.editor-line.line-spacer .line-content {
+  cursor: default !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
 /* Opposing insertion and deletion indicator lines */
 .diff-insertion-line {
   position: absolute;

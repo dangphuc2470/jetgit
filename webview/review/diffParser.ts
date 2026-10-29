@@ -1,5 +1,6 @@
 import { LINE_HEIGHT, state } from './state';
 import { DiffBlock, ScrollSegment } from './types';
+import { highlightCode, computeWordDiff } from '../shared/syntaxHighlight';
 
 export function isBlockStaged(
   block: DiffBlock,
@@ -367,4 +368,209 @@ export function mapRightToLeft(sRight: number): number {
   }
   const last = state.segments[state.segments.length - 1];
   return last ? (last.leftY + last.hLeft) : sRight;
+}
+
+export interface RenderLineItem {
+  id: number;
+  isSpacer: boolean;
+  lineNum?: number;
+  rowClass: string;
+  html: string;
+  text: string;
+  blockId?: number;
+}
+
+export interface AlignedRenderResult {
+  leftLines: RenderLineItem[];
+  rightLines: RenderLineItem[];
+  totalAlignedLines: number;
+}
+
+export function computeAlignedRenderLines(
+  baseLines: string[],
+  currentLines: string[],
+  blocks: DiffBlock[],
+  highlightWords: boolean
+): AlignedRenderResult {
+  const leftLines: RenderLineItem[] = [];
+  const rightLines: RenderLineItem[] = [];
+
+  let curL = 1;
+  let curR = 1;
+  let visualLine = 1;
+  let idCounter = 1;
+
+  for (const b of blocks) {
+    // 1. Common unchanged lines before this block
+    while (curL < b.leftStart && curL <= baseLines.length) {
+      const lText = baseLines[curL - 1] ?? '';
+      const rText = curR <= currentLines.length ? (currentLines[curR - 1] ?? '') : '';
+
+      leftLines.push({
+        id: idCounter++,
+        isSpacer: false,
+        lineNum: curL,
+        rowClass: 'editor-line',
+        html: highlightCode(lText),
+        text: lText,
+      });
+
+      rightLines.push({
+        id: idCounter++,
+        isSpacer: false,
+        lineNum: curR,
+        rowClass: 'editor-line',
+        html: highlightCode(rText),
+        text: rText,
+      });
+
+      curL++;
+      curR++;
+      visualLine++;
+    }
+
+    // 2. Block diff lines
+    b.visualStart = visualLine;
+
+    const delCount = b.delCount ?? (b.isLeftEmpty ? 0 : (b.leftEnd - b.leftStart + 1));
+    const addCount = b.addCount ?? (b.isRightEmpty ? 0 : (b.rightEnd - b.rightStart + 1));
+    const maxCount = Math.max(delCount, addCount);
+
+    for (let i = 0; i < maxCount; i++) {
+      // Left side
+      if (i < delCount) {
+        const lNum = curL;
+        const lText = baseLines[lNum - 1] ?? '';
+        let rowClass = 'editor-line';
+        let html = '';
+
+        if (b.type === 'del') {
+          rowClass += ' line-del';
+          html = highlightCode(lText);
+        } else if (b.type === 'mod') {
+          rowClass += ' line-mod';
+          if (highlightWords) {
+            const rOffset = i;
+            const rNum = b.rightStart + rOffset;
+            const rText = (rNum <= b.rightEnd && currentLines[rNum - 1] !== undefined)
+              ? currentLines[rNum - 1]
+              : '';
+            const wDiff = computeWordDiff(lText, rText);
+            html = wDiff.leftHtml;
+          } else {
+            html = highlightCode(lText);
+          }
+        }
+
+        leftLines.push({
+          id: idCounter++,
+          isSpacer: false,
+          lineNum: lNum,
+          rowClass,
+          html,
+          text: lText,
+          blockId: b.id,
+        });
+        curL++;
+      } else {
+        // Spacer on left (for additions on right)
+        leftLines.push({
+          id: idCounter++,
+          isSpacer: true,
+          rowClass: 'editor-line line-spacer',
+          html: '&nbsp;',
+          text: '',
+          blockId: b.id,
+        });
+      }
+
+      // Right side
+      if (i < addCount) {
+        const rNum = curR;
+        const rText = currentLines[rNum - 1] ?? '';
+        let rowClass = 'editor-line';
+        let html = '';
+
+        if (b.type === 'add') {
+          rowClass += ' line-add';
+          html = highlightCode(rText);
+        } else if (b.type === 'mod') {
+          rowClass += ' line-mod';
+          if (highlightWords) {
+            const lOffset = i;
+            const lNum = b.leftStart + lOffset;
+            const lText = (lNum <= b.leftEnd && baseLines[lNum - 1] !== undefined)
+              ? baseLines[lNum - 1]
+              : '';
+            const wDiff = computeWordDiff(lText, rText);
+            html = wDiff.rightHtml;
+          } else {
+            html = highlightCode(rText);
+          }
+        }
+
+        rightLines.push({
+          id: idCounter++,
+          isSpacer: false,
+          lineNum: rNum,
+          rowClass,
+          html,
+          text: rText,
+          blockId: b.id,
+        });
+        curR++;
+      } else {
+        // Spacer on right (for deletions on left)
+        rightLines.push({
+          id: idCounter++,
+          isSpacer: true,
+          rowClass: 'editor-line line-spacer',
+          html: '&nbsp;',
+          text: '',
+          blockId: b.id,
+        });
+      }
+
+      visualLine++;
+    }
+
+    b.visualEnd = visualLine - 1;
+  }
+
+  // 3. Trailing common lines after all blocks
+  while (curL <= baseLines.length || curR <= currentLines.length) {
+    const hasL = curL <= baseLines.length;
+    const hasR = curR <= currentLines.length;
+
+    const lText = hasL ? (baseLines[curL - 1] ?? '') : '';
+    const rText = hasR ? (currentLines[curR - 1] ?? '') : '';
+
+    leftLines.push({
+      id: idCounter++,
+      isSpacer: !hasL,
+      lineNum: hasL ? curL : undefined,
+      rowClass: hasL ? 'editor-line' : 'editor-line line-spacer',
+      html: hasL ? highlightCode(lText) : '&nbsp;',
+      text: lText,
+    });
+
+    rightLines.push({
+      id: idCounter++,
+      isSpacer: !hasR,
+      lineNum: hasR ? curR : undefined,
+      rowClass: hasR ? 'editor-line' : 'editor-line line-spacer',
+      html: hasR ? highlightCode(rText) : '&nbsp;',
+      text: rText,
+    });
+
+    curL++;
+    curR++;
+    visualLine++;
+  }
+
+  return {
+    leftLines,
+    rightLines,
+    totalAlignedLines: visualLine - 1,
+  };
 }

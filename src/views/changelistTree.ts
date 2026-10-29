@@ -18,8 +18,8 @@ type ChangelistNode =
   | { type: 'file'; path: string; changelist: string };
 
 const DEFAULT_DATA: ChangelistData = {
-  changelists: [{ name: 'Default', files: [] }],
-  active: 'Default',
+  changelists: [{ name: 'Changes', files: [] }],
+  active: 'Changes',
 };
 
 export class ChangelistTreeProvider implements vscode.TreeDataProvider<ChangelistNode> {
@@ -147,23 +147,23 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
   }
 
   async deleteChangelist(name: string): Promise<void> {
-    if (name === 'Default') {
-      vscode.window.showWarningMessage('Cannot delete the Default changelist.');
+    if (name === 'Changes' || name === 'Default') {
+      vscode.window.showWarningMessage('Cannot delete the default Changes list.');
       return;
     }
 
     const cl = this.data.changelists.find(c => c.name === name);
     if (!cl) return;
 
-    // Move files to Default
-    const defaultCl = this.data.changelists.find(c => c.name === 'Default');
+    // Move files to default Changes
+    const defaultCl = this.data.changelists.find(c => c.name === 'Changes' || c.name === 'Default');
     if (defaultCl && cl.files.length > 0) {
       defaultCl.files.push(...cl.files);
     }
 
     this.data.changelists = this.data.changelists.filter(c => c.name !== name);
     if (this.data.active === name) {
-      this.data.active = 'Default';
+      this.data.active = defaultCl?.name || 'Changes';
     }
     this.save();
     this._onDidChangeTreeData.fire(undefined);
@@ -176,8 +176,8 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
   }
 
   async renameChangelist(oldName: string, newName?: string): Promise<void> {
-    if (oldName === 'Default') {
-      vscode.window.showWarningMessage('Cannot rename the Default changelist.');
+    if (oldName === 'Changes' || oldName === 'Default') {
+      vscode.window.showWarningMessage('Cannot rename the default Changes list.');
       return;
     }
     if (!newName) {
@@ -277,6 +277,11 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
           continue;
         }
 
+        // Untracked/unversioned files belong strictly to Unversioned Files section, not changelists
+        if (entry.x === '?' && entry.y === '?') {
+          continue;
+        }
+
         if (!allFiles.has(entry.path)) {
           activeCl.files.push(entry.path);
           changed = true;
@@ -314,9 +319,15 @@ export class ChangelistTreeProvider implements vscode.TreeDataProvider<Changelis
     } catch {
       this.data = { ...DEFAULT_DATA };
     }
-    // Ensure Default changelist always exists
-    if (!this.data.changelists.some(c => c.name === 'Default')) {
-      this.data.changelists.unshift({ name: 'Default', files: [] });
+    // Migrate or ensure Changes changelist always exists
+    const def = this.data.changelists.find(c => c.name === 'Changes' || c.name === 'Default');
+    if (def) {
+      def.name = 'Changes';
+    } else {
+      this.data.changelists.unshift({ name: 'Changes', files: [] });
+    }
+    if (this.data.active === 'Default' || !this.data.active) {
+      this.data.active = 'Changes';
     }
     // Clean up any historical .vscode/changelists.json entries
     for (const cl of this.data.changelists) {

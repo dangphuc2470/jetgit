@@ -330,11 +330,205 @@ export function openCreateTagDialog(hash?: string): void {
   }, 50);
 }
 
+export interface CheckoutBranchDialogOptions {
+  remoteRef: string;
+  defaultName?: string;
+  localBranches?: string[];
+}
+
+export function openCheckoutBranchDialog(
+  optsOrRef: CheckoutBranchDialogOptions | string,
+  defaultNameArg?: string
+): void {
+  const existing = document.querySelector('.as-branch-dialog-overlay');
+  if (existing) existing.remove();
+
+  let remoteRef = '';
+  let defaultName = '';
+  let localBranches: string[] = [];
+
+  if (typeof optsOrRef === 'string') {
+    remoteRef = optsOrRef;
+    if (defaultNameArg) {
+      defaultName = defaultNameArg;
+    } else if (remoteRef.includes('/')) {
+      defaultName = remoteRef.slice(remoteRef.indexOf('/') + 1);
+    } else {
+      defaultName = remoteRef;
+    }
+  } else if (optsOrRef && typeof optsOrRef === 'object') {
+    remoteRef = optsOrRef.remoteRef;
+    if (optsOrRef.defaultName) {
+      defaultName = optsOrRef.defaultName;
+    } else if (remoteRef.includes('/')) {
+      defaultName = remoteRef.slice(remoteRef.indexOf('/') + 1);
+    } else {
+      defaultName = remoteRef;
+    }
+    if (Array.isArray(optsOrRef.localBranches)) {
+      localBranches = optsOrRef.localBranches;
+    }
+  }
+
+  if (localBranches.length === 0 && typeof window !== 'undefined') {
+    const branchData = (window as any).__GIT_BRANCH_DATA__;
+    if (branchData && Array.isArray(branchData.branches)) {
+      localBranches = branchData.branches.filter((b: any) => !b.remote).map((b: any) => b.name);
+    }
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'as-branch-dialog-overlay as-checkout-dialog-overlay';
+  overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+
+  const card = document.createElement('div');
+  card.className = 'as-dialog-card';
+  card.style.cssText = 'background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,0.65);width:450px;max-width:92vw;display:flex;flex-direction:column;overflow:visible;position:relative;color:var(--vscode-editor-foreground,#dfe1e5);';
+
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--vscode-sideBar-background,var(--vscode-editorWidget-background,#2b2d30));border-bottom:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-top-left-radius:8px;border-top-right-radius:8px;position:relative;user-select:none;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="as-dot-close" title="Close" style="width:12px;height:12px;border-radius:50%;background:#ed6a5e;cursor:pointer;display:inline-block;"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#4a4d52;display:inline-block;opacity:0.6;"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#61c554;display:inline-block;opacity:0.6;"></span>
+      </div>
+      <span style="font-weight:600;font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);position:absolute;left:50%;transform:translateX(-50%);">
+        Checkout
+      </span>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div style="padding:22px 20px 14px 20px;display:flex;flex-direction:column;gap:14px;position:relative;">
+      <!-- Balloon Warning Tooltip -->
+      <div id="as-co-balloon" style="display:none;position:absolute;bottom:calc(100% - 14px);left:116px;background:#502428;border:1px solid #8e383e;border-radius:6px;padding:6px 12px;font-size:12px;line-height:1.35;color:#f0bcbc;box-shadow:0 6px 18px rgba(0,0,0,0.55);z-index:100;white-space:nowrap;pointer-events:none;">
+        <div>Branch name <span id="as-co-balloon-name" style="font-weight:600;"></span> already exists.</div>
+        <div>Change the name or overwrite existing branch</div>
+        <div style="position:absolute;bottom:-5px;left:20px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #8e383e;"></div>
+        <div style="position:absolute;bottom:-4px;left:20px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #502428;"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;position:relative;">
+        <label for="as-co-name" style="font-size:13px;color:var(--vscode-editor-foreground,#dfe1e5);white-space:nowrap;font-weight:500;min-width:84px;">Branch Name:</label>
+        <input type="text" id="as-co-name" style="flex:1;background:var(--vscode-input-background,#1e1f22);color:var(--vscode-input-foreground,#dfe1e5);border:1px solid var(--vscode-focusBorder,#3574f0);border-radius:4px;padding:5px 8px;font-size:13px;outline:none;font-family:inherit;">
+      </div>
+
+      <div style="padding-left:96px;display:flex;align-items:center;">
+        <label style="display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
+          <input type="checkbox" id="as-co-overwrite" class="as-custom-chk" style="width:14px;height:14px;cursor:pointer;margin:0;accent-color:#3574f0;">
+          <span>Overwrite existing branch</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="padding:10px 20px 14px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-bottom-left-radius:8px;border-bottom-right-radius:8px;">
+      <button class="as-dialog-btn" id="as-co-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 18px;font-size:12.5px;cursor:pointer;">Cancel</button>
+      <button class="as-dialog-btn" id="as-co-submit" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s ease;">Checkout</button>
+    </div>
+  `;
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  const nameInput = card.querySelector('#as-co-name') as HTMLInputElement;
+  nameInput.value = defaultName;
+  const overwriteBox = card.querySelector('#as-co-overwrite') as HTMLInputElement;
+  const balloon = card.querySelector('#as-co-balloon') as HTMLElement;
+  const balloonName = card.querySelector('#as-co-balloon-name') as HTMLElement;
+  const btnCancel = card.querySelector('#as-co-cancel') as HTMLElement;
+  const btnSubmit = card.querySelector('#as-co-submit') as HTMLButtonElement;
+  const dotClose = card.querySelector('.as-dot-close') as HTMLElement;
+
+  const validate = () => {
+    const val = nameInput.value.trim();
+    if (!val) {
+      balloon.style.display = 'none';
+      nameInput.style.border = '1px solid var(--vscode-focusBorder,#3574f0)';
+      nameInput.style.background = 'var(--vscode-input-background,#1e1f22)';
+      btnSubmit.disabled = true;
+      btnSubmit.style.opacity = '0.45';
+      btnSubmit.style.pointerEvents = 'none';
+      return;
+    }
+
+    const exists = localBranches.includes(val);
+    const isOverwrite = overwriteBox.checked;
+
+    if (exists && !isOverwrite) {
+      balloonName.textContent = val;
+      balloon.style.display = 'block';
+      nameInput.style.border = '1px solid #c24646';
+      nameInput.style.background = '#281f21';
+      btnSubmit.disabled = true;
+      btnSubmit.style.opacity = '0.45';
+      btnSubmit.style.pointerEvents = 'none';
+    } else {
+      balloon.style.display = 'none';
+      nameInput.style.border = '1px solid var(--vscode-focusBorder,#3574f0)';
+      nameInput.style.background = 'var(--vscode-input-background,#1e1f22)';
+      btnSubmit.disabled = false;
+      btnSubmit.style.opacity = '1';
+      btnSubmit.style.pointerEvents = 'auto';
+    }
+  };
+
+  const closeDialog = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown);
+  };
+
+  const submitDialog = () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      nameInput.focus();
+      return;
+    }
+    const exists = localBranches.includes(name);
+    const force = overwriteBox.checked;
+    if (exists && !force) {
+      validate();
+      return;
+    }
+    postMessage('checkout', { branch: remoteRef, name, force });
+    closeDialog();
+  };
+
+  nameInput.addEventListener('input', validate);
+  overwriteBox.addEventListener('change', validate);
+
+  btnCancel.addEventListener('click', closeDialog);
+  if (dotClose) dotClose.addEventListener('click', closeDialog);
+  btnSubmit.addEventListener('click', submitDialog);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeDialog();
+  });
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDialog();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      submitDialog();
+    }
+  };
+
+  document.addEventListener('keydown', onKeyDown);
+
+  validate();
+
+  setTimeout(() => {
+    nameInput.focus();
+    nameInput.select();
+  }, 50);
+}
+
 // Bind to window for global access
 if (typeof window !== 'undefined') {
   (window as any).openCreateBranchDialog = openCreateBranchDialog;
   (window as any).openRenameBranchDialog = openRenameBranchDialog;
   (window as any).openCreateTagDialog = openCreateTagDialog;
+  (window as any).openCheckoutBranchDialog = openCheckoutBranchDialog;
 }
 
   export let activeAuthDialog: HTMLElement | null = null;

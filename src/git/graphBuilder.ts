@@ -143,8 +143,8 @@ export function linearizeCommitsBek(commits: Commit[]): Commit[] {
 export function buildGraph(rawCommits: Commit[]): GraphNode[] {
   if (rawCommits.length === 0) return [];
 
-  // 1. LinearBek pre-linearization of merge fragments
-  const commits = linearizeCommitsBek(rawCommits);
+  // Match Git log topological/date order directly so graph nodes align 1:1 with commit table rows
+  const commits = rawCommits;
 
   const nodes: GraphNode[] = [];
   let lanes: (string | null)[] = [];

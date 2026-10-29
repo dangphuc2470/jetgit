@@ -11,7 +11,8 @@
     activePushDialog,
     openGitAuthDialog,
     activeAuthDialog,
-    openCreateBranchDialog
+    openCreateBranchDialog,
+    openCheckoutBranchDialog
   } from "$shared/vscodeApi";
 
   let commits = $state<any[]>([]);
@@ -107,6 +108,10 @@
         }
         case "openCreateBranchDialog": {
           openCreateBranchDialog(msg.payload?.startPoint);
+          break;
+        }
+        case "openCheckoutBranchDialog": {
+          openCheckoutBranchDialog(msg.payload?.remoteRef, msg.payload?.defaultName);
           break;
         }
         case "authSuccess": {
@@ -246,6 +251,7 @@
           }
           const prevCurrentBranch = branchData?.currentBranch;
           branchData = msg.payload;
+          (window as any).__GIT_BRANCH_DATA__ = msg.payload;
           if (!hasInitializedActiveBranch) {
             hasInitializedActiveBranch = true;
             if (msg.payload && msg.payload.activeBranch) {

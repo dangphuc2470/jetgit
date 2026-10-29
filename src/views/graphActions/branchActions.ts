@@ -15,7 +15,18 @@ export async function handleBranchAction(
 
   switch (type) {
     case 'checkout': {
-      const ref = payload as string;
+      let ref = '';
+      let targetName: string | undefined;
+      let force = false;
+
+      if (typeof payload === 'string') {
+        ref = payload;
+      } else if (payload && typeof payload === 'object') {
+        ref = payload.branch || payload.ref || '';
+        targetName = payload.name;
+        force = payload.force === true;
+      }
+
       if (ref && ref.includes('/')) {
         const slashIdx = ref.indexOf('/');
         const remoteName = ref.slice(0, slashIdx);
@@ -45,7 +56,13 @@ export async function handleBranchAction(
           }
         } catch {}
       }
-      await handleCheckoutWithConflictResolution(gitService, ref, () => host.loadInitialData());
+      await handleCheckoutWithConflictResolution(gitService, ref, () => host.loadInitialData(), {
+        name: targetName,
+        force,
+        openCheckoutDialog: (remoteRef, defaultName) => {
+          (host as any).openCheckoutBranchDialog?.(remoteRef, defaultName);
+        },
+      });
       return true;
     }
 

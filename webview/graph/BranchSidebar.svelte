@@ -4,7 +4,8 @@
     postMessage,
     openCreateBranchDialog,
     openRenameBranchDialog,
-    openCreateTagDialog
+    openCreateTagDialog,
+    openCheckoutBranchDialog
   } from "$shared/vscodeApi";
   import { attachTooltip } from "$shared/tooltip";
 
@@ -475,7 +476,32 @@
     } else if (isRemote) {
       items.push({
         label: "Checkout",
-        onClick: () => closeAndRun(() => postMessage("checkout", branchName))
+        onClick: () => closeAndRun(() => {
+          const slashIdx = branchName.indexOf('/');
+          const defaultName = slashIdx !== -1 ? branchName.slice(slashIdx + 1) : branchName;
+          const localExists = branches.some((b) => !b.remote && b.name === defaultName);
+          if (localExists) {
+            openCheckoutBranchDialog({
+              remoteRef: branchName,
+              defaultName,
+              localBranches: branches.filter((b) => !b.remote).map((b) => b.name)
+            });
+          } else {
+            postMessage("checkout", branchName);
+          }
+        })
+      });
+      items.push({
+        label: "Checkout As...",
+        onClick: () => closeAndRun(() => {
+          const slashIdx = branchName.indexOf('/');
+          const defaultName = slashIdx !== -1 ? branchName.slice(slashIdx + 1) : branchName;
+          openCheckoutBranchDialog({
+            remoteRef: branchName,
+            defaultName,
+            localBranches: branches.filter((b) => !b.remote).map((b) => b.name)
+          });
+        })
       });
       items.push({
         label: "Fetch Branch",

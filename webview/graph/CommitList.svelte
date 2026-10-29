@@ -6,7 +6,8 @@
     postMessage,
     openCreateBranchDialog,
     openCreateTagDialog,
-    openRenameBranchDialog
+    openRenameBranchDialog,
+    openCheckoutBranchDialog
   } from '$shared/vscodeApi';
 
   interface Props {
@@ -449,7 +450,24 @@
         addSubItem('Push...', () => postMessage('push', cleanBranch));
         addSubItem('Rename...', () => openRenameBranchDialog(cleanBranch));
       } else {
-        addSubItem('Checkout', () => postMessage('checkout', cleanBranch));
+        addSubItem('Checkout', () => {
+          if (cleanBranch.includes('/')) {
+            const slashIdx = cleanBranch.indexOf('/');
+            const defaultName = cleanBranch.slice(slashIdx + 1);
+            const branchData = (window as any).__GIT_BRANCH_DATA__;
+            const branches: any[] = branchData?.branches || [];
+            const localExists = branches.some((b) => !b.remote && b.name === defaultName);
+            if (localExists) {
+              openCheckoutBranchDialog({
+                remoteRef: cleanBranch,
+                defaultName,
+                localBranches: branches.filter((b) => !b.remote).map((b) => b.name)
+              });
+              return;
+            }
+          }
+          postMessage('checkout', cleanBranch);
+        });
         addSubItem(`New Branch from '${cleanBranch}'...`, () => openCreateBranchDialog(cleanBranch));
         addSubItem('Merge into Current', () => postMessage('mergeBranch', cleanBranch));
         addSubItem('Rebase Current onto Selected', () => postMessage('rebase', cleanBranch));

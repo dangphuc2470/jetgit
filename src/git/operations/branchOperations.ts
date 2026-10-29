@@ -100,10 +100,20 @@ export async function getCurrentBranch(ctx: BranchExecContext): Promise<string> 
   return branch;
 }
 
-export async function checkout(ctx: BranchExecContext, ref: string): Promise<void> {
+export interface CheckoutOptions {
+  name?: string;
+  force?: boolean;
+}
+
+export async function checkout(
+  ctx: BranchExecContext,
+  ref: string,
+  options?: CheckoutOptions
+): Promise<void> {
+  const force = options?.force === true;
   let isRemoteBranch = false;
   let targetRemote = '';
-  let localBranchName = '';
+  let localBranchName = options?.name || '';
 
   try {
     const remotes = await ctx.getRemotes();
@@ -111,7 +121,9 @@ export async function checkout(ctx: BranchExecContext, ref: string): Promise<voi
       if (ref.startsWith(remote + '/')) {
         isRemoteBranch = true;
         targetRemote = remote;
-        localBranchName = ref.slice(remote.length + 1);
+        if (!localBranchName) {
+          localBranchName = ref.slice(remote.length + 1);
+        }
         break;
       }
     }
@@ -119,11 +131,20 @@ export async function checkout(ctx: BranchExecContext, ref: string): Promise<voi
 
   if (isRemoteBranch && targetRemote && localBranchName) {
     try {
-      await ctx.exec(['fetch', targetRemote, `refs/heads/${localBranchName}:refs/remotes/${targetRemote}/${localBranchName}`]);
+      const remoteBranchPart = ref.slice(targetRemote.length + 1);
+      await ctx.exec(['fetch', targetRemote, `refs/heads/${remoteBranchPart}:refs/remotes/${targetRemote}/${remoteBranchPart}`]);
     } catch {}
 
     const branchCheck = await ctx.exec(['branch', '--list', localBranchName]);
-    if (branchCheck.trim()) {
+    const branchExists = !!branchCheck.trim();
+
+    if (force) {
+      await ctx.exec(['checkout', '-B', localBranchName, ref]);
+      await ctx.exec(['branch', '--set-upstream-to', ref, localBranchName]).catch(() => {});
+      return;
+    }
+
+    if (branchExists) {
       await ctx.exec(['checkout', localBranchName]);
       const upstream = await ctx.exec(['rev-parse', '--abbrev-ref', `${localBranchName}@{upstream}`]).catch(() => '');
       if (!upstream.trim()) {
@@ -132,6 +153,11 @@ export async function checkout(ctx: BranchExecContext, ref: string): Promise<voi
     } else {
       await ctx.exec(['checkout', '-b', localBranchName, '--track', ref]);
     }
+    return;
+  }
+
+  if (force && localBranchName) {
+    await ctx.exec(['checkout', '-B', localBranchName, ref]);
     return;
   }
 

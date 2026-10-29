@@ -243,24 +243,50 @@ export async function withSmartStashOnConflict(
 export async function handleCheckoutWithConflictResolution(
   gitService: GitService,
   ref: string,
-  onSuccess: () => void
+  onSuccess: () => void,
+  options?: {
+    name?: string;
+    force?: boolean;
+    openCheckoutDialog?: (remoteRef: string, defaultName: string) => void;
+  }
 ): Promise<void> {
   let isRemote = false;
   let remoteName = '';
-  let localBranchName = '';
+  let localBranchName = options?.name || '';
   try {
     const remotes = await gitService.getRemotes();
     for (const r of remotes) {
       if (ref.startsWith(r + '/')) {
         isRemote = true;
         remoteName = r;
-        localBranchName = ref.slice(r.length + 1);
+        if (!localBranchName) {
+          localBranchName = ref.slice(r.length + 1);
+        }
         break;
       }
     }
   } catch {}
 
-  let doUpdate = false;
+  const targetName = options?.name || localBranchName;
+  const isForce = options?.force === true;
+
+  if (isForce) {
+    await withSmartStashOnConflict(
+      gitService,
+      'Checkout',
+      ref,
+      async () => {
+        await gitService.checkout(ref, { name: targetName, force: true });
+        vscode.window.showInformationMessage(`Checked out and overwritten '${targetName || ref}' to '${ref}'.`);
+      },
+      async () => {
+        onSuccess();
+        vscode.commands.executeCommand('intellij-git.refreshBranches');
+      }
+    );
+    return;
+  }
+
   if (isRemote && localBranchName) {
     try {
       await gitService.fetchSingleBranch(remoteName, localBranchName);
@@ -268,31 +294,50 @@ export async function handleCheckoutWithConflictResolution(
 
     const branchCheck = (await gitService.exec(['branch', '--list', localBranchName]).catch(() => '')).trim();
     if (branchCheck) {
-      const currentUpstream = (await gitService.exec(['rev-parse', '--abbrev-ref', `${localBranchName}@{upstream}`]).catch(() => '')).trim();
-      if (!currentUpstream) {
-        await gitService.exec(['branch', '--set-upstream-to', ref, localBranchName]).catch(() => {});
+      if (options?.openCheckoutDialog) {
+        options.openCheckoutDialog(ref, localBranchName);
+        return;
       }
 
-      const revCount = (await gitService.exec(['rev-list', '--left-right', '--count', `${localBranchName}...${ref}`]).catch(() => '')).trim();
-      const [aheadStr, behindStr] = revCount.split(/\s+/);
-      const ahead = parseInt(aheadStr, 10) || 0;
-      const behind = parseInt(behindStr, 10) || 0;
-
-      if (behind > 0) {
-        const plural = behind === 1 ? 'commit' : 'commits';
-        const aheadText = ahead > 0 ? ` (and local has ${ahead} unpushed ${ahead === 1 ? 'commit' : 'commits'})` : '';
-        const choice = await vscode.window.showInformationMessage(
-          `Local branch '${localBranchName}' is behind '${ref}' by ${behind} ${plural}${aheadText}.`,
-          'Update and Checkout',
-          'Checkout Only'
+      const choice = await vscode.window.showWarningMessage(
+        `Branch '${localBranchName}' already exists at local. Do you want to overwrite it with '${ref}'?`,
+        { modal: true },
+        'Overwrite Branch',
+        'Checkout Existing'
+      );
+      if (choice === 'Overwrite Branch') {
+        await withSmartStashOnConflict(
+          gitService,
+          'Checkout',
+          ref,
+          async () => {
+            await gitService.checkout(ref, { name: localBranchName, force: true });
+            vscode.window.showInformationMessage(`Checked out and overwritten '${localBranchName}' to '${ref}'.`);
+          },
+          async () => {
+            onSuccess();
+            vscode.commands.executeCommand('intellij-git.refreshBranches');
+          }
         );
-        if (!choice) {
-          return;
-        }
-        if (choice === 'Update and Checkout') {
-          doUpdate = true;
-        }
+        return;
       }
+      if (choice === 'Checkout Existing') {
+        await withSmartStashOnConflict(
+          gitService,
+          'Checkout',
+          localBranchName,
+          async () => {
+            await gitService.checkout(localBranchName);
+            vscode.window.showInformationMessage(`Checked out '${localBranchName}'.`);
+          },
+          async () => {
+            onSuccess();
+            vscode.commands.executeCommand('intellij-git.refreshBranches');
+          }
+        );
+        return;
+      }
+      return;
     }
   }
 
@@ -301,17 +346,8 @@ export async function handleCheckoutWithConflictResolution(
     'Checkout',
     ref,
     async () => {
-      await gitService.checkout(ref);
-      if (doUpdate && localBranchName) {
-        try {
-          await gitService.exec(['merge', '--ff-only', ref]);
-          vscode.window.showInformationMessage(`Checked out and updated '${localBranchName}' to '${ref}'.`);
-        } catch (mergeErr: any) {
-          vscode.window.showWarningMessage(`Checked out '${localBranchName}', but fast-forward failed: ${mergeErr.message}. You can update manually using Merge or Rebase.`);
-        }
-      } else {
-        vscode.window.showInformationMessage(`Checked out ${ref}`);
-      }
+      await gitService.checkout(ref, { name: targetName, force: false });
+      vscode.window.showInformationMessage(`Checked out ${targetName || ref}`);
     },
     async () => {
       onSuccess();

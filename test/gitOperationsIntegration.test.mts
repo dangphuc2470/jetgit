@@ -13,6 +13,11 @@ import {
   isBranchAlreadyExistsError,
   isPushRejectedError,
 } from '../src/git/conflictUtils.ts';
+import {
+  getSkippedFiles,
+  skipFile,
+  unskipFile,
+} from '../src/git/operations/stagingOperations.ts';
 
 function createTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -311,5 +316,47 @@ test('Integration: Real Push rejection on non-fast-forward push', async () => {
       fs.rmSync(cloneA, { recursive: true, force: true });
       fs.rmSync(cloneB, { recursive: true, force: true });
     } catch {}
+  }
+});
+
+test('Integration: getSkippedFiles, skipFile, and unskipFile with fast filter', async () => {
+  const { repoDir, cleanup } = setupTestRepo();
+  try {
+    const mockCtx = {
+      cwd: repoDir,
+      exec: async (args: string[]) => runGit(repoDir, args),
+      getStatus: async () => [],
+    };
+
+    // Initially no skipped files
+    let skipped = await getSkippedFiles(mockCtx);
+    assert.equal(skipped.length, 0);
+
+    // Create and track a config file
+    fs.writeFileSync(path.join(repoDir, 'local.env'), 'API_KEY=12345\n');
+    runGit(repoDir, ['add', 'local.env']);
+    runGit(repoDir, ['commit', '-m', 'Add local.env']);
+
+    // Mark as skipped (skip-worktree)
+    await skipFile(mockCtx, 'local.env');
+
+    skipped = await getSkippedFiles(mockCtx);
+    assert.equal(skipped.length, 1);
+    assert.equal(skipped[0].path, 'local.env');
+    assert.equal(skipped[0].mode, 'skip-worktree');
+    assert.equal(skipped[0].hasLocalChanges, false);
+
+    // Modify local.env locally
+    fs.writeFileSync(path.join(repoDir, 'local.env'), 'API_KEY=SECRET_UPDATED\n');
+    skipped = await getSkippedFiles(mockCtx);
+    assert.equal(skipped.length, 1);
+    assert.equal(skipped[0].hasLocalChanges, true);
+
+    // Unskip file
+    await unskipFile(mockCtx, 'local.env');
+    skipped = await getSkippedFiles(mockCtx);
+    assert.equal(skipped.length, 0);
+  } finally {
+    cleanup();
   }
 });

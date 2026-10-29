@@ -307,8 +307,8 @@ export class GitService {
     return branchOps.getCurrentBranch(this.asBranchContext());
   }
 
-  async checkout(ref: string): Promise<void> {
-    return branchOps.checkout(this.asBranchContext(), ref);
+  async checkout(ref: string, options?: branchOps.CheckoutOptions): Promise<void> {
+    return branchOps.checkout(this.asBranchContext(), ref, options);
   }
 
   async createBranch(name: string, startPoint?: string, checkout = true, force = false): Promise<void> {
@@ -572,6 +572,18 @@ export class GitService {
 
   async getStatus(): Promise<StatusEntry[]> {
     return stagingOps.getStatus(this.asStagingContext());
+  }
+
+  async getSkippedFiles(repoName?: string, repoPath?: string): Promise<stagingOps.SkippedFileEntry[]> {
+    return stagingOps.getSkippedFiles(this.asStagingContext(), repoName, repoPath);
+  }
+
+  async unskipFile(filePath: string): Promise<void> {
+    return stagingOps.unskipFile(this.asStagingContext(), filePath);
+  }
+
+  async skipFile(filePath: string): Promise<void> {
+    return stagingOps.skipFile(this.asStagingContext(), filePath);
   }
 
   async stageFile(filePath: string): Promise<void> {

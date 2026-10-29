@@ -10,6 +10,8 @@ export interface ConflictHunk {
   theirsLines?: string[];
   resolved?: boolean;
   chosen?: 'yours' | 'theirs' | 'custom' | 'ignored' | null;
+  leftStatus?: 'pending' | 'accepted' | 'ignored';
+  rightStatus?: 'pending' | 'accepted' | 'ignored';
   resultLines?: string[];
 }
 
@@ -118,7 +120,20 @@ export function applyAllNonConflicting(hunks: ConflictHunk[]): { resolvedCount: 
         h.resolved = true;
         h.chosen = result.side;
         h.resultLines = result.lines;
+        if (result.reason === 'identical_modifications') {
+          h.leftStatus = 'accepted';
+          h.rightStatus = 'accepted';
+        } else if (result.side === 'yours') {
+          h.leftStatus = 'accepted';
+          h.rightStatus = 'ignored';
+        } else if (result.side === 'theirs') {
+          h.leftStatus = 'ignored';
+          h.rightStatus = 'accepted';
+        }
         resolvedCount++;
+      } else {
+        if (!h.leftStatus) h.leftStatus = 'pending';
+        if (!h.rightStatus) h.rightStatus = 'pending';
       }
     }
   }
@@ -188,6 +203,8 @@ export function parseConflictHunksFromText(
           theirsLines: currentTheirs,
           resolved: false,
           chosen: null,
+          leftStatus: 'pending',
+          rightStatus: 'pending',
           resultLines: [],
         });
         currentYours = [];
@@ -237,6 +254,8 @@ export function parseConflictHunksFromText(
     theirsLines: tLines,
     resolved: false,
     chosen: null,
+    leftStatus: 'pending',
+    rightStatus: 'pending',
     resultLines: [],
   }];
 }

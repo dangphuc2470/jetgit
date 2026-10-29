@@ -22,6 +22,8 @@
     centerEnd: number;
     resolved: boolean;
     chosen: "yours" | "theirs" | "custom" | "ignored" | null;
+    leftStatus: "pending" | "accepted" | "ignored";
+    rightStatus: "pending" | "accepted" | "ignored";
   }
 
   interface RenderLine {
@@ -42,8 +44,10 @@
     ribbonClass: string;
     leftBtnY: number;
     rightBtnY: number;
-    leftAcceptActive: boolean;
-    rightAcceptActive: boolean;
+    resolved: boolean;
+    chosen: "yours" | "theirs" | "custom" | "ignored" | null;
+    leftStatus: "pending" | "accepted" | "ignored";
+    rightStatus: "pending" | "accepted" | "ignored";
   }
 
   let filePath = $state("");
@@ -104,8 +108,10 @@
         ribbonClass,
         leftBtnY,
         rightBtnY,
-        leftAcceptActive: b.resolved && b.chosen === "yours",
-        rightAcceptActive: b.resolved && b.chosen === "theirs",
+        resolved: b.resolved,
+        chosen: b.chosen,
+        leftStatus: b.leftStatus,
+        rightStatus: b.rightStatus,
       });
     }
 
@@ -148,30 +154,51 @@
         const rightEnd = rightNo - 1;
 
         const centerStart = centerNo;
-        const rLines = hunk.resultLines || [];
-        if (hunk.resolved && rLines.length > 0) {
-          for (const text of rLines) {
+        const leftHandled = hunk.leftStatus !== "pending";
+        const rightHandled = hunk.rightStatus !== "pending";
+        const isResolved = Boolean(hunk.resolved || (leftHandled && rightHandled));
+
+        if (hunk.resultLines !== undefined && hunk.resultLines !== null) {
+          if (hunk.resultLines.length > 0) {
+            for (const text of hunk.resultLines) {
+              nextCenter.push({
+                id: lineIdCounter++,
+                lineNo: centerNo++,
+                text,
+                extraClass: isResolved ? "line-conflict-resolved" : "line-conflict",
+                editable: true,
+                hunkId: hunk.id,
+              });
+            }
+          } else if (isResolved) {
+            // Empty result (both ignored or resolved to empty)
+          } else {
+            // Fallback if empty and unresolved
+            const bLines = (hunk.baseLines && hunk.baseLines.length > 0) ? hunk.baseLines : [""];
+            for (const text of bLines) {
+              nextCenter.push({
+                id: lineIdCounter++,
+                lineNo: centerNo++,
+                text,
+                extraClass: "line-conflict",
+                editable: true,
+                hunkId: hunk.id,
+              });
+            }
+          }
+        } else {
+          // Both sides still pending: show base lines if available, otherwise empty line
+          const bLines = (hunk.baseLines && hunk.baseLines.length > 0) ? hunk.baseLines : [""];
+          for (const text of bLines) {
             nextCenter.push({
               id: lineIdCounter++,
               lineNo: centerNo++,
               text,
-              extraClass: "line-conflict-resolved",
+              extraClass: "line-conflict",
               editable: true,
               hunkId: hunk.id,
             });
           }
-        } else if (hunk.resolved && rLines.length === 0) {
-          // Empty result (ignored)
-        } else {
-          // Unresolved placeholder
-          nextCenter.push({
-            id: lineIdCounter++,
-            lineNo: centerNo++,
-            text: `// Unresolved conflict #${hunk.id}`,
-            extraClass: "line-placeholder",
-            editable: true,
-            hunkId: hunk.id,
-          });
         }
         const centerEnd = centerNo - 1;
 
@@ -186,8 +213,10 @@
           rightCount: tLines.length,
           centerStart,
           centerEnd: Math.max(centerStart, centerEnd),
-          resolved: hunk.resolved || false,
+          resolved: isResolved,
           chosen: hunk.chosen || null,
+          leftStatus: hunk.leftStatus || "pending",
+          rightStatus: hunk.rightStatus || "pending",
         });
       }
     }
@@ -198,28 +227,99 @@
     conflictBlocks = nextBlocks;
   }
 
-  function acceptConflict(id: number, choice: "yours" | "theirs" | "ignored", append = false) {
+  function updateHunkResolved(hunk: ConflictHunk) {
+    const isBothHandled = hunk.leftStatus !== "pending" && hunk.rightStatus !== "pending";
+    hunk.resolved = isBothHandled;
+    if (isBothHandled) {
+      if (hunk.leftStatus === "accepted" && hunk.rightStatus === "accepted") {
+        hunk.chosen = "custom";
+      } else if (hunk.leftStatus === "accepted") {
+        hunk.chosen = "yours";
+      } else if (hunk.rightStatus === "accepted") {
+        hunk.chosen = "theirs";
+      } else {
+        hunk.chosen = "ignored";
+      }
+    } else {
+      hunk.chosen = null;
+    }
+  }
+
+  function acceptLeft(id: number) {
     const hunk = hunks.find((h) => h.id === id);
     if (!hunk) return;
-
-    if (choice === "ignored") {
-      hunk.resolved = true;
-      hunk.chosen = "ignored";
-      hunk.resultLines = [];
-    } else if (append && hunk.resolved && (hunk.resultLines || []).length > 0) {
-      const additional = choice === "yours" ? (hunk.yoursLines || []) : (hunk.theirsLines || []);
-      hunk.resultLines = [...(hunk.resultLines || []), ...additional];
-      hunk.chosen = "custom";
+    hunk.leftStatus = "accepted";
+    if (hunk.rightStatus === "accepted") {
+      hunk.resultLines = [...(hunk.yoursLines || []), ...(hunk.theirsLines || [])];
     } else {
-      hunk.resolved = true;
-      hunk.chosen = choice;
-      if (choice === "yours") {
-        hunk.resultLines = [...(hunk.yoursLines || [])];
-      } else if (choice === "theirs") {
-        hunk.resultLines = [...(hunk.theirsLines || [])];
-      }
+      hunk.resultLines = [...(hunk.yoursLines || [])];
     }
+    updateHunkResolved(hunk);
+    rebuildLines();
+  }
 
+  function ignoreLeft(id: number) {
+    const hunk = hunks.find((h) => h.id === id);
+    if (!hunk) return;
+    hunk.leftStatus = "ignored";
+    if (hunk.rightStatus === "accepted") {
+      hunk.resultLines = [...(hunk.theirsLines || [])];
+    } else if (hunk.rightStatus === "ignored") {
+      hunk.resultLines = [];
+    }
+    updateHunkResolved(hunk);
+    rebuildLines();
+  }
+
+  function revertLeft(id: number) {
+    const hunk = hunks.find((h) => h.id === id);
+    if (!hunk) return;
+    hunk.leftStatus = "pending";
+    if (hunk.rightStatus === "accepted") {
+      hunk.resultLines = [...(hunk.theirsLines || [])];
+    } else {
+      hunk.resultLines = undefined;
+    }
+    updateHunkResolved(hunk);
+    rebuildLines();
+  }
+
+  function acceptRight(id: number) {
+    const hunk = hunks.find((h) => h.id === id);
+    if (!hunk) return;
+    hunk.rightStatus = "accepted";
+    if (hunk.leftStatus === "accepted") {
+      hunk.resultLines = [...(hunk.yoursLines || []), ...(hunk.theirsLines || [])];
+    } else {
+      hunk.resultLines = [...(hunk.theirsLines || [])];
+    }
+    updateHunkResolved(hunk);
+    rebuildLines();
+  }
+
+  function ignoreRight(id: number) {
+    const hunk = hunks.find((h) => h.id === id);
+    if (!hunk) return;
+    hunk.rightStatus = "ignored";
+    if (hunk.leftStatus === "accepted") {
+      hunk.resultLines = [...(hunk.yoursLines || [])];
+    } else if (hunk.leftStatus === "ignored") {
+      hunk.resultLines = [];
+    }
+    updateHunkResolved(hunk);
+    rebuildLines();
+  }
+
+  function revertRight(id: number) {
+    const hunk = hunks.find((h) => h.id === id);
+    if (!hunk) return;
+    hunk.rightStatus = "pending";
+    if (hunk.leftStatus === "accepted") {
+      hunk.resultLines = [...(hunk.yoursLines || [])];
+    } else {
+      hunk.resultLines = undefined;
+    }
+    updateHunkResolved(hunk);
     rebuildLines();
   }
 
@@ -375,11 +475,15 @@
         if (hunk && !hunk.resolved) {
           hunk.resolved = true;
           hunk.chosen = "custom";
+          hunk.leftStatus = "accepted";
+          hunk.rightStatus = "accepted";
         }
         const b = conflictBlocks.find((cb) => cb.id === curLine.hunkId);
         if (b && !b.resolved) {
           b.resolved = true;
           b.chosen = "custom";
+          b.leftStatus = "accepted";
+          b.rightStatus = "accepted";
         }
       }
 
@@ -499,18 +603,23 @@
     const text = currentEl.textContent || "";
     if (centerLines[idx]) {
       centerLines[idx].text = text;
-      if (centerLines[idx].extraClass.includes("line-placeholder") && !text.includes("// Unresolved conflict")) {
+      if (centerLines[idx].extraClass.includes("line-conflict")) {
         centerLines[idx].extraClass = "line-conflict-resolved";
         if (centerLines[idx].hunkId) {
           const hunk = hunks.find((h) => h.id === centerLines[idx].hunkId);
           if (hunk) {
             hunk.resolved = true;
             hunk.chosen = "custom";
+            hunk.leftStatus = "accepted";
+            hunk.rightStatus = "accepted";
+            hunk.resultLines = centerLines.filter((l) => l.hunkId === hunk.id).map((l) => l.text);
           }
           const b = conflictBlocks.find((cb) => cb.id === centerLines[idx].hunkId);
           if (b) {
             b.resolved = true;
             b.chosen = "custom";
+            b.leftStatus = "accepted";
+            b.rightStatus = "accepted";
           }
           conflictBlocks = [...conflictBlocks];
         }
@@ -604,7 +713,18 @@
         yoursBranch = data.yoursBranch || "Current version";
         theirsBranch = data.theirsBranch || "Incoming version";
         hunks = data.hunks || [];
+        // Auto-apply all non-conflicting changes upfront like IntelliJ IDEA
+        applyAllNonConflicting(hunks);
         rebuildLines();
+        const firstUnresolved = conflictBlocks.findIndex((b) => !b.resolved);
+        if (firstUnresolved !== -1) {
+          currentConflictIndex = firstUnresolved;
+          const target = conflictBlocks[currentConflictIndex];
+          if (target && centerEditor) {
+            const targetY = Math.max(0, (target.centerStart - 4) * LINE_HEIGHT);
+            centerEditor.scrollTo({ top: targetY, behavior: "smooth" });
+          }
+        }
       } else if (msg.type === "themeTokens") {
         const tokens = msg.payload;
         if (tokens) {
@@ -715,32 +835,41 @@
       </svg>
       <div class="gutter-controls">
         {#each ribbons as ribbon}
-          <button
-            class={`block-btn accept-left-btn ${ribbon.leftAcceptActive ? "active-accepted" : ""} ${isAppendMode ? "append-mode" : ""}`.trim()}
-            style={`top: ${ribbon.leftBtnY}px; left: 4px;`}
-            title={isAppendMode ? "Append Yours (Left)" : "Accept Yours (Left) [Hold Ctrl/Cmd/Alt to Append]"}
-            onclick={(e) => acceptConflict(ribbon.id, "yours", isAppendMode || e.ctrlKey || e.metaKey || e.altKey)}
-          >
-            {#if isAppendMode}
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M5 2V8M2 5H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              </svg>
-            {:else}
+          {#if ribbon.leftStatus === "pending"}
+            <button
+              class="block-btn accept-left-btn"
+              style={`top: ${ribbon.leftBtnY}px; left: 4px;`}
+              title="Accept Yours (Left)"
+              onclick={() => acceptLeft(ribbon.id)}
+            >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-            {/if}
-          </button>
-          <button
-            class="block-btn btn-ignore ignore-left-btn"
-            style={`top: ${ribbon.leftBtnY}px; left: 24px;`}
-            title="Ignore Yours"
-            onclick={() => acceptConflict(ribbon.id, "ignored")}
-          >
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-              <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
-          </button>
+            </button>
+            <button
+              class="block-btn btn-ignore ignore-left-btn"
+              style={`top: ${ribbon.leftBtnY}px; left: 24px;`}
+              title="Ignore Yours (Left)"
+              onclick={() => ignoreLeft(ribbon.id)}
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </button>
+          {:else}
+            <button
+              class="block-btn btn-revert active-accepted"
+              style={`top: ${ribbon.leftBtnY}px; left: 13px;`}
+              title="Revert Left (re-open)"
+              onclick={() => revertLeft(ribbon.id)}
+            >
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.418A6 6 0 1 1 8 2v1z"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 4.5a.5.5 0 0 1-.5-.5V1a.5.5 0 0 1 1 0v3a.5.5 0 0 1-.5.5z"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M5.146 3.854a.5.5 0 0 1 0-.708l2.5-2.5a.5.5 0 0 1 .708.708L6.207 3.5l2.147 2.146a.5.5 0 0 1-.708.708l-2.5-2.5z"/>
+              </svg>
+            </button>
+          {/if}
         {/each}
       </div>
     </div>
@@ -780,32 +909,41 @@
       </svg>
       <div class="gutter-controls">
         {#each ribbons as ribbon}
-          <button
-            class="block-btn btn-ignore ignore-right-btn"
-            style={`top: ${ribbon.rightBtnY}px; left: 4px;`}
-            title="Ignore Theirs"
-            onclick={() => acceptConflict(ribbon.id, "ignored")}
-          >
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-              <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
-          </button>
-          <button
-            class={`block-btn accept-right-btn ${ribbon.rightAcceptActive ? "active-accepted" : ""} ${isAppendMode ? "append-mode" : ""}`.trim()}
-            style={`top: ${ribbon.rightBtnY}px; left: 22px;`}
-            title={isAppendMode ? "Append Theirs (Right)" : "Accept Theirs (Right) [Hold Ctrl/Cmd/Alt to Append]"}
-            onclick={(e) => acceptConflict(ribbon.id, "theirs", isAppendMode || e.ctrlKey || e.metaKey || e.altKey)}
-          >
-            {#if isAppendMode}
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M5 2V8M2 5H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          {#if ribbon.rightStatus === "pending"}
+            <button
+              class="block-btn btn-ignore ignore-right-btn"
+              style={`top: ${ribbon.rightBtnY}px; left: 4px;`}
+              title="Ignore Theirs (Right)"
+              onclick={() => ignoreRight(ribbon.id)}
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
               </svg>
-            {:else}
+            </button>
+            <button
+              class="block-btn accept-right-btn"
+              style={`top: ${ribbon.rightBtnY}px; left: 24px;`}
+              title="Accept Theirs (Right)"
+              onclick={() => acceptRight(ribbon.id)}
+            >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path d="M8.5 2L5 5L8.5 8M5 2L1.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-            {/if}
-          </button>
+            </button>
+          {:else}
+            <button
+              class="block-btn btn-revert active-accepted"
+              style={`top: ${ribbon.rightBtnY}px; left: 13px;`}
+              title="Revert Right (re-open)"
+              onclick={() => revertRight(ribbon.id)}
+            >
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.418A6 6 0 1 1 8 2v1z"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 4.5a.5.5 0 0 1-.5-.5V1a.5.5 0 0 1 1 0v3a.5.5 0 0 1-.5.5z"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M5.146 3.854a.5.5 0 0 1 0-.708l2.5-2.5a.5.5 0 0 1 .708.708L6.207 3.5l2.147 2.146a.5.5 0 0 1-.708.708l-2.5-2.5z"/>
+              </svg>
+            </button>
+          {/if}
         {/each}
       </div>
     </div>
@@ -1062,10 +1200,17 @@
     color: #ffffff;
     opacity: 1;
   }
-  .block-btn.active-accepted {
+  .block-btn.active-accepted,
+  .block-btn.btn-revert {
     background: #2ea043;
     border-color: #2ea043;
     color: #ffffff;
+  }
+  .block-btn.btn-revert:hover {
+    background: #ba4444;
+    border-color: #ba4444;
+    color: #ffffff;
+    transform: scale(1.12);
   }
   .block-btn.append-mode {
     border-color: #3574f0;

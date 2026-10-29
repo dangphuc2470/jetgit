@@ -315,6 +315,8 @@ export interface ConflictHunk {
   resolved?: boolean;
   chosen?: 'yours' | 'theirs' | 'custom' | 'ignored' | null;
   chosenSide?: 'yours' | 'theirs' | 'both' | 'custom';
+  leftStatus?: 'pending' | 'accepted' | 'ignored';
+  rightStatus?: 'pending' | 'accepted' | 'ignored';
   resultLines?: string[];
 }
 

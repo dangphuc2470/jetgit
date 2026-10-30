@@ -26,7 +26,7 @@
     expandAllFolders: boolean | null;
     changelists?: { name: string; files: string[] }[];
     activeChangelist?: string;
-    expandedChangelists?: Set<string>;
+    collapsedChangelists?: Set<string>;
     onSelectFile: (file: CommitFile) => void;
     onOpenFileDiff: (file: CommitFile) => void;
     onToggleStageFile: (file: CommitFile, checked: boolean) => void;
@@ -67,7 +67,7 @@
     expandAllFolders,
     changelists,
     activeChangelist,
-    expandedChangelists,
+    collapsedChangelists,
     onSelectFile,
     onOpenFileDiff,
     onToggleStageFile,
@@ -343,11 +343,11 @@
   </div>
 {/snippet}
 
-{#snippet fileGroup(title: string, groupFiles: CommitFile[], expanded: boolean, onToggleExpand: () => void)}
+{#snippet fileGroup(title: string, groupFiles: CommitFile[], expanded: boolean, onToggleExpand: () => void, isMain = false)}
   {@const checkState = getGroupCheckState(groupFiles)}
   <div class="tree-group">
     <div
-      class="group-header"
+      class={`group-header ${isMain ? 'is-active' : ''}`}
       onclick={onToggleExpand}
       role="button"
       tabindex="0"
@@ -424,17 +424,7 @@
           onToggleStageFiles(groupFiles, (e.target as HTMLInputElement).checked);
         }}
       />
-      {#if !isSingleList}
-        <span class="changelist-icon">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path fill-rule="evenodd" d="M2,2 L14,2 L14,14 L2,14 L2,2 Z M4,4 L4,12 L12,12 L12,4 L4,4 Z M5,5 H11 V6 H5 Z M5,7 H11 V8 H5 Z M5,9 H11 V10 H5 Z"/>
-          </svg>
-        </span>
-      {/if}
       <span class="group-title changelist-name">{displayName}</span>
-      {#if !isSingleList && isActive}
-        <span class="changelist-active-badge">(active)</span>
-      {/if}
       <span class="group-count">{groupFiles.length} {groupFiles.length === 1 ? 'file' : 'files'}</span>
     </div>
 
@@ -536,16 +526,17 @@
   {#if changelists && changelists.length > 0}
     {#each changelists as cl (cl.name)}
       {@const clFiles = changelistFilesMap.get(cl.name) || []}
-      {@const isClExpanded = expandedChangelists ? expandedChangelists.has(cl.name) : true}
-      {@const isClActive = cl.name === activeChangelist}
+      {@const isSingleList = !changelists || changelists.length <= 1}
+      {@const isClExpanded = collapsedChangelists ? !collapsedChangelists.has(cl.name) : true}
+      {@const isClActive = isSingleList || cl.name === activeChangelist}
       {@render changelistGroup(cl.name, clFiles, isClExpanded, isClActive)}
     {/each}
   {:else}
-    {@render fileGroup('Changes', changesFiles, expandChanges, onToggleExpandChanges)}
+    {@render fileGroup('Changes', changesFiles, expandChanges, onToggleExpandChanges, true)}
   {/if}
 
   {#if showIgnoredFiles !== false}
-    {@render fileGroup('Unversioned Files', unversionedFiles, expandUnversioned, onToggleExpandUnversioned)}
+    {@render fileGroup('Unversioned Files', unversionedFiles, expandUnversioned, onToggleExpandUnversioned, false)}
   {/if}
 
   {#if showSkippedWorktree}

@@ -23,21 +23,45 @@
   let isAmend = $state(false);
   let recentMessages = $state<string[]>([]);
   let stashes = $state<any[]>([]);
-  let expandChanges = $state(true);
-  let expandUnversioned = $state(true);
+  function loadBooleanSetting(key: string, defaultValue: boolean): boolean {
+    try {
+      const val = localStorage.getItem(key);
+      if (val !== null) return val === 'true';
+    } catch {}
+    return defaultValue;
+  }
+
+  function loadCollapsedChangelists(): Set<string> {
+    try {
+      const raw = localStorage.getItem('intellij_git_collapsed_changelists');
+      if (raw) {
+        return new Set(JSON.parse(raw));
+      }
+    } catch {}
+    return new Set();
+  }
+
+  function saveCollapsedChangelists() {
+    try {
+      localStorage.setItem('intellij_git_collapsed_changelists', JSON.stringify(Array.from(collapsedChangelists)));
+    } catch {}
+  }
+
+  let expandChanges = $state(loadBooleanSetting('intellij_git_expand_changes', true));
+  let expandUnversioned = $state(loadBooleanSetting('intellij_git_expand_unversioned', true));
   let expandSkipped = $state(false);
   let isLoadingSkipped = $state(false);
   let hasLoadedSkipped = $state(false);
-  let showPaths = $state(true);
+  let groupByDirectory = $state(loadBooleanSetting('intellij_git_groupby_directory', false));
+  let groupByModule = $state(loadBooleanSetting('intellij_git_groupby_module', false));
+  let showPaths = $state(!loadBooleanSetting('intellij_git_groupby_directory', false));
   let viewOptionsOpen = $state(false);
-  let groupByDirectory = $state(false);
-  let groupByModule = $state(false);
   let repoName = $state('Project');
   let expandedFolders = $state<Set<string>>(new Set());
   let collapsedFolders = $state<Set<string>>(new Set());
   let expandAllFolders = $state<boolean | null>(null);
-  let showIgnoredFiles = $state(true);
-  let showSkippedWorktree = $state(false);
+  let showIgnoredFiles = $state(loadBooleanSetting('intellij_git_show_ignored_files', true));
+  let showSkippedWorktree = $state(loadBooleanSetting('intellij_git_show_skipped_worktree', false));
   let checkedSkippedFiles = $state<Set<string>>(new Set());
   let commitOptionsOpen = $state(false);
   let recentOpen = $state(false);
@@ -46,7 +70,7 @@
   let splitRatio = $state(0.6);
   let changelists = $state<{ name: string; files: string[] }[]>([]);
   let activeChangelist = $state<string>('Changes');
-  let expandedChangelists = $state<Set<string>>(new Set(['Changes', 'Default']));
+  let collapsedChangelists = $state<Set<string>>(loadCollapsedChangelists());
 
   let commitBoxRef: any = $state(null);
   let leftPanelEl: HTMLDivElement | null = $state(null);
@@ -108,6 +132,12 @@
 
   $effect(() => {
     syncToSingleton();
+  });
+
+  $effect(() => {
+    if (showSkippedWorktree && !hasLoadedSkipped && !isLoadingSkipped) {
+      triggerScanSkipped();
+    }
   });
 
   // Render Diff Viewer into container if showDiff is true
@@ -211,12 +241,13 @@
   }
 
   function handleToggleChangelist(name: string) {
-    if (expandedChangelists.has(name)) {
-      expandedChangelists.delete(name);
+    if (collapsedChangelists.has(name)) {
+      collapsedChangelists.delete(name);
     } else {
-      expandedChangelists.add(name);
+      collapsedChangelists.add(name);
     }
-    expandedChangelists = new Set(expandedChangelists);
+    collapsedChangelists = new Set(collapsedChangelists);
+    saveCollapsedChangelists();
   }
 
   function handleChangelistContextMenu(e: MouseEvent, name: string, isActive: boolean) {
@@ -280,14 +311,37 @@
     expandedFolders.clear();
     collapsedFolders = new Set(collapsedFolders);
     expandedFolders = new Set(expandedFolders);
+    collapsedChangelists.clear();
+    collapsedChangelists = new Set(collapsedChangelists);
+    saveCollapsedChangelists();
+    try {
+      localStorage.setItem('intellij_git_expand_changes', 'true');
+      localStorage.setItem('intellij_git_expand_unversioned', 'true');
+    } catch {}
   }
 
   function handleCollapseAll() {
+    expandChanges = false;
+    expandUnversioned = false;
     expandAllFolders = false;
     expandedFolders.clear();
     collapsedFolders.clear();
     collapsedFolders = new Set(collapsedFolders);
     expandedFolders = new Set(expandedFolders);
+    if (changelists && changelists.length > 0) {
+      for (const cl of changelists) {
+        collapsedChangelists.add(cl.name);
+      }
+    } else {
+      collapsedChangelists.add('Changes');
+      collapsedChangelists.add('Default');
+    }
+    collapsedChangelists = new Set(collapsedChangelists);
+    saveCollapsedChangelists();
+    try {
+      localStorage.setItem('intellij_git_expand_changes', 'false');
+      localStorage.setItem('intellij_git_expand_unversioned', 'false');
+    } catch {}
   }
 
   // Commit Actions
@@ -381,12 +435,6 @@
         stashes = data.stashes || [];
         if (data.changelists && Array.isArray(data.changelists)) {
           changelists = data.changelists;
-          for (const cl of changelists) {
-            if (!expandedChangelists.has(cl.name)) {
-              expandedChangelists.add(cl.name);
-            }
-          }
-          expandedChangelists = new Set(expandedChangelists);
         }
         if (data.activeChangelist) {
           activeChangelist = data.activeChangelist;
@@ -777,10 +825,17 @@
                   e.stopPropagation();
                   groupByDirectory = !groupByDirectory;
                   showPaths = !groupByDirectory;
+                  try { localStorage.setItem('intellij_git_groupby_directory', String(groupByDirectory)); } catch {}
                 }}
                 role="button"
                 tabindex="0"
-                onkeydown={(e) => { if (e.key === 'Enter') { groupByDirectory = !groupByDirectory; showPaths = !groupByDirectory; } }}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') {
+                    groupByDirectory = !groupByDirectory;
+                    showPaths = !groupByDirectory;
+                    try { localStorage.setItem('intellij_git_groupby_directory', String(groupByDirectory)); } catch {}
+                  }
+                }}
               >
                 <div class="as-menu-item-left">
                   <span class="as-menu-check">{groupByDirectory ? '✓' : ''}</span>
@@ -794,10 +849,16 @@
                 onclick={(e) => {
                   e.stopPropagation();
                   groupByModule = !groupByModule;
+                  try { localStorage.setItem('intellij_git_groupby_module', String(groupByModule)); } catch {}
                 }}
                 role="button"
                 tabindex="0"
-                onkeydown={(e) => { if (e.key === 'Enter') { groupByModule = !groupByModule; } }}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') {
+                    groupByModule = !groupByModule;
+                    try { localStorage.setItem('intellij_git_groupby_module', String(groupByModule)); } catch {}
+                  }
+                }}
               >
                 <div class="as-menu-item-left">
                   <span class="as-menu-check">{groupByModule ? '✓' : ''}</span>
@@ -811,10 +872,16 @@
                 onclick={(e) => {
                   e.stopPropagation();
                   showIgnoredFiles = !showIgnoredFiles;
+                  try { localStorage.setItem('intellij_git_show_ignored_files', String(showIgnoredFiles)); } catch {}
                 }}
                 role="button"
                 tabindex="0"
-                onkeydown={(e) => { if (e.key === 'Enter') { showIgnoredFiles = !showIgnoredFiles; } }}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') {
+                    showIgnoredFiles = !showIgnoredFiles;
+                    try { localStorage.setItem('intellij_git_show_ignored_files', String(showIgnoredFiles)); } catch {}
+                  }
+                }}
               >
                 <div class="as-menu-item-left">
                   <span class="as-menu-check">{showIgnoredFiles !== false ? '✓' : ''}</span>
@@ -827,6 +894,7 @@
                 onclick={(e) => {
                   e.stopPropagation();
                   showSkippedWorktree = !showSkippedWorktree;
+                  try { localStorage.setItem('intellij_git_show_skipped_worktree', String(showSkippedWorktree)); } catch {}
                   if (showSkippedWorktree && !hasLoadedSkipped && !isLoadingSkipped) {
                     triggerScanSkipped();
                   }
@@ -836,6 +904,7 @@
                 onkeydown={(e) => {
                   if (e.key === 'Enter') {
                     showSkippedWorktree = !showSkippedWorktree;
+                    try { localStorage.setItem('intellij_git_show_skipped_worktree', String(showSkippedWorktree)); } catch {}
                     if (showSkippedWorktree && !hasLoadedSkipped && !isLoadingSkipped) {
                       triggerScanSkipped();
                     }
@@ -905,15 +974,21 @@
             {expandAllFolders}
             {changelists}
             {activeChangelist}
-            {expandedChangelists}
+            {collapsedChangelists}
             onSelectFile={handleSelectFile}
             onSelectSkippedFile={handleSelectSkippedFile}
             onOpenFileDiff={handleOpenFileDiff}
             onToggleStageFile={handleToggleStageFile}
             onToggleStageFiles={handleToggleStageFiles}
             onToggleFolder={handleToggleFolder}
-            onToggleExpandChanges={() => { expandChanges = !expandChanges; }}
-            onToggleExpandUnversioned={() => { expandUnversioned = !expandUnversioned; }}
+            onToggleExpandChanges={() => {
+              expandChanges = !expandChanges;
+              try { localStorage.setItem('intellij_git_expand_changes', String(expandChanges)); } catch {}
+            }}
+            onToggleExpandUnversioned={() => {
+              expandUnversioned = !expandUnversioned;
+              try { localStorage.setItem('intellij_git_expand_unversioned', String(expandUnversioned)); } catch {}
+            }}
             onToggleExpandSkipped={handleToggleExpandSkipped}
             onToggleSkippedFileChecked={handleToggleSkippedFileChecked}
             onToggleAllSkipped={handleToggleAllSkipped}

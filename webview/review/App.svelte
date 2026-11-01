@@ -1021,6 +1021,11 @@
 
   <!-- Diff Viewport Wrapper -->
   <div class="studio-diff-viewport-wrapper">
+    {#if leftRenderLines.length === 0 && rightRenderLines.length === 0}
+      <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--vscode-descriptionForeground, #7f848e); font-size: 13px; z-index: 5; pointer-events: none;">
+        <span>{filePath ? 'No differences or empty file' : 'Loading diff...'}</span>
+      </div>
+    {/if}
     <!-- Left Pane (Base) -->
     <div
       class="editor-pane left-pane"

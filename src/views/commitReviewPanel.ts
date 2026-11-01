@@ -35,7 +35,7 @@ export class CommitReviewPanel {
   private constructor(
     panel: vscode.WebviewPanel,
     private extensionUri: vscode.Uri,
-    private gitService: GitService,
+    public gitService: GitService,
     private onStageChange?: () => void,
     readOnly = false,
     revisions?: ReviewRevisions,
@@ -73,6 +73,7 @@ export class CommitReviewPanel {
       log.appendLine(`[CommitReviewPanel] createOrShow: ${filePath}, hasCurrentPanel=${Boolean(CommitReviewPanel.currentPanel)}`);
     }
     if (CommitReviewPanel.currentPanel) {
+      CommitReviewPanel.currentPanel.gitService = gitService;
       if (onStageChange) {
         CommitReviewPanel.currentPanel.onStageChange = onStageChange;
       }
@@ -121,6 +122,67 @@ export class CommitReviewPanel {
     });
   }
 
+  private async resolveFileDiskPath(filePath: string): Promise<string> {
+    if (path.isAbsolute(filePath) && fs.existsSync(filePath)) {
+      return filePath;
+    }
+    const cwd = this.gitService.getCwd();
+    const directPath = path.join(cwd, filePath);
+    if (fs.existsSync(directPath)) {
+      return directPath;
+    }
+
+    try {
+      const repoRoot = await this.gitService.getRepoRoot();
+      if (repoRoot && repoRoot !== cwd) {
+        const rootPath = path.join(repoRoot, filePath);
+        if (fs.existsSync(rootPath)) return rootPath;
+      }
+    } catch {}
+
+    const cwdBasename = path.basename(cwd);
+    const parts = filePath.split(/[/\\]/);
+    if (parts[0] === cwdBasename) {
+      const stripped = path.join(cwd, ...parts.slice(1));
+      if (fs.existsSync(stripped)) return stripped;
+    }
+
+    const wsFolders = vscode.workspace.workspaceFolders || [];
+    for (const ws of wsFolders) {
+      const candidate = path.join(ws.uri.fsPath, filePath);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+
+    return directPath;
+  }
+
+  private async fetchBaseContent(filePath: string, ref = 'HEAD'): Promise<string> {
+    // 1. Try with ./ prefix to resolve relative to current git cwd
+    try {
+      const out = await this.gitService.exec(['show', `${ref}:./${filePath}`]);
+      if (out) return out;
+    } catch {}
+
+    // 2. Try raw ref:filePath
+    try {
+      const out = await this.gitService.exec(['show', `${ref}:${filePath}`]);
+      if (out) return out;
+    } catch {}
+
+    // 3. Try relative to git repo root
+    try {
+      const repoRoot = await this.gitService.getRepoRoot();
+      const diskPath = await this.resolveFileDiskPath(filePath);
+      const relToRoot = path.relative(repoRoot, diskPath).replace(/\\/g, '/');
+      if (relToRoot && !relToRoot.startsWith('..')) {
+        const out = await this.gitService.exec(['show', `${ref}:${relToRoot}`]);
+        if (out) return out;
+      }
+    } catch {}
+
+    return '';
+  }
+
   async loadFile(
     filePath: string,
     filesList?: string[],
@@ -148,17 +210,17 @@ export class CommitReviewPanel {
         const targetRef = this.revisions.targetRef || 'HEAD';
         [diff, baseContent, currentContent] = await Promise.all([
           this.gitService.exec(['diff', `${baseRef}..${targetRef}`, '--', filePath]).catch(() => ''),
-          this.gitService.exec(['show', `${baseRef}:${filePath}`]).catch(() => ''),
-          this.gitService.exec(['show', `${targetRef}:${filePath}`]).catch(() => ''),
+          this.fetchBaseContent(filePath, baseRef),
+          this.fetchBaseContent(filePath, targetRef),
         ]);
       } else {
-        const fullPath = path.join(this.gitService.getCwd(), filePath);
+        const fullPath = await this.resolveFileDiskPath(filePath);
         [diff, baseContent, currentContent, stagedDiff] = await Promise.all([
           this.gitService.getFileDiff(filePath).catch(() => ''),
-          this.gitService.exec(['show', `HEAD:${filePath}`]).catch(() => ''),
+          this.fetchBaseContent(filePath, 'HEAD'),
           (async () => {
             try {
-              if (fs.existsSync(fullPath)) {
+              if (fs.existsSync(fullPath) && !fs.statSync(fullPath).isDirectory()) {
                 return fs.readFileSync(fullPath, 'utf8');
               }
             } catch {}
@@ -166,6 +228,18 @@ export class CommitReviewPanel {
           })(),
           this.gitService.exec(['diff', '--cached', '--', filePath]).catch(() => '')
         ]);
+
+        // Synthesize diff for untracked / new files if git diff was empty but current content exists
+        if ((!diff || !diff.trim()) && currentContent && !baseContent) {
+          const lines = currentContent.split('\n');
+          const header = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
+          diff = header + lines.map(l => `+${l}`).join('\n');
+        } else if ((!diff || !diff.trim()) && baseContent && !currentContent) {
+          // Synthesize diff for deleted file
+          const lines = baseContent.split('\n');
+          const header = `--- a/${filePath}\n+++ /dev/null\n@@ -1,${lines.length} +0,0 @@\n`;
+          diff = header + lines.map(l => `-${l}`).join('\n');
+        }
       }
 
       const isSameFile = this.lastLoadedState && this.lastLoadedState.filePath === filePath;

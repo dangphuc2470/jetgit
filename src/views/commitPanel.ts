@@ -115,6 +115,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
             ? this.gitService
             : new GitService(normalized);
           repos.push({ name, path: normalized, gitService: gs });
+          return;
+        }
+
+        // Check if folder is a subdirectory of a git repository
+        const tempGs = new GitService(normalized);
+        const repoRoot = await tempGs.getRepoRoot().catch(() => '');
+        if (repoRoot) {
+          const rootNorm = path.resolve(repoRoot);
+          if (!seenPaths.has(rootNorm)) {
+            seenPaths.add(rootNorm);
+            const gs = rootNorm === path.resolve(this.gitService.getCwd())
+              ? this.gitService
+              : new GitService(rootNorm);
+            repos.push({ name: path.basename(rootNorm) || name, path: rootNorm, gitService: gs });
+          }
         }
       } catch {}
     };
@@ -135,13 +150,11 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (repos.length === 0) {
-      const rootPath = path.resolve(this.gitService.getCwd());
-      const isRepo = await this.gitService.isGitRepo();
-      if (isRepo) {
-        await checkAndAdd(path.basename(rootPath) || 'Project', rootPath);
-      }
       try {
-        const sub = await this.gitService.findSubRepos();
+        const repoRoot = await this.gitService.getRepoRoot().catch(() => '');
+        const targetPath = repoRoot || path.resolve(this.gitService.getCwd());
+        await checkAndAdd(path.basename(targetPath) || 'Project', targetPath);
+        const sub = await this.gitService.findSubRepos().catch(() => []);
         for (const s of sub) {
           await checkAndAdd(s.name, s.path);
         }

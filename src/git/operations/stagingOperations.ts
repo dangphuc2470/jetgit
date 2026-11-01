@@ -103,15 +103,19 @@ export async function rollbackFiles(ctx: StagingExecContext, paths: string[]): P
 }
 
 export async function getFileDiff(ctx: StagingExecContext, filePath: string): Promise<string> {
-  const status = await ctx.getStatus();
-  const entry = status.find(s => s.path === filePath);
+  const status = await ctx.getStatus().catch(() => []);
+  const entry = status.find(s => s.path === filePath || s.path.endsWith('/' + filePath) || filePath.endsWith('/' + s.path));
   if (entry && entry.x === '?' && entry.y === '?') {
     try {
-      const fullPath = path.join(ctx.cwd, filePath);
-      const content = fs.readFileSync(fullPath, 'utf8');
-      const lines = content.split('\n');
-      const diffHeader = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
-      return diffHeader + lines.map(l => `+${l}`).join('\n');
+      const fullPath = path.isAbsolute(filePath)
+        ? filePath
+        : (fs.existsSync(path.join(ctx.cwd, filePath)) ? path.join(ctx.cwd, filePath) : path.join(ctx.cwd, entry.path));
+      if (fs.existsSync(fullPath) && !fs.statSync(fullPath).isDirectory()) {
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const lines = content.split('\n');
+        const diffHeader = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
+        return diffHeader + lines.map(l => `+${l}`).join('\n');
+      }
     } catch {
       return '';
     }
@@ -119,9 +123,15 @@ export async function getFileDiff(ctx: StagingExecContext, filePath: string): Pr
   try {
     const diff = await ctx.exec(['diff', 'HEAD', '--', filePath]);
     if (diff.trim()) return diff;
+    const diffRel = await ctx.exec(['diff', 'HEAD', '--', `./${filePath}`]).catch(() => '');
+    if (diffRel.trim()) return diffRel;
     return await ctx.exec(['diff', '--', filePath]);
   } catch {
-    return await ctx.exec(['diff', '--', filePath]);
+    try {
+      return await ctx.exec(['diff', '--', `./${filePath}`]);
+    } catch {
+      return '';
+    }
   }
 }
 

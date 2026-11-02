@@ -292,11 +292,13 @@ export class GitService {
     return results;
   }
 
-  async fetchSingleBranch(remote: string, branchName: string): Promise<string> {
-    return this.exec([
-      'fetch', remote,
-      `refs/heads/${branchName}:refs/remotes/${remote}/${branchName}`
-    ], 100 * 1024 * 1024, 1, 300000);
+  async fetchSingleBranch(remote: string, branchName: string, depth?: number): Promise<string> {
+    const args = ['fetch'];
+    if (depth && depth > 0) {
+      args.push(`--depth=${depth}`);
+    }
+    args.push(remote, `refs/heads/${branchName}:refs/remotes/${remote}/${branchName}`);
+    return this.exec(args, 100 * 1024 * 1024, 1, 900000);
   }
 
   async getTags(): Promise<TagInfo[]> {

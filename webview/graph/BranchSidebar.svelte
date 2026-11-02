@@ -463,6 +463,15 @@
           postMessage("pull", branchName);
         })
       });
+      if (branchInfo?.upstream) {
+        items.push({
+          label: `Fetch '${branchInfo.upstream}' (--depth=1)`,
+          onClick: () => closeAndRun(() => {
+            showToast(`Fetching '${branchInfo.upstream}' (--depth=1)...`);
+            postMessage("fetchSingleBranch", { branch: branchInfo.upstream, depth: 1 });
+          })
+        });
+      }
       items.push({
         label: "Push...",
         onClick: () => closeAndRun(() => postMessage("push", branchName))
@@ -508,6 +517,13 @@
         onClick: () => closeAndRun(() => {
           showToast(`Fetching '${branchName}'...`);
           postMessage("fetchSingleBranch", { branch: branchName });
+        })
+      });
+      items.push({
+        label: "Fetch Branch (--depth=1)",
+        onClick: () => closeAndRun(() => {
+          showToast(`Fetching '${branchName}' (--depth=1)...`);
+          postMessage("fetchSingleBranch", { branch: branchName, depth: 1 });
         })
       });
       const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
@@ -592,6 +608,15 @@
           postMessage("pull", branchName);
         })
       });
+      if (branchInfo?.upstream) {
+        items.push({
+          label: `Fetch '${branchInfo.upstream}' (--depth=1)`,
+          onClick: () => closeAndRun(() => {
+            showToast(`Fetching '${branchInfo.upstream}' (--depth=1)...`);
+            postMessage("fetchSingleBranch", { branch: branchInfo.upstream, depth: 1 });
+          })
+        });
+      }
       items.push({
         label: "Push...",
         onClick: () => closeAndRun(() => postMessage("push", branchName))
@@ -678,6 +703,13 @@
         onClick: () => closeAndRun(() => {
           showToast(`Fetching remote '${remoteName}'...`);
           postMessage("fetchRemote", { remote: remoteName });
+        })
+      });
+      items.push({
+        label: `Fetch '${remoteName}' (--depth=1)`,
+        onClick: () => closeAndRun(() => {
+          showToast(`Fetching remote '${remoteName}' (--depth=1)...`);
+          postMessage("fetchRemote", { remote: remoteName, depth: 1 });
         })
       });
     }

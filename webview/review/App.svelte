@@ -11,7 +11,6 @@
     mapRightToLeft,
     buildStagedContent,
     isBlockStaged,
-    computeAlignedRenderLines,
   } from "./diffParser";
   import {
     pushHistoryState,
@@ -73,13 +72,109 @@
   let isMasterChecked = $derived(stagedBlocksCount === totalBlocksCount && totalBlocksCount > 0);
   let isMasterIndeterminate = $derived(stagedBlocksCount > 0 && stagedBlocksCount < totalBlocksCount);
 
-  let alignedResult = $derived.by(() => {
-    return computeAlignedRenderLines(baseLines, currentLines, blocks, highlightWords);
+  let leftLineMap = $derived.by(() => {
+    const map: Record<number, DiffBlock> = {};
+    for (const b of blocks) {
+      if (!b.isLeftEmpty) {
+        for (let l = b.leftStart; l <= b.leftEnd; l++) {
+          map[l] = b;
+        }
+      }
+    }
+    return map;
   });
 
-  let leftRenderLines = $derived(alignedResult.leftLines);
-  let rightRenderLines = $derived(alignedResult.rightLines);
-  let totalAlignedLines = $derived(alignedResult.totalAlignedLines);
+  let rightLineMap = $derived.by(() => {
+    const map: Record<number, DiffBlock> = {};
+    for (const b of blocks) {
+      if (!b.isRightEmpty) {
+        for (let r = b.rightStart; r <= b.rightEnd; r++) {
+          map[r] = b;
+        }
+      }
+    }
+    return map;
+  });
+
+  let leftRenderLines = $derived.by(() => {
+    return baseLines.map((line, idx) => {
+      const lineNum = idx + 1;
+      const b = leftLineMap[lineNum];
+      let rowClass = "editor-line";
+      let html = highlightCode(line);
+
+      if (b) {
+        if (b.type === "del") {
+          rowClass += " line-del";
+          html = highlightCode(line);
+        } else if (b.type === "mod") {
+          rowClass += " line-mod";
+          if (highlightWords) {
+            const rOffset = lineNum - b.leftStart;
+            const matchingRightLineNum = b.rightStart + rOffset;
+            const rightText = (matchingRightLineNum <= b.rightEnd && currentLines[matchingRightLineNum - 1] !== undefined)
+              ? currentLines[matchingRightLineNum - 1]
+              : "";
+            const wDiff = computeWordDiff(line, rightText);
+            html = wDiff.leftHtml;
+          } else {
+            html = highlightCode(line);
+          }
+        }
+      }
+
+      return { lineNum, rowClass, html };
+    });
+  });
+
+  let rightRenderLines = $derived.by(() => {
+    return currentLines.map((line, idx) => {
+      const lineNum = idx + 1;
+      const b = rightLineMap[lineNum];
+      let rowClass = "editor-line";
+      let html = highlightCode(line);
+
+      if (b) {
+        if (b.type === "add") {
+          rowClass += " line-add";
+          html = highlightCode(line);
+        } else if (b.type === "mod") {
+          rowClass += " line-mod";
+          if (highlightWords) {
+            const lOffset = lineNum - b.rightStart;
+            const matchingLeftLineNum = b.leftStart + lOffset;
+            const leftText = (matchingLeftLineNum <= b.leftEnd && baseLines[matchingLeftLineNum - 1] !== undefined)
+              ? baseLines[matchingLeftLineNum - 1]
+              : "";
+            const wDiff = computeWordDiff(leftText, line);
+            html = wDiff.rightHtml;
+          } else {
+            html = highlightCode(line);
+          }
+        }
+      }
+
+      return { lineNum, rowClass, html };
+    });
+  });
+
+  let leftInsertions = $derived.by(() => {
+    return blocks
+      .filter((b) => b.isLeftEmpty)
+      .map((b) => ({
+        id: b.id,
+        topY: (b.leftStart - 1) * LINE_HEIGHT,
+      }));
+  });
+
+  let rightInsertions = $derived.by(() => {
+    return blocks
+      .filter((b) => b.isRightEmpty)
+      .map((b) => ({
+        id: b.id,
+        topY: (b.rightStart - 1) * LINE_HEIGHT,
+      }));
+  });
 
   // Sync state singleton with Svelte component
   function syncToSingleton() {
@@ -225,7 +320,7 @@
     if (runtime.isRendering || runtime.isSyncing || runtime.activeScroller === "right") return;
     if (!leftPaneEl || !rightPaneEl) return;
     runtime.isSyncing = true;
-    rightPaneEl.scrollTop = leftPaneEl.scrollTop;
+    rightPaneEl.scrollTop = mapLeftToRight(leftPaneEl.scrollTop);
     runtime.savedScrollTop = rightPaneEl.scrollTop;
     updateScrollPositions();
     requestAnimationFrame(() => {
@@ -239,7 +334,7 @@
     runtime.savedScrollTop = rightPaneEl.scrollTop;
     if (runtime.isSyncing || runtime.activeScroller === "left") return;
     runtime.isSyncing = true;
-    leftPaneEl.scrollTop = rightPaneEl.scrollTop;
+    leftPaneEl.scrollTop = mapRightToLeft(rightPaneEl.scrollTop);
     updateScrollPositions();
     requestAnimationFrame(() => {
       runtime.isSyncing = false;
@@ -752,6 +847,11 @@
         parseDiffData(reviewState.diff);
         syncFromSingleton();
 
+        vscode.postMessage({
+          type: "webviewLog",
+          payload: `fileDiff parsed for ${filePath}: baseLines=${baseLines.length}, currentLines=${currentLines.length}, blocks=${blocks.length}`,
+        });
+
         requestAnimationFrame(() => {
           if (runtime.savedScrollTop !== null && rightPaneEl && leftPaneEl) {
             runtime.isSyncing = true;
@@ -949,6 +1049,21 @@
     window.addEventListener("message", handleMessage);
     window.addEventListener("keydown", handleGlobalKeyDown);
 
+    const onWindowError = (e: ErrorEvent) => {
+      vscode.postMessage({
+        type: "webviewError",
+        payload: `${e.message} at ${e.filename}:${e.lineno}:${e.colno}`,
+      });
+    };
+    const onUnhandledRejection = (e: PromiseRejectionEvent) => {
+      vscode.postMessage({
+        type: "webviewError",
+        payload: `Unhandled rejection: ${e.reason?.stack || e.reason}`,
+      });
+    };
+    window.addEventListener("error", onWindowError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
     const cleanupTooltips = initTooltips();
 
     // Handshake
@@ -957,6 +1072,8 @@
     return () => {
       window.removeEventListener("message", handleMessage);
       window.removeEventListener("keydown", handleGlobalKeyDown);
+      window.removeEventListener("error", onWindowError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
       runtime.setActiveBlockId = null;
       cleanupTooltips();
     };
@@ -1035,11 +1152,14 @@
       onpointerdown={() => setScroller("left")}
     >
       <div class="editor-lines-container">
-        {#each leftRenderLines as line (line.id)}
+        {#each leftRenderLines as line (line.lineNum)}
           <div class={line.rowClass} data-line={line.lineNum}>
-            <span class="gutter-num">{line.lineNum ?? ""}</span>
-            <span class="line-content">{@html line.html}</span>
+            <span class="gutter-num">{line.lineNum}</span>
+            <span class="line-content">{@html line.html || "&nbsp;"}</span>
           </div>
+        {/each}
+        {#each leftInsertions as ins (ins.id)}
+          <div class="diff-insertion-line insertion-add" style={`top: ${ins.topY}px;`}></div>
         {/each}
       </div>
     </div>
@@ -1072,24 +1192,20 @@
       onpaste={onRightPaste}
     >
       <div class="editor-lines-container">
-        {#each rightRenderLines as line (line.id)}
-          {#if line.isSpacer}
-            <div class={line.rowClass}>
-              <span class="gutter-num"></span>
-              <span class="line-content">&nbsp;</span>
-            </div>
-          {:else}
-            <div class={`${line.rowClass} in-right`} data-line={line.lineNum}>
-              <span class="gutter-num">{line.lineNum}</span>
-              <span
-                class="line-content"
-                data-line={line.lineNum}
-                oninput={(e) => handleLineInput(e.currentTarget as HTMLElement)}
-              >
-                {@html line.html}
-              </span>
-            </div>
-          {/if}
+        {#each rightRenderLines as line (line.lineNum)}
+          <div class={`${line.rowClass} in-right`} data-line={line.lineNum}>
+            <span class="gutter-num">{line.lineNum}</span>
+            <span
+              class="line-content"
+              data-line={line.lineNum}
+              oninput={(e) => handleLineInput(e.currentTarget as HTMLElement)}
+            >
+              {@html line.html || "&nbsp;"}
+            </span>
+          </div>
+        {/each}
+        {#each rightInsertions as ins (ins.id)}
+          <div class="diff-insertion-line insertion-del" style={`top: ${ins.topY}px;`}></div>
         {/each}
       </div>
     </div>
@@ -1097,7 +1213,7 @@
     <!-- Overview Ruler -->
     <OverviewRuler
       {blocks}
-      totalLines={totalAlignedLines}
+      totalLines={Math.max(currentLines.length, baseLines.length, 1)}
       onJumpToBlock={(idx) => jumpToBlock(idx, true)}
     />
   </div>

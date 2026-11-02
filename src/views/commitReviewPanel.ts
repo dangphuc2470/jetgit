@@ -397,6 +397,18 @@ export class CommitReviewPanel {
         }
         break;
       }
+      case 'webviewLog': {
+        if (this.log) {
+          this.log.appendLine(`[CommitReviewPanel] [Webview] ${msg.payload}`);
+        }
+        break;
+      }
+      case 'webviewError': {
+        if (this.log) {
+          this.log.appendLine(`[CommitReviewPanel] [Webview ERROR] ${msg.payload}`);
+        }
+        break;
+      }
     }
   }
 

@@ -165,6 +165,32 @@ export function parseDiffData(rawDiff: string): void {
     }
   }
 
+  // Fallback: reconstruct minimal lines from hunks if full content failed to load
+  if (state.baseLines.length === 0 && state.currentLines.length === 0 && hunks.length > 0) {
+    const recBase: string[] = [];
+    const recCurr: string[] = [];
+    for (const hunk of hunks) {
+      while (recBase.length < hunk.oldStart - 1) {
+        recBase.push('');
+      }
+      while (recCurr.length < hunk.newStart - 1) {
+        recCurr.push('');
+      }
+      for (const dl of hunk.diffLines) {
+        if (dl.startsWith(' ')) {
+          recBase.push(dl.slice(1));
+          recCurr.push(dl.slice(1));
+        } else if (dl.startsWith('-')) {
+          recBase.push(dl.slice(1));
+        } else if (dl.startsWith('+')) {
+          recCurr.push(dl.slice(1));
+        }
+      }
+    }
+    state.baseLines = recBase;
+    state.currentLines = recCurr;
+  }
+
   const blocks: DiffBlock[] = [];
   hunks.forEach((hunk) => {
     let bLine = hunk.oldStart;
@@ -371,7 +397,7 @@ export function mapRightToLeft(sRight: number): number {
 }
 
 export interface RenderLineItem {
-  id: number;
+  id: string | number;
   isSpacer: boolean;
   lineNum?: number;
   rowClass: string;
@@ -383,6 +409,7 @@ export interface RenderLineItem {
 export interface AlignedRenderResult {
   leftLines: RenderLineItem[];
   rightLines: RenderLineItem[];
+  alignedBlocks: DiffBlock[];
   totalAlignedLines: number;
 }
 
@@ -394,20 +421,22 @@ export function computeAlignedRenderLines(
 ): AlignedRenderResult {
   const leftLines: RenderLineItem[] = [];
   const rightLines: RenderLineItem[] = [];
+  const alignedBlocks: DiffBlock[] = (blocks || []).map(b => ({ ...b }));
 
   let curL = 1;
   let curR = 1;
   let visualLine = 1;
-  let idCounter = 1;
 
-  for (const b of blocks) {
+  for (let bIdx = 0; bIdx < alignedBlocks.length; bIdx++) {
+    const b = alignedBlocks[bIdx];
+
     // 1. Common unchanged lines before this block
     while (curL < b.leftStart && curL <= baseLines.length) {
       const lText = baseLines[curL - 1] ?? '';
       const rText = curR <= currentLines.length ? (currentLines[curR - 1] ?? '') : '';
 
       leftLines.push({
-        id: idCounter++,
+        id: `l-${curL}`,
         isSpacer: false,
         lineNum: curL,
         rowClass: 'editor-line',
@@ -416,7 +445,7 @@ export function computeAlignedRenderLines(
       });
 
       rightLines.push({
-        id: idCounter++,
+        id: `r-${curR}`,
         isSpacer: false,
         lineNum: curR,
         rowClass: 'editor-line',
@@ -463,7 +492,7 @@ export function computeAlignedRenderLines(
         }
 
         leftLines.push({
-          id: idCounter++,
+          id: `l-${lNum}`,
           isSpacer: false,
           lineNum: lNum,
           rowClass,
@@ -475,7 +504,7 @@ export function computeAlignedRenderLines(
       } else {
         // Spacer on left (for additions on right)
         leftLines.push({
-          id: idCounter++,
+          id: `l-sp-${visualLine}`,
           isSpacer: true,
           rowClass: 'editor-line line-spacer',
           html: '&nbsp;',
@@ -510,7 +539,7 @@ export function computeAlignedRenderLines(
         }
 
         rightLines.push({
-          id: idCounter++,
+          id: `r-${rNum}`,
           isSpacer: false,
           lineNum: rNum,
           rowClass,
@@ -522,7 +551,7 @@ export function computeAlignedRenderLines(
       } else {
         // Spacer on right (for deletions on left)
         rightLines.push({
-          id: idCounter++,
+          id: `r-sp-${visualLine}`,
           isSpacer: true,
           rowClass: 'editor-line line-spacer',
           html: '&nbsp;',
@@ -546,7 +575,7 @@ export function computeAlignedRenderLines(
     const rText = hasR ? (currentLines[curR - 1] ?? '') : '';
 
     leftLines.push({
-      id: idCounter++,
+      id: hasL ? `l-${curL}` : `l-sp-${visualLine}`,
       isSpacer: !hasL,
       lineNum: hasL ? curL : undefined,
       rowClass: hasL ? 'editor-line' : 'editor-line line-spacer',
@@ -555,7 +584,7 @@ export function computeAlignedRenderLines(
     });
 
     rightLines.push({
-      id: idCounter++,
+      id: hasR ? `r-${curR}` : `r-sp-${visualLine}`,
       isSpacer: !hasR,
       lineNum: hasR ? curR : undefined,
       rowClass: hasR ? 'editor-line' : 'editor-line line-spacer',
@@ -571,6 +600,7 @@ export function computeAlignedRenderLines(
   return {
     leftLines,
     rightLines,
+    alignedBlocks,
     totalAlignedLines: visualLine - 1,
   };
 }

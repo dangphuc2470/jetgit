@@ -75,7 +75,9 @@ export type ReviewToExtensionMessage =
       };
     }
   | { type: 'openFile'; payload: string }
-  | { type: 'rollbackHunk'; payload: { patch: string } };
+  | { type: 'rollbackHunk'; payload: { patch: string } }
+  | { type: 'webviewLog'; payload: string }
+  | { type: 'webviewError'; payload: string };
 
 
 // ============================================================================

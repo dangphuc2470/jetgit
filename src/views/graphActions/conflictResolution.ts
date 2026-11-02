@@ -267,6 +267,45 @@ export async function handleCheckoutWithConflictResolution(
     }
   } catch {}
 
+  if (isRemote) {
+    const verifyTarget = ref.startsWith('refs/') ? ref : `refs/remotes/${ref}`;
+    const hasLocalRef = await gitService
+      .exec(['rev-parse', '--verify', verifyTarget])
+      .then(() => true)
+      .catch(() => false);
+
+    if (!hasLocalRef) {
+      const remoteBranchPart = ref.slice(remoteName.length + 1);
+      const action = await vscode.window.showWarningMessage(
+        `Remote branch '${ref}' has not been fetched to your local repository yet.`,
+        'Fetch & Checkout'
+      );
+      if (action === 'Fetch & Checkout') {
+        let fetchSuccess = false;
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Fetching '${ref}'...`,
+            cancellable: false,
+          },
+          async () => {
+            try {
+              await gitService.fetchSingleBranch(remoteName, remoteBranchPart);
+              fetchSuccess = true;
+            } catch (err: any) {
+              vscode.window.showErrorMessage(`Failed to fetch '${ref}': ${err.message}`);
+            }
+          }
+        );
+        if (!fetchSuccess) {
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+  }
+
   const targetName = options?.name || localBranchName;
   const isForce = options?.force === true;
 
@@ -288,9 +327,6 @@ export async function handleCheckoutWithConflictResolution(
   }
 
   if (isRemote && localBranchName) {
-    try {
-      await gitService.fetchSingleBranch(remoteName, localBranchName);
-    } catch {}
 
     const branchCheck = (await gitService.exec(['branch', '--list', localBranchName]).catch(() => '')).trim();
     if (branchCheck) {

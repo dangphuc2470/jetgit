@@ -130,10 +130,6 @@ export async function checkout(
   } catch {}
 
   if (isRemoteBranch && targetRemote && localBranchName) {
-    try {
-      const remoteBranchPart = ref.slice(targetRemote.length + 1);
-      await ctx.exec(['fetch', targetRemote, `refs/heads/${remoteBranchPart}:refs/remotes/${targetRemote}/${remoteBranchPart}`]);
-    } catch {}
 
     const branchCheck = await ctx.exec(['branch', '--list', localBranchName]);
     const branchExists = !!branchCheck.trim();

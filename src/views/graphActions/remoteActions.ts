@@ -80,18 +80,23 @@ export async function handleRemoteAction(
     }
 
     case 'fetchRemote': {
-      const { remote } = (payload || {}) as { remote?: string };
+      const { remote, depth } = (payload || {}) as { remote?: string; depth?: number };
       if (!remote) return true;
       try {
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: `Fetching '${remote}'...`,
+            title: `Fetching '${remote}'${depth ? ` (--depth=${depth})` : ''}...`,
             cancellable: false,
           },
           async () => {
-            await gitService.exec(['fetch', remote, '--prune'], 10 * 1024 * 1024, 1, 90000);
-            vscode.window.showInformationMessage(`Fetched remote '${remote}' successfully.`);
+            const args = ['fetch'];
+            if (depth && depth > 0) {
+              args.push(`--depth=${depth}`);
+            }
+            args.push(remote, '--prune');
+            await gitService.exec(args, 10 * 1024 * 1024, 1, 90000);
+            vscode.window.showInformationMessage(`Fetched remote '${remote}'${depth ? ` (depth ${depth})` : ''} successfully.`);
           }
         );
       } catch (err: any) {
@@ -103,7 +108,7 @@ export async function handleRemoteAction(
     }
 
     case 'fetchSingleBranch': {
-      const { branch } = (payload || {}) as { branch?: string };
+      const { branch, depth } = (payload || {}) as { branch?: string; depth?: number };
       if (!branch) return true;
       const slashIdx = branch.indexOf('/');
       if (slashIdx === -1) return true;
@@ -113,12 +118,12 @@ export async function handleRemoteAction(
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: `Fetching '${branch}'...`,
+            title: `Fetching '${branch}'${depth ? ` (--depth=${depth})` : ''}...`,
             cancellable: false,
           },
           async () => {
-            await gitService.fetchSingleBranch(remoteName, branchName);
-            vscode.window.showInformationMessage(`Fetched branch '${branch}' successfully.`);
+            await gitService.fetchSingleBranch(remoteName, branchName, depth);
+            vscode.window.showInformationMessage(`Fetched branch '${branch}'${depth ? ` (depth ${depth})` : ''} successfully.`);
           }
         );
       } catch (err: any) {

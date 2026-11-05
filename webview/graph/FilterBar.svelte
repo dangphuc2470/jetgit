@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { postMessage } from "$shared/vscodeApi";
+  import type { ViewOptions } from "./types";
 
   interface Props {
     activeBranch?: string;
     branchData?: any;
     commits?: any[];
     selectedHash?: string | null;
+    viewOptions?: ViewOptions;
     onFilter: (filter: any) => void;
     onRefresh: () => void;
     setActiveBranch?: (name: string) => void;
@@ -17,6 +19,7 @@
     branchData = { branches: [], currentBranch: "" },
     commits = [],
     selectedHash = null,
+    viewOptions = $bindable(),
     onFilter,
     onRefresh,
     setActiveBranch
@@ -58,34 +61,17 @@
   let isFirstParent = $state(false);
   let isNoMerges = $state(false);
 
-  // View Options state
-  let viewCompactRefs = $state(true);
-  let viewTagNames = $state(false);
-  let viewLongEdges = $state(false);
-  let viewCommitTimestamp = $state(false);
-  let viewRefsOnLeft = $state(false);
-
-  let colAuthor = $state(true);
-  let colHash = $state(false);
-  let colDate = $state(true);
-  let colGpg = $state(false);
-
-  let hlMyCommits = $state(true);
-  let hlMergeCommits = $state(true);
-  let hlCurrentBranch = $state(true);
-  let hlNotCherryPicked = $state(false);
-
-  try {
-    if (localStorage.getItem("intellij_git_hl_my_commits") !== null) {
-      hlMyCommits = localStorage.getItem("intellij_git_hl_my_commits") === "true";
-    }
-    if (localStorage.getItem("intellij_git_hl_merge_commits") !== null) {
-      hlMergeCommits = localStorage.getItem("intellij_git_hl_merge_commits") === "true";
-    }
-    if (localStorage.getItem("intellij_git_hl_current_branch") !== null) {
-      hlCurrentBranch = localStorage.getItem("intellij_git_hl_current_branch") === "true";
-    }
-  } catch {}
+  function toggleOption(key: keyof ViewOptions, storageKey: string) {
+    if (!viewOptions) return;
+    const nextVal = !viewOptions[key];
+    viewOptions = {
+      ...viewOptions,
+      [key]: nextVal
+    };
+    try {
+      localStorage.setItem(storageKey, String(nextVal));
+    } catch {}
+  }
 
   // Sync activeBranch prop with curBranch
   $effect(() => {
@@ -96,15 +82,20 @@
 
   // Apply View Options classes to document.body
   $effect(() => {
-    if (typeof document !== "undefined" && document.body) {
-      document.body.classList.toggle("hide-col-author", !colAuthor);
-      document.body.classList.toggle("hide-col-date", !colDate);
-      document.body.classList.toggle("show-col-hash", colHash);
-      document.body.classList.toggle("compact-refs", viewCompactRefs);
-      document.body.classList.toggle("refs-on-left", viewRefsOnLeft);
-      document.body.classList.toggle("hl-my-commits", hlMyCommits);
-      document.body.classList.toggle("hl-merge-commits", hlMergeCommits);
-      document.body.classList.toggle("hl-current-branch", hlCurrentBranch);
+    if (typeof document !== "undefined" && document.body && viewOptions) {
+      document.body.classList.toggle("hide-col-author", !viewOptions.colAuthor);
+      document.body.classList.toggle("hide-col-date", !viewOptions.colDate);
+      document.body.classList.toggle("show-col-hash", viewOptions.colHash);
+      document.body.classList.toggle("show-col-gpg", viewOptions.colGpg);
+      document.body.classList.toggle("compact-refs", viewOptions.compactRefs);
+      document.body.classList.toggle("hide-tag-names", !viewOptions.tagNames);
+      document.body.classList.toggle("show-long-edges", viewOptions.longEdges);
+      document.body.classList.toggle("commit-timestamp", viewOptions.commitTimestamp);
+      document.body.classList.toggle("refs-on-left", viewOptions.refsOnLeft);
+      document.body.classList.toggle("hl-my-commits", viewOptions.hlMyCommits);
+      document.body.classList.toggle("hl-merge-commits", viewOptions.hlMergeCommits);
+      document.body.classList.toggle("hl-current-branch", viewOptions.hlCurrentBranch);
+      document.body.classList.toggle("hl-not-cherry-picked", viewOptions.hlNotCherryPicked);
     }
   });
 
@@ -861,12 +852,10 @@
           <div class="as-menu-section-header">Show</div>
           <div
             class="as-menu-item"
-            onclick={() => {
-              viewCompactRefs = !viewCompactRefs;
-            }}
+            onclick={() => toggleOption("compactRefs", "jetgit_view_compact_refs")}
           >
             <span class="as-menu-check">
-              {#if viewCompactRefs}
+              {#if viewOptions?.compactRefs}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -875,12 +864,10 @@
 
           <div
             class="as-menu-item"
-            onclick={() => {
-              viewTagNames = !viewTagNames;
-            }}
+            onclick={() => toggleOption("tagNames", "jetgit_view_tag_names")}
           >
             <span class="as-menu-check">
-              {#if viewTagNames}
+              {#if viewOptions?.tagNames}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -889,12 +876,10 @@
 
           <div
             class="as-menu-item"
-            onclick={() => {
-              viewLongEdges = !viewLongEdges;
-            }}
+            onclick={() => toggleOption("longEdges", "jetgit_view_long_edges")}
           >
             <span class="as-menu-check">
-              {#if viewLongEdges}
+              {#if viewOptions?.longEdges}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -903,12 +888,10 @@
 
           <div
             class="as-menu-item"
-            onclick={() => {
-              viewCommitTimestamp = !viewCommitTimestamp;
-            }}
+            onclick={() => toggleOption("commitTimestamp", "jetgit_view_commit_timestamp")}
           >
             <span class="as-menu-check">
-              {#if viewCommitTimestamp}
+              {#if viewOptions?.commitTimestamp}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -917,12 +900,10 @@
 
           <div
             class="as-menu-item"
-            onclick={() => {
-              viewRefsOnLeft = !viewRefsOnLeft;
-            }}
+            onclick={() => toggleOption("refsOnLeft", "jetgit_view_refs_on_left")}
           >
             <span class="as-menu-check">
-              {#if viewRefsOnLeft}
+              {#if viewOptions?.refsOnLeft}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -940,11 +921,11 @@
                 class="as-menu-item"
                 onclick={(e) => {
                   e.stopPropagation();
-                  colAuthor = !colAuthor;
+                  toggleOption("colAuthor", "jetgit_col_author");
                 }}
               >
                 <span class="as-menu-check">
-                  {#if colAuthor}
+                  {#if viewOptions?.colAuthor}
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
                   {/if}
                 </span>
@@ -955,11 +936,11 @@
                 class="as-menu-item"
                 onclick={(e) => {
                   e.stopPropagation();
-                  colHash = !colHash;
+                  toggleOption("colHash", "jetgit_col_hash");
                 }}
               >
                 <span class="as-menu-check">
-                  {#if colHash}
+                  {#if viewOptions?.colHash}
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
                   {/if}
                 </span>
@@ -970,11 +951,11 @@
                 class="as-menu-item"
                 onclick={(e) => {
                   e.stopPropagation();
-                  colDate = !colDate;
+                  toggleOption("colDate", "jetgit_col_date");
                 }}
               >
                 <span class="as-menu-check">
-                  {#if colDate}
+                  {#if viewOptions?.colDate}
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
                   {/if}
                 </span>
@@ -985,11 +966,11 @@
                 class="as-menu-item"
                 onclick={(e) => {
                   e.stopPropagation();
-                  colGpg = !colGpg;
+                  toggleOption("colGpg", "jetgit_col_gpg");
                 }}
               >
                 <span class="as-menu-check">
-                  {#if colGpg}
+                  {#if viewOptions?.colGpg}
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
                   {/if}
                 </span>
@@ -1004,13 +985,10 @@
           <div class="as-menu-section-header">Highlight</div>
           <div
             class="as-menu-item"
-            onclick={() => {
-              hlMyCommits = !hlMyCommits;
-              try { localStorage.setItem("intellij_git_hl_my_commits", hlMyCommits ? "true" : "false"); } catch {}
-            }}
+            onclick={() => toggleOption("hlMyCommits", "jetgit_hl_my_commits")}
           >
             <span class="as-menu-check">
-              {#if hlMyCommits}
+              {#if viewOptions?.hlMyCommits}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -1019,13 +997,10 @@
 
           <div
             class="as-menu-item"
-            onclick={() => {
-              hlMergeCommits = !hlMergeCommits;
-              try { localStorage.setItem("intellij_git_hl_merge_commits", hlMergeCommits ? "true" : "false"); } catch {}
-            }}
+            onclick={() => toggleOption("hlMergeCommits", "jetgit_hl_merge_commits")}
           >
             <span class="as-menu-check">
-              {#if hlMergeCommits}
+              {#if viewOptions?.hlMergeCommits}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -1034,13 +1009,10 @@
 
           <div
             class="as-menu-item"
-            onclick={() => {
-              hlCurrentBranch = !hlCurrentBranch;
-              try { localStorage.setItem("intellij_git_hl_current_branch", hlCurrentBranch ? "true" : "false"); } catch {}
-            }}
+            onclick={() => toggleOption("hlCurrentBranch", "jetgit_hl_current_branch")}
           >
             <span class="as-menu-check">
-              {#if hlCurrentBranch}
+              {#if viewOptions?.hlCurrentBranch}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>
@@ -1049,12 +1021,10 @@
 
           <div
             class="as-menu-item"
-            onclick={() => {
-              hlNotCherryPicked = !hlNotCherryPicked;
-            }}
+            onclick={() => toggleOption("hlNotCherryPicked", "jetgit_hl_not_cherry_picked")}
           >
             <span class="as-menu-check">
-              {#if hlNotCherryPicked}
+              {#if viewOptions?.hlNotCherryPicked}
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z" /></svg>
               {/if}
             </span>

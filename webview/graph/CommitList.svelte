@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import CommitGraph from './CommitGraph.svelte';
   import BranchLabels from './BranchLabels.svelte';
+  import type { ViewOptions } from './types';
   import {
     postMessage,
     openCreateBranchDialog,
@@ -15,6 +16,7 @@
     selectedHash: string | null;
     graphWidth: number;
     scrollToIndex: number;
+    viewOptions?: ViewOptions;
     onSelectCommit: (hash: string) => void;
     onRebaseFromHere: (hash: string) => void;
     onLoadMore: () => void;
@@ -25,10 +27,90 @@
     selectedHash = null,
     graphWidth = 1,
     scrollToIndex = -1,
+    viewOptions = {
+      compactRefs: true,
+      tagNames: true,
+      longEdges: false,
+      commitTimestamp: false,
+      refsOnLeft: false,
+      colAuthor: true,
+      colDate: true,
+      colHash: false,
+      colGpg: false,
+      hlMyCommits: true,
+      hlMergeCommits: true,
+      hlCurrentBranch: true,
+      hlNotCherryPicked: false
+    },
     onSelectCommit,
     onRebaseFromHere,
     onLoadMore
   }: Props = $props();
+
+  const DEFAULT_COL_WIDTHS = {
+    author: 100,
+    date: 125,
+    hash: 75,
+    gpg: 36
+  };
+
+  let colWidths = $state({ ...DEFAULT_COL_WIDTHS });
+
+  try {
+    const saved = localStorage.getItem('jetgit_col_widths');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (typeof parsed.author === 'number' && parsed.author >= 50) colWidths.author = parsed.author;
+      if (typeof parsed.date === 'number' && parsed.date >= 60) colWidths.date = parsed.date;
+      if (typeof parsed.hash === 'number' && parsed.hash >= 50) colWidths.hash = parsed.hash;
+      if (typeof parsed.gpg === 'number' && parsed.gpg >= 24) colWidths.gpg = parsed.gpg;
+    }
+  } catch {}
+
+  function startResize(col: 'author' | 'date' | 'hash' | 'gpg', e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = colWidths[col];
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const diff = ev.clientX - startX;
+      const minW = col === 'gpg' ? 24 : col === 'hash' ? 50 : 60;
+      const maxW = col === 'author' ? 450 : col === 'date' ? 350 : 250;
+      colWidths[col] = Math.max(minW, Math.min(maxW, startW + diff));
+    };
+
+    const onMouseUp = () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      try {
+        localStorage.setItem('jetgit_col_widths', JSON.stringify(colWidths));
+      } catch {}
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  function resetColWidth(col: 'author' | 'date' | 'hash' | 'gpg') {
+    colWidths[col] = DEFAULT_COL_WIDTHS[col];
+    try {
+      localStorage.setItem('jetgit_col_widths', JSON.stringify(colWidths));
+    } catch {}
+  }
+
+  let graphLeft = $derived.by(() => {
+    let left = 8;
+    if (viewOptions.colAuthor) left += colWidths.author + 8;
+    if (viewOptions.colDate) left += colWidths.date + 8;
+    if (viewOptions.colHash) left += colWidths.hash + 8;
+    if (viewOptions.colGpg) left += colWidths.gpg + 8;
+    return left;
+  });
 
   const ROW_HEIGHT = 25;
   const OVERSCAN = 5;
@@ -123,6 +205,17 @@
     const month = d.getMonth() + 1;
     const year = String(d.getFullYear()).slice(-2);
     return `${day}/${month}/${year}, ${timeStr}`;
+  }
+
+  function formatCommitDate(iso: string, timestampMode: boolean) {
+    if (!iso) return '';
+    if (timestampMode) {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    return formatDate(iso);
   }
 
   const ICON_COPY = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>';
@@ -805,7 +898,88 @@
   }
 </script>
 
-<div class="commit-list-container" bind:this={containerEl} onscroll={onScroll}>
+<div
+  class="commit-list-container"
+  class:compact-refs={viewOptions.compactRefs}
+  class:hide-tag-names={!viewOptions.tagNames}
+  class:refs-on-left={viewOptions.refsOnLeft}
+  class:hl-my-commits={viewOptions.hlMyCommits}
+  class:hl-merge-commits={viewOptions.hlMergeCommits}
+  class:hl-current-branch={viewOptions.hlCurrentBranch}
+  class:hl-not-cherry-picked={viewOptions.hlNotCherryPicked}
+  bind:this={containerEl}
+  onscroll={onScroll}
+>
+  <div class="table-header">
+    {#if viewOptions.colAuthor}
+      <div
+        class="th-cell th-author"
+        style="width: {colWidths.author}px; min-width: {colWidths.author}px; max-width: {colWidths.author}px;"
+      >
+        <span class="th-title">Author</span>
+        <div
+          class="col-resizer"
+          role="separator"
+          tabindex="-1"
+          title="Drag to resize, double-click to reset"
+          onmousedown={(e) => startResize('author', e)}
+          ondblclick={() => resetColWidth('author')}
+        ></div>
+      </div>
+    {/if}
+    {#if viewOptions.colDate}
+      <div
+        class="th-cell th-date"
+        style="width: {colWidths.date}px; min-width: {colWidths.date}px; max-width: {colWidths.date}px;"
+      >
+        <span class="th-title">Date</span>
+        <div
+          class="col-resizer"
+          role="separator"
+          tabindex="-1"
+          title="Drag to resize, double-click to reset"
+          onmousedown={(e) => startResize('date', e)}
+          ondblclick={() => resetColWidth('date')}
+        ></div>
+      </div>
+    {/if}
+    {#if viewOptions.colHash}
+      <div
+        class="th-cell th-hash"
+        style="width: {colWidths.hash}px; min-width: {colWidths.hash}px; max-width: {colWidths.hash}px;"
+      >
+        <span class="th-title">Hash</span>
+        <div
+          class="col-resizer"
+          role="separator"
+          tabindex="-1"
+          title="Drag to resize, double-click to reset"
+          onmousedown={(e) => startResize('hash', e)}
+          ondblclick={() => resetColWidth('hash')}
+        ></div>
+      </div>
+    {/if}
+    {#if viewOptions.colGpg}
+      <div
+        class="th-cell th-gpg"
+        style="width: {colWidths.gpg}px; min-width: {colWidths.gpg}px; max-width: {colWidths.gpg}px;"
+      >
+        <span class="th-title">GPG</span>
+        <div
+          class="col-resizer"
+          role="separator"
+          tabindex="-1"
+          title="Drag to resize, double-click to reset"
+          onmousedown={(e) => startResize('gpg', e)}
+          ondblclick={() => resetColWidth('gpg')}
+        ></div>
+      </div>
+    {/if}
+    <div class="th-cell th-description">
+      <span class="th-title">Description</span>
+    </div>
+  </div>
+
   <div
     class="scroll-content"
     style="height: {commits.length * ROW_HEIGHT}px; position: relative; min-width: 100%; width: max-content;"
@@ -814,13 +988,14 @@
       class="visible-rows"
       style="transform: translateY({startIndex * ROW_HEIGHT}px); min-width: 100%; width: max-content;"
     >
-      <div class="graph-column">
+      <div class="graph-column" style="left: {graphLeft}px;">
         <CommitGraph
           nodes={graphNodes}
           {graphWidth}
           {startIndex}
           visibleCount={endIndex - startIndex}
           rowHeight={ROW_HEIGHT}
+          showLongEdges={viewOptions.longEdges}
         />
       </div>
       <div class="rows-column">
@@ -843,17 +1018,67 @@
             oncontextmenu={(e) => onContextMenu(e, commit)}
             onkeydown={(e) => { if (e.key === 'Enter') onSelectCommit(commit.hash); }}
           >
-            <span class="hash" style="width: {gw}px; min-width: {gw}px;"></span>
-            {#if commit.refs && commit.refs.length > 0}
+            {#if viewOptions.colAuthor}
+              <span
+                class="author"
+                class:is-my-commit={isMy}
+                style="width: {colWidths.author}px; min-width: {colWidths.author}px; max-width: {colWidths.author}px;"
+                title={commit.author}
+              >
+                {commit.author}
+              </span>
+            {/if}
+            {#if viewOptions.colDate}
+              <span
+                class="date"
+                style="width: {colWidths.date}px; min-width: {colWidths.date}px; max-width: {colWidths.date}px;"
+                title={commit.authorDate}
+              >
+                {formatCommitDate(commit.authorDate, viewOptions.commitTimestamp)}
+              </span>
+            {/if}
+            {#if viewOptions.colHash}
+              <span
+                class="col-hash"
+                style="width: {colWidths.hash}px; min-width: {colWidths.hash}px; max-width: {colWidths.hash}px;"
+                title={commit.hash}
+              >
+                {commit.hash ? commit.hash.slice(0, 8) : ''}
+              </span>
+            {/if}
+            {#if viewOptions.colGpg}
+              <span
+                class="col-gpg"
+                style="width: {colWidths.gpg}px; min-width: {colWidths.gpg}px; max-width: {colWidths.gpg}px;"
+                title={commit.gpgSignature ? 'GPG Signature Verified' : 'No Signature'}
+              >
+                {#if commit.gpgSignature}
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="gpg-verified-icon">
+                    <path d="M8 0c-.8 0-1.5.3-2.1.9l-4.5 4.5c-.6.6-.9 1.3-.9 2.1v5c0 1.9 1.6 3.5 3.5 3.5h8c1.9 0 3.5-1.6 3.5-3.5v-5c0-.8-.3-1.5-.9-2.1L10.1.9C9.5.3 8.8 0 8 0zm0 1.5c.4 0 .8.2 1.1.5l4.5 4.5c.3.3.4.7.4 1.1v5c0 1.1-.9 2-2 2h-8c-1.1 0-2-.9-2-2v-5c0-.4.1-.8.4-1.1l4.5-4.5c.3-.3.7-.5 1.1-.5zM7 5v4h2V5H7zm0 5v2h2v-2H7z"/>
+                  </svg>
+                {/if}
+              </span>
+            {/if}
+            <span class="graph-spacer" style="width: {gw}px; min-width: {gw}px;"></span>
+            {#if viewOptions.refsOnLeft && commit.refs && commit.refs.length > 0}
               <BranchLabels
                 refs={commit.refs}
+                compact={viewOptions.compactRefs}
+                showTags={viewOptions.tagNames}
                 onBranchContextMenu={showBranchLabelContextMenu}
                 onBranchCheckout={(name) => postMessage('checkout', name.replace(/^refs\/(heads|remotes)\//, '').replace(/^HEAD -> /, ''))}
               />
             {/if}
             <span class="subject" title={commit.subject}>{commit.subject}</span>
-            <span class="author" class:is-my-commit={isMy}>{commit.author}</span>
-            <span class="date">{formatDate(commit.authorDate)}</span>
+            {#if !viewOptions.refsOnLeft && commit.refs && commit.refs.length > 0}
+              <BranchLabels
+                refs={commit.refs}
+                compact={viewOptions.compactRefs}
+                showTags={viewOptions.tagNames}
+                onBranchContextMenu={showBranchLabelContextMenu}
+                onBranchCheckout={(name) => postMessage('checkout', name.replace(/^refs\/(heads|remotes)\//, '').replace(/^HEAD -> /, ''))}
+              />
+            {/if}
           </div>
         {/each}
       </div>
@@ -907,9 +1132,70 @@
   .graph-column {
     position: absolute;
     top: 0;
-    left: 244px;
     pointer-events: none;
     z-index: 1;
+  }
+  .table-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 24px;
+    background: var(--vscode-editor-background, #1e1f22);
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.25));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    box-sizing: border-box;
+    user-select: none;
+    min-width: 100%;
+    width: max-content;
+  }
+  .th-cell {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    color: var(--vscode-descriptionForeground, #8c9199);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+  .th-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .th-description {
+    flex: 1;
+    min-width: 300px;
+  }
+  .col-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -4px;
+    width: 8px;
+    cursor: col-resize;
+    z-index: 2;
+  }
+  .col-resizer::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    right: 3px;
+    width: 1px;
+    background: var(--vscode-panel-border, rgba(128,128,128,0.25));
+    transition: background 0.15s ease;
+  }
+  .col-resizer:hover::after,
+  .col-resizer:active::after {
+    background: var(--vscode-focusBorder, #3574f0);
+    width: 2px;
   }
   .rows-column {
     min-width: 100%;
@@ -951,40 +1237,55 @@
   .commit-row.selected .author,
   .commit-row.selected .date,
   .commit-row.selected .subject,
-  .commit-row.selected .hash,
+  .commit-row.selected .col-hash,
+  .commit-row.selected .col-gpg,
   .commit-row.selected * {
     color: var(--vscode-list-activeSelectionForeground, #ffffff) !important;
   }
   .author {
-    order: 1;
     flex-shrink: 0;
     font-weight: 400;
     color: #9aa0a6;
     font-size: 0.92em;
-    width: 95px;
-    min-width: 95px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .date {
-    order: 2;
     flex-shrink: 0;
     color: #8c8c8c;
     font-size: 0.88em;
-    width: 125px;
-    min-width: 125px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .hash {
-    order: 3;
+  .col-hash {
     flex-shrink: 0;
-    color: transparent;
+    color: #8c9199;
+    font-size: 0.88em;
+    font-family: var(--vscode-editor-font-family, monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .col-gpg {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #57ab5a;
+  }
+  .gpg-verified-icon {
+    display: block;
+    color: #57ab5a;
+  }
+  .graph-spacer {
+    display: inline-block;
+    flex-shrink: 0;
     user-select: none;
-    font-size: 0;
+    pointer-events: none;
   }
   .subject {
-    order: 4;
     flex: 0 0 auto;
     min-width: max-content;
     white-space: nowrap;
@@ -995,36 +1296,53 @@
     font-weight: 600;
     color: #ffffff;
   }
-  :global(body.hl-my-commits) .author.is-my-commit {
+  :global(body.hl-my-commits) .author.is-my-commit,
+  .commit-list-container.hl-my-commits .author.is-my-commit {
     font-weight: 700 !important;
     color: #ffffff !important;
   }
-  :global(body.hl-merge-commits) .commit-row.is-merge .subject {
+  :global(body.hl-merge-commits) .commit-row.is-merge .subject,
+  .commit-list-container.hl-merge-commits .commit-row.is-merge .subject {
     color: #8c8c8c !important;
     font-weight: 400;
   }
-  :global(body.hl-merge-commits) .commit-row.is-merge .author {
+  :global(body.hl-merge-commits) .commit-row.is-merge .author,
+  .commit-list-container.hl-merge-commits .commit-row.is-merge .author {
     color: #8c8c8c !important;
     font-weight: 400;
   }
   :global(body.hl-merge-commits) .commit-row.selected .subject,
-  :global(body.hl-merge-commits) .commit-row.selected .author {
+  :global(body.hl-merge-commits) .commit-row.selected .author,
+  .commit-list-container.hl-merge-commits .commit-row.selected .subject,
+  .commit-list-container.hl-merge-commits .commit-row.selected .author {
     color: var(--vscode-list-activeSelectionForeground, #ffffff) !important;
   }
-  :global(body.hl-current-branch) .commit-row.is-current-branch:not(.selected) {
+  :global(body.hl-current-branch) .commit-row.is-current-branch:not(.selected),
+  .commit-list-container.hl-current-branch .commit-row.is-current-branch:not(.selected) {
     background: rgba(255,255,255,0.038) !important;
     box-shadow: none !important;
   }
-  :global(body.hl-current-branch) .commit-row.is-current-branch:not(.selected):hover {
+  :global(body.hl-current-branch) .commit-row.is-current-branch:not(.selected):hover,
+  .commit-list-container.hl-current-branch .commit-row.is-current-branch:not(.selected):hover {
     background: var(--vscode-list-hoverBackground) !important;
     box-shadow: none !important;
   }
-  :global(body.hl-current-branch) .commit-row.selected {
+  :global(body.hl-current-branch) .commit-row.selected,
+  .commit-list-container.hl-current-branch .commit-row.selected {
     background: var(--vscode-list-activeSelectionBackground) !important;
   }
-  :global(body.hl-current-branch) .commit-row.selected:hover {
+  :global(body.hl-current-branch) .commit-row.selected:hover,
+  .commit-list-container.hl-current-branch .commit-row.selected:hover {
     background: var(--vscode-list-activeSelectionBackground) !important;
     filter: brightness(1.18);
+  }
+  :global(body.hl-not-cherry-picked) .commit-row:not(.is-current-branch),
+  .commit-list-container.hl-not-cherry-picked .commit-row:not(.is-current-branch) {
+    opacity: 0.65;
+  }
+  :global(body.hl-not-cherry-picked) .commit-row.is-current-branch,
+  .commit-list-container.hl-not-cherry-picked .commit-row.is-current-branch {
+    opacity: 1;
   }
   .context-menu {
     position: fixed;

@@ -1201,7 +1201,31 @@ if (typeof window !== 'undefined') {
     renderFiles();
   }
 
-  if (typeof window !== "undefined") {
+  export function migrateLegacyStorage(): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const keysToMigrate: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('intellij_git_')) {
+        keysToMigrate.push(k);
+      }
+    }
+    for (const oldKey of keysToMigrate) {
+      const newKey = 'jetgit_' + oldKey.slice('intellij_git_'.length);
+      const val = localStorage.getItem(oldKey);
+      if (val !== null) {
+        if (localStorage.getItem(newKey) === null) {
+          localStorage.setItem(newKey, val);
+        }
+        localStorage.removeItem(oldKey);
+      }
+    }
+  } catch {}
+}
+
+if (typeof window !== "undefined") {
   (window as any).openGitAuthDialog = openGitAuthDialog;
   (window as any).openPushDialog = openPushDialog;
+  migrateLegacyStorage();
 }

@@ -122,7 +122,7 @@
   // Favorites persistence
   function loadFavorites() {
     try {
-      const raw = localStorage.getItem("intellij_git_fav_branches");
+      const raw = localStorage.getItem("jetgit_fav_branches");
       if (raw) {
         favoriteSet = new Set(JSON.parse(raw));
         return;
@@ -133,7 +133,7 @@
 
   function saveFavorites(set: Set<string>) {
     try {
-      localStorage.setItem("intellij_git_fav_branches", JSON.stringify(Array.from(set)));
+      localStorage.setItem("jetgit_fav_branches", JSON.stringify(Array.from(set)));
     } catch {}
   }
 
@@ -156,7 +156,7 @@
   // Folder collapse state persistence
   function loadFolderStates(repoKey: string) {
     try {
-      const raw = localStorage.getItem("intellij_git_folders_" + repoKey);
+      const raw = localStorage.getItem("jetgit_folders_" + repoKey);
       if (raw) {
         folderCollapseMap = JSON.parse(raw);
         return;
@@ -167,7 +167,7 @@
 
   function saveFolderStates(repoKey: string, states: Record<string, boolean>) {
     try {
-      localStorage.setItem("intellij_git_folders_" + repoKey, JSON.stringify(states));
+      localStorage.setItem("jetgit_folders_" + repoKey, JSON.stringify(states));
     } catch {}
   }
 

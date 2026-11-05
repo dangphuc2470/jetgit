@@ -7,6 +7,7 @@
     visibleCount: number;
     rowHeight: number;
     graphWidth: number;
+    showLongEdges?: boolean;
   }
 
   let {
@@ -14,7 +15,8 @@
     startIndex = 0,
     visibleCount = 0,
     rowHeight = 28,
-    graphWidth = 1
+    graphWidth = 1,
+    showLongEdges = false
   }: Props = $props();
 
   const COL_WIDTH = 16;
@@ -75,6 +77,8 @@
 
 <svg class="graph-svg" width={svgWidth} height={svgHeight}>
   {#each visibleLines as item}
+    {@const isPassThrough = nodes[item.line.fromRow]?.column !== item.line.fromColumn}
+    {@const isLong = Math.abs(item.line.toRow - item.line.fromRow) > 1 || isPassThrough}
     {#if item.line.fromColumn === item.line.toColumn}
       <line
         x1={cx(item.line.fromColumn)}
@@ -84,6 +88,8 @@
         stroke={item.color}
         stroke-width="1.8"
         stroke-linecap="round"
+        stroke-dasharray={!showLongEdges && isLong ? "4 3" : undefined}
+        opacity={!showLongEdges && isLong ? 0.45 : 1}
       />
     {:else}
       <path
@@ -93,6 +99,8 @@
         stroke-width="1.8"
         stroke-linecap="round"
         stroke-linejoin="round"
+        stroke-dasharray={!showLongEdges && isLong ? "4 3" : undefined}
+        opacity={!showLongEdges && isLong ? 0.45 : 1}
       />
     {/if}
   {/each}

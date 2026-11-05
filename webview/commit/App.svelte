@@ -33,7 +33,7 @@
 
   function loadCollapsedChangelists(): Set<string> {
     try {
-      const raw = localStorage.getItem('intellij_git_collapsed_changelists');
+      const raw = localStorage.getItem('jetgit_collapsed_changelists');
       if (raw) {
         return new Set(JSON.parse(raw));
       }
@@ -43,25 +43,25 @@
 
   function saveCollapsedChangelists() {
     try {
-      localStorage.setItem('intellij_git_collapsed_changelists', JSON.stringify(Array.from(collapsedChangelists)));
+      localStorage.setItem('jetgit_collapsed_changelists', JSON.stringify(Array.from(collapsedChangelists)));
     } catch {}
   }
 
-  let expandChanges = $state(loadBooleanSetting('intellij_git_expand_changes', true));
-  let expandUnversioned = $state(loadBooleanSetting('intellij_git_expand_unversioned', true));
+  let expandChanges = $state(loadBooleanSetting('jetgit_expand_changes', true));
+  let expandUnversioned = $state(loadBooleanSetting('jetgit_expand_unversioned', true));
   let expandSkipped = $state(false);
   let isLoadingSkipped = $state(false);
   let hasLoadedSkipped = $state(false);
-  let groupByDirectory = $state(loadBooleanSetting('intellij_git_groupby_directory', false));
-  let groupByModule = $state(loadBooleanSetting('intellij_git_groupby_module', false));
-  let showPaths = $state(!loadBooleanSetting('intellij_git_groupby_directory', false));
+  let groupByDirectory = $state(loadBooleanSetting('jetgit_groupby_directory', false));
+  let groupByModule = $state(loadBooleanSetting('jetgit_groupby_module', false));
+  let showPaths = $state(!loadBooleanSetting('jetgit_groupby_directory', false));
   let viewOptionsOpen = $state(false);
   let repoName = $state('Project');
   let expandedFolders = $state<Set<string>>(new Set());
   let collapsedFolders = $state<Set<string>>(new Set());
   let expandAllFolders = $state<boolean | null>(null);
-  let showIgnoredFiles = $state(loadBooleanSetting('intellij_git_show_ignored_files', true));
-  let showSkippedWorktree = $state(loadBooleanSetting('intellij_git_show_skipped_worktree', false));
+  let showIgnoredFiles = $state(loadBooleanSetting('jetgit_show_ignored_files', true));
+  let showSkippedWorktree = $state(loadBooleanSetting('jetgit_show_skipped_worktree', false));
   let checkedSkippedFiles = $state<Set<string>>(new Set());
   let commitOptionsOpen = $state(false);
   let recentOpen = $state(false);
@@ -315,8 +315,8 @@
     collapsedChangelists = new Set(collapsedChangelists);
     saveCollapsedChangelists();
     try {
-      localStorage.setItem('intellij_git_expand_changes', 'true');
-      localStorage.setItem('intellij_git_expand_unversioned', 'true');
+      localStorage.setItem('jetgit_expand_changes', 'true');
+      localStorage.setItem('jetgit_expand_unversioned', 'true');
     } catch {}
   }
 
@@ -339,8 +339,8 @@
     collapsedChangelists = new Set(collapsedChangelists);
     saveCollapsedChangelists();
     try {
-      localStorage.setItem('intellij_git_expand_changes', 'false');
-      localStorage.setItem('intellij_git_expand_unversioned', 'false');
+      localStorage.setItem('jetgit_expand_changes', 'false');
+      localStorage.setItem('jetgit_expand_unversioned', 'false');
     } catch {}
   }
 
@@ -825,7 +825,7 @@
                   e.stopPropagation();
                   groupByDirectory = !groupByDirectory;
                   showPaths = !groupByDirectory;
-                  try { localStorage.setItem('intellij_git_groupby_directory', String(groupByDirectory)); } catch {}
+                  try { localStorage.setItem('jetgit_groupby_directory', String(groupByDirectory)); } catch {}
                 }}
                 role="button"
                 tabindex="0"
@@ -833,7 +833,7 @@
                   if (e.key === 'Enter') {
                     groupByDirectory = !groupByDirectory;
                     showPaths = !groupByDirectory;
-                    try { localStorage.setItem('intellij_git_groupby_directory', String(groupByDirectory)); } catch {}
+                    try { localStorage.setItem('jetgit_groupby_directory', String(groupByDirectory)); } catch {}
                   }
                 }}
               >
@@ -849,14 +849,14 @@
                 onclick={(e) => {
                   e.stopPropagation();
                   groupByModule = !groupByModule;
-                  try { localStorage.setItem('intellij_git_groupby_module', String(groupByModule)); } catch {}
+                  try { localStorage.setItem('jetgit_groupby_module', String(groupByModule)); } catch {}
                 }}
                 role="button"
                 tabindex="0"
                 onkeydown={(e) => {
                   if (e.key === 'Enter') {
                     groupByModule = !groupByModule;
-                    try { localStorage.setItem('intellij_git_groupby_module', String(groupByModule)); } catch {}
+                    try { localStorage.setItem('jetgit_groupby_module', String(groupByModule)); } catch {}
                   }
                 }}
               >
@@ -872,14 +872,14 @@
                 onclick={(e) => {
                   e.stopPropagation();
                   showIgnoredFiles = !showIgnoredFiles;
-                  try { localStorage.setItem('intellij_git_show_ignored_files', String(showIgnoredFiles)); } catch {}
+                  try { localStorage.setItem('jetgit_show_ignored_files', String(showIgnoredFiles)); } catch {}
                 }}
                 role="button"
                 tabindex="0"
                 onkeydown={(e) => {
                   if (e.key === 'Enter') {
                     showIgnoredFiles = !showIgnoredFiles;
-                    try { localStorage.setItem('intellij_git_show_ignored_files', String(showIgnoredFiles)); } catch {}
+                    try { localStorage.setItem('jetgit_show_ignored_files', String(showIgnoredFiles)); } catch {}
                   }
                 }}
               >
@@ -894,7 +894,7 @@
                 onclick={(e) => {
                   e.stopPropagation();
                   showSkippedWorktree = !showSkippedWorktree;
-                  try { localStorage.setItem('intellij_git_show_skipped_worktree', String(showSkippedWorktree)); } catch {}
+                  try { localStorage.setItem('jetgit_show_skipped_worktree', String(showSkippedWorktree)); } catch {}
                   if (showSkippedWorktree && !hasLoadedSkipped && !isLoadingSkipped) {
                     triggerScanSkipped();
                   }
@@ -904,7 +904,7 @@
                 onkeydown={(e) => {
                   if (e.key === 'Enter') {
                     showSkippedWorktree = !showSkippedWorktree;
-                    try { localStorage.setItem('intellij_git_show_skipped_worktree', String(showSkippedWorktree)); } catch {}
+                    try { localStorage.setItem('jetgit_show_skipped_worktree', String(showSkippedWorktree)); } catch {}
                     if (showSkippedWorktree && !hasLoadedSkipped && !isLoadingSkipped) {
                       triggerScanSkipped();
                     }
@@ -983,11 +983,11 @@
             onToggleFolder={handleToggleFolder}
             onToggleExpandChanges={() => {
               expandChanges = !expandChanges;
-              try { localStorage.setItem('intellij_git_expand_changes', String(expandChanges)); } catch {}
+              try { localStorage.setItem('jetgit_expand_changes', String(expandChanges)); } catch {}
             }}
             onToggleExpandUnversioned={() => {
               expandUnversioned = !expandUnversioned;
-              try { localStorage.setItem('intellij_git_expand_unversioned', String(expandUnversioned)); } catch {}
+              try { localStorage.setItem('jetgit_expand_unversioned', String(expandUnversioned)); } catch {}
             }}
             onToggleExpandSkipped={handleToggleExpandSkipped}
             onToggleSkippedFileChecked={handleToggleSkippedFileChecked}

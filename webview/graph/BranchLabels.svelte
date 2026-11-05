@@ -3,19 +3,32 @@
 
   interface Props {
     refs: string[];
+    compact?: boolean;
+    showTags?: boolean;
     onBranchContextMenu?: (e: MouseEvent, branchName: string) => void;
     onBranchCheckout?: (branchName: string) => void;
   }
 
-  let { refs = [], onBranchContextMenu, onBranchCheckout }: Props = $props();
+  let {
+    refs = [],
+    compact = true,
+    showTags = true,
+    onBranchContextMenu,
+    onBranchCheckout
+  }: Props = $props();
 
-  let parsedRefs: ParsedRef[] = $derived(refs.map(parseRef));
+  let parsedRefs: ParsedRef[] = $derived(
+    refs
+      .map(parseRef)
+      .filter((item) => showTags || item.type !== 'tag')
+  );
 </script>
 
-<span class="labels">
+<span class="labels" class:compact>
   {#each parsedRefs as item}
     <span
       class="label {item.type}"
+      class:compact
       title={item.displayName}
       role="button"
       tabindex="0"
@@ -72,15 +85,19 @@
 
 <style>
   .labels {
-    order: 5;
-    margin-left: 12px;
+    margin-left: 0;
+    margin-right: 8px;
     display: inline-flex;
     gap: 5px;
     flex-shrink: 0;
-    padding-right: 12px;
+    padding-right: 0;
     min-width: max-content;
     overflow: visible;
     align-items: center;
+  }
+  :global(body:not(.refs-on-left)) .labels {
+    margin-left: 10px;
+    margin-right: 0;
   }
   .label {
     display: inline-flex;
@@ -96,6 +113,22 @@
     box-sizing: border-box;
     cursor: default;
     user-select: none;
+    transition: all 0.1s ease;
+  }
+  .label.compact,
+  :global(body.compact-refs) .label {
+    padding: 0 4px;
+    font-size: 10.5px;
+    max-width: 130px;
+  }
+  .label.compact .label-text,
+  :global(body.compact-refs) .label-text {
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  :global(body.hide-tag-names) .label.tag {
+    display: none !important;
   }
   .label-icon {
     display: inline-flex;

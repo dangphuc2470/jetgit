@@ -14,6 +14,89 @@
     openCreateBranchDialog,
     openCheckoutBranchDialog
   } from "$shared/vscodeApi";
+  import type { ViewOptions } from "./types";
+
+  const defaultViewOptions: ViewOptions = {
+    compactRefs: true,
+    tagNames: true,
+    longEdges: false,
+    commitTimestamp: false,
+    refsOnLeft: false,
+    colAuthor: true,
+    colDate: true,
+    colHash: false,
+    colGpg: false,
+    hlMyCommits: true,
+    hlMergeCommits: true,
+    hlCurrentBranch: true,
+    hlNotCherryPicked: false
+  };
+
+  function loadViewOptions(): ViewOptions {
+    const opts = { ...defaultViewOptions };
+    try {
+      if (localStorage.getItem("jetgit_view_compact_refs") !== null) {
+        opts.compactRefs = localStorage.getItem("jetgit_view_compact_refs") === "true";
+      }
+      if (localStorage.getItem("jetgit_view_tag_names") !== null) {
+        opts.tagNames = localStorage.getItem("jetgit_view_tag_names") === "true";
+      }
+      if (localStorage.getItem("jetgit_view_long_edges") !== null) {
+        opts.longEdges = localStorage.getItem("jetgit_view_long_edges") === "true";
+      }
+      if (localStorage.getItem("jetgit_view_commit_timestamp") !== null) {
+        opts.commitTimestamp = localStorage.getItem("jetgit_view_commit_timestamp") === "true";
+      }
+      if (localStorage.getItem("jetgit_view_refs_on_left") !== null) {
+        opts.refsOnLeft = localStorage.getItem("jetgit_view_refs_on_left") === "true";
+      }
+      if (localStorage.getItem("jetgit_col_author") !== null) {
+        opts.colAuthor = localStorage.getItem("jetgit_col_author") === "true";
+      }
+      if (localStorage.getItem("jetgit_col_date") !== null) {
+        opts.colDate = localStorage.getItem("jetgit_col_date") === "true";
+      }
+      if (localStorage.getItem("jetgit_col_hash") !== null) {
+        opts.colHash = localStorage.getItem("jetgit_col_hash") === "true";
+      }
+      if (localStorage.getItem("jetgit_col_gpg") !== null) {
+        opts.colGpg = localStorage.getItem("jetgit_col_gpg") === "true";
+      }
+      if (localStorage.getItem("jetgit_hl_my_commits") !== null) {
+        opts.hlMyCommits = localStorage.getItem("jetgit_hl_my_commits") === "true";
+      }
+      if (localStorage.getItem("jetgit_hl_merge_commits") !== null) {
+        opts.hlMergeCommits = localStorage.getItem("jetgit_hl_merge_commits") === "true";
+      }
+      if (localStorage.getItem("jetgit_hl_current_branch") !== null) {
+        opts.hlCurrentBranch = localStorage.getItem("jetgit_hl_current_branch") === "true";
+      }
+      if (localStorage.getItem("jetgit_hl_not_cherry_picked") !== null) {
+        opts.hlNotCherryPicked = localStorage.getItem("jetgit_hl_not_cherry_picked") === "true";
+      }
+    } catch {}
+    return opts;
+  }
+
+  let viewOptions = $state<ViewOptions>(loadViewOptions());
+
+  $effect(() => {
+    if (typeof document !== "undefined" && document.body && viewOptions) {
+      document.body.classList.toggle("compact-refs", viewOptions.compactRefs);
+      document.body.classList.toggle("hide-tag-names", !viewOptions.tagNames);
+      document.body.classList.toggle("show-long-edges", viewOptions.longEdges);
+      document.body.classList.toggle("commit-timestamp", viewOptions.commitTimestamp);
+      document.body.classList.toggle("refs-on-left", viewOptions.refsOnLeft);
+      document.body.classList.toggle("hide-col-author", !viewOptions.colAuthor);
+      document.body.classList.toggle("hide-col-date", !viewOptions.colDate);
+      document.body.classList.toggle("show-col-hash", viewOptions.colHash);
+      document.body.classList.toggle("show-col-gpg", viewOptions.colGpg);
+      document.body.classList.toggle("hl-my-commits", viewOptions.hlMyCommits);
+      document.body.classList.toggle("hl-merge-commits", viewOptions.hlMergeCommits);
+      document.body.classList.toggle("hl-current-branch", viewOptions.hlCurrentBranch);
+      document.body.classList.toggle("hl-not-cherry-picked", viewOptions.hlNotCherryPicked);
+    }
+  });
 
   let commits = $state<any[]>([]);
   let graphWidth = $state(1);
@@ -288,7 +371,7 @@
 
     // Load saved branch sidebar width
     try {
-      const savedW = localStorage.getItem("intellij_git_branch_sidebar_width");
+      const savedW = localStorage.getItem("jetgit_branch_sidebar_width");
       if (savedW) {
         const w = parseInt(savedW, 10);
         if (w >= 140 && w <= 700) {
@@ -335,7 +418,7 @@
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       try {
-        localStorage.setItem("intellij_git_branch_sidebar_width", String(sidebarWidth));
+        localStorage.setItem("jetgit_branch_sidebar_width", String(sidebarWidth));
       } catch (err) {}
     };
 
@@ -353,7 +436,7 @@
   $effect(() => {
     if (!selectedHash || !detailSplitterEl || !detailPanelEl) return;
     try {
-      const savedDW = localStorage.getItem("intellij_git_detail_panel_width");
+      const savedDW = localStorage.getItem("jetgit_detail_panel_width");
       if (savedDW) {
         const dw = parseInt(savedDW, 10);
         if (dw >= 180 && dw <= 800) {
@@ -374,7 +457,7 @@
       detailPanelEl.style.width = newWidth + "px";
       detailPanelEl.style.minWidth = newWidth + "px";
       try {
-        localStorage.setItem("intellij_git_detail_panel_width", String(newWidth));
+        localStorage.setItem("jetgit_detail_panel_width", String(newWidth));
       } catch (err) {}
     };
 
@@ -414,6 +497,7 @@
 
 <div class="app">
   <FilterBar
+    bind:viewOptions
     bind:activeBranch
     setActiveBranch={(b) => { activeBranch = b; }}
     {branchData}
@@ -510,6 +594,7 @@
           {graphWidth}
           {selectedHash}
           {scrollToIndex}
+          {viewOptions}
           {onSelectCommit}
           {onLoadMore}
           {onRebaseFromHere}

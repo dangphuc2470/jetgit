@@ -94,11 +94,16 @@ html, body {
   gap: 3px;
   flex-shrink: 0;
   box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
 }
 
 .sidebar-strip-btn {
   width: 26px;
   height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -696,4 +701,8 @@ html, body {
   left: 100%;
   top: -4px;
   margin-left: 2px;
+}
+
+.strip-overflow-menu {
+  min-width: 230px;
 }

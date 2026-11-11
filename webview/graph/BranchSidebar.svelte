@@ -77,6 +77,25 @@
   });
   let favoriteSet = $state<Set<string>>(new Set(["develop", "main", "master"]));
 
+  // Strip toolbar overflow & menu state
+  interface StripAction {
+    id: string;
+    label: string;
+    tooltipText: string;
+    shortcut?: string;
+    active?: boolean;
+    disabled?: boolean;
+    onClick: () => void;
+  }
+
+  let stripEl = $state<HTMLDivElement>();
+  let stripHeight = $state(0);
+  let overflowMenu = $state<{ visible: boolean; x: number; y: number }>({
+    visible: false,
+    x: 0,
+    y: 0
+  });
+
   // Context menu state
   let contextMenu = $state<{
     visible: boolean;
@@ -104,19 +123,7 @@
   function showToast(text: string) {
     if (typeof window !== "undefined" && (window as any).showToast) {
       (window as any).showToast(text);
-      return;
     }
-    const old = document.querySelector(".as-mini-toast");
-    if (old) old.remove();
-    const t = document.createElement("div");
-    t.className = "as-mini-toast";
-    t.innerText = text;
-    document.body.appendChild(t);
-    setTimeout(() => t.classList.add("visible"), 10);
-    setTimeout(() => {
-      t.classList.remove("visible");
-      setTimeout(() => t.remove(), 250);
-    }, 2000);
   }
 
   // Favorites persistence
@@ -191,7 +198,23 @@
 
     const closeMenu = () => {
       contextMenu.visible = false;
+      overflowMenu.visible = false;
     };
+
+    if (stripEl) {
+      stripHeight = stripEl.clientHeight;
+    }
+    const ro = new ResizeObserver(() => {
+      if (stripEl) {
+        stripHeight = stripEl.clientHeight;
+      }
+    });
+    if (stripEl) ro.observe(stripEl);
+
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    window.addEventListener("keydown", keyHandler);
 
     const blurHandler = () => {
       if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
@@ -215,6 +238,8 @@
     window.addEventListener("closeAllGraphMenus", closeMenu);
 
     return () => {
+      ro.disconnect();
+      window.removeEventListener("keydown", keyHandler);
       window.removeEventListener("blur", blurHandler);
       document.removeEventListener("visibilitychange", visHandler);
       window.removeEventListener("message", msgHandler);
@@ -811,9 +836,167 @@
     if (!target) return;
     toggleBranchFavorite(target);
   }
+
+  const stripActions = $derived.by<StripAction[]>(() => {
+    const deleteTarget = selectedTreeBranch || activeBranch;
+    const canDelete = !!(deleteTarget && deleteTarget !== currentBranch);
+    const favTarget = selectedTreeBranch || currentBranch;
+
+    const items: StripAction[] = [
+      {
+        id: "newBranch",
+        label: "New Branch...",
+        tooltipText: "New Branch...",
+        shortcut: "+",
+        onClick: () => openCreateBranchDialog(selectedTreeBranch || currentBranch || "HEAD")
+      },
+      {
+        id: "update",
+        label: "Update Selected Branch",
+        tooltipText: "Update Selected Branch",
+        shortcut: "Fetch/Pull",
+        onClick: () => {
+          const target = selectedTreeBranch || currentBranch;
+          if (target) {
+            showToast(`Updating '${target}'...`);
+            postMessage("pull", target);
+          }
+        }
+      },
+      {
+        id: "delete",
+        label: "Delete Selected Branch",
+        tooltipText: "Delete Selected Branch",
+        shortcut: "Delete",
+        disabled: !canDelete,
+        onClick: () => {
+          if (canDelete) {
+            postMessage("deleteBranch", deleteTarget);
+          }
+        }
+      },
+      {
+        id: "compare",
+        label: "Compare with Current Branch",
+        tooltipText: "Compare with Current Branch",
+        shortcut: "Compare",
+        onClick: () => {
+          const target = selectedTreeBranch || activeBranch;
+          if (target) {
+            postMessage("compareBranch", { branch: target, withBranch: currentBranch });
+          }
+        }
+      },
+      {
+        id: "fetchAll",
+        label: "Fetch All Remotes",
+        tooltipText: "Fetch All Remotes",
+        shortcut: "git fetch --all",
+        onClick: () => postMessage("fetchAll")
+      },
+      {
+        id: "search",
+        label: "Search Branches",
+        tooltipText: "Search Branches",
+        shortcut: "Search",
+        onClick: () => {
+          if (isCollapsed) isCollapsed = false;
+          tick().then(() => {
+            searchInputEl?.focus();
+            searchInputEl?.select();
+          });
+        }
+      },
+      {
+        id: "expandAll",
+        label: "Expand / Collapse All Folders",
+        tooltipText: "Expand / Collapse All Folders",
+        onClick: expandOrCollapseAll
+      },
+      {
+        id: "favorite",
+        label: isCurrentFav ? "Remove from Favorites" : "Add to Favorites",
+        tooltipText: isCurrentFav
+          ? `Remove '${favTarget}' from Favorites (★)`
+          : `Add '${favTarget}' to Favorites (★)`,
+        shortcut: "Favorite",
+        active: isCurrentFav,
+        onClick: handleFavoriteToggle
+      },
+      {
+        id: "auth",
+        label: "Git Remote Logins & Credentials",
+        tooltipText: "Git Remote Logins & Credentials",
+        shortcut: "Git Log In",
+        onClick: () => postMessage("openAuthDialog")
+      }
+    ];
+
+    if (isSubRepo) {
+      items.push({
+        id: "exitSubRepo",
+        label: "Exit Repository (Choose Another Repo)",
+        tooltipText: "Exit Repository (Choose Another Repo)",
+        shortcut: "Exit",
+        onClick: () => postMessage("exitSubRepo")
+      });
+    }
+
+    return items;
+  });
+
+  // 12px vertical padding + 26px collapse btn + 29px per action btn (+ 2px safety margin)
+  const visibleCount = $derived.by(() => {
+    const totalNeeded = 38 + stripActions.length * 29;
+    const effHeight = stripHeight > 0 ? stripHeight - 2 : 0;
+    if (stripHeight === 0 || effHeight >= totalNeeded) {
+      return stripActions.length;
+    }
+    const availForActions = effHeight - 67; // reserve padding + collapse + more btn
+    if (availForActions <= 0) return 0;
+    return Math.max(0, Math.min(stripActions.length, Math.floor(availForActions / 29)));
+  });
+
+  const visibleActions = $derived(stripActions.slice(0, visibleCount));
+  const overflowItems = $derived(stripActions.slice(visibleCount));
+  const showMoreBtn = $derived(overflowItems.length > 0 && (stripHeight === 0 || stripHeight - 2 >= 67));
+
+  $effect(() => {
+    if (overflowItems.length === 0 && overflowMenu.visible) {
+      overflowMenu.visible = false;
+    }
+  });
+
+  function toggleOverflowMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (overflowMenu.visible) {
+      overflowMenu.visible = false;
+      return;
+    }
+    const btn = e.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+    window.dispatchEvent(new CustomEvent("closeAllGraphMenus"));
+    contextMenu.visible = false;
+    (window as any).__lastGraphMenuOpenedAt = Date.now();
+
+    const approxHeight = overflowItems.length * 26 + 16;
+    const margin = 8;
+    const menuX = rect.right + 4;
+    let menuY = rect.top;
+    if (menuY + approxHeight > window.innerHeight - margin) {
+      menuY = Math.max(margin, window.innerHeight - approxHeight - margin);
+    }
+
+    overflowMenu = {
+      visible: true,
+      x: Math.round(menuX),
+      y: Math.round(menuY)
+    };
+  }
 </script>
 
-<svelte:window onclick={() => { contextMenu.visible = false; }} />
+<svelte:window onclick={() => { contextMenu.visible = false; overflowMenu.visible = false; }} />
 
 <div
   class="branch-sidebar"
@@ -823,7 +1006,7 @@
   style:transition={isDragging ? "none" : "width 0.12s ease"}
 >
   <!-- Strip Toolbar (Leftmost thin strip) -->
-  <div class="sidebar-strip">
+  <div class="sidebar-strip" bind:this={stripEl}>
     <!-- Collapse / Expand Button -->
     <button
       class="sidebar-strip-btn"
@@ -841,166 +1024,31 @@
       {/if}
     </button>
 
-    <!-- New Branch (+) -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "New Branch...", shortcut: "+" }}
-      onclick={() => openCreateBranchDialog(selectedTreeBranch || currentBranch || "HEAD")}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
-      </svg>
-    </button>
-
-    <!-- Update Selected Branch (↙) -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "Update Selected Branch", shortcut: "Fetch/Pull" }}
-      onclick={() => {
-        const target = selectedTreeBranch || currentBranch;
-        if (target) {
-          showToast(`Updating '${target}'...`);
-          postMessage("pull", target);
-        }
-      }}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="17" y1="7" x2="7" y2="17"></line>
-        <polyline points="17 17 7 17 7 7"></polyline>
-      </svg>
-    </button>
-
-    <!-- Delete Selected Branch (🗑) -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "Delete Selected Branch", shortcut: "Delete" }}
-      onclick={() => {
-        const target = selectedTreeBranch || activeBranch;
-        if (target && target !== currentBranch) {
-          postMessage("deleteBranch", target);
-        }
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>
-    </button>
-
-    <!-- Compare with Current Branch (⇄) -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "Compare with Current Branch", shortcut: "Compare" }}
-      onclick={() => {
-        const target = selectedTreeBranch || activeBranch;
-        if (target) {
-          postMessage("compareBranch", { branch: target, withBranch: currentBranch });
-        }
-      }}
-    >
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M5.85355 8.14645C5.65829 7.95118 5.34171 7.95118 5.14645 8.14645C4.95118 8.34171 4.95118 8.65829 5.14645 8.85355L7.29289 11H0.5C0.223858 11 0 11.2239 0 11.5C0 11.7761 0.223858 12 0.5 12H7.29289L5.14645 14.1464C4.95118 14.3417 4.95118 14.6583 5.14645 14.8536C5.34171 15.0488 5.65829 15.0488 5.85355 14.8536L8.85355 11.8536L9.20711 11.5L8.85355 11.1464L5.85355 8.14645Z" fill="currentColor"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z" fill="currentColor"/>
-      </svg>
-    </button>
-
-    <!-- Fetch All Remotes -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "Fetch All Remotes", shortcut: "git fetch --all" }}
-      onclick={() => postMessage("fetchAll")}
-    >
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
-        <path d="M12.8536 3.14645C13.0488 3.34171 13.0488 3.65829 12.8536 3.85355L11.4393 5.26777C11.2441 5.46303 10.9275 5.46303 10.7322 5.26777C10.537 5.0725 10.537 4.75592 10.7322 4.56066L12.1464 3.14645C12.3417 2.95118 12.6583 2.95118 12.8536 3.14645Z" fill="currentColor"/>
-        <path d="M10.0251 5.97487C10.2204 6.17014 10.2204 6.48672 10.0251 6.68198L8.61091 8.09619C8.41565 8.29146 8.09907 8.29146 7.90381 8.09619C7.70854 7.90093 7.70854 7.58435 7.90381 7.38909L9.31802 5.97487C9.51328 5.77961 9.82986 5.77961 10.0251 5.97487Z" fill="currentColor"/>
-        <path d="M7.1967 8.8033C7.39196 8.99856 7.39196 9.31515 7.1967 9.51041L5.78249 10.9246C5.58722 11.1199 5.27064 11.1199 5.07538 10.9246C4.88012 10.7294 4.88012 10.4128 5.07538 10.2175L6.48959 8.8033C6.68485 8.60804 7.00144 8.60804 7.1967 8.8033Z" fill="currentColor"/>
-        <path d="M3.5 5C3.77614 5 4 5.22386 4 5.5V7.5C4 7.77614 3.77614 8 3.5 8C3.22386 8 3 7.77614 3 7.5V5.5C3 5.22386 3.22386 5 3.5 5Z" fill="currentColor"/>
-        <path d="M3.5 9C3.77614 9 4 9.22386 4 9.5V12H6.5C6.77614 12 7 12.2239 7 12.5C7 12.7761 6.77614 13 6.5 13H3.5C3.22386 13 3 12.7761 3 12.5V9.5C3 9.22386 3.22386 9 3.5 9Z" fill="currentColor"/>
-        <path d="M8 12.5C8 12.2239 8.22386 12 8.5 12H10.5C10.7761 12 11 12.2239 11 12.5C11 12.7761 10.7761 13 10.5 13H8.5C8.22386 13 8 12.7761 8 12.5Z" fill="currentColor"/>
-      </svg>
-    </button>
-
-    <!-- Search (Q) -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "Search Branches", shortcut: "Search" }}
-      onclick={() => {
-        if (isCollapsed) isCollapsed = false;
-        tick().then(() => {
-          searchInputEl?.focus();
-          searchInputEl?.select();
-        });
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-    </button>
-
-    <!-- Expand / Collapse All Folders -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "Expand / Collapse All Folders" }}
-      onclick={expandOrCollapseAll}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="15 3 21 3 21 9"></polyline>
-        <polyline points="9 21 3 21 3 15"></polyline>
-        <line x1="21" y1="3" x2="14" y2="10"></line>
-        <line x1="3" y1="21" x2="10" y2="14"></line>
-      </svg>
-    </button>
-
-    <!-- Favorite / Unfavorite Selected Branch (★) -->
-    <button
-      class="sidebar-strip-btn"
-      class:active={isCurrentFav}
-      use:tooltip={{
-        text: isCurrentFav ? `Remove '${selectedTreeBranch || currentBranch}' from Favorites (★)` : `Add '${selectedTreeBranch || currentBranch}' to Favorites (★)`,
-        shortcut: "Favorite"
-      }}
-      onclick={handleFavoriteToggle}
-    >
-      {#if isCurrentFav}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="#e5a50a" stroke="#e5a50a" stroke-width="2">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-        </svg>
-      {:else}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-        </svg>
-      {/if}
-    </button>
-
-    <!-- Git Remote Credentials / Log In -->
-    <button
-      class="sidebar-strip-btn"
-      use:tooltip={{ text: "Git Remote Logins & Credentials", shortcut: "Git Log In" }}
-      onclick={() => postMessage("openAuthDialog")}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-        <circle cx="7.5" cy="15.5" r="5.5"></circle>
-        <path d="m21 2-9.6 9.6"></path>
-        <path d="m15.5 7.5 2.5 2.5"></path>
-        <path d="m18.5 4.5 2.5 2.5"></path>
-        <circle cx="7.5" cy="15.5" r="1.5"></circle>
-      </svg>
-    </button>
-
-    <!-- Exit Sub-repo (Door Icon) -->
-    {#if isSubRepo}
+    {#each visibleActions as item (item.id)}
       <button
-        class="sidebar-strip-btn exit-subrepo-btn"
-        style="margin-top:auto;"
-        use:tooltip={{ text: "Exit Repository (Choose Another Repo)", shortcut: "Exit" }}
-        onclick={() => postMessage("exitSubRepo")}
+        class="sidebar-strip-btn"
+        class:active={item.active}
+        class:exit-subrepo-btn={item.id === "exitSubRepo"}
+        style={item.id === "exitSubRepo" ? "margin-top:auto;" : ""}
+        use:tooltip={{ text: item.tooltipText, shortcut: item.shortcut }}
+        onclick={() => item.onClick()}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-          <polyline points="16 17 21 12 16 7"></polyline>
-          <line x1="21" y1="12" x2="9" y2="12"></line>
+        {@render renderActionIcon(item.id, item.active)}
+      </button>
+    {/each}
+
+    {#if showMoreBtn}
+      <button
+        class="sidebar-strip-btn more-actions-btn"
+        class:active={overflowMenu.visible}
+        use:tooltip={{ text: "More Actions...", shortcut: `${overflowItems.length}` }}
+        onclick={toggleOverflowMenu}
+        aria-label="More Actions"
+      >
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+          <circle cx="3.5" cy="8" r="1.4" />
+          <circle cx="8" cy="8" r="1.4" />
+          <circle cx="12.5" cy="8" r="1.4" />
         </svg>
       </button>
     {/if}
@@ -1186,6 +1234,108 @@
     {/each}
   </div>
 {/if}
+
+<!-- FLOATING STRIP OVERFLOW MENU -->
+{#if overflowMenu.visible && overflowItems.length > 0}
+  <div
+    class="branch-context-menu strip-overflow-menu"
+    style="left:{overflowMenu.x}px;top:{overflowMenu.y}px;"
+    data-vscode-context={JSON.stringify({ preventDefaultContextMenuItems: true })}
+    onclick={(e) => e.stopPropagation()}
+    oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+  >
+    {#each overflowItems as it (it.id)}
+      <div
+        class="bcm-item"
+        class:disabled={it.disabled}
+        onclick={(e) => {
+          if (it.disabled) return;
+          e.stopPropagation();
+          overflowMenu.visible = false;
+          it.onClick();
+        }}
+      >
+        <span class="ccm-icon" style={it.active ? "color:#e5a50a;opacity:1;" : ""}>
+          {@render renderActionIcon(it.id, it.active)}
+        </span>
+        <span class="ccm-label">{it.label}</span>
+        {#if it.shortcut}
+          <span class="bcm-shortcut">{it.shortcut}</span>
+        {/if}
+      </div>
+    {/each}
+  </div>
+{/if}
+
+<!-- SVELTE 5 STRIP ACTION ICON SNIPPET -->
+{#snippet renderActionIcon(id: string, active?: boolean)}
+  {#if id === "newBranch"}
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  {:else if id === "update"}
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="17" y1="7" x2="7" y2="17"></line>
+      <polyline points="17 17 7 17 7 7"></polyline>
+    </svg>
+  {:else if id === "delete"}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  {:else if id === "compare"}
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M5.85355 8.14645C5.65829 7.95118 5.34171 7.95118 5.14645 8.14645C4.95118 8.34171 4.95118 8.65829 5.14645 8.85355L7.29289 11H0.5C0.223858 11 0 11.2239 0 11.5C0 11.7761 0.223858 12 0.5 12H7.29289L5.14645 14.1464C4.95118 14.3417 4.95118 14.6583 5.14645 14.8536C5.34171 15.0488 5.65829 15.0488 5.85355 14.8536L8.85355 11.8536L9.20711 11.5L8.85355 11.1464L5.85355 8.14645Z" fill="currentColor"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M10.1464 1.14645C10.3417 0.951184 10.6583 0.951184 10.8536 1.14645C11.0488 1.34171 11.0488 1.65829 10.8536 1.85355L8.70711 4H15.5C15.7761 4 16 4.22386 16 4.5C16 4.77614 15.7761 5 15.5 5H8.70711L10.8536 7.14645C11.0488 7.34171 11.0488 7.65829 10.8536 7.85355C10.6583 8.04882 10.3417 8.04882 10.1464 7.85355L7.14645 4.85355L6.79289 4.5L7.14645 4.14645L10.1464 1.14645Z" fill="currentColor"/>
+    </svg>
+  {:else if id === "fetchAll"}
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="display:block;">
+      <path d="M12.8536 3.14645C13.0488 3.34171 13.0488 3.65829 12.8536 3.85355L11.4393 5.26777C11.2441 5.46303 10.9275 5.46303 10.7322 5.26777C10.537 5.0725 10.537 4.75592 10.7322 4.56066L12.1464 3.14645C12.3417 2.95118 12.6583 2.95118 12.8536 3.14645Z" fill="currentColor"/>
+      <path d="M10.0251 5.97487C10.2204 6.17014 10.2204 6.48672 10.0251 6.68198L8.61091 8.09619C8.41565 8.29146 8.09907 8.29146 7.90381 8.09619C7.70854 7.90093 7.70854 7.58435 7.90381 7.38909L9.31802 5.97487C9.51328 5.77961 9.82986 5.77961 10.0251 5.97487Z" fill="currentColor"/>
+      <path d="M7.1967 8.8033C7.39196 8.99856 7.39196 9.31515 7.1967 9.51041L5.78249 10.9246C5.58722 11.1199 5.27064 11.1199 5.07538 10.9246C4.88012 10.7294 4.88012 10.4128 5.07538 10.2175L6.48959 8.8033C6.68485 8.60804 7.00144 8.60804 7.1967 8.8033Z" fill="currentColor"/>
+      <path d="M3.5 5C3.77614 5 4 5.22386 4 5.5V7.5C4 7.77614 3.77614 8 3.5 8C3.22386 8 3 7.77614 3 7.5V5.5C3 5.22386 3.22386 5 3.5 5Z" fill="currentColor"/>
+      <path d="M3.5 9C3.77614 9 4 9.22386 4 9.5V12H6.5C6.77614 12 7 12.2239 7 12.5C7 12.7761 6.77614 13 6.5 13H3.5C3.22386 13 3 12.7761 3 12.5V9.5C3 9.22386 3.22386 9 3.5 9Z" fill="currentColor"/>
+      <path d="M8 12.5C8 12.2239 8.22386 12 8.5 12H10.5C10.7761 12 11 12.2239 11 12.5C11 12.7761 10.7761 13 10.5 13H8.5C8.22386 13 8 12.7761 8 12.5Z" fill="currentColor"/>
+    </svg>
+  {:else if id === "search"}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+  {:else if id === "expandAll"}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 3 21 3 21 9"></polyline>
+      <polyline points="9 21 3 21 3 15"></polyline>
+      <line x1="21" y1="3" x2="14" y2="10"></line>
+      <line x1="3" y1="21" x2="10" y2="14"></line>
+    </svg>
+  {:else if id === "favorite"}
+    {#if active}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#e5a50a" stroke="#e5a50a" stroke-width="2">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+      </svg>
+    {:else}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+      </svg>
+    {/if}
+  {:else if id === "auth"}
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+      <circle cx="7.5" cy="15.5" r="5.5"></circle>
+      <path d="m21 2-9.6 9.6"></path>
+      <path d="m15.5 7.5 2.5 2.5"></path>
+      <path d="m18.5 4.5 2.5 2.5"></path>
+      <circle cx="7.5" cy="15.5" r="1.5"></circle>
+    </svg>
+  {:else if id === "exitSubRepo"}
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+      <polyline points="16 17 21 12 16 7"></polyline>
+      <line x1="21" y1="12" x2="9" y2="12"></line>
+    </svg>
+  {/if}
+{/snippet}
 
 <!-- SVELTE 5 RECURSIVE TREE SNIPPET -->
 {#snippet renderTreeLevel(node: TreeNode, isRemoteTree: boolean)}

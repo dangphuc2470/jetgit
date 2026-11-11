@@ -84,17 +84,32 @@ export class GitService {
     await execFileAsync('git', ['init'], { cwd: this.cwd });
   }
 
-  async exec(args: string[], maxBuffer = 10 * 1024 * 1024, retries = 5, timeout = 0): Promise<string> {
+  async exec(
+    args: string[],
+    maxBuffer = 10 * 1024 * 1024,
+    retries = 5,
+    timeout = 0,
+    signal?: AbortSignal
+  ): Promise<string> {
     for (let attempt = 0; attempt < retries; attempt++) {
+      if (signal?.aborted) {
+        const err = new Error('Git operation cancelled');
+        err.name = 'AbortError';
+        throw err;
+      }
       try {
         const { stdout } = await execFileAsync('git', args, {
           cwd: this.cwd,
           maxBuffer,
           timeout: timeout > 0 ? timeout : undefined,
+          signal,
           env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
         });
         return stdout;
       } catch (err: any) {
+        if (err?.name === 'AbortError' || signal?.aborted) {
+          throw err;
+        }
         const isLockError = err?.message && (
           err.message.includes('index.lock') ||
           (err.message.includes('Unable to create') && err.message.includes('.lock'))
@@ -292,13 +307,13 @@ export class GitService {
     return results;
   }
 
-  async fetchSingleBranch(remote: string, branchName: string, depth?: number): Promise<string> {
+  async fetchSingleBranch(remote: string, branchName: string, depth?: number, signal?: AbortSignal): Promise<string> {
     const args = ['fetch'];
     if (depth && depth > 0) {
       args.push(`--depth=${depth}`);
     }
     args.push(remote, `refs/heads/${branchName}:refs/remotes/${remote}/${branchName}`);
-    return this.exec(args, 100 * 1024 * 1024, 1, 900000);
+    return this.exec(args, 100 * 1024 * 1024, 1, 900000, signal);
   }
 
   async getTags(): Promise<TagInfo[]> {
@@ -345,8 +360,8 @@ export class GitService {
     return branchOps.getRemoteUrl(this.asBranchContext());
   }
 
-  async pull(branch?: string): Promise<string> {
-    return branchOps.pull(this.asBranchContext(), branch);
+  async pull(branch?: string, signal?: AbortSignal): Promise<string> {
+    return branchOps.pull(this.asBranchContext(), branch, signal);
   }
 
   async getPushInfo(targetBranch?: string): Promise<PushInfo> {
@@ -359,9 +374,10 @@ export class GitService {
     setUpstream = false,
     remoteName?: string,
     tags = false,
-    targetBranch?: string
+    targetBranch?: string,
+    signal?: AbortSignal
   ): Promise<string> {
-    return branchOps.push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch);
+    return branchOps.push(this.asBranchContext(), branch, force, setUpstream, remoteName, tags, targetBranch, signal);
   }
 
   async isRemoteReachable(remoteName: string, timeoutMs = 3500): Promise<{ reachable: boolean; latency: number }> {
@@ -414,7 +430,8 @@ export class GitService {
 
   async smartFetchAll(
     onRemoteSuccess?: (remote: string) => void,
-    onProgress?: (status: string) => void
+    onProgress?: (status: string) => void,
+    signal?: AbortSignal
   ): Promise<{
     successful: string[];
     failed: string[];
@@ -433,11 +450,15 @@ export class GitService {
     if (remotes.length === 1) {
       const r = remotes[0];
       try {
+        if (signal?.aborted) {
+          throw Object.assign(new Error('Git operation cancelled'), { name: 'AbortError' });
+        }
         onProgress?.(`Fetching '${r}'...`);
-        await this.exec(['fetch', r, '--prune'], 10 * 1024 * 1024, 1, 90000);
+        await this.exec(['fetch', r, '--prune'], 10 * 1024 * 1024, 1, 90000, signal);
         onRemoteSuccess?.(r);
         return { successful: [r], failed: [], skipped: [], needsAuth: [] };
       } catch (err: any) {
+        if (err?.name === 'AbortError' || signal?.aborted) throw err;
         const msg = err?.message || '';
         if (isAuthError(msg)) {
           const url = await this.getRemoteUrl(r);
@@ -449,6 +470,9 @@ export class GitService {
       }
     }
 
+    if (signal?.aborted) {
+      throw Object.assign(new Error('Git operation cancelled'), { name: 'AbortError' });
+    }
     onProgress?.('Checking remotes connectivity...');
     const checks = await Promise.allSettled(
       remotes.map(async r => {
@@ -479,17 +503,21 @@ export class GitService {
     const skipped: string[] = [];
 
     for (const item of probeResults) {
+      if (signal?.aborted) {
+        throw Object.assign(new Error('Git operation cancelled'), { name: 'AbortError' });
+      }
       if (!item.reachable) {
         skipped.push(item.remote);
         continue;
       }
       try {
         onProgress?.(`Fetching '${item.remote}'...`);
-        await this.exec(['fetch', item.remote, '--prune'], 10 * 1024 * 1024, 1, 90000);
+        await this.exec(['fetch', item.remote, '--prune'], 10 * 1024 * 1024, 1, 90000, signal);
         successful.push(item.remote);
         // Notify immediately so UI reloads right after each remote succeeds
         onRemoteSuccess?.(item.remote);
       } catch (err: any) {
+        if (err?.name === 'AbortError' || signal?.aborted) throw err;
         const msg = err?.message || '';
         if (isAuthError(msg)) {
           const url = await this.getRemoteUrl(item.remote);
@@ -505,14 +533,15 @@ export class GitService {
   }
 
   async fetchAll(
-    onRemoteSuccess?: (remote: string) => void
+    onRemoteSuccess?: (remote: string) => void,
+    signal?: AbortSignal
   ): Promise<{
     successful: string[];
     failed: string[];
     skipped: string[];
     needsAuth: { remote: string; url: string; host: string }[];
   }> {
-    return this.smartFetchAll(onRemoteSuccess);
+    return this.smartFetchAll(onRemoteSuccess, undefined, signal);
   }
 
   async checkoutAndRebase(branch: string, onto: string): Promise<string> {
@@ -711,7 +740,7 @@ export class GitService {
   private asBranchContext(): branchOps.BranchExecContext {
     return {
       cwd: this.cwd,
-      exec: (args, mb, retries) => this.exec(args, mb, retries),
+      exec: (args, mb, retries, timeout, signal) => this.exec(args, mb, retries, timeout, signal),
       getCurrentBranch: () => this.getCurrentBranch(),
       getRepoRoot: () => this.getRepoRoot(),
       getRemotes: () => this.getRemotes(),

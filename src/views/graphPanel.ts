@@ -7,6 +7,7 @@ import { CommitReviewPanel } from './commitReviewPanel';
 import { handleGraphAction } from './graphActionHandlers';
 import { getNonce } from '../utils/themeTokens';
 import { GraphToExtensionMessage, ExtensionToGraphMessage } from '../shared/protocol';
+import { taskManager } from '../services/taskManager';
 
 export class GraphViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellij-git.logView';
@@ -92,6 +93,18 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       } else {
         this.closeAllMenus();
       }
+    });
+
+    // Subscribe to background tasks
+    const unsubTasks = taskManager.subscribe((tasks) => {
+      this.view?.webview.postMessage({
+        type: 'tasksUpdate',
+        payload: tasks,
+      });
+    });
+
+    webviewView.onDidDispose(() => {
+      unsubTasks();
     });
 
     // Load data once the webview is ready
@@ -275,7 +288,29 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     switch (msg.type) {
       case 'ready': {
         this.log.appendLine('Webview reported ready');
+        this.view?.webview.postMessage({
+          type: 'tasksUpdate',
+          payload: taskManager.getTasks(),
+        });
         await this.loadInitialData();
+        break;
+      }
+      case 'cancelTask': {
+        const { id } = msg.payload || {};
+        if (id) {
+          taskManager.cancelTask(id);
+        }
+        break;
+      }
+      case 'dismissTask': {
+        const { id } = msg.payload || {};
+        if (id) {
+          taskManager.dismissTask(id);
+        }
+        break;
+      }
+      case 'clearFinishedTasks': {
+        taskManager.clearFinishedTasks();
         break;
       }
       case 'switchRepo': {
@@ -440,7 +475,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           await this.gitService.refreshRemoteBranchNames();
           await this.refresh();
           vscode.commands.executeCommand('intellij-git.refreshBranches');
-          vscode.window.showInformationMessage('Branches refreshed.');
+          taskManager.notifyInfo('Branches refreshed.');
         } catch (err: any) {
           vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);
         }

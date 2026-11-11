@@ -4,6 +4,8 @@
   import CommitList from "./CommitList.svelte";
   import CommitDetail from "./CommitDetail.svelte";
   import BranchSidebar from "./BranchSidebar.svelte";
+  import TaskStatusBar from "./TaskStatusBar.svelte";
+  import type { TaskItem } from "$shared/protocol";
   import {
     postMessage,
     onMessage,
@@ -117,6 +119,20 @@
   let detailPanelEl = $state<HTMLDivElement>();
   let detailSplitterEl = $state<HTMLDivElement>();
   let unsubscribe: (() => void) | undefined;
+
+  let tasks = $state<TaskItem[]>([]);
+
+  function onCancelTask(id: string) {
+    postMessage("cancelTask", { id });
+  }
+
+  function onDismissTask(id: string) {
+    postMessage("dismissTask", { id });
+  }
+
+  function onClearFinishedTasks() {
+    postMessage("clearFinishedTasks");
+  }
 
   function onSelectCommit(hash: string) {
     selectedHash = hash;
@@ -364,6 +380,10 @@
           if (idx >= 0) {
             scrollToIndex = idx;
           }
+          break;
+        }
+        case "tasksUpdate": {
+          tasks = msg.payload || [];
           break;
         }
       }
@@ -621,6 +641,13 @@
       </div>
     {/if}
   </div>
+
+  <TaskStatusBar
+    {tasks}
+    {onCancelTask}
+    {onDismissTask}
+    onClearFinished={onClearFinishedTasks}
+  />
 </div>
 
 

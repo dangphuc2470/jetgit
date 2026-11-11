@@ -5,6 +5,7 @@ import {
   handleCheckoutAndRebaseWithConflictResolution,
 } from './conflictResolution';
 import { isBranchAlreadyExistsError } from '../../git/conflictUtils';
+import { taskManager } from '../../services/taskManager';
 
 export async function handleBranchAction(
   type: string,
@@ -53,7 +54,7 @@ export async function handleBranchAction(
       }
       try {
         await gitService.createBranch(name, startPoint, checkout !== false, force === true);
-        vscode.window.showInformationMessage(`Created branch ${name}`);
+        taskManager.notifyInfo(`Created branch ${name}`);
         host.loadInitialData();
       } catch (err: any) {
         const rawErr = String(err?.message || err);
@@ -69,7 +70,7 @@ export async function handleBranchAction(
           } else if (choice === 'Force Recreate') {
             try {
               await gitService.createBranch(branchExists, startPoint, checkout !== false, true);
-              vscode.window.showInformationMessage(`Recreated branch '${branchExists}'`);
+              taskManager.notifyInfo(`Recreated branch '${branchExists}'`);
               host.loadInitialData();
             } catch (createErr: any) {
               vscode.window.showErrorMessage(`Force recreate failed: ${createErr.message}`);
@@ -86,7 +87,7 @@ export async function handleBranchAction(
       const ref = payload as string;
       try {
         await gitService.deleteBranch(ref);
-        vscode.window.showInformationMessage(`Deleted branch '${ref}'`);
+        taskManager.notifyInfo(`Deleted branch '${ref}'`);
         host.loadInitialData();
       } catch (err: any) {
         if (err.message && (err.message.includes('not fully merged') || err.message.includes('not merged'))) {
@@ -98,7 +99,7 @@ export async function handleBranchAction(
           if (force === 'Force Delete') {
             try {
               await gitService.deleteBranch(ref, true);
-              vscode.window.showInformationMessage(`Force deleted branch '${ref}'`);
+              taskManager.notifyInfo(`Force deleted branch '${ref}'`);
               host.loadInitialData();
             } catch (e: any) {
               vscode.window.showErrorMessage(`Delete failed: ${e.message}`);
@@ -127,7 +128,7 @@ export async function handleBranchAction(
           all: false,
         });
         host.updateGraph(commits);
-        vscode.window.showInformationMessage(`Comparing commits between ${branch} and ${withBranch}`);
+        taskManager.notifyInfo(`Comparing commits between ${branch} and ${withBranch}`);
       } catch (err: any) {
         vscode.window.showErrorMessage(`Compare failed: ${err.message}`);
       }
@@ -146,7 +147,7 @@ export async function handleBranchAction(
       if (!oldName || !newName) return true;
       try {
         await gitService.renameBranch(oldName, newName);
-        vscode.window.showInformationMessage(`Renamed branch '${oldName}' to '${newName}'`);
+        taskManager.notifyInfo(`Renamed branch '${oldName}' to '${newName}'`);
         host.loadInitialData();
       } catch (err: any) {
         vscode.window.showErrorMessage(`Rename failed: ${err.message}`);
@@ -158,25 +159,36 @@ export async function handleBranchAction(
       const { branch, upstream } = payload || {};
       if (!branch || !upstream) return true;
       try {
-        const slashIdx = upstream.indexOf('/');
-        const remote = slashIdx !== -1 ? upstream.slice(0, slashIdx) : upstream;
-        const remoteBranch = slashIdx !== -1 ? upstream.slice(slashIdx + 1) : branch;
+        await taskManager.runTask(
+          `Tracking '${branch}' -> '${upstream}'...`,
+          async (signal) => {
+            const slashIdx = upstream.indexOf('/');
+            const remote = slashIdx !== -1 ? upstream.slice(0, slashIdx) : upstream;
+            const remoteBranch = slashIdx !== -1 ? upstream.slice(slashIdx + 1) : branch;
 
-        try {
-          await gitService.exec(['fetch', remote, remoteBranch]);
-        } catch {}
+            try {
+              await gitService.exec(['fetch', remote, remoteBranch], undefined, undefined, undefined, signal);
+            } catch (e: any) {
+              if (e?.name === 'AbortError' || signal.aborted) throw e;
+            }
 
-        try {
-          await gitService.exec(['branch', '--set-upstream-to', upstream, branch]);
-        } catch {
-          await gitService.exec(['config', `branch.${branch}.remote`, remote]);
-          await gitService.exec(['config', `branch.${branch}.merge`, `refs/heads/${remoteBranch}`]);
-        }
-        vscode.window.showInformationMessage(`Branch '${branch}' is now tracking '${upstream}'.`);
-        host.loadInitialData();
-        vscode.commands.executeCommand('intellij-git.refreshBranches');
+            try {
+              await gitService.exec(['branch', '--set-upstream-to', upstream, branch], undefined, undefined, undefined, signal);
+            } catch (e: any) {
+              if (e?.name === 'AbortError' || signal.aborted) throw e;
+              await gitService.exec(['config', `branch.${branch}.remote`, remote], undefined, undefined, undefined, signal);
+              await gitService.exec(['config', `branch.${branch}.merge`, `refs/heads/${remoteBranch}`], undefined, undefined, undefined, signal);
+            }
+            host.loadInitialData();
+            vscode.commands.executeCommand('intellij-git.refreshBranches');
+            return `Branch '${branch}' is now tracking '${upstream}'.`;
+          },
+          { cancellable: true }
+        );
       } catch (err: any) {
-        vscode.window.showErrorMessage(`Set upstream failed: ${err.message}`);
+        if (err?.name !== 'AbortError') {
+          taskManager.notifyError('Set upstream failed', err.message);
+        }
       }
       return true;
     }
@@ -186,7 +198,7 @@ export async function handleBranchAction(
       if (!branch) return true;
       try {
         await gitService.exec(['branch', '--unset-upstream', branch]);
-        vscode.window.showInformationMessage(`Unset tracked branch for '${branch}'.`);
+        taskManager.notifyInfo(`Unset tracked branch for '${branch}'.`);
         host.loadInitialData();
         vscode.commands.executeCommand('intellij-git.refreshBranches');
       } catch (err: any) {
@@ -199,16 +211,12 @@ export async function handleBranchAction(
       const { remote, prefix } = payload || {};
       if (!remote) return true;
       const displayTarget = prefix ? `${remote}/${prefix}` : remote;
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: `Tracking branches to '${displayTarget}'...`,
-          cancellable: false,
-        },
-        async () => {
+      await taskManager.runTask(
+        `Tracking branches to '${displayTarget}'...`,
+        async (signal, updateDetail) => {
           try {
             try {
-              await gitService.exec(['fetch', remote]);
+              await gitService.exec(['fetch', remote], undefined, undefined, undefined, signal);
             } catch {}
 
             const branches = await gitService.getBranches();
@@ -221,34 +229,37 @@ export async function handleBranchAction(
             const errors: string[] = [];
 
             for (const local of locals) {
+              if (signal.aborted) break;
               const targetRemoteBranch = `${remote}/${local.name}`;
               try {
                 try {
-                  await gitService.exec(['branch', '--set-upstream-to', targetRemoteBranch, local.name]);
+                  await gitService.exec(['branch', '--set-upstream-to', targetRemoteBranch, local.name], undefined, undefined, undefined, signal);
                 } catch {
-                  await gitService.exec(['config', `branch.${local.name}.remote`, remote]);
-                  await gitService.exec(['config', `branch.${local.name}.merge`, `refs/heads/${local.name}`]);
+                  await gitService.exec(['config', `branch.${local.name}.remote`, remote], undefined, undefined, undefined, signal);
+                  await gitService.exec(['config', `branch.${local.name}.merge`, `refs/heads/${local.name}`], undefined, undefined, undefined, signal);
                 }
                 trackedCount++;
+                updateDetail(`Tracked ${trackedCount}/${locals.length} branches...`);
               } catch (err: any) {
                 errors.push(`${local.name}: ${err.message}`);
               }
             }
 
             if (trackedCount > 0) {
-              vscode.window.showInformationMessage(`Successfully tracked ${trackedCount} local branch${trackedCount > 1 ? 'es' : ''} to '${displayTarget}'.`);
               host.loadInitialData();
               vscode.commands.executeCommand('intellij-git.refreshBranches');
+              return `Successfully tracked ${trackedCount} local branch${trackedCount > 1 ? 'es' : ''} to '${displayTarget}'.`;
             } else {
-              vscode.window.showInformationMessage(`No matching local branches found to track to '${displayTarget}'.`);
-            }
-            if (errors.length > 0) {
-              vscode.window.showWarningMessage(`Some branches could not be tracked:\n${errors.join('\n')}`);
+              return `No matching local branches found to track to '${displayTarget}'.`;
             }
           } catch (err: any) {
-            vscode.window.showErrorMessage(`Track branches failed: ${err.message}`);
+            if (err?.name !== 'AbortError') {
+              taskManager.notifyError('Track branches failed', err.message);
+            }
+            throw err;
           }
-        }
+        },
+        { cancellable: true }
       );
       return true;
     }

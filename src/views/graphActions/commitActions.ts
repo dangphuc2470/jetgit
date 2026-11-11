@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitContentProvider } from '../../providers/gitContentProvider';
 import { GraphActionHost } from './types';
+import { taskManager } from '../../services/taskManager';
 import {
   handleMergeWithConflictResolution,
   handleRebaseWithConflictResolution,
@@ -87,7 +88,7 @@ export async function handleCommitAction(
         }
 
         await gitService.exec(['commit', `--fixup=${hash}`]);
-        vscode.window.showInformationMessage(`Created fixup commit for ${hash.slice(0, 8)}`);
+        taskManager.notifyInfo(`Created fixup commit for ${hash.slice(0, 8)}`);
         host.loadInitialData();
       } catch (err: any) {
         vscode.window.showErrorMessage(`Fixup failed: ${err.message}`);
@@ -129,7 +130,7 @@ export async function handleCommitAction(
         }
         try {
           await gitService.reset(hash, mode.mode as any);
-          vscode.window.showInformationMessage(`Reset branch to ${hash.slice(0, 8)} (${mode.label})`);
+          taskManager.notifyInfo(`Reset branch to ${hash.slice(0, 8)} (${mode.label})`);
           host.loadInitialData();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Reset failed: ${err.message}`);
@@ -141,7 +142,7 @@ export async function handleCommitAction(
     case 'undoCommit': {
       try {
         await gitService.reset('HEAD~1', 'soft');
-        vscode.window.showInformationMessage('Undid last commit (changes kept staged)');
+        taskManager.notifyInfo('Undid last commit (changes kept staged)');
         host.loadInitialData();
       } catch (err: any) {
         vscode.window.showErrorMessage(`Undo commit failed: ${err.message}`);
@@ -160,7 +161,7 @@ export async function handleCommitAction(
       }
       try {
         await gitService.createTag(name, hash);
-        vscode.window.showInformationMessage(`Created tag ${name} at ${hash ? hash.slice(0, 8) : ''}`);
+        taskManager.notifyInfo(`Created tag ${name} at ${hash ? hash.slice(0, 8) : ''}`);
         host.loadInitialData();
       } catch (err: any) {
         vscode.window.showErrorMessage(`Create tag failed: ${err.message}`);
@@ -179,7 +180,7 @@ export async function handleCommitAction(
       if (confirm === 'Delete') {
         try {
           await gitService.deleteTag(tag);
-          vscode.window.showInformationMessage(`Deleted tag '${tag}'`);
+          taskManager.notifyInfo(`Deleted tag '${tag}'`);
           host.loadInitialData();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Delete tag failed: ${err.message}`);
@@ -192,19 +193,18 @@ export async function handleCommitAction(
       const tag = (typeof payload === 'string' ? payload : payload?.name) as string;
       if (!tag) return true;
       try {
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: `Pushing tag '${tag}' to origin...`,
-            cancellable: false,
+        await taskManager.runTask(
+          `Pushing tag '${tag}' to origin...`,
+          async (signal) => {
+            await gitService.exec(['push', 'origin', tag], undefined, undefined, undefined, signal);
+            return `Pushed tag '${tag}' successfully.`;
           },
-          async () => {
-            await gitService.exec(['push', 'origin', tag]);
-            vscode.window.showInformationMessage(`Pushed tag '${tag}' successfully.`);
-          }
+          { cancellable: true }
         );
       } catch (err: any) {
-        vscode.window.showErrorMessage(`Push tag failed: ${err.message}`);
+        if (err?.name !== 'AbortError') {
+          taskManager.notifyError(`Push tag failed`, err.message);
+        }
       }
       return true;
     }
@@ -218,7 +218,7 @@ export async function handleCommitAction(
           language: 'diff',
         });
         await vscode.window.showTextDocument(doc);
-        vscode.window.showInformationMessage(`Created patch for ${hash.slice(0, 8)}`);
+        taskManager.notifyInfo(`Created patch for ${hash.slice(0, 8)}`);
       } catch (err: any) {
         vscode.window.showErrorMessage(`Create patch failed: ${err.message}`);
       }
@@ -272,7 +272,7 @@ export async function handleCommitAction(
           const headHash = (await gitService.getLog({ maxCount: 1 }))[0]?.hash;
           if (headHash === hash) {
             await gitService.exec(['commit', '--amend', '-m', newMsg.trim()]);
-            vscode.window.showInformationMessage('Commit message updated');
+            taskManager.notifyInfo('Commit message updated');
             host.loadInitialData();
           } else {
             vscode.window.showWarningMessage('Editing commit message of older commits requires interactive rebase.');
@@ -291,7 +291,7 @@ export async function handleCommitAction(
         const headHash = (await gitService.getLog({ maxCount: 1 }))[0]?.hash;
         if (headHash === hash) {
           await gitService.reset('HEAD~1', 'hard');
-          vscode.window.showInformationMessage(`Dropped commit ${hash.slice(0, 8)}`);
+          taskManager.notifyInfo(`Dropped commit ${hash.slice(0, 8)}`);
           host.loadInitialData();
         } else {
           vscode.window.showInformationMessage(`Use Interactive Rebase to drop older commit ${hash.slice(0, 8)}`);

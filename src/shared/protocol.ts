@@ -252,7 +252,18 @@ export type ExtensionToGraphMessage =
   | { type: 'authSuccess'; payload: { remote: string } }
   | { type: 'scrollToCommit'; payload: string }
   | { type: 'openCheckoutBranchDialog'; payload: { remoteRef: string; defaultName?: string } }
-  | { type: 'themeTokens'; payload: Record<string, string> };
+  | { type: 'themeTokens'; payload: Record<string, string> }
+  | { type: 'tasksUpdate'; payload: TaskItem[] };
+
+export interface TaskItem {
+  id: string;
+  title: string;
+  detail?: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  startTime: number;
+  endTime?: number;
+  canCancel: boolean;
+}
 
 export type GraphToExtensionMessage =
   | { type: 'ready' }
@@ -279,7 +290,10 @@ export type GraphToExtensionMessage =
   | { type: 'tagCommit'; payload: { hash: string; name: string } }
   | { type: 'push'; payload?: any }
   | { type: 'pull'; payload?: any }
-  | { type: 'fetch'; payload?: any };
+  | { type: 'fetch'; payload?: any }
+  | { type: 'cancelTask'; payload: { id: string } }
+  | { type: 'dismissTask'; payload: { id: string } }
+  | { type: 'clearFinishedTasks' };
 
 
 // ============================================================================

@@ -3,7 +3,7 @@ import { BranchInfo, TagInfo, PushInfo } from '../gitTypes';
 
 export interface BranchExecContext {
   cwd: string;
-  exec(args: string[], maxBuffer?: number, retries?: number): Promise<string>;
+  exec(args: string[], maxBuffer?: number, retries?: number, timeout?: number, signal?: AbortSignal): Promise<string>;
   getCurrentBranch(): Promise<string>;
   getRepoRoot(): Promise<string>;
   getRemotes(): Promise<string[]>;
@@ -215,10 +215,10 @@ export async function getRemoteUrl(ctx: BranchExecContext): Promise<string> {
   }
 }
 
-export async function pull(ctx: BranchExecContext, branch?: string): Promise<string> {
+export async function pull(ctx: BranchExecContext, branch?: string, signal?: AbortSignal): Promise<string> {
   const curBranch = await ctx.getCurrentBranch();
   if (!branch || branch === curBranch) {
-    return ctx.exec(['pull']);
+    return ctx.exec(['pull'], undefined, undefined, undefined, signal);
   }
 
   try {
@@ -229,12 +229,12 @@ export async function pull(ctx: BranchExecContext, branch?: string): Promise<str
       targetBranch = branch.slice(remote.length + 1);
     }
 
-    const branchCheck = await ctx.exec(['branch', '--list', targetBranch]);
+    const branchCheck = await ctx.exec(['branch', '--list', targetBranch], undefined, undefined, undefined, signal);
     if (branchCheck.trim()) {
-      const out = await ctx.exec(['fetch', remote, `${targetBranch}:${targetBranch}`]);
+      const out = await ctx.exec(['fetch', remote, `${targetBranch}:${targetBranch}`], undefined, undefined, undefined, signal);
       return out || `Updated branch '${targetBranch}' successfully.`;
     } else {
-      const out = await ctx.exec(['fetch', remote, targetBranch]);
+      const out = await ctx.exec(['fetch', remote, targetBranch], undefined, undefined, undefined, signal);
       return out || `Fetched '${targetBranch}' successfully.`;
     }
   } catch (err: any) {
@@ -338,7 +338,8 @@ export async function push(
   setUpstream = false,
   remoteName?: string,
   tags = false,
-  targetBranch?: string
+  targetBranch?: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const curBranch = branch || await ctx.getCurrentBranch();
   const remote = remoteName || await getDefaultRemote(ctx, curBranch);
@@ -348,7 +349,7 @@ export async function push(
 
   let hasUpstream = false;
   try {
-    const upstream = await ctx.exec(['rev-parse', '--abbrev-ref', `${curBranch}@{u}`]);
+    const upstream = await ctx.exec(['rev-parse', '--abbrev-ref', `${curBranch}@{u}`], undefined, undefined, undefined, signal);
     if (upstream.trim()) hasUpstream = true;
   } catch {}
 
@@ -362,5 +363,5 @@ export async function push(
     args.push(remote, refspec);
   }
 
-  return ctx.exec(args);
+  return ctx.exec(args, undefined, undefined, undefined, signal);
 }

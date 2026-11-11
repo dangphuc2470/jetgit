@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { GitService } from '../../git/gitService';
+import { taskManager } from '../../services/taskManager';
 
 import {
   type SmartActionLabel,
@@ -52,7 +53,7 @@ export async function withSmartStashOnConflict(
       } else if (choice === `Abort ${inProgress.title}`) {
         try {
           await gitService.abortOperation(inProgress.type);
-          vscode.window.showInformationMessage(`Aborted ${inProgress.title} successfully.`);
+          taskManager.notifyInfo(`Aborted ${inProgress.title} successfully.`);
           onSuccess();
         } catch (abortErr: any) {
           vscode.window.showErrorMessage(`Failed to abort ${inProgress.title}: ${abortErr.message}`);
@@ -69,7 +70,7 @@ export async function withSmartStashOnConflict(
       if (choice === 'Unlock & Retry') {
         const unlocked = await gitService.removeIndexLock();
         if (unlocked) {
-          vscode.window.showInformationMessage('Removed .git/index.lock. Retrying action...');
+          taskManager.notifyInfo('Removed .git/index.lock. Retrying action...');
           return withSmartStashOnConflict(gitService, actionLabel, targetRef, runAction, onSuccess);
         } else {
           vscode.window.showErrorMessage('Could not remove .git/index.lock. Please check if another Git process is still active.');
@@ -209,7 +210,7 @@ export async function withSmartStashOnConflict(
     if (choice === smartLabel && stashed) {
       try {
         await gitService.exec(['stash', 'pop']);
-        vscode.window.showInformationMessage(`${smartLabel} completed: Restored your changes.`);
+        taskManager.notifyInfo(`${smartLabel} completed: Restored your changes.`);
       } catch (popErr: any) {
         vscode.commands.executeCommand('intellij-git.refreshCommit');
         await vscode.commands.executeCommand('intellij-git.resolveConflicts');
@@ -224,7 +225,7 @@ export async function withSmartStashOnConflict(
         } else if (warnChoice === 'Rollback Stash') {
           try {
             await gitService.exec(['reset', '--hard', 'HEAD']);
-            vscode.window.showInformationMessage(`Rolled back working tree. Your changes remain safely stored in Stash.`);
+            taskManager.notifyInfo(`Rolled back working tree. Your changes remain safely stored in Stash.`);
             vscode.commands.executeCommand('intellij-git.refreshCommit');
             onSuccess();
           } catch (rollbackErr: any) {
@@ -233,7 +234,7 @@ export async function withSmartStashOnConflict(
         }
       }
     } else if (choice === stashLabel && stashed) {
-      vscode.window.showInformationMessage(`${actionLabel} succeeded. Your changes were safely saved to Stash.`);
+      taskManager.notifyInfo(`${actionLabel} succeeded. Your changes were safely saved to Stash.`);
     }
 
     onSuccess();
@@ -282,21 +283,21 @@ export async function handleCheckoutWithConflictResolution(
       );
       if (action === 'Fetch & Checkout') {
         let fetchSuccess = false;
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: `Fetching '${ref}'...`,
-            cancellable: false,
-          },
-          async () => {
-            try {
-              await gitService.fetchSingleBranch(remoteName, remoteBranchPart);
+        try {
+          await taskManager.runTask(
+            `Fetching '${ref}'...`,
+            async (signal) => {
+              await gitService.fetchSingleBranch(remoteName, remoteBranchPart, undefined, signal);
               fetchSuccess = true;
-            } catch (err: any) {
-              vscode.window.showErrorMessage(`Failed to fetch '${ref}': ${err.message}`);
-            }
+              return `Fetched '${ref}' successfully.`;
+            },
+            { cancellable: true }
+          );
+        } catch (err: any) {
+          if (err?.name !== 'AbortError') {
+            taskManager.notifyError(`Failed to fetch '${ref}'`, err.message);
           }
-        );
+        }
         if (!fetchSuccess) {
           return;
         }
@@ -316,7 +317,7 @@ export async function handleCheckoutWithConflictResolution(
       ref,
       async () => {
         await gitService.checkout(ref, { name: targetName, force: true });
-        vscode.window.showInformationMessage(`Checked out and overwritten '${targetName || ref}' to '${ref}'.`);
+        taskManager.notifyInfo(`Checked out and overwritten '${targetName || ref}' to '${ref}'.`);
       },
       async () => {
         onSuccess();
@@ -348,7 +349,7 @@ export async function handleCheckoutWithConflictResolution(
           ref,
           async () => {
             await gitService.checkout(ref, { name: localBranchName, force: true });
-            vscode.window.showInformationMessage(`Checked out and overwritten '${localBranchName}' to '${ref}'.`);
+            taskManager.notifyInfo(`Checked out and overwritten '${localBranchName}' to '${ref}'.`);
           },
           async () => {
             onSuccess();
@@ -364,7 +365,7 @@ export async function handleCheckoutWithConflictResolution(
           localBranchName,
           async () => {
             await gitService.checkout(localBranchName);
-            vscode.window.showInformationMessage(`Checked out '${localBranchName}'.`);
+            taskManager.notifyInfo(`Checked out '${localBranchName}'.`);
           },
           async () => {
             onSuccess();
@@ -383,7 +384,7 @@ export async function handleCheckoutWithConflictResolution(
     ref,
     async () => {
       await gitService.checkout(ref, { name: targetName, force: false });
-      vscode.window.showInformationMessage(`Checked out ${targetName || ref}`);
+      taskManager.notifyInfo(`Checked out ${targetName || ref}`);
     },
     async () => {
       onSuccess();
@@ -403,7 +404,7 @@ export async function handleMergeWithConflictResolution(
     ref,
     async () => {
       await gitService.merge(ref);
-      vscode.window.showInformationMessage(`Merged '${ref}' into current branch.`);
+      taskManager.notifyInfo(`Merged '${ref}' into current branch.`);
     },
     onSuccess
   );
@@ -420,7 +421,7 @@ export async function handleRebaseWithConflictResolution(
     ref,
     async () => {
       await gitService.rebase(ref);
-      vscode.window.showInformationMessage(`Rebased current branch onto ${ref}.`);
+      taskManager.notifyInfo(`Rebased current branch onto ${ref}.`);
     },
     onSuccess
   );
@@ -438,7 +439,7 @@ export async function handleCheckoutAndRebaseWithConflictResolution(
     onto,
     async () => {
       await gitService.checkoutAndRebase(branch, onto);
-      vscode.window.showInformationMessage(`Rebased ${branch} onto ${onto}`);
+      taskManager.notifyInfo(`Rebased ${branch} onto ${onto}`);
     },
     onSuccess
   );
@@ -455,7 +456,7 @@ export async function handleCherryPickWithConflictResolution(
     hash,
     async () => {
       await gitService.cherryPick(hash);
-      vscode.window.showInformationMessage(`Cherry-picked ${hash.slice(0, 8)} successfully.`);
+      taskManager.notifyInfo(`Cherry-picked ${hash.slice(0, 8)} successfully.`);
     },
     onSuccess
   );
@@ -472,7 +473,7 @@ export async function handleRevertWithConflictResolution(
     hash,
     async () => {
       await gitService.revertCommit(hash);
-      vscode.window.showInformationMessage(`Reverted commit ${hash.slice(0, 8)}.`);
+      taskManager.notifyInfo(`Reverted commit ${hash.slice(0, 8)}.`);
     },
     onSuccess
   );
@@ -483,23 +484,28 @@ export async function handlePullWithConflictResolution(
   branch: string,
   onSuccess: () => void
 ): Promise<void> {
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: `Updating '${branch}'...`,
-      cancellable: false,
-    },
-    async () => {
-      await withSmartStashOnConflict(
-        gitService,
-        'Update',
-        branch,
-        async () => {
-          const out = await gitService.pull(branch);
-          vscode.window.showInformationMessage(`Updated ${branch}: ${out || 'Already up to date.'}`);
-        },
-        onSuccess
-      );
+  try {
+    await taskManager.runTask(
+      `Updating '${branch}'...`,
+      async (signal) => {
+        let resultMsg = '';
+        await withSmartStashOnConflict(
+          gitService,
+          'Update',
+          branch,
+          async () => {
+            const out = await gitService.pull(branch, signal);
+            resultMsg = out ? `Updated ${branch}: ${out}` : `Updated ${branch}: Already up to date.`;
+          },
+          onSuccess
+        );
+        return resultMsg || `Updated '${branch}' successfully.`;
+      },
+      { cancellable: true }
+    );
+  } catch (err: any) {
+    if (err?.name !== 'AbortError') {
+      taskManager.notifyError(`Failed to update '${branch}'`, err.message);
     }
-  );
+  }
 }

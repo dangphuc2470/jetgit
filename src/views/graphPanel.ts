@@ -471,19 +471,27 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       case 'refreshBranches': {
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
+        if (!(await this.gitService.isGitRepo())) {
+          await this.loadInitialData();
+          break;
+        }
         try {
           await this.gitService.refreshRemoteBranchNames();
           await this.refresh();
           vscode.commands.executeCommand('intellij-git.refreshBranches');
           taskManager.notifyInfo('Branches refreshed.');
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);
+          taskManager.notifyError(`Refresh failed: ${err.message}`);
         }
         break;
       }
       case 'refresh': {
         this.hasReachedEnd = false;
         this.isLoadingMore = false;
+        if (!(await this.gitService.isGitRepo())) {
+          await this.loadInitialData();
+          break;
+        }
         try {
           const [commits, branches, tags] = await Promise.all([
             this.gitService.getLog({
@@ -506,7 +514,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           this.sendCommits();
           this.sendBranches(branches, tags);
         } catch (err: any) {
-          vscode.window.showErrorMessage(`Refresh failed: ${err.message}`);
+          taskManager.notifyError(`Refresh failed: ${err.message}`);
         }
         break;
       }
@@ -545,6 +553,10 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     this.hasReachedEnd = false;
     this.isLoadingMore = false;
     try {
+      if (!(await this.gitService.isGitRepo())) {
+        await this.loadInitialData();
+        return;
+      }
       const [commits, branches, tags] = await Promise.all([
         this.gitService.getLog({
           maxCount: 300,

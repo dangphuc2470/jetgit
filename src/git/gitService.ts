@@ -65,18 +65,25 @@ export class GitService {
 
   async findSubRepos(): Promise<{ name: string; path: string }[]> {
     const results: { name: string; path: string }[] = [];
-    try {
-      const entries = fs.readdirSync(this.cwd, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
-          const subPath = path.join(this.cwd, entry.name);
-          const subGit = path.join(subPath, '.git');
-          if (fs.existsSync(subGit)) {
-            results.push({ name: entry.name, path: subPath });
+    const scanDir = (dir: string, depth: number) => {
+      if (depth > 2) return;
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+            const subPath = path.join(dir, entry.name);
+            const subGit = path.join(subPath, '.git');
+            if (fs.existsSync(subGit)) {
+              const relName = path.relative(this.cwd, subPath);
+              results.push({ name: relName, path: subPath });
+            } else {
+              scanDir(subPath, depth + 1);
+            }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    };
+    scanDir(this.cwd, 1);
     return results;
   }
 

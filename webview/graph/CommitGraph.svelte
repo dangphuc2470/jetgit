@@ -77,8 +77,7 @@
 
 <svg class="graph-svg" width={svgWidth} height={svgHeight}>
   {#each visibleLines as item}
-    {@const isPassThrough = nodes[item.line.fromRow]?.column !== item.line.fromColumn}
-    {@const isLong = Math.abs(item.line.toRow - item.line.fromRow) > 1 || isPassThrough}
+    {@const isLong = Math.abs(item.line.toRow - item.line.fromRow) > 6}
     {#if item.line.fromColumn === item.line.toColumn}
       <line
         x1={cx(item.line.fromColumn)}

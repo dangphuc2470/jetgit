@@ -67,6 +67,30 @@
     }
   } catch {}
 
+  let userGraphWidth = $state<number | null>(null);
+  try {
+    const savedGw = localStorage.getItem('jetgit_graph_width');
+    if (savedGw !== null) {
+      const parsed = Number(savedGw);
+      if (!isNaN(parsed) && parsed >= 30 && parsed <= 800) {
+        userGraphWidth = parsed;
+      }
+    }
+  } catch {}
+
+  let prevTimestampMode = false;
+  $effect(() => {
+    const ts = !!viewOptions?.commitTimestamp;
+    if (ts !== prevTimestampMode) {
+      prevTimestampMode = ts;
+      if (ts && colWidths.date < 155) {
+        colWidths.date = 155;
+      } else if (!ts && colWidths.date === 155) {
+        colWidths.date = DEFAULT_COL_WIDTHS.date;
+      }
+    }
+  });
+
   function startResize(col: 'author' | 'date' | 'hash' | 'gpg', e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -111,6 +135,61 @@
     if (viewOptions.colGpg) left += colWidths.gpg + 8;
     return left;
   });
+
+  let autoGraphWidth = $derived.by(() => {
+    let max = 3;
+    for (let i = 0; i < (commits ? Math.min(commits.length, 50) : 0); i++) {
+      const g = commits[i]?.graph;
+      if (!g) continue;
+      if (g.column > max) max = g.column;
+      if (g.lines) {
+        for (let li = 0; li < g.lines.length; li++) {
+          const l = g.lines[li];
+          if (l.fromColumn > max) max = l.fromColumn;
+          if (l.toColumn > max) max = l.toColumn;
+        }
+      }
+    }
+    return Math.max(4, max + 1) * 16 + 20;
+  });
+
+  let effectiveGraphWidth = $derived(userGraphWidth ?? autoGraphWidth);
+
+  function startGraphResize(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = effectiveGraphWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const diff = ev.clientX - startX;
+      userGraphWidth = Math.max(36, Math.min(800, startW + diff));
+    };
+
+    const onMouseUp = () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      try {
+        if (userGraphWidth !== null) {
+          localStorage.setItem('jetgit_graph_width', String(userGraphWidth));
+        }
+      } catch {}
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  function resetGraphWidth() {
+    userGraphWidth = null;
+    try {
+      localStorage.removeItem('jetgit_graph_width');
+    } catch {}
+  }
 
   const ROW_HEIGHT = 25;
   const OVERSCAN = 5;
@@ -976,7 +1055,16 @@
       </div>
     {/if}
     <div class="th-cell th-description">
-      <span class="th-title">Description</span>
+      <div
+        class="graph-col-resizer"
+        style="left: {effectiveGraphWidth}px;"
+        role="separator"
+        tabindex="-1"
+        title="Drag to resize graph width, double-click to reset"
+        onmousedown={startGraphResize}
+        ondblclick={resetGraphWidth}
+      ></div>
+      <span class="th-title" style="padding-left: {effectiveGraphWidth + 6}px;">Description</span>
     </div>
   </div>
 
@@ -985,10 +1073,20 @@
     style="height: {commits.length * ROW_HEIGHT}px; position: relative; min-width: 100%; width: max-content;"
   >
     <div
+      class="graph-body-resizer"
+      style="left: {graphLeft + effectiveGraphWidth}px;"
+      role="separator"
+      tabindex="-1"
+      title="Drag to resize graph width, double-click to reset"
+      onmousedown={startGraphResize}
+      ondblclick={resetGraphWidth}
+    ></div>
+
+    <div
       class="visible-rows"
       style="transform: translateY({startIndex * ROW_HEIGHT}px); min-width: 100%; width: max-content;"
     >
-      <div class="graph-column" style="left: {graphLeft}px;">
+      <div class="graph-column" style="left: {graphLeft}px; width: {effectiveGraphWidth}px; overflow: hidden;">
         <CommitGraph
           nodes={graphNodes}
           {graphWidth}
@@ -1004,7 +1102,7 @@
           {@const isCur = commit.isCurrentBranch !== false}
           {@const isHead = commit.refs && commit.refs.some((r: string) => r === 'HEAD' || r.startsWith('HEAD -> '))}
           {@const isMy = isMyCommit(commit)}
-          {@const gw = computeGraphWidth(commit)}
+          {@const gw = effectiveGraphWidth}
           <div
             role="row"
             tabindex="0"
@@ -1172,6 +1270,55 @@
   .th-description {
     flex: 1;
     min-width: 300px;
+    position: relative;
+  }
+  .graph-col-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    margin-left: -4px;
+    cursor: col-resize;
+    z-index: 3;
+  }
+  .graph-col-resizer::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: 1px;
+    background: transparent;
+    transition: background 0.15s ease;
+  }
+  .graph-col-resizer:hover::after,
+  .graph-col-resizer:active::after {
+    background: var(--vscode-focusBorder, #3574f0);
+    width: 2px;
+  }
+  .graph-body-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    margin-left: -4px;
+    cursor: col-resize;
+    z-index: 4;
+  }
+  .graph-body-resizer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 1px;
+    background: transparent;
+    transition: background 0.15s ease;
+  }
+  .graph-body-resizer:hover::after,
+  .graph-body-resizer:active::after {
+    background: var(--vscode-focusBorder, #3574f0);
+    width: 2px;
   }
   .col-resizer {
     position: absolute;

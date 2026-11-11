@@ -17,18 +17,43 @@
     onBranchCheckout
   }: Props = $props();
 
-  let parsedRefs: ParsedRef[] = $derived(
-    refs
-      .map(parseRef)
-      .filter((item) => showTags || item.type !== 'tag')
+  let isExpanded = $state(false);
+
+  $effect(() => {
+    if (!compact) {
+      isExpanded = false;
+    }
+  });
+
+  let parsedRefs: ParsedRef[] = $derived.by(() => {
+    const list = refs.map(parseRef);
+    const priority: Record<string, number> = { head: 0, branch: 1, remote: 2, tag: 3 };
+    return list.sort((a, b) => (priority[a.type] ?? 4) - (priority[b.type] ?? 4));
+  });
+
+  let displayedRefs = $derived.by(() => {
+    if (!compact || isExpanded || parsedRefs.length <= 1) {
+      return parsedRefs;
+    }
+    return parsedRefs.slice(0, 1);
+  });
+
+  let remainingCount = $derived(
+    compact && !isExpanded && parsedRefs.length > 1 ? parsedRefs.length - 1 : 0
+  );
+
+  let remainingTooltip = $derived(
+    parsedRefs.slice(1).map((r) => r.displayName).join(', ')
   );
 </script>
 
 <span class="labels" class:compact>
-  {#each parsedRefs as item}
+  {#each displayedRefs as item}
+    {@const isIconOnly = item.type === 'tag' && !showTags}
     <span
       class="label {item.type}"
       class:compact
+      class:icon-only={isIconOnly}
       title={item.displayName}
       role="button"
       tabindex="0"
@@ -78,9 +103,24 @@
           </svg>
         {/if}
       </span>
-      <span class="label-text">{item.shortName}</span>
+      {#if !isIconOnly}
+        <span class="label-text">{item.shortName}</span>
+      {/if}
     </span>
   {/each}
+
+  {#if remainingCount > 0}
+    <span
+      class="label more-badge"
+      role="button"
+      tabindex="0"
+      title="{remainingTooltip} (click to expand)"
+      onclick={(e) => { e.stopPropagation(); isExpanded = true; }}
+      onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); isExpanded = true; } }}
+    >
+      +{remainingCount}
+    </span>
+  {/if}
 </span>
 
 <style>
@@ -95,6 +135,12 @@
     overflow: visible;
     align-items: center;
   }
+  :global(.refs-on-left) .labels,
+  :global(body.refs-on-left) .labels {
+    margin-left: 0;
+    margin-right: 8px;
+  }
+  :global(:not(.refs-on-left)) .labels,
   :global(body:not(.refs-on-left)) .labels {
     margin-left: 10px;
     margin-right: 0;
@@ -119,16 +165,36 @@
   :global(body.compact-refs) .label {
     padding: 0 4px;
     font-size: 10.5px;
-    max-width: 130px;
+    max-width: 140px;
   }
   .label.compact .label-text,
   :global(body.compact-refs) .label-text {
-    max-width: 105px;
+    max-width: 115px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  :global(body.hide-tag-names) .label.tag {
-    display: none !important;
+  .label.icon-only {
+    padding: 1px 4px 2px 4px;
+  }
+  .label.icon-only .label-icon {
+    margin-right: 0;
+  }
+  .label.more-badge {
+    background: rgba(255, 255, 255, 0.1);
+    color: #c9d1d9;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 6px;
+    line-height: 14px;
+    transition: all 0.15s ease;
+  }
+  .label.more-badge:hover {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.4);
   }
   .label-icon {
     display: inline-flex;

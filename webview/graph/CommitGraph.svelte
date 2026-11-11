@@ -77,7 +77,6 @@
 
 <svg class="graph-svg" width={svgWidth} height={svgHeight}>
   {#each visibleLines as item}
-    {@const isLong = Math.abs(item.line.toRow - item.line.fromRow) > 6}
     {#if item.line.fromColumn === item.line.toColumn}
       <line
         x1={cx(item.line.fromColumn)}
@@ -87,8 +86,6 @@
         stroke={item.color}
         stroke-width="1.8"
         stroke-linecap="round"
-        stroke-dasharray={!showLongEdges && isLong ? "4 3" : undefined}
-        opacity={!showLongEdges && isLong ? 0.45 : 1}
       />
     {:else}
       <path
@@ -98,8 +95,6 @@
         stroke-width="1.8"
         stroke-linecap="round"
         stroke-linejoin="round"
-        stroke-dasharray={!showLongEdges && isLong ? "4 3" : undefined}
-        opacity={!showLongEdges && isLong ? 0.45 : 1}
       />
     {/if}
   {/each}

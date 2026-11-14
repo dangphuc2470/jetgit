@@ -396,15 +396,63 @@ export async function handleCheckoutWithConflictResolution(
 export async function handleMergeWithConflictResolution(
   gitService: GitService,
   ref: string,
-  onSuccess: () => void
+  onSuccess: () => void,
+  options?: { noFastForward?: boolean }
 ): Promise<void> {
+  const config = vscode.workspace.getConfiguration('jetgit');
+  const fallbackConfig = vscode.workspace.getConfiguration('intellijGit');
+  const alwaysNoFf = config.get<boolean>('merge.noFastForward') ?? fallbackConfig.get<boolean>('merge.noFastForward', false);
+  const noFf = options?.noFastForward ?? alwaysNoFf;
+
+  const currentBranch = await gitService.getCurrentBranch().catch(() => '');
+  const targetLabel = currentBranch || 'current branch';
+
   await withSmartStashOnConflict(
     gitService,
     'Merge',
     ref,
     async () => {
-      await gitService.merge(ref);
-      taskManager.notifyInfo(`Merged '${ref}' into current branch.`);
+      await gitService.merge(ref, { noFastForward: noFf });
+      taskManager.notifyInfo(`Merged '${ref}' into ${targetLabel}.`);
+
+      const branches = await gitService.getBranches().catch(() => []);
+      const localBranch = branches.find(b => !b.remote && b.name === ref);
+      if (localBranch && localBranch.name !== currentBranch) {
+        const deleteAction = `Delete ${ref}`;
+        vscode.window.showInformationMessage(
+          `Merged ${ref} to ${targetLabel}`,
+          deleteAction
+        ).then(async (choice) => {
+          if (choice === deleteAction) {
+            try {
+              await gitService.deleteBranch(ref);
+              taskManager.notifyInfo(`Deleted branch '${ref}'`);
+              vscode.window.showInformationMessage(`Deleted branch '${ref}'`);
+              onSuccess();
+              vscode.commands.executeCommand('intellij-git.refreshBranches');
+            } catch (err: any) {
+              if (err.message && (err.message.includes('not fully merged') || err.message.includes('not merged'))) {
+                const forceChoice = await vscode.window.showWarningMessage(
+                  `Branch '${ref}' is not fully merged. Do you want to force delete it?`,
+                  { modal: true },
+                  'Force Delete'
+                );
+                if (forceChoice === 'Force Delete') {
+                  await gitService.deleteBranch(ref, true);
+                  taskManager.notifyInfo(`Force deleted branch '${ref}'`);
+                  vscode.window.showInformationMessage(`Force deleted branch '${ref}'`);
+                  onSuccess();
+                  vscode.commands.executeCommand('intellij-git.refreshBranches');
+                }
+              } else {
+                vscode.window.showErrorMessage(`Delete failed: ${err.message}`);
+              }
+            }
+          }
+        });
+      } else {
+        vscode.window.showInformationMessage(`Merged ${ref} to ${targetLabel}`);
+      }
     },
     onSuccess
   );

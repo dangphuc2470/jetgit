@@ -68,6 +68,16 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "JetGit",
+      "properties": {
+        "jetgit.merge.noFastForward": {
+          "type": "boolean",
+          "default": false,
+          "description": "Always create a merge commit even if the merge resolved as a fast-forward (--no-ff)."
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {

@@ -556,8 +556,13 @@ export class GitService {
     return this.rebase(onto);
   }
 
-  async merge(branch: string): Promise<string> {
-    return this.exec(['merge', branch]);
+  async merge(branch: string, options?: { noFastForward?: boolean }): Promise<string> {
+    const args = ['merge'];
+    if (options?.noFastForward) {
+      args.push('--no-ff');
+    }
+    args.push(branch);
+    return this.exec(args);
   }
 
   async rebase(onto: string): Promise<string> {

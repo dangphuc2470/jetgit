@@ -58,8 +58,15 @@ export async function handleCommitAction(
     }
 
     case 'mergeBranch': {
-      const ref = payload as string;
-      await handleMergeWithConflictResolution(gitService, ref, () => host.loadInitialData());
+      let ref = '';
+      let noFastForward: boolean | undefined;
+      if (typeof payload === 'string') {
+        ref = payload;
+      } else if (payload && typeof payload === 'object') {
+        ref = payload.branch || payload.ref || '';
+        noFastForward = payload.noFastForward;
+      }
+      await handleMergeWithConflictResolution(gitService, ref, () => host.loadInitialData(), { noFastForward });
       return true;
     }
 

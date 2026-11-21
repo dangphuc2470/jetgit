@@ -190,6 +190,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
       if (repos.length === 0) {
         this.fileRepoMap.clear();
+        this.view.badge = undefined;
         this.view.webview.postMessage({
           type: 'status',
           payload: {
@@ -351,6 +352,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
       const changesCount = changesFiles.length;
       const unversionedCount = unversionedFiles.length;
+
+      this.view.badge = changesCount > 0
+        ? { value: changesCount, tooltip: `${changesCount} changed ${changesCount === 1 ? 'file' : 'files'}` }
+        : undefined;
 
       this.changesFilePaths = changesFiles.map(f => f.path);
       this.unversionedFilePaths = unversionedFiles.map(f => f.path);

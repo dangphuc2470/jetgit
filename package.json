@@ -82,14 +82,14 @@
       "activitybar": [
         {
           "id": "jetgit-commit",
-          "title": "Changes",
+          "title": "Jet Changes",
           "icon": "resources/commit.svg"
         }
       ],
       "panel": [
         {
           "id": "jetgit-log",
-          "title": "Git Log",
+          "title": "Jet Log",
           "icon": "resources/commit.svg"
         }
       ]
@@ -212,14 +212,14 @@
         {
           "type": "webview",
           "id": "jetgit.commitView",
-          "name": "Changes"
+          "name": "Jet Changes"
         }
       ],
       "jetgit-log": [
         {
           "type": "webview",
           "id": "jetgit.logView",
-          "name": "Git Log",
+          "name": "Jet Log",
           "when": "workspaceFolderCount > 0"
         }
       ],

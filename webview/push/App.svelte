@@ -863,7 +863,6 @@
   }
 
   .as-checkbox {
-    accent-color: var(--vscode-focusBorder, #3574f0);
     cursor: pointer;
     width: 14px;
     height: 14px;

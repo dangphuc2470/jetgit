@@ -25,6 +25,93 @@ export function postMessage<M extends { type: string; payload?: any } = AnyWebvi
   }
 }
 
+function ensureDarkCheckboxStyle(): void {
+  if (typeof document === 'undefined' || !document.head) return;
+  if (document.getElementById('as-checkbox-transparent-style')) return;
+
+  const cs = document.createElement('style');
+  cs.id = 'as-checkbox-transparent-style';
+  cs.textContent = `
+    input[type="checkbox"],
+    .as-custom-chk {
+      appearance: none !important;
+      -webkit-appearance: none !important;
+      width: 14px !important;
+      height: 14px !important;
+      min-width: 14px !important;
+      min-height: 14px !important;
+      border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, #6C707E)) !important;
+      border-radius: 2.5px !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      cursor: pointer !important;
+      position: relative !important;
+      outline: none !important;
+      margin: 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+      transition: border-color 0.12s ease, background-color 0.12s ease !important;
+      flex-shrink: 0 !important;
+    }
+    input[type="checkbox"]:hover,
+    .as-custom-chk:hover {
+      border-color: var(--vscode-focusBorder, #CED0D6) !important;
+      background-color: rgba(255, 255, 255, 0.06) !important;
+    }
+    input[type="checkbox"]:checked,
+    .as-custom-chk:checked {
+      background: transparent !important;
+      background-color: transparent !important;
+      border-color: var(--vscode-focusBorder, #CED0D6) !important;
+    }
+    input[type="checkbox"]:checked::after,
+    .as-custom-chk:checked::after {
+      content: '' !important;
+      position: absolute !important;
+      top: 1px !important;
+      left: 4px !important;
+      width: 3.5px !important;
+      height: 7px !important;
+      border: solid var(--vscode-editor-foreground, #CED0D6) !important;
+      border-width: 0 1.8px 1.8px 0 !important;
+      transform: rotate(45deg) !important;
+    }
+    input[type="checkbox"]:indeterminate,
+    .as-custom-chk:indeterminate {
+      background: transparent !important;
+      background-color: transparent !important;
+      border-color: var(--vscode-focusBorder, #CED0D6) !important;
+    }
+    input[type="checkbox"]:indeterminate::after,
+    .as-custom-chk:indeterminate::after {
+      content: '' !important;
+      position: absolute !important;
+      top: 5px !important;
+      left: 3px !important;
+      width: 6px !important;
+      height: 2px !important;
+      background: var(--vscode-editor-foreground, #CED0D6) !important;
+    }
+    input[type="checkbox"]:disabled,
+    .as-custom-chk:disabled {
+      opacity: 0.45 !important;
+      cursor: default !important;
+    }
+    .studio-chk-wrap input[type="checkbox"] {
+      position: absolute !important;
+      opacity: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
+  `;
+  document.head.appendChild(cs);
+}
+
+ensureDarkCheckboxStyle();
+
 export function onMessage<M = AnyExtensionToWebviewMessage>(handler: (data: M) => void): () => void {
   const listener = (event: MessageEvent) => {
     handler(event.data);
@@ -414,7 +501,7 @@ export function openCheckoutBranchDialog(
 
       <div style="padding-left:96px;display:flex;align-items:center;">
         <label style="display:inline-flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;color:var(--vscode-editor-foreground,#dfe1e5);user-select:none;">
-          <input type="checkbox" id="as-co-overwrite" class="as-custom-chk" style="width:14px;height:14px;cursor:pointer;margin:0;accent-color:#3574f0;">
+          <input type="checkbox" id="as-co-overwrite" class="as-custom-chk" style="width:14px;height:14px;cursor:pointer;margin:0;">
           <span>Overwrite existing branch</span>
         </label>
       </div>
@@ -636,76 +723,7 @@ if (typeof window !== 'undefined') {
     document.body.appendChild(overlay);
     activeAuthDialog = overlay;
 
-    if (!document.getElementById("as-checkbox-transparent-style")) {
-      const cs = document.createElement("style");
-      cs.id = "as-checkbox-transparent-style";
-      cs.textContent = `
-        input[type="checkbox"],
-        .as-custom-chk {
-          appearance: none !important;
-          -webkit-appearance: none !important;
-          width: 14px !important;
-          height: 14px !important;
-          min-width: 14px !important;
-          min-height: 14px !important;
-          border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, #6C707E)) !important;
-          border-radius: 2.5px !important;
-          background: transparent !important;
-          background-color: transparent !important;
-          cursor: pointer !important;
-          position: relative !important;
-          outline: none !important;
-          margin: 0 !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          vertical-align: middle !important;
-          box-sizing: border-box !important;
-          transition: border-color 0.12s ease, background-color 0.12s ease !important;
-          flex-shrink: 0 !important;
-        }
-        input[type="checkbox"]:hover,
-        .as-custom-chk:hover {
-          border-color: var(--vscode-focusBorder, #CED0D6) !important;
-          background-color: rgba(255, 255, 255, 0.06) !important;
-        }
-        input[type="checkbox"]:checked,
-        .as-custom-chk:checked {
-          background: transparent !important;
-          background-color: transparent !important;
-          border-color: var(--vscode-focusBorder, #CED0D6) !important;
-        }
-        input[type="checkbox"]:checked::after,
-        .as-custom-chk:checked::after {
-          content: '' !important;
-          position: absolute !important;
-          top: 1px !important;
-          left: 4px !important;
-          width: 3.5px !important;
-          height: 7px !important;
-          border: solid var(--vscode-editor-foreground, #CED0D6) !important;
-          border-width: 0 1.8px 1.8px 0 !important;
-          transform: rotate(45deg) !important;
-        }
-        input[type="checkbox"]:indeterminate,
-        .as-custom-chk:indeterminate {
-          background: transparent !important;
-          background-color: transparent !important;
-          border-color: var(--vscode-focusBorder, #CED0D6) !important;
-        }
-        input[type="checkbox"]:indeterminate::after,
-        .as-custom-chk:indeterminate::after {
-          content: '' !important;
-          position: absolute !important;
-          top: 5px !important;
-          left: 3px !important;
-          width: 6px !important;
-          height: 2px !important;
-          background: var(--vscode-editor-foreground, #CED0D6) !important;
-        }
-      `;
-      document.head.appendChild(cs);
-    }
+    ensureDarkCheckboxStyle();
 
     if (!document.getElementById("as-auth-spin-style")) {
       const s = document.createElement("style");

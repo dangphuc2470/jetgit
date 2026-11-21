@@ -103,15 +103,18 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
   private async discoverRepositories(): Promise<{ name: string; path: string; gitService: GitService }[]> {
     const repos: { name: string; path: string; gitService: GitService }[] = [];
     const seenPaths = new Set<string>();
+    const toKey = (p: string) => (process.platform === 'win32' ? p.toLowerCase() : p);
+    const cwdKey = toKey(path.resolve(this.gitService.getCwd()));
 
     const checkAndAdd = async (name: string, folderPath: string) => {
       const normalized = path.resolve(folderPath);
-      if (seenPaths.has(normalized)) return;
+      const key = toKey(normalized);
+      if (seenPaths.has(key)) return;
       try {
         const gitPath = path.join(normalized, '.git');
         if (fs.existsSync(gitPath)) {
-          seenPaths.add(normalized);
-          const gs = normalized === path.resolve(this.gitService.getCwd())
+          seenPaths.add(key);
+          const gs = key === cwdKey
             ? this.gitService
             : new GitService(normalized);
           repos.push({ name, path: normalized, gitService: gs });
@@ -123,9 +126,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         const repoRoot = await tempGs.getRepoRoot().catch(() => '');
         if (repoRoot) {
           const rootNorm = path.resolve(repoRoot);
-          if (!seenPaths.has(rootNorm)) {
-            seenPaths.add(rootNorm);
-            const gs = rootNorm === path.resolve(this.gitService.getCwd())
+          const rootKey = toKey(rootNorm);
+          if (!seenPaths.has(rootKey)) {
+            seenPaths.add(rootKey);
+            const gs = rootKey === cwdKey
               ? this.gitService
               : new GitService(rootNorm);
             repos.push({ name: path.basename(rootNorm) || name, path: rootNorm, gitService: gs });

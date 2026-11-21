@@ -1,20 +1,18 @@
-<p align="center">
+<div align="center">
   <img src="icon.png" alt="JetGit Icon" width="96" />
-</p>
+  <h1>JetGit</h1>
+  <p>
+    IntelliJ &amp; JetBrains style Git client for VS Code, Cursor, Windsurf, and Antigravity.<br />
+    Powered by <strong>Svelte 5</strong> and the <strong>LinearBek DAG graph engine</strong>.
+  </p>
+</div>
 
-<h1 align="center">JetGit</h1>
-
-<p align="center">
-  IntelliJ &amp; JetBrains style Git client for VS Code, Cursor, Windsurf, and Antigravity.<br/>
-  Powered by <strong>Svelte 5</strong> and the <strong>LinearBek DAG graph engine</strong>.
-</p>
- 
 ![JetGit Workspace Overview](resources/screenshots/All_features.png)
- 
+
 ---
- 
+
 ## Features
- 
+
 ### Visual Commit Graph (`Cmd+9` / `Ctrl+Shift+9`)
 Smooth Bezier commit graph with **LinearBek** layout, instant filtering (text, hash, branch, author, date, path), and a commit details inspector.
 
@@ -22,7 +20,7 @@ Smooth Bezier commit graph with **LinearBek** layout, instant filtering (text, h
 
 ### Side-by-Side Diff Review
 2-way diff viewer with **word-level inline highlights**, SVG gutter ribbons, editable working copy, hunk revert (`>>`), and partial block staging.
- 
+
 ![JetGit 2-Way Diff Review](resources/screenshots/2_way_review.png)
 
 ### 3-Way Merge Tool
@@ -55,20 +53,20 @@ Tune per-panel font sizes, advanced remote fetch menu density, and `--no-ff` mer
 ---
 
 ## Keyboard Shortcuts
- 
+
 | Action | macOS | Windows / Linux |
 | :--- | :--- | :--- |
 | **Open Git Log** | `Cmd+9` | `Ctrl+Shift+9` |
 | **Commit Tool Window** | `Cmd+K` | `Ctrl+K` |
 | **Next / Previous Diff** | `F7` / `Shift+F7` | `F7` / `Shift+F7` |
- 
+
 ---
- 
+
 ## Requirements
 
 - VS Code `^1.85.0` or compatible editors (Cursor, Windsurf, Antigravity, Void, VSCodium).
 - Git `2.0+` in your system `PATH`.
- 
+
 ---
 
 ## Acknowledgements & Credits

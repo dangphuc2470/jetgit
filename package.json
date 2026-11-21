@@ -2,7 +2,7 @@
   "name": "jetgit-scm",
   "displayName": "JetGit - IntelliJ & JetBrains Style Git Client",
   "description": "JetBrains IntelliJ-style Git integration for VS Code — visual commit graph, colored branch lines, inline blame annotations, interactive rebase, changelists, 3-way merge, and side-by-side diff viewer. Fast, reactive, and powered by Svelte 5.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "phucdnh",
   "icon": "icon.png",
   "license": "MIT",

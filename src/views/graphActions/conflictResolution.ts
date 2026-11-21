@@ -164,8 +164,18 @@ export async function withSmartStashOnConflict(
         stashed = true;
       }
     } catch (stashErr: any) {
-      vscode.window.showErrorMessage(`Failed to stash changes: ${stashErr.message}`);
-      return;
+      const stashDetails = `${stashErr?.stdout || ''}\n${stashErr?.stderr || ''}\n${stashErr?.message || ''}`;
+      if (stashDetails.includes('Saved working directory and index state')) {
+        stashed = true;
+      } else {
+        const cleanErr = stashDetails
+          .split(/\r?\n/)
+          .filter((line) => !line.includes('LF will be replaced by CRLF'))
+          .join('\n')
+          .trim() || stashErr.message;
+        vscode.window.showErrorMessage(`Failed to stash changes: ${cleanErr}`);
+        return;
+      }
     }
 
     try {

@@ -31,7 +31,8 @@ test('fileIcons: Fallbacks to VS Code file document icon for general text/code f
   assert.ok(confIcon.includes('#8C8C8C')); // VS Code file icon color
 });
 
-test('fileIcons: Fallbacks to question mark only for extensionless or unrecognized binary', () => {
+test('fileIcons: Fallbacks to VS Code file document icon for extensionless or unrecognized files', () => {
   const unknownIcon = getFileIcon('unknown_file_without_ext');
-  assert.ok(unknownIcon.includes('9.03c0')); // question mark path
+  assert.ok(!unknownIcon.includes('9.03c0'));
+  assert.ok(unknownIcon.includes('#8C8C8C'));
 });

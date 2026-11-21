@@ -11,7 +11,7 @@ const UNKNOWN_QUESTION_ICON =
   '<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="#2B2D30" stroke="#7F848E"/><path d="M7.325 9.03c0-.227.039-.425.115-.595.08-.173.175-.32.285-.44.114-.123.26-.263.44-.42.16-.14.285-.257.375-.35.094-.097.17-.208.23-.335.064-.127.095-.268.095-.425 0-.25-.076-.453-.23-.61-.153-.16-.356-.24-.61-.24-.28 0-.505.09-.675.27-.166.18-.248.415-.245.705H5.725c0-.46.094-.855.28-1.185.187-.333.454-.587.8-.76.35-.177.762-.265 1.235-.265.457 0 .854.082 1.19.245.337.163.596.395.776.695.18.297.268.647.265 1.05 0 .303-.048.565-.145.785-.097.22-.212.4-.345.54-.134.14-.309.298-.525.475-.15.12-.269.22-.355.3a.96.96 0 00-.21.275c-.054.1-.08.212-.08.335v.175H7.325V9.03zm1.415 2.47H7.24V10h1.5v1.5z" fill="#7F848E"/></svg>';
 
 export function getFileIcon(filename: string): string {
-  if (!filename) return UNKNOWN_QUESTION_ICON;
+  if (!filename) return VSCODE_FILE_ICON;
   const base = filename.toLowerCase();
   const ext = base.includes('.') ? base.split('.').pop() || '' : '';
 
@@ -181,12 +181,6 @@ export function getFileIcon(filename: string): string {
     return '<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="#3D3228" stroke="#F5A623"/><path d="M8 2.5v11M6.5 5h3M6.5 8h3M6.5 11h3" stroke="#F5A623" stroke-width="1.2"/></svg>';
   }
 
-  // 33. Known text/code/config extension fallback -> Visual Studio Code Official File Document Icon
-  // If the file has a recognizable extension (alphanumeric, 1-6 chars), render VS Code file icon
-  if (/^[a-z0-9_-]{1,8}$/.test(ext)) {
-    return VSCODE_FILE_ICON;
-  }
-
-  // 34. Complete unknown/binary/extensionless fallback -> Question mark icon
-  return UNKNOWN_QUESTION_ICON;
+  // 33. Fallback -> Visual Studio Code Official File Document Icon
+  return VSCODE_FILE_ICON;
 }

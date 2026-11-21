@@ -209,7 +209,7 @@ export async function handleRemoteAction(
           async (signal) => {
             await gitService.push(branch, force, setUpstream, remote, tags, targetBranch, signal);
             host.loadInitialData();
-            vscode.commands.executeCommand('intellij-git.refreshBranches');
+            vscode.commands.executeCommand('jetgit.refreshBranches');
             host.view?.webview.postMessage({ type: 'pushSuccess' });
             return `Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`;
           },

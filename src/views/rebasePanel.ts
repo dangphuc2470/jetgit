@@ -5,7 +5,7 @@ import { RebaseToExtensionMessage, ExtensionToRebaseMessage } from '../shared/pr
 
 export class RebasePanel {
   public static currentPanel: RebasePanel | undefined;
-  private static readonly viewType = 'intellij-git.rebasePanel';
+  private static readonly viewType = 'jetgit.rebasePanel';
 
   private panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
@@ -92,7 +92,7 @@ export class RebasePanel {
             'Open Merge Editor',
           ).then(choice => {
             if (choice === 'Open Merge Editor') {
-              vscode.commands.executeCommand('intellij-git.resolveConflicts');
+              vscode.commands.executeCommand('jetgit.resolveConflicts');
             }
           });
           this.panel.dispose();

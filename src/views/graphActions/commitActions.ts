@@ -72,7 +72,7 @@ export async function handleCommitAction(
 
     case 'rebaseFromHere': {
       const hash = payload as string;
-      await vscode.commands.executeCommand('intellij-git.interactiveRebase', hash);
+      await vscode.commands.executeCommand('jetgit.interactiveRebase', hash);
       return true;
     }
 
@@ -85,7 +85,7 @@ export async function handleCommitAction(
           vscode.window.showInformationMessage(
             `No local changes to fixup into commit ${hash.slice(0, 8)}. Opening Interactive Rebase...`
           );
-          await vscode.commands.executeCommand('intellij-git.interactiveRebase', hash);
+          await vscode.commands.executeCommand('jetgit.interactiveRebase', hash);
           return true;
         }
 
@@ -283,7 +283,7 @@ export async function handleCommitAction(
             host.loadInitialData();
           } else {
             vscode.window.showWarningMessage('Editing commit message of older commits requires interactive rebase.');
-            await vscode.commands.executeCommand('intellij-git.interactiveRebase', hash);
+            await vscode.commands.executeCommand('jetgit.interactiveRebase', hash);
           }
         } catch (err: any) {
           vscode.window.showErrorMessage(`Edit message failed: ${err.message}`);
@@ -302,7 +302,7 @@ export async function handleCommitAction(
           host.loadInitialData();
         } else {
           vscode.window.showInformationMessage(`Use Interactive Rebase to drop older commit ${hash.slice(0, 8)}`);
-          await vscode.commands.executeCommand('intellij-git.interactiveRebase', hash);
+          await vscode.commands.executeCommand('jetgit.interactiveRebase', hash);
         }
       } catch (err: any) {
         vscode.window.showErrorMessage(`Drop commit failed: ${err.message}`);

@@ -133,8 +133,8 @@ export async function generateAiCommitMessage(
   }
 
   const restoreFocus = () => {
-    vscode.commands.executeCommand('workbench.view.extension.intellij-git-commit');
-    vscode.commands.executeCommand('intellij-git.commitView.focus');
+    vscode.commands.executeCommand('workbench.view.extension.jetgit-commit');
+    vscode.commands.executeCommand('jetgit.commitView.focus');
   };
   setTimeout(restoreFocus, 30);
   setTimeout(restoreFocus, 80);

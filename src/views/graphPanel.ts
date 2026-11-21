@@ -10,7 +10,7 @@ import { GraphToExtensionMessage, ExtensionToGraphMessage } from '../shared/prot
 import { taskManager } from '../services/taskManager';
 
 export class GraphViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'intellij-git.logView';
+  public static readonly viewType = 'jetgit.logView';
   private view?: vscode.WebviewView;
   private allCommits: Commit[] = [];
   private graphNodes: GraphNode[] = [];
@@ -478,7 +478,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         try {
           await this.gitService.refreshRemoteBranchNames();
           await this.refresh();
-          vscode.commands.executeCommand('intellij-git.refreshBranches');
+          vscode.commands.executeCommand('jetgit.refreshBranches');
           taskManager.notifyInfo('Branches refreshed.');
         } catch (err: any) {
           taskManager.notifyError(`Refresh failed: ${err.message}`);

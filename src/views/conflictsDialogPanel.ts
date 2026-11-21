@@ -7,7 +7,7 @@ import { ConflictsToExtensionMessage, ExtensionToConflictsMessage } from '../sha
 
 export class ConflictsDialogPanel {
   public static currentPanel: ConflictsDialogPanel | undefined;
-  public static readonly viewType = 'intellij-git.conflictsDialogWindow';
+  public static readonly viewType = 'jetgit.conflictsDialogWindow';
 
   private panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];

@@ -59,12 +59,12 @@
   },
   "activationEvents": [
     "workspaceContains:.git",
-    "onCommand:intellij-git.openLog",
-    "onCommand:intellij-git.openCommit",
-    "onCommand:intellij-git.toggleBlame",
-    "onView:intellij-git.commitView",
-    "onView:intellij-git.branches",
-    "onView:intellij-git.changelists"
+    "onCommand:jetgit.openLog",
+    "onCommand:jetgit.openCommit",
+    "onCommand:jetgit.toggleBlame",
+    "onView:jetgit.commitView",
+    "onView:jetgit.branches",
+    "onView:jetgit.changelists"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -81,7 +81,7 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "intellij-git-commit",
+          "id": "jetgit-commit",
           "title": "Changes",
           "icon": "resources/commit.svg"
         }
@@ -89,140 +89,140 @@
     },
     "commands": [
       {
-        "command": "intellij-git.openCommit",
+        "command": "jetgit.openCommit",
         "title": "Open Commit Tool Window",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(check)"
       },
       {
-        "command": "intellij-git.openLog",
+        "command": "jetgit.openLog",
         "title": "Open Git Log",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(git-commit)"
       },
       {
-        "command": "intellij-git.toggleBlame",
+        "command": "jetgit.toggleBlame",
         "title": "Toggle Blame Annotations",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.interactiveRebase",
+        "command": "jetgit.interactiveRebase",
         "title": "Interactive Rebase...",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.newChangelist",
+        "command": "jetgit.newChangelist",
         "title": "New Changelist...",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(add)"
       },
       {
-        "command": "intellij-git.deleteChangelist",
+        "command": "jetgit.deleteChangelist",
         "title": "Delete Changelist",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(trash)"
       },
       {
-        "command": "intellij-git.setActiveChangelist",
+        "command": "jetgit.setActiveChangelist",
         "title": "Set as Active Changelist",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.commitChangelist",
+        "command": "jetgit.commitChangelist",
         "title": "Commit Changelist",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(check)"
       },
       {
-        "command": "intellij-git.refreshBranches",
+        "command": "jetgit.refreshBranches",
         "title": "Refresh Branches",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(refresh)"
       },
       {
-        "command": "intellij-git.checkoutBranch",
+        "command": "jetgit.checkoutBranch",
         "title": "Checkout",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.deleteBranch",
+        "command": "jetgit.deleteBranch",
         "title": "Delete Branch",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.mergeBranch",
+        "command": "jetgit.mergeBranch",
         "title": "Merge into Current",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.rebaseBranch",
+        "command": "jetgit.rebaseBranch",
         "title": "Rebase Current onto...",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.compareBranch",
+        "command": "jetgit.compareBranch",
         "title": "Compare with Current",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.createBranch",
+        "command": "jetgit.createBranch",
         "title": "Create Branch...",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(git-branch-create)"
       },
       {
-        "command": "intellij-git.resolveConflicts",
+        "command": "jetgit.resolveConflicts",
         "title": "Resolve Merge Conflicts",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.acceptAllNonConflicting",
+        "command": "jetgit.acceptAllNonConflicting",
         "title": "Accept All Non-Conflicting",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       },
       {
-        "command": "intellij-git.refreshChangelists",
+        "command": "jetgit.refreshChangelists",
         "title": "Refresh Changelists",
-        "category": "IntelliJ Git",
+        "category": "JetGit",
         "icon": "$(refresh)"
       },
       {
-        "command": "intellij-git.pushDialog",
+        "command": "jetgit.pushDialog",
         "title": "Push...",
-        "category": "IntelliJ Git"
+        "category": "JetGit"
       }
     ],
     "keybindings": [
       {
-        "command": "intellij-git.pushDialog",
+        "command": "jetgit.pushDialog",
         "key": "shift+cmd+k",
         "mac": "shift+cmd+k",
         "win": "shift+ctrl+k"
       }
     ],
     "views": {
-      "intellij-git-commit": [
+      "jetgit-commit": [
         {
           "type": "webview",
-          "id": "intellij-git.commitView",
+          "id": "jetgit.commitView",
           "name": "Changes"
         }
       ],
       "panel": [
         {
           "type": "webview",
-          "id": "intellij-git.logView",
+          "id": "jetgit.logView",
           "name": "Git Log",
           "when": "workspaceFolderCount > 0"
         }
       ],
       "scm": [
         {
-          "id": "intellij-git.branches",
+          "id": "jetgit.branches",
           "name": "Branches"
         },
         {
-          "id": "intellij-git.changelists",
+          "id": "jetgit.changelists",
           "name": "Changelists",
           "when": "scmProviderCount > 0"
         }
@@ -231,70 +231,70 @@
     "menus": {
       "view/title": [
         {
-          "command": "intellij-git.refreshBranches",
-          "when": "view == intellij-git.branches",
+          "command": "jetgit.refreshBranches",
+          "when": "view == jetgit.branches",
           "group": "navigation"
         },
         {
-          "command": "intellij-git.createBranch",
-          "when": "view == intellij-git.branches",
+          "command": "jetgit.createBranch",
+          "when": "view == jetgit.branches",
           "group": "navigation"
         },
         {
-          "command": "intellij-git.newChangelist",
-          "when": "view == intellij-git.changelists",
+          "command": "jetgit.newChangelist",
+          "when": "view == jetgit.changelists",
           "group": "navigation"
         },
         {
-          "command": "intellij-git.refreshChangelists",
-          "when": "view == intellij-git.changelists",
+          "command": "jetgit.refreshChangelists",
+          "when": "view == jetgit.changelists",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "intellij-git.checkoutBranch",
-          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "command": "jetgit.checkoutBranch",
+          "when": "view == jetgit.branches && viewItem =~ /branch/",
           "group": "1_actions@1"
         },
         {
-          "command": "intellij-git.createBranch",
-          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "command": "jetgit.createBranch",
+          "when": "view == jetgit.branches && viewItem =~ /branch/",
           "group": "1_actions@2"
         },
         {
-          "command": "intellij-git.mergeBranch",
-          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "command": "jetgit.mergeBranch",
+          "when": "view == jetgit.branches && viewItem =~ /branch/",
           "group": "2_merge@1"
         },
         {
-          "command": "intellij-git.rebaseBranch",
-          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "command": "jetgit.rebaseBranch",
+          "when": "view == jetgit.branches && viewItem =~ /branch/",
           "group": "2_merge@2"
         },
         {
-          "command": "intellij-git.compareBranch",
-          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "command": "jetgit.compareBranch",
+          "when": "view == jetgit.branches && viewItem =~ /branch/",
           "group": "3_compare@1"
         },
         {
-          "command": "intellij-git.deleteBranch",
-          "when": "view == intellij-git.branches && viewItem =~ /branch/",
+          "command": "jetgit.deleteBranch",
+          "when": "view == jetgit.branches && viewItem =~ /branch/",
           "group": "4_delete@1"
         },
         {
-          "command": "intellij-git.setActiveChangelist",
-          "when": "view == intellij-git.changelists && viewItem == changelist",
+          "command": "jetgit.setActiveChangelist",
+          "when": "view == jetgit.changelists && viewItem == changelist",
           "group": "1_actions@1"
         },
         {
-          "command": "intellij-git.commitChangelist",
-          "when": "view == intellij-git.changelists && viewItem =~ /changelist/",
+          "command": "jetgit.commitChangelist",
+          "when": "view == jetgit.changelists && viewItem =~ /changelist/",
           "group": "1_actions@2"
         },
         {
-          "command": "intellij-git.deleteChangelist",
-          "when": "view == intellij-git.changelists && viewItem == changelist",
+          "command": "jetgit.deleteChangelist",
+          "when": "view == jetgit.changelists && viewItem == changelist",
           "group": "2_delete@1"
         }
       ]

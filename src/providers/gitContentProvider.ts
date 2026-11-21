@@ -3,10 +3,10 @@ import { GitService } from '../git/gitService';
 
 /**
  * Provides file contents at a specific git commit for diff viewing.
- * URI format: intellij-git:/<hash>/<filePath>
+ * URI format: jetgit:/<hash>/<filePath>
  */
 export class GitContentProvider implements vscode.TextDocumentContentProvider {
-  static readonly scheme = 'intellij-git';
+  static readonly scheme = 'jetgit';
 
   constructor(private gitService: GitService) {}
 

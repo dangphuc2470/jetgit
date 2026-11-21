@@ -92,7 +92,7 @@ export class BlameDecorationProvider implements vscode.Disposable {
         const blameLine = lines.find(l => l.lineNumber === sel.active.line + 1);
         if (!blameLine || blameLine.hash.startsWith('0000000')) return;
 
-        vscode.commands.executeCommand('intellij-git.showCommitInLog', blameLine.hash);
+        vscode.commands.executeCommand('jetgit.showCommitInLog', blameLine.hash);
       }),
     );
 

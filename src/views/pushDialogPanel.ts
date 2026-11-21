@@ -7,7 +7,7 @@ import { PushToExtensionMessage, ExtensionToPushMessage } from '../shared/protoc
 
 export class PushDialogPanel {
   public static currentPanel: PushDialogPanel | undefined;
-  public static readonly viewType = 'intellij-git.pushDialogWindow';
+  public static readonly viewType = 'jetgit.pushDialogWindow';
 
   private panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];

@@ -12,7 +12,7 @@ export class MergeProvider implements vscode.Disposable {
       vscode.StatusBarAlignment.Left,
       100,
     );
-    this.statusBarItem.command = 'intellij-git.resolveConflicts';
+    this.statusBarItem.command = 'jetgit.resolveConflicts';
     this.disposables.push(this.statusBarItem);
 
     this.checkForConflicts();

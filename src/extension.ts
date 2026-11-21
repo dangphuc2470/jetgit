@@ -77,7 +77,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // --- Branch Tree Sidebar (left) ---
   const branchTree = new BranchTreeProvider(gitService, context.extensionUri);
-  const branchTreeView = vscode.window.createTreeView('intellij-git.branches', {
+  const branchTreeView = vscode.window.createTreeView('jetgit.branches', {
     treeDataProvider: branchTree,
     showCollapseAll: true,
   });
@@ -85,7 +85,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // --- Changelist Tree Sidebar ---
   const changelistTree = new ChangelistTreeProvider(gitService, workspaceRoot, context.extensionUri);
-  const changelistTreeView = vscode.window.createTreeView('intellij-git.changelists', {
+  const changelistTreeView = vscode.window.createTreeView('jetgit.changelists', {
     treeDataProvider: changelistTree,
     showCollapseAll: true,
   });
@@ -106,29 +106,29 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Commit Tool Window — reveal / focus (Cmd+K)
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.openCommit', () => {
-      vscode.commands.executeCommand('intellij-git.commitView.focus');
+    vscode.commands.registerCommand('jetgit.openCommit', () => {
+      vscode.commands.executeCommand('jetgit.commitView.focus');
     }),
   );
 
   // Git Log — focus/reveal the bottom panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.openLog', () => {
-      vscode.commands.executeCommand('intellij-git.logView.focus');
+    vscode.commands.registerCommand('jetgit.openLog', () => {
+      vscode.commands.executeCommand('jetgit.logView.focus');
     }),
   );
 
   // Show specific commit in git log (triggered by blame click)
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.showCommitInLog', (hash: string) => {
-      vscode.commands.executeCommand('intellij-git.logView.focus');
+    vscode.commands.registerCommand('jetgit.showCommitInLog', (hash: string) => {
+      vscode.commands.executeCommand('jetgit.logView.focus');
       graphViewProvider.selectCommit(hash);
     }),
   );
 
   // Toggle Blame
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.toggleBlame', () => {
+    vscode.commands.registerCommand('jetgit.toggleBlame', () => {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
         log.appendLine(`Toggling blame on ${editor.document.uri.fsPath}`);
@@ -141,7 +141,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Interactive Rebase
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.interactiveRebase', async (baseHash?: string) => {
+    vscode.commands.registerCommand('jetgit.interactiveRebase', async (baseHash?: string) => {
       if (!baseHash) {
         baseHash = await vscode.window.showInputBox({
           prompt: 'Base commit hash (rebase from this point)',
@@ -155,7 +155,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Branch actions (kept for branch tree if re-added later)
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.refreshBranches', async () => {
+    vscode.commands.registerCommand('jetgit.refreshBranches', async () => {
       try {
         await gitService.refreshRemoteBranchNames();
       } catch {}
@@ -166,7 +166,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.checkoutBranch', async (node: any) => {
+    vscode.commands.registerCommand('jetgit.checkoutBranch', async (node: any) => {
       const ref = node?.ref;
       if (!ref) return;
       await handleCheckoutWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
@@ -174,7 +174,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.createBranch', async (node: any) => {
+    vscode.commands.registerCommand('jetgit.createBranch', async (node: any) => {
       const opened = graphViewProvider.openCreateBranchDialog(node?.ref);
       if (opened) return;
 
@@ -194,7 +194,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.deleteBranch', async (node: any) => {
+    vscode.commands.registerCommand('jetgit.deleteBranch', async (node: any) => {
       const ref = node?.ref;
       if (!ref) return;
       const confirm = await vscode.window.showWarningMessage(
@@ -213,7 +213,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.mergeBranch', async (node: any) => {
+    vscode.commands.registerCommand('jetgit.mergeBranch', async (node: any) => {
       const ref = node?.ref;
       if (!ref) return;
       await handleMergeWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
@@ -221,7 +221,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.rebaseBranch', async (node: any) => {
+    vscode.commands.registerCommand('jetgit.rebaseBranch', async (node: any) => {
       const ref = node?.ref;
       if (!ref) return;
       await handleRebaseWithConflictResolution(gitService, ref, () => graphViewProvider.refresh());
@@ -229,7 +229,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.compareBranch', async (node: any) => {
+    vscode.commands.registerCommand('jetgit.compareBranch', async (node: any) => {
       const ref = node?.ref;
       if (!ref) return;
       try {
@@ -243,13 +243,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Merge conflict resolution (Floating Window)
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.resolveConflicts', async () => {
+    vscode.commands.registerCommand('jetgit.resolveConflicts', async () => {
       await ConflictsDialogPanel.createOrShow(context.extensionUri, gitService);
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.openMergeEditor', async (filePath: string) => {
+    vscode.commands.registerCommand('jetgit.openMergeEditor', async (filePath: string) => {
       if (filePath) {
         await MergeEditorPanel.createOrShow(context.extensionUri, gitService, filePath);
       }
@@ -257,27 +257,27 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.acceptAllNonConflicting', () => {
+    vscode.commands.registerCommand('jetgit.acceptAllNonConflicting', () => {
       mergeProvider.acceptAllNonConflicting();
     }),
   );
 
   // Push Commits dialog (Floating Window)
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.pushDialog', async (branch?: string) => {
+    vscode.commands.registerCommand('jetgit.pushDialog', async (branch?: string) => {
       await PushDialogPanel.createOrShow(context.extensionUri, gitService, branch);
     }),
   );
 
   // Changelist commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.newChangelist', () => {
+    vscode.commands.registerCommand('jetgit.newChangelist', () => {
       changelistTree.createChangelist();
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.deleteChangelist', (node: any) => {
+    vscode.commands.registerCommand('jetgit.deleteChangelist', (node: any) => {
       if (node?.name) {
         changelistTree.deleteChangelist(node.name);
       }
@@ -285,7 +285,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.setActiveChangelist', (node: any) => {
+    vscode.commands.registerCommand('jetgit.setActiveChangelist', (node: any) => {
       if (node?.name) {
         changelistTree.setActive(node.name);
       }
@@ -293,19 +293,19 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.commitChangelist', (node: any) => {
+    vscode.commands.registerCommand('jetgit.commitChangelist', (node: any) => {
       changelistTree.commitChangelist(node?.name);
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.refreshGraph', () => {
+    vscode.commands.registerCommand('jetgit.refreshGraph', () => {
       graphViewProvider.refresh();
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('intellij-git.refreshChangelists', () => {
+    vscode.commands.registerCommand('jetgit.refreshChangelists', () => {
       changelistTree.refresh();
     }),
   );

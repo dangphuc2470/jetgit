@@ -48,8 +48,8 @@ export async function withSmartStashOnConflict(
         `Abort ${inProgress.title}`
       );
       if (choice === 'Resolve Conflicts') {
-        vscode.commands.executeCommand('intellij-git.refreshCommit');
-        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+        vscode.commands.executeCommand('jetgit.refreshCommit');
+        await vscode.commands.executeCommand('jetgit.resolveConflicts');
       } else if (choice === `Abort ${inProgress.title}`) {
         try {
           await gitService.abortOperation(inProgress.type);
@@ -111,8 +111,8 @@ export async function withSmartStashOnConflict(
 
     if (!isConflict) {
       if (is3WayConflict && (actionLabel === 'Merge' || actionLabel === 'Rebase' || actionLabel === 'Cherry-Pick' || actionLabel === 'Revert')) {
-        vscode.commands.executeCommand('intellij-git.refreshCommit');
-        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+        vscode.commands.executeCommand('jetgit.refreshCommit');
+        await vscode.commands.executeCommand('jetgit.resolveConflicts');
         onSuccess();
         return;
       }
@@ -123,8 +123,8 @@ export async function withSmartStashOnConflict(
           'Resolve Conflicts'
         );
         if (choice === 'Resolve Conflicts') {
-          vscode.commands.executeCommand('intellij-git.refreshCommit');
-          await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+          vscode.commands.executeCommand('jetgit.refreshCommit');
+          await vscode.commands.executeCommand('jetgit.resolveConflicts');
         }
         return;
       }
@@ -183,15 +183,15 @@ export async function withSmartStashOnConflict(
         actMsg.includes('git rebase --continue');
 
       if (stashed && is3Way) {
-        vscode.commands.executeCommand('intellij-git.refreshCommit');
-        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+        vscode.commands.executeCommand('jetgit.refreshCommit');
+        await vscode.commands.executeCommand('jetgit.resolveConflicts');
         const warnChoice = await vscode.window.showWarningMessage(
           `${actionLabel} resulted in conflicts. Your local changes were safely saved to stash '${stashName}'. Resolve conflicts first, then apply your stash.`,
           'Resolve Conflicts'
         );
         if (warnChoice === 'Resolve Conflicts') {
-          vscode.commands.executeCommand('intellij-git.refreshCommit');
-          await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+          vscode.commands.executeCommand('jetgit.refreshCommit');
+          await vscode.commands.executeCommand('jetgit.resolveConflicts');
         }
         onSuccess();
         return;
@@ -212,21 +212,21 @@ export async function withSmartStashOnConflict(
         await gitService.exec(['stash', 'pop']);
         taskManager.notifyInfo(`${smartLabel} completed: Restored your changes.`);
       } catch (popErr: any) {
-        vscode.commands.executeCommand('intellij-git.refreshCommit');
-        await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+        vscode.commands.executeCommand('jetgit.refreshCommit');
+        await vscode.commands.executeCommand('jetgit.resolveConflicts');
         const warnChoice = await vscode.window.showWarningMessage(
           `${actionLabel} succeeded, but applying stashed changes resulted in merge conflicts. Please resolve them.`,
           'Resolve Conflicts',
           'Rollback Stash'
         );
         if (warnChoice === 'Resolve Conflicts') {
-          vscode.commands.executeCommand('intellij-git.refreshCommit');
-          await vscode.commands.executeCommand('intellij-git.resolveConflicts');
+          vscode.commands.executeCommand('jetgit.refreshCommit');
+          await vscode.commands.executeCommand('jetgit.resolveConflicts');
         } else if (warnChoice === 'Rollback Stash') {
           try {
             await gitService.exec(['reset', '--hard', 'HEAD']);
             taskManager.notifyInfo(`Rolled back working tree. Your changes remain safely stored in Stash.`);
-            vscode.commands.executeCommand('intellij-git.refreshCommit');
+            vscode.commands.executeCommand('jetgit.refreshCommit');
             onSuccess();
           } catch (rollbackErr: any) {
             vscode.window.showErrorMessage(`Rollback failed: ${rollbackErr.message}`);
@@ -321,7 +321,7 @@ export async function handleCheckoutWithConflictResolution(
       },
       async () => {
         onSuccess();
-        vscode.commands.executeCommand('intellij-git.refreshBranches');
+        vscode.commands.executeCommand('jetgit.refreshBranches');
       }
     );
     return;
@@ -353,7 +353,7 @@ export async function handleCheckoutWithConflictResolution(
           },
           async () => {
             onSuccess();
-            vscode.commands.executeCommand('intellij-git.refreshBranches');
+            vscode.commands.executeCommand('jetgit.refreshBranches');
           }
         );
         return;
@@ -369,7 +369,7 @@ export async function handleCheckoutWithConflictResolution(
           },
           async () => {
             onSuccess();
-            vscode.commands.executeCommand('intellij-git.refreshBranches');
+            vscode.commands.executeCommand('jetgit.refreshBranches');
           }
         );
         return;
@@ -388,7 +388,7 @@ export async function handleCheckoutWithConflictResolution(
     },
     async () => {
       onSuccess();
-      vscode.commands.executeCommand('intellij-git.refreshBranches');
+      vscode.commands.executeCommand('jetgit.refreshBranches');
     }
   );
 }
@@ -429,7 +429,7 @@ export async function handleMergeWithConflictResolution(
               taskManager.notifyInfo(`Deleted branch '${ref}'`);
               vscode.window.showInformationMessage(`Deleted branch '${ref}'`);
               onSuccess();
-              vscode.commands.executeCommand('intellij-git.refreshBranches');
+              vscode.commands.executeCommand('jetgit.refreshBranches');
             } catch (err: any) {
               if (err.message && (err.message.includes('not fully merged') || err.message.includes('not merged'))) {
                 const forceChoice = await vscode.window.showWarningMessage(
@@ -442,7 +442,7 @@ export async function handleMergeWithConflictResolution(
                   taskManager.notifyInfo(`Force deleted branch '${ref}'`);
                   vscode.window.showInformationMessage(`Force deleted branch '${ref}'`);
                   onSuccess();
-                  vscode.commands.executeCommand('intellij-git.refreshBranches');
+                  vscode.commands.executeCommand('jetgit.refreshBranches');
                 }
               } else {
                 vscode.window.showErrorMessage(`Delete failed: ${err.message}`);

@@ -9,7 +9,7 @@ import { parseConflictHunksFromText, type ConflictHunk } from '../shared/mergeRe
 
 export class MergeEditorPanel {
   public static currentPanel: MergeEditorPanel | undefined;
-  public static readonly viewType = 'intellij-git.mergeEditor';
+  public static readonly viewType = 'jetgit.mergeEditor';
 
   private panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];

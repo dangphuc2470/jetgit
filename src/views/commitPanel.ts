@@ -13,7 +13,7 @@ import { CommitToExtensionMessage, ExtensionToCommitMessage } from '../shared/pr
 import { ChangelistTreeProvider } from './changelistTree';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'intellij-git.commitView';
+  public static readonly viewType = 'jetgit.commitView';
   public static currentProvider?: CommitViewProvider;
   private view?: vscode.WebviewView;
   private changelistTree?: ChangelistTreeProvider;
@@ -800,8 +800,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           await this.refresh();
           this.graphViewProvider?.refresh();
           this.changelistTree?.syncChangelists();
-          vscode.commands.executeCommand('intellij-git.refreshGraph');
-          vscode.commands.executeCommand('intellij-git.refreshChangelists');
+          vscode.commands.executeCommand('jetgit.refreshGraph');
+          vscode.commands.executeCommand('jetgit.refreshChangelists');
         } catch (err: any) {
           vscode.window.showErrorMessage(`Commit failed: ${err.message}`);
         }
@@ -831,8 +831,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           await this.refresh();
           this.graphViewProvider?.refresh();
           this.changelistTree?.syncChangelists();
-          vscode.commands.executeCommand('intellij-git.refreshGraph');
-          vscode.commands.executeCommand('intellij-git.refreshChangelists');
+          vscode.commands.executeCommand('jetgit.refreshGraph');
+          vscode.commands.executeCommand('jetgit.refreshChangelists');
           await this.openPushDialog();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Commit failed: ${err.message}`);
@@ -850,7 +850,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
           vscode.window.showInformationMessage(`Pushed ${branch || 'branch'} successfully to ${remote || 'remote'}.`);
           await this.refresh();
           this.graphViewProvider?.refresh();
-          vscode.commands.executeCommand('intellij-git.refreshGraph');
+          vscode.commands.executeCommand('jetgit.refreshGraph');
           this.view?.webview.postMessage({ type: 'pushSuccess' });
         } catch (err: any) {
           vscode.window.showErrorMessage(`Push failed: ${err.message}`);
@@ -972,7 +972,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
               'Resolve Conflicts'
             ).then(res => {
               if (res === 'Resolve Conflicts') {
-                vscode.commands.executeCommand('intellij-git.resolveConflicts');
+                vscode.commands.executeCommand('jetgit.resolveConflicts');
               }
             });
           } else {
@@ -996,7 +996,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
               'Resolve Conflicts'
             ).then(res => {
               if (res === 'Resolve Conflicts') {
-                vscode.commands.executeCommand('intellij-git.resolveConflicts');
+                vscode.commands.executeCommand('jetgit.resolveConflicts');
               }
             });
           } else {
@@ -1025,7 +1025,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'openLog': {
-        vscode.commands.executeCommand('intellij-git.openLog');
+        vscode.commands.executeCommand('jetgit.openLog');
         break;
       }
       case 'collapseView': {

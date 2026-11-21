@@ -180,7 +180,7 @@ export async function handleBranchAction(
               await gitService.exec(['config', `branch.${branch}.merge`, `refs/heads/${remoteBranch}`], undefined, undefined, undefined, signal);
             }
             host.loadInitialData();
-            vscode.commands.executeCommand('intellij-git.refreshBranches');
+            vscode.commands.executeCommand('jetgit.refreshBranches');
             return `Branch '${branch}' is now tracking '${upstream}'.`;
           },
           { cancellable: true }
@@ -200,7 +200,7 @@ export async function handleBranchAction(
         await gitService.exec(['branch', '--unset-upstream', branch]);
         taskManager.notifyInfo(`Unset tracked branch for '${branch}'.`);
         host.loadInitialData();
-        vscode.commands.executeCommand('intellij-git.refreshBranches');
+        vscode.commands.executeCommand('jetgit.refreshBranches');
       } catch (err: any) {
         vscode.window.showErrorMessage(`Unset upstream failed: ${err.message}`);
       }
@@ -247,7 +247,7 @@ export async function handleBranchAction(
 
             if (trackedCount > 0) {
               host.loadInitialData();
-              vscode.commands.executeCommand('intellij-git.refreshBranches');
+              vscode.commands.executeCommand('jetgit.refreshBranches');
               return `Successfully tracked ${trackedCount} local branch${trackedCount > 1 ? 'es' : ''} to '${displayTarget}'.`;
             } else {
               return `No matching local branches found to track to '${displayTarget}'.`;

@@ -14,7 +14,7 @@ export interface ReviewRevisions {
 
 export class CommitReviewPanel {
   public static currentPanel: CommitReviewPanel | undefined;
-  public static readonly viewType = 'intellij-git.commitReview';
+  public static readonly viewType = 'jetgit.commitReview';
   public static onFileNavigateListener?: (filePath: string) => void;
 
   private panel: vscode.WebviewPanel;

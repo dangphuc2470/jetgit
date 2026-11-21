@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { highlightCode } from "$shared/syntaxHighlight";
+  import { highlightCode, tokenize } from "$shared/syntaxHighlight";
   import { postMessage } from "$shared/vscodeApi";
   import type { ConflictHunk, ExtensionToMergeMessage } from "$shared/protocol";
   import { applyAllNonConflicting } from "$mergeResolveUtil";
@@ -33,9 +33,48 @@
     id: number;
     lineNo: number;
     text: string;
+    html?: string;
     extraClass: string;
     editable?: boolean;
     hunkId?: number;
+  }
+
+  function buildInlineDiffPair(
+    leftText: string,
+    rightText: string,
+    spanClass: string,
+  ): { leftHtml: string; rightHtml: string } {
+    if (leftText === rightText) {
+      return { leftHtml: highlightCode(leftText), rightHtml: highlightCode(rightText) };
+    }
+    const leftTokens = tokenize(leftText);
+    const rightTokens = tokenize(rightText);
+
+    let start = 0;
+    while (start < leftTokens.length && start < rightTokens.length && leftTokens[start] === rightTokens[start]) {
+      start++;
+    }
+    let endLeft = leftTokens.length - 1;
+    let endRight = rightTokens.length - 1;
+    while (endLeft >= start && endRight >= start && leftTokens[endLeft] === rightTokens[endRight]) {
+      endLeft--;
+      endRight--;
+    }
+
+    const renderSide = (tokens: string[], endIdx: number): string => {
+      if (start > endIdx) {
+        return highlightCode(tokens.join(""));
+      }
+      const prefix = tokens.slice(0, start).join("");
+      const changed = tokens.slice(start, endIdx + 1).join("");
+      const suffix = tokens.slice(endIdx + 1).join("");
+      return `${highlightCode(prefix)}<span class="${spanClass}">${highlightCode(changed)}</span>${highlightCode(suffix)}`;
+    };
+
+    return {
+      leftHtml: renderSide(leftTokens, endLeft),
+      rightHtml: renderSide(rightTokens, endRight),
+    };
   }
 
   let lineIdCounter = 1;
@@ -191,15 +230,53 @@
               ? ""
               : pendingLineClass;
 
+        const centerLinesToRender =
+          hunk.resultLines !== undefined && hunk.resultLines !== null
+            ? hunk.resultLines
+            : hunk.baseLines || [];
+
+        const leftHtmlList: (string | undefined)[] = new Array(yLines.length).fill(undefined);
+        const rightHtmlList: (string | undefined)[] = new Array(tLines.length).fill(undefined);
+        const centerHtmlList: (string | undefined)[] = new Array(centerLinesToRender.length).fill(undefined);
+
+        if (changeKind === "modify") {
+          if (activeSide === "yours" && hunk.leftStatus === "pending" && yLines.length === centerLinesToRender.length) {
+            for (let i = 0; i < yLines.length; i++) {
+              const pair = buildInlineDiffPair(yLines[i], centerLinesToRender[i], "diff-word-modify");
+              leftHtmlList[i] = pair.leftHtml;
+              centerHtmlList[i] = pair.rightHtml;
+            }
+          } else if (activeSide === "theirs" && hunk.rightStatus === "pending" && tLines.length === centerLinesToRender.length) {
+            for (let i = 0; i < tLines.length; i++) {
+              const pair = buildInlineDiffPair(centerLinesToRender[i], tLines[i], "diff-word-modify");
+              centerHtmlList[i] = pair.leftHtml;
+              rightHtmlList[i] = pair.rightHtml;
+            }
+          }
+        } else if (changeKind === "conflict") {
+          if (hunk.leftStatus === "pending" && yLines.length === centerLinesToRender.length) {
+            for (let i = 0; i < yLines.length; i++) {
+              const pair = buildInlineDiffPair(yLines[i], centerLinesToRender[i], "diff-word-conflict");
+              leftHtmlList[i] = pair.leftHtml;
+            }
+          }
+          if (hunk.rightStatus === "pending" && tLines.length === centerLinesToRender.length) {
+            for (let i = 0; i < tLines.length; i++) {
+              const pair = buildInlineDiffPair(centerLinesToRender[i], tLines[i], "diff-word-conflict");
+              rightHtmlList[i] = pair.rightHtml;
+            }
+          }
+        }
+
         const leftStart = leftNo;
-        for (const text of yLines) {
-          nextLeft.push({ id: lineIdCounter++, lineNo: leftNo++, text, extraClass: leftLineClass });
+        for (let i = 0; i < yLines.length; i++) {
+          nextLeft.push({ id: lineIdCounter++, lineNo: leftNo++, text: yLines[i], html: leftHtmlList[i], extraClass: leftLineClass });
         }
         const leftEnd = leftNo - 1;
 
         const rightStart = rightNo;
-        for (const text of tLines) {
-          nextRight.push({ id: lineIdCounter++, lineNo: rightNo++, text, extraClass: rightLineClass });
+        for (let i = 0; i < tLines.length; i++) {
+          nextRight.push({ id: lineIdCounter++, lineNo: rightNo++, text: tLines[i], html: rightHtmlList[i], extraClass: rightLineClass });
         }
         const rightEnd = rightNo - 1;
 
@@ -208,22 +285,18 @@
         const rightHandled = hunk.rightStatus !== "pending";
         const isResolved = Boolean(hunk.resolved || (leftHandled && rightHandled));
 
-        const centerLinesToRender =
-          hunk.resultLines !== undefined && hunk.resultLines !== null
-            ? hunk.resultLines
-            : hunk.baseLines || [];
-
         const centerClass = isResolved
           ? hunk.chosen === "ignored"
             ? ""
             : resolvedLineClass
           : pendingLineClass;
 
-        for (const text of centerLinesToRender) {
+        for (let i = 0; i < centerLinesToRender.length; i++) {
           nextCenter.push({
             id: lineIdCounter++,
             lineNo: centerNo++,
-            text,
+            text: centerLinesToRender[i],
+            html: centerHtmlList[i],
             extraClass: centerClass,
             editable: true,
             hunkId: hunk.id,
@@ -640,6 +713,7 @@
     const text = currentEl.textContent || "";
     if (centerLines[idx]) {
       centerLines[idx].text = text;
+      centerLines[idx].html = undefined;
       if (centerLines[idx].extraClass.includes("line-conflict")) {
         centerLines[idx].extraClass = "line-conflict-resolved";
         if (centerLines[idx].hunkId) {
@@ -855,7 +929,7 @@
         {#each leftLines as line (line.id)}
           <div class={`editor-line ${line.extraClass}`.trim()}>
             <div class="gutter-num">{line.lineNo}</div>
-            <div class="line-content">{@html highlightCode(line.text)}</div>
+            <div class="line-content">{@html line.html ?? highlightCode(line.text)}</div>
           </div>
         {/each}
       </div>
@@ -932,7 +1006,7 @@
               onblur={(e) => handleCenterBlur(e, idx)}
               onpaste={(e) => handleCenterPaste(e, idx)}
             >
-              {@html highlightCode(line.text)}
+              {@html line.html ?? highlightCode(line.text)}
             </div>
           </div>
         {/each}
@@ -1002,7 +1076,7 @@
         {#each rightLines as line (line.id)}
           <div class={`editor-line ${line.extraClass}`.trim()}>
             <div class="gutter-num">{line.lineNo}</div>
-            <div class="line-content">{@html highlightCode(line.text)}</div>
+            <div class="line-content">{@html line.html ?? highlightCode(line.text)}</div>
           </div>
         {/each}
       </div>
@@ -1257,14 +1331,16 @@
   }
   .block-btn.active-accepted,
   .block-btn.btn-revert {
-    background: #2ea043;
-    border-color: #2ea043;
-    color: #ffffff;
+    background: transparent;
+    border-color: transparent;
+    color: var(--vscode-foreground, #bcbec4);
+    opacity: 0.78;
   }
   .block-btn.btn-revert:hover {
-    background: #ba4444;
-    border-color: #ba4444;
+    background: rgba(186, 68, 68, 0.28);
+    border-color: rgba(186, 68, 68, 0.75);
     color: #ffffff;
+    opacity: 1;
     transform: scale(1.12);
   }
   .block-btn.append-mode {
@@ -1290,6 +1366,16 @@
   }
   .line-modify-resolved {
     background: rgba(53, 116, 240, 0.14) !important;
+  }
+  :global(.diff-word-modify) {
+    background: rgba(53, 116, 240, 0.55);
+    padding: 1px 2px;
+    border-radius: 2px;
+  }
+  :global(.diff-word-conflict) {
+    background: rgba(218, 70, 70, 0.52);
+    padding: 1px 2px;
+    border-radius: 2px;
   }
   .line-placeholder {
     font-style: italic;

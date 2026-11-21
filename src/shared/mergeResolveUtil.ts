@@ -13,6 +13,8 @@ export interface ConflictHunk {
   leftStatus?: 'pending' | 'accepted' | 'ignored';
   rightStatus?: 'pending' | 'accepted' | 'ignored';
   resultLines?: string[];
+  changeKind?: 'conflict' | 'insert' | 'modify';
+  activeSide?: 'yours' | 'theirs' | 'both';
 }
 
 export function areLinesEqual(a?: string[], b?: string[]): boolean {
@@ -257,5 +259,256 @@ export function parseConflictHunksFromText(
     leftStatus: 'pending',
     rightStatus: 'pending',
     resultLines: [],
+    changeKind: 'conflict',
+    activeSide: 'both',
   }];
+}
+
+interface DiffEdit {
+  baseStart: number;
+  baseEnd: number;
+  targetStart: number;
+  targetEnd: number;
+}
+
+function computeLineDiffEdits(base: string[], target: string[]): DiffEdit[] | null {
+  let prefix = 0;
+  while (prefix < base.length && prefix < target.length && base[prefix] === target[prefix]) {
+    prefix++;
+  }
+
+  let baseEnd = base.length;
+  let targetEnd = target.length;
+  while (baseEnd > prefix && targetEnd > prefix && base[baseEnd - 1] === target[targetEnd - 1]) {
+    baseEnd--;
+    targetEnd--;
+  }
+
+  const m = baseEnd - prefix;
+  const n = targetEnd - prefix;
+  if (m === 0 && n === 0) {
+    return [];
+  }
+  if (m === 0 || n === 0) {
+    return [{ baseStart: prefix, baseEnd, targetStart: prefix, targetEnd }];
+  }
+  if (m * n > 2_000_000) {
+    return null;
+  }
+
+  const cols = n + 1;
+  const dp = new Uint32Array((m + 1) * cols);
+  for (let i = m - 1; i >= 0; i--) {
+    const bLine = base[prefix + i];
+    const rowOff = i * cols;
+    const nextRowOff = (i + 1) * cols;
+    for (let j = n - 1; j >= 0; j--) {
+      if (bLine === target[prefix + j]) {
+        dp[rowOff + j] = dp[nextRowOff + j + 1] + 1;
+      } else {
+        const down = dp[nextRowOff + j];
+        const right = dp[rowOff + j + 1];
+        dp[rowOff + j] = down >= right ? down : right;
+      }
+    }
+  }
+
+  const matches: Array<[number, number]> = [];
+  let i = 0;
+  let j = 0;
+  while (i < m && j < n) {
+    if (base[prefix + i] === target[prefix + j]) {
+      matches.push([prefix + i, prefix + j]);
+      i++;
+      j++;
+    } else if (dp[(i + 1) * cols + j] >= dp[i * cols + j + 1]) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+  matches.push([baseEnd, targetEnd]);
+
+  const edits: DiffEdit[] = [];
+  let curB = prefix;
+  let curT = prefix;
+  for (const [mb, mt] of matches) {
+    if (mb > curB || mt > curT) {
+      edits.push({
+        baseStart: curB,
+        baseEnd: mb,
+        targetStart: curT,
+        targetEnd: mt,
+      });
+    }
+    curB = mb + 1;
+    curT = mt + 1;
+  }
+
+  return edits;
+}
+
+function mapBaseRangeToTarget(
+  bStart: number,
+  bEnd: number,
+  edits: DiffEdit[],
+): [number, number] {
+  let offsetBefore = 0;
+  let deltaInside = 0;
+
+  for (const e of edits) {
+    if (e.baseEnd < bStart || (e.baseEnd === bStart && e.baseStart < bStart)) {
+      offsetBefore += (e.targetEnd - e.targetStart) - (e.baseEnd - e.baseStart);
+    } else if (e.baseStart <= bEnd && e.baseEnd >= bStart) {
+      deltaInside += (e.targetEnd - e.targetStart) - (e.baseEnd - e.baseStart);
+    }
+  }
+
+  const tStart = bStart + offsetBefore;
+  const tEnd = bEnd + offsetBefore + deltaInside;
+  return [tStart, tEnd];
+}
+
+/**
+ * Computes IntelliJ-style 3-way merge hunks directly from Base, Yours, and Theirs contents.
+ * Distinguishes between insertions (green), modifications (blue), and true conflicts (red).
+ * Returns null if the files are too large for exact line diffing (caller falls back to conflict markers).
+ */
+export function computeThreeWayHunks(
+  baseContent: string,
+  yoursContent: string,
+  theirsContent: string,
+): ConflictHunk[] | null {
+  const baseLines = baseContent === '' ? [] : baseContent.split(/\r?\n/);
+  const yoursLines = yoursContent === '' ? [] : yoursContent.split(/\r?\n/);
+  const theirsLines = theirsContent === '' ? [] : theirsContent.split(/\r?\n/);
+
+  const yoursEdits = computeLineDiffEdits(baseLines, yoursLines);
+  const theirsEdits = computeLineDiffEdits(baseLines, theirsLines);
+  if (!yoursEdits || !theirsEdits) {
+    return null;
+  }
+
+  const combined = [
+    ...yoursEdits.map(e => ({ ...e })),
+    ...theirsEdits.map(e => ({ ...e })),
+  ].sort((a, b) => a.baseStart - b.baseStart || a.baseEnd - b.baseEnd);
+
+  const mergedRanges: Array<{ baseStart: number; baseEnd: number }> = [];
+  for (const edit of combined) {
+    const last = mergedRanges[mergedRanges.length - 1];
+    if (!last) {
+      mergedRanges.push({ baseStart: edit.baseStart, baseEnd: edit.baseEnd });
+      continue;
+    }
+    const overlaps =
+      edit.baseStart < last.baseEnd ||
+      (edit.baseStart === last.baseEnd && (edit.baseStart === edit.baseEnd || last.baseStart === last.baseEnd));
+    if (overlaps) {
+      if (edit.baseEnd > last.baseEnd) {
+        last.baseEnd = edit.baseEnd;
+      }
+    } else {
+      mergedRanges.push({ baseStart: edit.baseStart, baseEnd: edit.baseEnd });
+    }
+  }
+
+  const hunks: ConflictHunk[] = [];
+  let hunkId = 1;
+  let cursor = 0;
+
+  for (const range of mergedRanges) {
+    if (range.baseStart > cursor) {
+      hunks.push({
+        id: hunkId++,
+        type: 'common',
+        commonLines: baseLines.slice(cursor, range.baseStart),
+      });
+    }
+
+    const [yStart, yEnd] = mapBaseRangeToTarget(range.baseStart, range.baseEnd, yoursEdits);
+    const [tStart, tEnd] = mapBaseRangeToTarget(range.baseStart, range.baseEnd, theirsEdits);
+
+    const baseSlice = baseLines.slice(range.baseStart, range.baseEnd);
+    const yoursSlice = yoursLines.slice(yStart, yEnd);
+    const theirsSlice = theirsLines.slice(tStart, tEnd);
+
+    const yoursChanged = !areLinesEqual(baseSlice, yoursSlice);
+    const theirsChanged = !areLinesEqual(baseSlice, theirsSlice);
+
+    if (!yoursChanged && !theirsChanged) {
+      if (baseSlice.length > 0) {
+        hunks.push({
+          id: hunkId++,
+          type: 'common',
+          commonLines: baseSlice,
+        });
+      }
+    } else if (yoursChanged && theirsChanged && areLinesEqual(yoursSlice, theirsSlice)) {
+      if (yoursSlice.length > 0) {
+        hunks.push({
+          id: hunkId++,
+          type: 'common',
+          commonLines: yoursSlice,
+        });
+      }
+    } else if (yoursChanged && !theirsChanged) {
+      hunks.push({
+        id: hunkId++,
+        type: 'conflict',
+        baseLines: baseSlice,
+        yoursLines: yoursSlice,
+        theirsLines: theirsSlice,
+        resolved: false,
+        chosen: null,
+        leftStatus: 'pending',
+        rightStatus: 'ignored',
+        resultLines: [...baseSlice],
+        changeKind: baseSlice.length === 0 ? 'insert' : 'modify',
+        activeSide: 'yours',
+      });
+    } else if (!yoursChanged && theirsChanged) {
+      hunks.push({
+        id: hunkId++,
+        type: 'conflict',
+        baseLines: baseSlice,
+        yoursLines: yoursSlice,
+        theirsLines: theirsSlice,
+        resolved: false,
+        chosen: null,
+        leftStatus: 'ignored',
+        rightStatus: 'pending',
+        resultLines: [...baseSlice],
+        changeKind: baseSlice.length === 0 ? 'insert' : 'modify',
+        activeSide: 'theirs',
+      });
+    } else {
+      hunks.push({
+        id: hunkId++,
+        type: 'conflict',
+        baseLines: baseSlice,
+        yoursLines: yoursSlice,
+        theirsLines: theirsSlice,
+        resolved: false,
+        chosen: null,
+        leftStatus: 'pending',
+        rightStatus: 'pending',
+        resultLines: [...baseSlice],
+        changeKind: 'conflict',
+        activeSide: 'both',
+      });
+    }
+
+    cursor = range.baseEnd;
+  }
+
+  if (cursor < baseLines.length) {
+    hunks.push({
+      id: hunkId++,
+      type: 'common',
+      commonLines: baseLines.slice(cursor),
+    });
+  }
+
+  return hunks;
 }

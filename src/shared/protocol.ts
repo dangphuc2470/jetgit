@@ -335,6 +335,8 @@ export interface ConflictHunk {
   leftStatus?: 'pending' | 'accepted' | 'ignored';
   rightStatus?: 'pending' | 'accepted' | 'ignored';
   resultLines?: string[];
+  changeKind?: 'conflict' | 'insert' | 'modify';
+  activeSide?: 'yours' | 'theirs' | 'both';
 }
 
 export interface LoadMergeDataPayload {

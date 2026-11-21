@@ -5,7 +5,7 @@ import { GitService } from '../git/gitService';
 import { ConflictsDialogPanel } from './conflictsDialogPanel';
 import { getThemeTokens, getNonce } from '../utils/themeTokens';
 import { MergeToExtensionMessage, ExtensionToMergeMessage } from '../shared/protocol';
-import { parseConflictHunksFromText, type ConflictHunk } from '../shared/mergeResolveUtil';
+import { computeThreeWayHunks, parseConflictHunksFromText, type ConflictHunk } from '../shared/mergeResolveUtil';
 import { getJetGitSettings } from '../utils/settings';
 
 export class MergeEditorPanel {
@@ -110,7 +110,10 @@ export class MergeEditorPanel {
         theirsBranch: 'Incoming',
       }));
 
-      const hunks = parseConflictHunksFromText(fileOnDisk, yoursContent, theirsContent, baseContent);
+      const canThreeWayDiff = Boolean(yoursContent || theirsContent);
+      const hunks = (canThreeWayDiff
+        ? computeThreeWayHunks(baseContent, yoursContent, theirsContent)
+        : null) ?? parseConflictHunksFromText(fileOnDisk, yoursContent, theirsContent, baseContent);
 
       this.panel.webview.postMessage({
         type: 'loadMergeData',

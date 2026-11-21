@@ -20,10 +20,13 @@
     rightCount: number;
     centerStart: number;
     centerEnd: number;
+    centerCount: number;
     resolved: boolean;
     chosen: "yours" | "theirs" | "custom" | "ignored" | null;
     leftStatus: "pending" | "accepted" | "ignored";
     rightStatus: "pending" | "accepted" | "ignored";
+    changeKind: "conflict" | "insert" | "modify";
+    activeSide: "yours" | "theirs" | "both";
   }
 
   interface RenderLine {
@@ -41,7 +44,10 @@
     id: number;
     leftD: string;
     rightD: string;
-    ribbonClass: string;
+    leftRibbonClass: string;
+    rightRibbonClass: string;
+    showLeft: boolean;
+    showRight: boolean;
     leftBtnY: number;
     rightBtnY: number;
     resolved: boolean;
@@ -71,7 +77,24 @@
   let sCenter = $state(0);
   let sRight = $state(0);
 
-  let remainingConflicts = $derived(conflictBlocks.filter((b) => !b.resolved).length);
+  let remainingConflicts = $derived(
+    conflictBlocks.filter((b) => !b.resolved && b.changeKind === "conflict").length
+  );
+
+  function getSideRibbonClass(
+    changeKind: "conflict" | "insert" | "modify",
+    status: "pending" | "accepted" | "ignored",
+  ): string {
+    if (status === "accepted") {
+      return changeKind === "modify" ? "modify-ribbon resolved" : "insert-ribbon resolved";
+    }
+    if (status === "ignored") {
+      return "conflict-ribbon ignored";
+    }
+    if (changeKind === "insert") return "insert-ribbon";
+    if (changeKind === "modify") return "modify-ribbon";
+    return "conflict-ribbon";
+  }
 
   let ribbons = $derived.by(() => {
     const W = GUTTER_WIDTH;
@@ -80,23 +103,23 @@
     for (const b of conflictBlocks) {
       // Left -> Center
       const ly1 = (b.leftStart - 1) * LINE_HEIGHT - sLeft;
-      const ly2 = b.leftCount === 0 ? ly1 : b.leftEnd * LINE_HEIGHT - sLeft;
+      const ly2 = b.leftCount === 0 ? ly1 + 2 : b.leftEnd * LINE_HEIGHT - sLeft;
       const cy1 = (b.centerStart - 1) * LINE_HEIGHT - sCenter;
-      const cy2 = b.centerEnd * LINE_HEIGHT - sCenter;
+      const cy2 = b.centerCount === 0 ? cy1 + 2 : b.centerEnd * LINE_HEIGHT - sCenter;
 
       const leftD = `M 0,${ly1} L 6,${ly1} C 16,${ly1} ${W - 16},${cy1} ${W - 6},${cy1} L ${W},${cy1} L ${W},${cy2} L ${W - 6},${cy2} C ${W - 16},${cy2} 16,${ly2} 6,${ly2} L 0,${ly2} Z`;
 
       // Center <- Right
       const ry1 = (b.rightStart - 1) * LINE_HEIGHT - sRight;
-      const ry2 = b.rightCount === 0 ? ry1 : b.rightEnd * LINE_HEIGHT - sRight;
+      const ry2 = b.rightCount === 0 ? ry1 + 2 : b.rightEnd * LINE_HEIGHT - sRight;
 
       const rightD = `M 0,${cy1} L 6,${cy1} C 16,${cy1} ${W - 16},${ry1} ${W - 6},${ry1} L ${W},${ry1} L ${W},${ry2} L ${W - 6},${ry2} C ${W - 16},${ry2} 16,${cy2} 6,${cy2} L 0,${cy2} Z`;
 
-      const ribbonClass = b.resolved
-        ? b.chosen === "ignored"
-          ? "conflict-ribbon ignored"
-          : "conflict-ribbon resolved"
-        : "conflict-ribbon";
+      const showLeft = b.activeSide === "yours" || b.activeSide === "both";
+      const showRight = b.activeSide === "theirs" || b.activeSide === "both";
+
+      const leftRibbonClass = getSideRibbonClass(b.changeKind, b.leftStatus);
+      const rightRibbonClass = getSideRibbonClass(b.changeKind, b.rightStatus);
 
       const leftBtnY = Math.max(0, ly1 + 2);
       const rightBtnY = Math.max(0, ry1 + 2);
@@ -105,7 +128,10 @@
         id: b.id,
         leftD,
         rightD,
-        ribbonClass,
+        leftRibbonClass,
+        rightRibbonClass,
+        showLeft,
+        showRight,
         leftBtnY,
         rightBtnY,
         resolved: b.resolved,
@@ -140,16 +166,40 @@
       } else if (hunk.type === "conflict") {
         const yLines = hunk.yoursLines || [];
         const tLines = hunk.theirsLines || [];
+        const changeKind = hunk.changeKind || "conflict";
+        const activeSide = hunk.activeSide || "both";
+
+        const pendingLineClass =
+          changeKind === "insert"
+            ? "line-insert"
+            : changeKind === "modify"
+              ? "line-modify"
+              : "line-conflict";
+        const resolvedLineClass =
+          changeKind === "modify" ? "line-modify-resolved" : "line-conflict-resolved";
+
+        const leftLineClass =
+          hunk.leftStatus === "accepted"
+            ? resolvedLineClass
+            : hunk.leftStatus === "ignored"
+              ? ""
+              : pendingLineClass;
+        const rightLineClass =
+          hunk.rightStatus === "accepted"
+            ? resolvedLineClass
+            : hunk.rightStatus === "ignored"
+              ? ""
+              : pendingLineClass;
 
         const leftStart = leftNo;
         for (const text of yLines) {
-          nextLeft.push({ id: lineIdCounter++, lineNo: leftNo++, text, extraClass: "line-conflict" });
+          nextLeft.push({ id: lineIdCounter++, lineNo: leftNo++, text, extraClass: leftLineClass });
         }
         const leftEnd = leftNo - 1;
 
         const rightStart = rightNo;
         for (const text of tLines) {
-          nextRight.push({ id: lineIdCounter++, lineNo: rightNo++, text, extraClass: "line-conflict" });
+          nextRight.push({ id: lineIdCounter++, lineNo: rightNo++, text, extraClass: rightLineClass });
         }
         const rightEnd = rightNo - 1;
 
@@ -158,48 +208,28 @@
         const rightHandled = hunk.rightStatus !== "pending";
         const isResolved = Boolean(hunk.resolved || (leftHandled && rightHandled));
 
-        if (hunk.resultLines !== undefined && hunk.resultLines !== null) {
-          if (hunk.resultLines.length > 0) {
-            for (const text of hunk.resultLines) {
-              nextCenter.push({
-                id: lineIdCounter++,
-                lineNo: centerNo++,
-                text,
-                extraClass: isResolved ? "line-conflict-resolved" : "line-conflict",
-                editable: true,
-                hunkId: hunk.id,
-              });
-            }
-          } else if (isResolved) {
-            // Empty result (both ignored or resolved to empty)
-          } else {
-            // Fallback if empty and unresolved
-            const bLines = (hunk.baseLines && hunk.baseLines.length > 0) ? hunk.baseLines : [""];
-            for (const text of bLines) {
-              nextCenter.push({
-                id: lineIdCounter++,
-                lineNo: centerNo++,
-                text,
-                extraClass: "line-conflict",
-                editable: true,
-                hunkId: hunk.id,
-              });
-            }
-          }
-        } else {
-          // Both sides still pending: show base lines if available, otherwise empty line
-          const bLines = (hunk.baseLines && hunk.baseLines.length > 0) ? hunk.baseLines : [""];
-          for (const text of bLines) {
-            nextCenter.push({
-              id: lineIdCounter++,
-              lineNo: centerNo++,
-              text,
-              extraClass: "line-conflict",
-              editable: true,
-              hunkId: hunk.id,
-            });
-          }
+        const centerLinesToRender =
+          hunk.resultLines !== undefined && hunk.resultLines !== null
+            ? hunk.resultLines
+            : hunk.baseLines || [];
+
+        const centerClass = isResolved
+          ? hunk.chosen === "ignored"
+            ? ""
+            : resolvedLineClass
+          : pendingLineClass;
+
+        for (const text of centerLinesToRender) {
+          nextCenter.push({
+            id: lineIdCounter++,
+            lineNo: centerNo++,
+            text,
+            extraClass: centerClass,
+            editable: true,
+            hunkId: hunk.id,
+          });
         }
+        const centerCount = centerLinesToRender.length;
         const centerEnd = centerNo - 1;
 
         nextBlocks.push({
@@ -213,10 +243,13 @@
           rightCount: tLines.length,
           centerStart,
           centerEnd: Math.max(centerStart, centerEnd),
+          centerCount,
           resolved: isResolved,
           chosen: hunk.chosen || null,
           leftStatus: hunk.leftStatus || "pending",
           rightStatus: hunk.rightStatus || "pending",
+          changeKind,
+          activeSide,
         });
       }
     }
@@ -265,7 +298,9 @@
     if (hunk.rightStatus === "accepted") {
       hunk.resultLines = [...(hunk.theirsLines || [])];
     } else if (hunk.rightStatus === "ignored") {
-      hunk.resultLines = [];
+      hunk.resultLines = hunk.activeSide && hunk.activeSide !== "both"
+        ? [...(hunk.baseLines || [])]
+        : [];
     }
     updateHunkResolved(hunk);
     rebuildLines();
@@ -278,7 +313,7 @@
     if (hunk.rightStatus === "accepted") {
       hunk.resultLines = [...(hunk.theirsLines || [])];
     } else {
-      hunk.resultLines = undefined;
+      hunk.resultLines = [...(hunk.baseLines || [])];
     }
     updateHunkResolved(hunk);
     rebuildLines();
@@ -304,7 +339,9 @@
     if (hunk.leftStatus === "accepted") {
       hunk.resultLines = [...(hunk.yoursLines || [])];
     } else if (hunk.leftStatus === "ignored") {
-      hunk.resultLines = [];
+      hunk.resultLines = hunk.activeSide && hunk.activeSide !== "both"
+        ? [...(hunk.baseLines || [])]
+        : [];
     }
     updateHunkResolved(hunk);
     rebuildLines();
@@ -317,7 +354,7 @@
     if (hunk.leftStatus === "accepted") {
       hunk.resultLines = [...(hunk.yoursLines || [])];
     } else {
-      hunk.resultLines = undefined;
+      hunk.resultLines = [...(hunk.baseLines || [])];
     }
     updateHunkResolved(hunk);
     rebuildLines();
@@ -713,8 +750,6 @@
         yoursBranch = data.yoursBranch || "Current version";
         theirsBranch = data.theirsBranch || "Incoming version";
         hunks = data.hunks || [];
-        // Auto-apply all non-conflicting changes upfront like IntelliJ IDEA
-        applyAllNonConflicting(hunks);
         rebuildLines();
         const firstUnresolved = conflictBlocks.findIndex((b) => !b.resolved);
         if (firstUnresolved !== -1) {
@@ -830,45 +865,49 @@
     <div class="merge-gutter">
       <svg class="gutter-svg">
         {#each ribbons as ribbon}
-          <path d={ribbon.leftD} class={ribbon.ribbonClass} data-id={ribbon.id} />
+          {#if ribbon.showLeft}
+            <path d={ribbon.leftD} class={ribbon.leftRibbonClass} data-id={ribbon.id} />
+          {/if}
         {/each}
       </svg>
       <div class="gutter-controls">
         {#each ribbons as ribbon}
-          {#if ribbon.leftStatus === "pending"}
-            <button
-              class="block-btn accept-left-btn"
-              style={`top: ${ribbon.leftBtnY}px; left: 4px;`}
-              title="Accept Yours (Left)"
-              onclick={() => acceptLeft(ribbon.id)}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <button
-              class="block-btn btn-ignore ignore-left-btn"
-              style={`top: ${ribbon.leftBtnY}px; left: 24px;`}
-              title="Ignore Yours (Left)"
-              onclick={() => ignoreLeft(ribbon.id)}
-            >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-              </svg>
-            </button>
-          {:else}
-            <button
-              class="block-btn btn-revert active-accepted"
-              style={`top: ${ribbon.leftBtnY}px; left: 13px;`}
-              title="Revert Left (re-open)"
-              onclick={() => revertLeft(ribbon.id)}
-            >
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.418A6 6 0 1 1 8 2v1z"/>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 4.5a.5.5 0 0 1-.5-.5V1a.5.5 0 0 1 1 0v3a.5.5 0 0 1-.5.5z"/>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M5.146 3.854a.5.5 0 0 1 0-.708l2.5-2.5a.5.5 0 0 1 .708.708L6.207 3.5l2.147 2.146a.5.5 0 0 1-.708.708l-2.5-2.5z"/>
-              </svg>
-            </button>
+          {#if ribbon.showLeft}
+            {#if ribbon.leftStatus === "pending"}
+              <button
+                class="block-btn accept-left-btn"
+                style={`top: ${ribbon.leftBtnY}px; left: 4px;`}
+                title="Accept Yours (Left)"
+                onclick={() => acceptLeft(ribbon.id)}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 2L5 5L1.5 8M5 2L8.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button
+                class="block-btn btn-ignore ignore-left-btn"
+                style={`top: ${ribbon.leftBtnY}px; left: 24px;`}
+                title="Ignore Yours (Left)"
+                onclick={() => ignoreLeft(ribbon.id)}
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </button>
+            {:else}
+              <button
+                class="block-btn btn-revert active-accepted"
+                style={`top: ${ribbon.leftBtnY}px; left: 13px;`}
+                title="Revert Left (re-open)"
+                onclick={() => revertLeft(ribbon.id)}
+              >
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.418A6 6 0 1 1 8 2v1z"/>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 4.5a.5.5 0 0 1-.5-.5V1a.5.5 0 0 1 1 0v3a.5.5 0 0 1-.5.5z"/>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M5.146 3.854a.5.5 0 0 1 0-.708l2.5-2.5a.5.5 0 0 1 .708.708L6.207 3.5l2.147 2.146a.5.5 0 0 1-.708.708l-2.5-2.5z"/>
+                </svg>
+              </button>
+            {/if}
           {/if}
         {/each}
       </div>
@@ -904,45 +943,49 @@
     <div class="merge-gutter">
       <svg class="gutter-svg">
         {#each ribbons as ribbon}
-          <path d={ribbon.rightD} class={ribbon.ribbonClass} data-id={ribbon.id} />
+          {#if ribbon.showRight}
+            <path d={ribbon.rightD} class={ribbon.rightRibbonClass} data-id={ribbon.id} />
+          {/if}
         {/each}
       </svg>
       <div class="gutter-controls">
         {#each ribbons as ribbon}
-          {#if ribbon.rightStatus === "pending"}
-            <button
-              class="block-btn btn-ignore ignore-right-btn"
-              style={`top: ${ribbon.rightBtnY}px; left: 4px;`}
-              title="Ignore Theirs (Right)"
-              onclick={() => ignoreRight(ribbon.id)}
-            >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <button
-              class="block-btn accept-right-btn"
-              style={`top: ${ribbon.rightBtnY}px; left: 24px;`}
-              title="Accept Theirs (Right)"
-              onclick={() => acceptRight(ribbon.id)}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M8.5 2L5 5L8.5 8M5 2L1.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-          {:else}
-            <button
-              class="block-btn btn-revert active-accepted"
-              style={`top: ${ribbon.rightBtnY}px; left: 13px;`}
-              title="Revert Right (re-open)"
-              onclick={() => revertRight(ribbon.id)}
-            >
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.418A6 6 0 1 1 8 2v1z"/>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M8 4.5a.5.5 0 0 1-.5-.5V1a.5.5 0 0 1 1 0v3a.5.5 0 0 1-.5.5z"/>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M5.146 3.854a.5.5 0 0 1 0-.708l2.5-2.5a.5.5 0 0 1 .708.708L6.207 3.5l2.147 2.146a.5.5 0 0 1-.708.708l-2.5-2.5z"/>
-              </svg>
-            </button>
+          {#if ribbon.showRight}
+            {#if ribbon.rightStatus === "pending"}
+              <button
+                class="block-btn btn-ignore ignore-right-btn"
+                style={`top: ${ribbon.rightBtnY}px; left: 4px;`}
+                title="Ignore Theirs (Right)"
+                onclick={() => ignoreRight(ribbon.id)}
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button
+                class="block-btn accept-right-btn"
+                style={`top: ${ribbon.rightBtnY}px; left: 24px;`}
+                title="Accept Theirs (Right)"
+                onclick={() => acceptRight(ribbon.id)}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M8.5 2L5 5L8.5 8M5 2L1.5 5L5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            {:else}
+              <button
+                class="block-btn btn-revert active-accepted"
+                style={`top: ${ribbon.rightBtnY}px; left: 13px;`}
+                title="Revert Right (re-open)"
+                onclick={() => revertRight(ribbon.id)}
+              >
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.418A6 6 0 1 1 8 2v1z"/>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 4.5a.5.5 0 0 1-.5-.5V1a.5.5 0 0 1 1 0v3a.5.5 0 0 1-.5.5z"/>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M5.146 3.854a.5.5 0 0 1 0-.708l2.5-2.5a.5.5 0 0 1 .708.708L6.207 3.5l2.147 2.146a.5.5 0 0 1-.708.708l-2.5-2.5z"/>
+                </svg>
+              </button>
+            {/if}
           {/if}
         {/each}
       </div>
@@ -1158,11 +1201,23 @@
     fill: rgba(186, 68, 68, 0.35);
     transition: fill 0.15s ease;
   }
-  .conflict-ribbon.resolved {
-    fill: rgba(46, 160, 67, 0.25);
+  .insert-ribbon {
+    fill: rgba(46, 160, 67, 0.32);
+    transition: fill 0.15s ease;
+  }
+  .modify-ribbon {
+    fill: rgba(53, 116, 240, 0.32);
+    transition: fill 0.15s ease;
+  }
+  .conflict-ribbon.resolved,
+  .insert-ribbon.resolved {
+    fill: rgba(46, 160, 67, 0.22);
+  }
+  .modify-ribbon.resolved {
+    fill: rgba(53, 116, 240, 0.22);
   }
   .conflict-ribbon.ignored {
-    fill: rgba(90, 95, 105, 0.15);
+    fill: rgba(90, 95, 105, 0.14);
   }
 
   .block-btn {
@@ -1222,10 +1277,19 @@
   }
 
   .line-conflict {
-    background: rgba(186, 68, 68, 0.18) !important;
+    background: rgba(186, 68, 68, 0.20) !important;
+  }
+  .line-insert {
+    background: rgba(46, 160, 67, 0.20) !important;
+  }
+  .line-modify {
+    background: rgba(53, 116, 240, 0.20) !important;
   }
   .line-conflict-resolved {
-    background: rgba(46, 160, 67, 0.15) !important;
+    background: rgba(46, 160, 67, 0.14) !important;
+  }
+  .line-modify-resolved {
+    background: rgba(53, 116, 240, 0.14) !important;
   }
   .line-placeholder {
     font-style: italic;

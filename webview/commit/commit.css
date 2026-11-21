@@ -12,7 +12,7 @@ body, html {
   background-color: var(--vscode-editor-background, #1e1f22);
   color: var(--vscode-editor-foreground, #bcbec4);
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-  font-size: 12px;
+  font-size: var(--jetgit-font-size, 12px);
 }
 
 #app {
@@ -99,11 +99,12 @@ body, html {
   border: none;
   color: #8c8c8c;
   cursor: pointer;
-  padding: 0 4px;
-  height: 20px;
-  border-radius: 4px;
-  font-size: 13px;
-  display: flex;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 14px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
@@ -2106,10 +2107,10 @@ body.resizing-h .h-splitter {
   z-index: 100000;
   background: var(--vscode-menu-background, #2b2d30);
   border: 1px solid var(--vscode-menu-border, #393b40);
-  border-radius: 6px;
+  border-radius: 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.35);
   min-width: 220px;
-  padding: 4px;
+  padding: 6px;
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-size: 12px;
   color: var(--vscode-menu-foreground, #dfe1e5);
@@ -2154,7 +2155,7 @@ body.resizing-h .h-splitter {
   box-sizing: border-box;
 }
 
-.as-menu-item:hover {
+.as-menu-item:hover:not(:has(.as-menu-item:hover)) {
   background: var(--vscode-menu-selectionBackground, #2e436e) !important;
   color: var(--vscode-menu-selectionForeground, #ffffff) !important;
 }
@@ -2183,7 +2184,7 @@ body.resizing-h .h-splitter {
   display: block;
 }
 
-.as-menu-item:hover .as-menu-icon {
+.as-menu-item:hover:not(:has(.as-menu-item:hover)) > .as-menu-item-left > .as-menu-icon {
   color: var(--vscode-menu-selectionForeground, #ffffff) !important;
   opacity: 1;
 }
@@ -2195,7 +2196,7 @@ body.resizing-h .h-splitter {
   color: inherit;
 }
 
-.as-menu-item:hover .as-menu-label {
+.as-menu-item:hover:not(:has(.as-menu-item:hover)) > .as-menu-item-left > .as-menu-label {
   color: var(--vscode-menu-selectionForeground, #ffffff) !important;
 }
 
@@ -2208,7 +2209,7 @@ body.resizing-h .h-splitter {
   opacity: 0.7;
 }
 
-.as-menu-item:hover .as-menu-shortcut {
+.as-menu-item:hover:not(:has(.as-menu-item:hover)) > .as-menu-shortcut {
   color: var(--vscode-menu-selectionForeground, #ffffff) !important;
   opacity: 0.95;
 }
@@ -2262,10 +2263,10 @@ body.resizing-h .h-splitter {
   z-index: 100000;
   background: var(--vscode-menu-background, #2b2d30);
   border: 1px solid var(--vscode-menu-border, #3c3f41);
-  border-radius: 6px;
+  border-radius: 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   min-width: 170px;
-  padding: 6px 4px;
+  padding: 6px;
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-size: 12.5px;
   color: var(--vscode-menu-foreground, #bcbec4);
@@ -2285,21 +2286,24 @@ body.resizing-h .h-splitter {
   justify-content: space-between;
   padding: 5px 10px;
   margin: 1px 0;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
   user-select: none;
+  position: relative;
+  white-space: nowrap;
   color: var(--vscode-menu-foreground, #dfe1e5);
   transition: background 0.1s ease, color 0.1s ease;
 }
 
-.as-view-options-menu .as-menu-item:hover {
+.as-view-options-menu .as-menu-item:hover:not(:has(.as-menu-item:hover)) {
   background: var(--vscode-menu-selectionBackground, #2e436e) !important;
+}
+.as-view-options-menu .as-menu-item:hover:not(:has(.as-menu-item:hover)) > .as-menu-item-left,
+.as-view-options-menu .as-menu-item:hover:not(:has(.as-menu-item:hover)) > .as-menu-item-left > .as-menu-check,
+.as-view-options-menu .as-menu-item:hover:not(:has(.as-menu-item:hover)) > .as-menu-arrow {
   color: var(--vscode-menu-selectionForeground, #ffffff) !important;
 }
-.as-view-options-menu .as-menu-item:hover .as-menu-check {
-  color: var(--vscode-menu-selectionForeground, #ffffff) !important;
-}
-.as-view-options-menu .as-menu-item:hover .as-menu-shortcut {
+.as-view-options-menu .as-menu-item:hover:not(:has(.as-menu-item:hover)) > .as-menu-shortcut {
   color: var(--vscode-menu-selectionForeground, #ffffff) !important;
   opacity: 0.95;
 }
@@ -2316,6 +2320,7 @@ body.resizing-h .h-splitter {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
   color: var(--vscode-foreground, #dfe1e5);
@@ -2326,6 +2331,92 @@ body.resizing-h .h-splitter {
   color: #868a91;
   margin-left: 16px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.as-view-options-menu .as-menu-arrow {
+  font-size: 13px;
+  color: #868a91;
+  margin-left: 14px;
+}
+
+.as-view-options-menu .as-menu-divider {
+  height: 1px;
+  background: var(--vscode-menu-separatorBackground, rgba(255, 255, 255, 0.08));
+  margin: 4px 6px;
+}
+
+.as-more-options-menu {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+}
+
+.as-submenu {
+  color: var(--vscode-menu-foreground, #dfe1e5) !important;
+}
+
+.as-submenu .as-menu-item:not(:hover) > .as-menu-item-left,
+.as-submenu .as-menu-item:not(:hover) > .as-menu-item-left > .as-menu-check {
+  color: var(--vscode-menu-foreground, #dfe1e5) !important;
+}
+
+.as-submenu-inline {
+  margin: 2px 0 4px 14px;
+  padding-left: 6px;
+  border-left: 1px solid var(--vscode-menu-separatorBackground, rgba(255, 255, 255, 0.12));
+}
+
+.as-submenu-right {
+  top: -6px;
+  left: calc(100% + 4px);
+  right: auto;
+  min-width: 155px;
+}
+
+.as-submenu-left {
+  top: -6px;
+  left: auto;
+  right: calc(100% + 4px);
+  min-width: 155px;
+}
+
+.commit-speed-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3f41);
+  background: var(--vscode-editorWidget-background, #252526);
+}
+
+.commit-speed-search-bar .css-icon {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.commit-speed-search-bar .css-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--vscode-input-foreground, #dfe1e5);
+  font-size: 12px;
+}
+
+.commit-speed-search-bar .css-clear {
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground, #8c8c8c);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.commit-speed-search-bar .css-clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--vscode-foreground, #dfe1e5);
 }
 
 /* Directory Tree & Module Grouping */

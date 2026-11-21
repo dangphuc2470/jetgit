@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { GitService, type Commit } from '../git/gitService';
 import { RebaseHandler, type RebaseTodoItem } from '../git/rebaseHandler';
 import { RebaseToExtensionMessage, ExtensionToRebaseMessage } from '../shared/protocol';
+import { getJetGitSettings } from '../utils/settings';
 
 export class RebasePanel {
   public static currentPanel: RebasePanel | undefined;
@@ -19,12 +20,22 @@ export class RebasePanel {
   ) {
     this.panel = panel;
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    vscode.workspace.onDidChangeConfiguration(
+      e => {
+        if (e.affectsConfiguration('jetgit')) {
+          this.sendSettings();
+        }
+      },
+      null,
+      this.disposables,
+    );
     this.panel.webview.html = this.getHtml();
     this.panel.webview.onDidReceiveMessage(
       msg => this.handleMessage(msg),
       null,
       this.disposables,
     );
+    this.sendSettings();
     this.loadCommits();
   }
 
@@ -75,8 +86,20 @@ export class RebasePanel {
     }
   }
 
+  private sendSettings(): void {
+    const settings = getJetGitSettings();
+    this.panel.webview.postMessage({
+      type: 'settingsUpdate',
+      payload: { fontSize: settings.fontSize.merge },
+    });
+  }
+
   private async handleMessage(msg: RebaseToExtensionMessage): Promise<void> {
     switch (msg.type) {
+      case 'ready': {
+        this.sendSettings();
+        break;
+      }
       case 'startRebase': {
         const todoItems: RebaseTodoItem[] = msg.payload;
         this.panel.webview.postMessage({ type: 'rebaseStarted' });

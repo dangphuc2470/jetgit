@@ -6,6 +6,7 @@ import { ConflictsDialogPanel } from './conflictsDialogPanel';
 import { getThemeTokens, getNonce } from '../utils/themeTokens';
 import { MergeToExtensionMessage, ExtensionToMergeMessage } from '../shared/protocol';
 import { parseConflictHunksFromText, type ConflictHunk } from '../shared/mergeResolveUtil';
+import { getJetGitSettings } from '../utils/settings';
 
 export class MergeEditorPanel {
   public static currentPanel: MergeEditorPanel | undefined;
@@ -26,6 +27,15 @@ export class MergeEditorPanel {
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     vscode.window.onDidChangeActiveColorTheme(
       () => this.sendThemeTokens(),
+      null,
+      this.disposables,
+    );
+    vscode.workspace.onDidChangeConfiguration(
+      e => {
+        if (e.affectsConfiguration('jetgit')) {
+          this.sendSettings();
+        }
+      },
       null,
       this.disposables,
     );
@@ -120,10 +130,19 @@ export class MergeEditorPanel {
     }
   }
 
+  private sendSettings(): void {
+    const settings = getJetGitSettings();
+    this.panel.webview.postMessage({
+      type: 'settingsUpdate',
+      payload: { fontSize: settings.fontSize.merge },
+    });
+  }
+
   private async handleMessage(msg: MergeToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'ready': {
         this.sendThemeTokens();
+        this.sendSettings();
         if (this.currentFilePath) {
           await this.loadConflictData(this.currentFilePath);
         }

@@ -1495,16 +1495,17 @@
     position: fixed;
     background: var(--vscode-menu-background, #252526);
     border: 1px solid var(--vscode-menu-border, #454545);
-    border-radius: 4px;
-    padding: 4px 0;
+    border-radius: 14px;
+    padding: 6px;
     z-index: 1000;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
   .context-item {
     display: block;
     width: 100%;
-    padding: 6px 20px;
+    padding: 6px 14px;
     border: none;
+    border-radius: 8px;
     background: none;
     color: var(--vscode-menu-foreground, #ccc);
     font-size: inherit;
@@ -1625,12 +1626,12 @@
     background: var(--vscode-button-secondaryHoverBackground, #35373c);
   }
   :global(.as-dialog-btn-primary) {
-    background: var(--vscode-button-background, #3574f0);
-    color: var(--vscode-button-foreground, #ffffff);
-    border: 1px solid var(--vscode-button-background, #3574f0);
+    background: #3574f0;
+    color: #ffffff;
+    border: 1px solid #3574f0;
   }
   :global(.as-dialog-btn-primary:hover) {
-    background: var(--vscode-button-hoverBackground, #3068d9);
-    border-color: var(--vscode-button-hoverBackground, #3068d9);
+    background: #3068d9;
+    border-color: #3068d9;
   }
 </style>

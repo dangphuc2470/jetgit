@@ -8,6 +8,7 @@ import { handleGraphAction } from './graphActionHandlers';
 import { getNonce } from '../utils/themeTokens';
 import { GraphToExtensionMessage, ExtensionToGraphMessage } from '../shared/protocol';
 import { taskManager } from '../services/taskManager';
+import { getJetGitSettings } from '../utils/settings';
 
 export class GraphViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'jetgit.logView';
@@ -103,8 +104,15 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       });
     });
 
+    const configSub = vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('jetgit')) {
+        this.sendSettings();
+      }
+    });
+
     webviewView.onDidDispose(() => {
       unsubTasks();
+      configSub.dispose();
     });
 
     // Load data once the webview is ready
@@ -231,6 +239,17 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private sendSettings(): void {
+    const settings = getJetGitSettings();
+    this.view?.webview.postMessage({
+      type: 'settingsUpdate',
+      payload: {
+        fontSize: settings.fontSize.log,
+        advancedActions: settings.ui.advanced,
+      },
+    });
+  }
+
   private sendCommits(): void {
     const isSingleBranch = !!this.currentFilter.branch;
     const isSubRepo = !!(this.initialWorkspaceRoot && this.gitService.getCwd() !== this.initialWorkspaceRoot);
@@ -288,11 +307,16 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     switch (msg.type) {
       case 'ready': {
         this.log.appendLine('Webview reported ready');
+        this.sendSettings();
         this.view?.webview.postMessage({
           type: 'tasksUpdate',
           payload: taskManager.getTasks(),
         });
         await this.loadInitialData();
+        break;
+      }
+      case 'openSettings': {
+        await vscode.commands.executeCommand('jetgit.openSettings');
         break;
       }
       case 'cancelTask': {

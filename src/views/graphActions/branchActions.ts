@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { GraphActionHost } from './types';
 import {
   handleCheckoutWithConflictResolution,
@@ -261,6 +262,64 @@ export async function handleBranchAction(
         },
         { cancellable: true }
       );
+      return true;
+    }
+
+    case 'newWorktreeFromBranch': {
+      const { branch } = (payload || {}) as { branch?: string };
+      if (!branch) return true;
+      try {
+        const repoRoot = await gitService.getRepoRoot();
+        const repoName = path.basename(repoRoot);
+        const parentDir = path.dirname(repoRoot);
+        const sanitizedBranch = branch.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+        const defaultPath = path.join(parentDir, `${repoName}-${sanitizedBranch || 'worktree'}`);
+
+        const targetPath = await vscode.window.showInputBox({
+          title: `New Worktree from '${branch}'`,
+          prompt: 'Enter path for the new Git worktree directory',
+          value: defaultPath,
+          validateInput: (val) => (!val.trim() ? 'Worktree path cannot be empty' : undefined),
+        });
+        if (!targetPath || !targetPath.trim()) return true;
+        const resolvedPath = path.resolve(targetPath.trim());
+
+        const branches = await gitService.getBranches();
+        const isRemote = branches.some((b) => b.remote && b.name === branch);
+        const localBranches = new Set(branches.filter((b) => !b.remote).map((b) => b.name));
+
+        await taskManager.runTask(
+          `Creating worktree at '${resolvedPath}'...`,
+          async (signal) => {
+            if (isRemote) {
+              const slashIdx = branch.indexOf('/');
+              const shortName = slashIdx !== -1 ? branch.slice(slashIdx + 1) : branch;
+              if (!localBranches.has(shortName)) {
+                await gitService.exec(['worktree', 'add', '-b', shortName, resolvedPath, branch], undefined, undefined, undefined, signal);
+              } else {
+                await gitService.exec(['worktree', 'add', '--detach', resolvedPath, branch], undefined, undefined, undefined, signal);
+              }
+            } else {
+              await gitService.exec(['worktree', 'add', resolvedPath, branch], undefined, undefined, undefined, signal);
+            }
+            host.loadInitialData();
+            return `Created worktree for '${branch}' at '${resolvedPath}'.`;
+          },
+          { cancellable: true }
+        );
+
+        const openAction = await vscode.window.showInformationMessage(
+          `Created worktree at '${resolvedPath}'.`,
+          'Open in New Window'
+        );
+        if (openAction === 'Open in New Window') {
+          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(resolvedPath), { forceNewWindow: true });
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          vscode.window.showErrorMessage(`Failed to create worktree: ${err?.message || err}`);
+        }
+      }
       return true;
     }
 

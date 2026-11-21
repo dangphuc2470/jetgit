@@ -71,6 +71,42 @@
     "configuration": {
       "title": "JetGit",
       "properties": {
+        "jetgit.fontSize.log": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 28,
+          "description": "Font size in pixels for the Jet Log panel (0 = use VS Code default)."
+        },
+        "jetgit.fontSize.commit": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 28,
+          "description": "Font size in pixels for the Jet Changes (Commit) panel (0 = use VS Code default)."
+        },
+        "jetgit.fontSize.merge": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 28,
+          "description": "Font size in pixels for 3-Way Merge, Diff Review, Rebase, and Push panels (0 = use VS Code default)."
+        },
+        "jetgit.ui.advanced.fetchBranch": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show 'Fetch Branch' action in remote branch context menus."
+        },
+        "jetgit.ui.advanced.fetchBranchShallow": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show 'Fetch Branch (--depth=1)' action in remote branch context menus."
+        },
+        "jetgit.ui.advanced.trackIntoCurrent": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show 'Track into <current>' action in remote branch context menus."
+        },
         "jetgit.merge.noFastForward": {
           "type": "boolean",
           "default": false,
@@ -197,6 +233,12 @@
         "command": "jetgit.pushDialog",
         "title": "Push...",
         "category": "JetGit"
+      },
+      {
+        "command": "jetgit.openSettings",
+        "title": "Open Settings",
+        "category": "JetGit",
+        "icon": "$(gear)"
       }
     ],
     "keybindings": [
@@ -255,6 +297,11 @@
         {
           "command": "jetgit.refreshChangelists",
           "when": "view == jetgit.changelists",
+          "group": "navigation"
+        },
+        {
+          "command": "jetgit.openSettings",
+          "when": "view == jetgit.logView || view == jetgit.commitView || view == jetgit.branches",
           "group": "navigation"
         }
       ],

@@ -11,6 +11,7 @@ import { generateAiCommitMessage } from '../utils/aiCommitGenerator';
 import { getNonce } from '../utils/themeTokens';
 import { CommitToExtensionMessage, ExtensionToCommitMessage } from '../shared/protocol';
 import { ChangelistTreeProvider } from './changelistTree';
+import { getJetGitSettings } from '../utils/settings';
 
 export class CommitViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'jetgit.commitView';
@@ -93,7 +94,27 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
       }
     });
 
+    const configSub = vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('jetgit')) {
+        this.sendSettings();
+      }
+    });
+
+    webviewView.onDidDispose(() => {
+      configSub.dispose();
+    });
+
     this.refresh();
+  }
+
+  private sendSettings(): void {
+    const settings = getJetGitSettings();
+    this.view?.webview.postMessage({
+      type: 'settingsUpdate',
+      payload: {
+        fontSize: settings.fontSize.commit,
+      },
+    });
   }
 
   closeAllMenus(): void {
@@ -438,7 +459,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider {
 
   private async handleMessage(msg: CommitToExtensionMessage): Promise<void> {
     switch (msg.type) {
-      case 'ready':
+      case 'ready': {
+        this.sendSettings();
+        this.skippedCacheValid = false;
+        await this.refresh();
+        break;
+      }
       case 'refresh': {
         this.skippedCacheValid = false;
         await this.refresh();

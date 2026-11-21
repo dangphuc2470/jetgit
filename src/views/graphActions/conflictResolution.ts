@@ -557,3 +557,59 @@ export async function handlePullWithConflictResolution(
     }
   }
 }
+
+export async function handlePullIntoWithMode(
+  gitService: GitService,
+  sourceBranch: string,
+  mode: 'rebase' | 'merge',
+  onSuccess: () => void
+): Promise<void> {
+  const modeLabel = mode === 'rebase' ? 'Rebase' : 'Merge';
+  try {
+    await taskManager.runTask(
+      `Pulling '${sourceBranch}' using ${modeLabel}...`,
+      async (signal) => {
+        const currentBranch = await gitService.getCurrentBranch();
+        const remotes = await gitService.getRemotes();
+        let matchedRemote: string | undefined;
+        let remoteBranchName = sourceBranch;
+        for (const r of remotes) {
+          if (sourceBranch.startsWith(`${r}/`)) {
+            matchedRemote = r;
+            remoteBranchName = sourceBranch.slice(r.length + 1);
+            break;
+          }
+        }
+
+        let resultMsg = '';
+        await withSmartStashOnConflict(
+          gitService,
+          mode === 'rebase' ? 'Rebase' : 'Merge',
+          sourceBranch,
+          async () => {
+            if (matchedRemote) {
+              const args = ['pull', mode === 'rebase' ? '--rebase' : '--no-rebase', matchedRemote, remoteBranchName];
+              const out = await gitService.exec(args, 10 * 1024 * 1024, 1, 90000, signal);
+              resultMsg = out?.trim()
+                ? `Pulled '${sourceBranch}' into '${currentBranch}' using ${modeLabel}: ${out.trim()}`
+                : `Pulled '${sourceBranch}' into '${currentBranch}' using ${modeLabel}.`;
+            } else if (mode === 'rebase') {
+              await gitService.exec(['rebase', sourceBranch], 10 * 1024 * 1024, 1, 90000, signal);
+              resultMsg = `Rebased '${currentBranch}' onto '${sourceBranch}'.`;
+            } else {
+              await gitService.merge(sourceBranch);
+              resultMsg = `Merged '${sourceBranch}' into '${currentBranch}'.`;
+            }
+          },
+          onSuccess
+        );
+        return resultMsg || `Pulled '${sourceBranch}' using ${modeLabel} successfully.`;
+      },
+      { cancellable: true }
+    );
+  } catch (err: any) {
+    if (err?.name !== 'AbortError') {
+      taskManager.notifyError(`Pull using ${modeLabel} failed`, err.message);
+    }
+  }
+}

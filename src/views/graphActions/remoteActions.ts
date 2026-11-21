@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { GraphActionHost } from './types';
 import {
   handlePullWithConflictResolution,
+  handlePullIntoWithMode,
   withSmartStashOnConflict,
 } from './conflictResolution';
 import { isPushRejectedError } from '../../git/conflictUtils';
@@ -18,6 +19,20 @@ export async function handleRemoteAction(
     case 'pull': {
       const branch = payload as string;
       await handlePullWithConflictResolution(gitService, branch, () => host.loadInitialData());
+      return true;
+    }
+
+    case 'pullIntoUsingRebase': {
+      const { branch } = (payload || {}) as { branch?: string };
+      if (!branch) return true;
+      await handlePullIntoWithMode(gitService, branch, 'rebase', () => host.loadInitialData());
+      return true;
+    }
+
+    case 'pullIntoUsingMerge': {
+      const { branch } = (payload || {}) as { branch?: string };
+      if (!branch) return true;
+      await handlePullIntoWithMode(gitService, branch, 'merge', () => host.loadInitialData());
       return true;
     }
 
@@ -288,6 +303,68 @@ export async function handleRemoteAction(
         if (err?.name !== 'AbortError') {
           taskManager.notifyError('Push failed', err.message);
         }
+      }
+      return true;
+    }
+
+    case 'editRemote': {
+      const { remote } = (payload || {}) as { remote?: string };
+      if (!remote) return true;
+      try {
+        const currentUrl = await gitService.getRemoteUrl(remote);
+        const newName = await vscode.window.showInputBox({
+          title: `Edit Remote '${remote}' (1/2: Name)`,
+          prompt: 'Enter remote name',
+          value: remote,
+          validateInput: (val) => {
+            if (!val.trim()) return 'Remote name cannot be empty';
+            if (/\s/.test(val.trim())) return 'Remote name cannot contain spaces';
+            return undefined;
+          },
+        });
+        if (newName === undefined) return true;
+        const trimmedName = newName.trim();
+
+        const newUrl = await vscode.window.showInputBox({
+          title: `Edit Remote '${trimmedName}' (2/2: URL)`,
+          prompt: 'Enter remote URL',
+          value: currentUrl || '',
+          validateInput: (val) => (!val.trim() ? 'Remote URL cannot be empty' : undefined),
+        });
+        if (newUrl === undefined) return true;
+        const trimmedUrl = newUrl.trim();
+
+        let activeName = remote;
+        if (trimmedName !== remote) {
+          await gitService.exec(['remote', 'rename', remote, trimmedName]);
+          activeName = trimmedName;
+        }
+        if (trimmedUrl !== (currentUrl || '').trim()) {
+          await gitService.exec(['remote', 'set-url', activeName, trimmedUrl]);
+        }
+        vscode.window.showInformationMessage(`Updated remote '${activeName}'.`);
+        host.loadInitialData();
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to edit remote '${remote}': ${err?.message || err}`);
+      }
+      return true;
+    }
+
+    case 'removeRemote': {
+      const { remote } = (payload || {}) as { remote?: string };
+      if (!remote) return true;
+      const choice = await vscode.window.showWarningMessage(
+        `Remove remote '${remote}'?`,
+        { modal: true, detail: `This will remove '${remote}' and its remote-tracking branches from your local repository.` },
+        'Remove'
+      );
+      if (choice !== 'Remove') return true;
+      try {
+        await gitService.exec(['remote', 'remove', remote]);
+        vscode.window.showInformationMessage(`Removed remote '${remote}'.`);
+        host.loadInitialData();
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to remove remote '${remote}': ${err?.message || err}`);
       }
       return true;
     }

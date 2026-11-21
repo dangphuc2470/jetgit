@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { GitService } from '../git/gitService';
 import { getThemeTokens, getNonce } from '../utils/themeTokens';
 import { ReviewToExtensionMessage, ExtensionToReviewMessage } from '../shared/protocol';
+import { getJetGitSettings } from '../utils/settings';
 
 export interface ReviewRevisions {
   baseRef?: string;
@@ -47,6 +48,15 @@ export class CommitReviewPanel {
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     vscode.window.onDidChangeActiveColorTheme(
       () => this.sendThemeTokens(),
+      null,
+      this.disposables,
+    );
+    vscode.workspace.onDidChangeConfiguration(
+      e => {
+        if (e.affectsConfiguration('jetgit')) {
+          this.sendSettings();
+        }
+      },
       null,
       this.disposables,
     );
@@ -294,10 +304,19 @@ export class CommitReviewPanel {
     }
   }
 
+  private sendSettings(): void {
+    const settings = getJetGitSettings();
+    this.panel.webview.postMessage({
+      type: 'settingsUpdate',
+      payload: { fontSize: settings.fontSize.merge },
+    });
+  }
+
   private async handleMessage(msg: ReviewToExtensionMessage): Promise<void> {
     switch (msg.type) {
       case 'ready': {
         this.sendThemeTokens();
+        this.sendSettings();
         if (this.currentFilePath) {
           this.loadFile(this.currentFilePath, this.filesList, this.isReadOnly, undefined, true);
         }

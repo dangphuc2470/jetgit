@@ -3,6 +3,7 @@
   import { escapeHtml } from '../shared/escape';
   import { attachTooltip } from '../shared/tooltip';
   import { getVsCodeApi } from '$shared/vscodeApi';
+  import { applyPanelFontSize } from '$shared/fontScale';
   import type { CommitFile, DiffData, SkippedFile } from './types';
   import { state as commitState } from './state';
   import { renderDiffViewer } from './diffViewer';
@@ -64,6 +65,56 @@
   let showSkippedWorktree = $state(loadBooleanSetting('jetgit_show_skipped_worktree', false));
   let checkedSkippedFiles = $state<Set<string>>(new Set());
   let commitOptionsOpen = $state(false);
+  let moreOptionsOpen = $state(false);
+  let moreSubmenu = $state<'doubleClick' | 'configureLocal' | null>(null);
+  let submenuStyle = $state('');
+  let submenuDrilldown = $state<'doubleClick' | 'configureLocal' | null>(null);
+  function canFloatSubmenu(el: HTMLElement): boolean {
+    const rect = el.getBoundingClientRect();
+    const subWidth = 152;
+    if (rect.right + subWidth + 6 <= window.innerWidth) {
+      submenuStyle = 'top: -6px; left: calc(100% + 4px); right: auto;';
+      return true;
+    }
+    if (rect.left >= subWidth + 6) {
+      submenuStyle = 'top: -6px; right: calc(100% + 4px); left: auto;';
+      return true;
+    }
+    submenuStyle = '';
+    return false;
+  }
+  function hoverMoreSubmenu(key: 'doubleClick' | 'configureLocal', el: HTMLElement) {
+    if (canFloatSubmenu(el)) {
+      moreSubmenu = key;
+    }
+  }
+  function clickMoreSubmenu(key: 'doubleClick' | 'configureLocal', el: HTMLElement) {
+    if (canFloatSubmenu(el)) {
+      moreSubmenu = key;
+      submenuDrilldown = null;
+    } else {
+      moreSubmenu = null;
+      submenuDrilldown = key;
+    }
+  }
+  let doubleClickAction = $state<'diff' | 'source'>((() => {
+    try {
+      const v = localStorage.getItem('jetgit_commit_double_click');
+      if (v === 'source') return 'source';
+    } catch {}
+    return 'diff';
+  })());
+  let showToolbar = $state(loadBooleanSetting('jetgit_commit_show_toolbar', true));
+  let speedSearchOpen = $state(false);
+  let speedSearchQuery = $state('');
+  let speedSearchInputEl: HTMLInputElement | null = $state(null);
+  let displayMode = $state<'changelists' | 'staging'>((() => {
+    try {
+      const v = localStorage.getItem('jetgit_commit_display_mode');
+      if (v === 'staging') return 'staging';
+    } catch {}
+    return 'changelists';
+  })());
   let recentOpen = $state(false);
   let isGeneratingAi = $state(false);
   let conflictInfo = $state<any>(null);
@@ -71,6 +122,12 @@
   let changelists = $state<{ name: string; files: string[] }[]>([]);
   let activeChangelist = $state<string>('Changes');
   let collapsedChangelists = $state<Set<string>>(loadCollapsedChangelists());
+
+  let displayFiles = $derived(
+    speedSearchQuery.trim()
+      ? files.filter((f) => f.path.toLowerCase().includes(speedSearchQuery.trim().toLowerCase()))
+      : files
+  );
 
   let commitBoxRef: any = $state(null);
   let leftPanelEl: HTMLDivElement | null = $state(null);
@@ -173,7 +230,11 @@
 
   function handleOpenFileDiff(file: CommitFile) {
     selectedFile = file.path;
-    vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
+    if (doubleClickAction === 'source') {
+      vscode.postMessage({ type: 'jumpToSource', payload: file.path });
+    } else {
+      vscode.postMessage({ type: 'openReviewInCenter', payload: file.path });
+    }
   }
 
   function handleToggleStageFile(file: CommitFile, checked: boolean) {
@@ -422,6 +483,10 @@
         isLoadingSkipped = false;
         break;
       }
+      case 'settingsUpdate': {
+        applyPanelFontSize(msg.payload?.fontSize);
+        break;
+      }
       case 'init':
       case 'status': {
         const data = msg.payload || {};
@@ -519,6 +584,8 @@
         recentOpen = false;
         commitOptionsOpen = false;
         viewOptionsOpen = false;
+        moreOptionsOpen = false;
+        moreSubmenu = null;
         break;
       }
     }
@@ -528,17 +595,20 @@
     const target = e.target as HTMLElement | null;
     if (!target) return;
 
-    if (recentOpen || commitOptionsOpen || viewOptionsOpen) {
+    if (recentOpen || commitOptionsOpen || viewOptionsOpen || moreOptionsOpen) {
       if (
         !target.closest('#recent-dropdown') &&
         !target.closest('#btn-recent-msgs') &&
         !target.closest('#gear-dropdown') &&
         !target.closest('#btn-commit-gear') &&
-        !target.closest('#view-options-wrapper')
+        !target.closest('#view-options-wrapper') &&
+        !target.closest('#more-options-wrapper')
       ) {
         recentOpen = false;
         commitOptionsOpen = false;
         viewOptionsOpen = false;
+        moreOptionsOpen = false;
+        moreSubmenu = null;
       }
     }
 
@@ -547,17 +617,39 @@
     }
   }
 
+  function openSpeedSearch() {
+    speedSearchOpen = true;
+    moreOptionsOpen = false;
+    moreSubmenu = null;
+    requestAnimationFrame(() => {
+      speedSearchInputEl?.focus();
+    });
+  }
+
   function handleGlobalKeyDown(e: KeyboardEvent) {
     if ((e.ctrlKey || (e.metaKey && e.altKey)) && (e.key === 'p' || e.key === 'P')) {
       e.preventDefault();
       groupByDirectory = !groupByDirectory;
       showPaths = !groupByDirectory;
     }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F')) {
+      const activeTag = (document.activeElement as HTMLElement | null)?.tagName;
+      if (activeTag !== 'TEXTAREA' && activeTag !== 'INPUT') {
+        e.preventDefault();
+        openSpeedSearch();
+      }
+    }
     if (e.key === 'Escape') {
       closeContextMenu();
       recentOpen = false;
       commitOptionsOpen = false;
       viewOptionsOpen = false;
+      moreOptionsOpen = false;
+      moreSubmenu = null;
+      if (speedSearchOpen) {
+        speedSearchOpen = false;
+        speedSearchQuery = '';
+      }
     }
   }
 
@@ -616,16 +708,274 @@
       ><span>Stash</span></button>
     </div>
     <div class="tab-actions">
-      <button
-        type="button"
-        class="icon-btn"
-        id="btn-tab-menu"
-        title="More Options"
-        data-tooltip="More Options"
-        onclick={() => vscode.postMessage({ type: 'openLog' })}
-      >
-        ⋮
-      </button>
+      <div id="more-options-wrapper" style="position: relative; display: inline-flex;">
+        <button
+          type="button"
+          class="icon-btn"
+          id="btn-tab-menu"
+          title="More Options"
+          data-tooltip="More Options"
+          onclick={(e) => {
+            e.stopPropagation();
+            moreOptionsOpen = !moreOptionsOpen;
+            moreSubmenu = null;
+            submenuDrilldown = null;
+            viewOptionsOpen = false;
+            commitOptionsOpen = false;
+            recentOpen = false;
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:block;">
+            <circle cx="8" cy="3.2" r="1.3"/>
+            <circle cx="8" cy="8" r="1.3"/>
+            <circle cx="8" cy="12.8" r="1.3"/>
+          </svg>
+        </button>
+        {#if moreOptionsOpen}
+          <div
+            class="as-view-options-menu as-more-options-menu"
+            id="more-options-menu"
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => { if (e.key === 'Escape') { moreOptionsOpen = false; moreSubmenu = null; submenuDrilldown = null; } }}
+            role="menu"
+            tabindex="-1"
+          >
+            {#if submenuDrilldown === 'doubleClick'}
+              <div
+                class="as-menu-item as-submenu-back"
+                onclick={() => { submenuDrilldown = null; }}
+                role="menuitem"
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">‹</span>
+                  <span class="as-menu-label" style="font-weight: 600;">Show on Double-Click</span>
+                </div>
+              </div>
+              <div class="as-menu-divider"></div>
+              <div
+                class={`as-menu-item ${doubleClickAction === 'diff' ? 'active' : ''}`}
+                onclick={() => {
+                  doubleClickAction = 'diff';
+                  try { localStorage.setItem('jetgit_commit_double_click', 'diff'); } catch {}
+                  moreOptionsOpen = false;
+                  submenuDrilldown = null;
+                }}
+                role="menuitemradio"
+                aria-checked={doubleClickAction === 'diff'}
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">
+                    {#if doubleClickAction === 'diff'}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                    {/if}
+                  </span>
+                  <span class="as-menu-label">Show Diff</span>
+                </div>
+              </div>
+              <div
+                class={`as-menu-item ${doubleClickAction === 'source' ? 'active' : ''}`}
+                onclick={() => {
+                  doubleClickAction = 'source';
+                  try { localStorage.setItem('jetgit_commit_double_click', 'source'); } catch {}
+                  moreOptionsOpen = false;
+                  submenuDrilldown = null;
+                }}
+                role="menuitemradio"
+                aria-checked={doubleClickAction === 'source'}
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">
+                    {#if doubleClickAction === 'source'}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                    {/if}
+                  </span>
+                  <span class="as-menu-label">Open Source</span>
+                </div>
+              </div>
+            {:else if submenuDrilldown === 'configureLocal'}
+              <div
+                class="as-menu-item as-submenu-back"
+                onclick={() => { submenuDrilldown = null; }}
+                role="menuitem"
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">‹</span>
+                  <span class="as-menu-label" style="font-weight: 600;">Configure Local Changes</span>
+                </div>
+              </div>
+              <div class="as-menu-divider"></div>
+              <div class="as-menu-section-header">Display as</div>
+              <div
+                class={`as-menu-item ${displayMode === 'staging' ? 'active' : ''}`}
+                onclick={() => {
+                  displayMode = 'staging';
+                  try { localStorage.setItem('jetgit_commit_display_mode', 'staging'); } catch {}
+                  moreOptionsOpen = false;
+                  submenuDrilldown = null;
+                }}
+                role="menuitemradio"
+                aria-checked={displayMode === 'staging'}
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">
+                    {#if displayMode === 'staging'}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                    {/if}
+                  </span>
+                  <span class="as-menu-label">Staging Area</span>
+                </div>
+              </div>
+              <div
+                class={`as-menu-item ${displayMode === 'changelists' ? 'active' : ''}`}
+                onclick={() => {
+                  displayMode = 'changelists';
+                  try { localStorage.setItem('jetgit_commit_display_mode', 'changelists'); } catch {}
+                  moreOptionsOpen = false;
+                  submenuDrilldown = null;
+                }}
+                role="menuitemradio"
+                aria-checked={displayMode === 'changelists'}
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">
+                    {#if displayMode === 'changelists'}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                    {/if}
+                  </span>
+                  <span class="as-menu-label">Changelists</span>
+                </div>
+              </div>
+            {:else}
+              <div
+                class={`as-menu-item has-submenu ${moreSubmenu === 'doubleClick' ? 'submenu-open' : ''}`}
+                onmouseenter={(e) => hoverMoreSubmenu('doubleClick', e.currentTarget as HTMLElement)}
+                onclick={(e) => clickMoreSubmenu('doubleClick', e.currentTarget as HTMLElement)}
+                role="menuitem"
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check"></span>
+                  <span class="as-menu-label">Show on Double-Click</span>
+                </div>
+                <span class="as-menu-arrow">›</span>
+                {#if moreSubmenu === 'doubleClick'}
+                  <div class="as-view-options-menu as-submenu" style={submenuStyle}>
+                    <div
+                      class={`as-menu-item ${doubleClickAction === 'diff' ? 'active' : ''}`}
+                      onclick={() => {
+                        doubleClickAction = 'diff';
+                        try { localStorage.setItem('jetgit_commit_double_click', 'diff'); } catch {}
+                        moreOptionsOpen = false;
+                        moreSubmenu = null;
+                      }}
+                      role="menuitemradio"
+                      aria-checked={doubleClickAction === 'diff'}
+                      tabindex="0"
+                    >
+                      <div class="as-menu-item-left">
+                        <span class="as-menu-check">
+                          {#if doubleClickAction === 'diff'}
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                          {/if}
+                        </span>
+                        <span class="as-menu-label">Show Diff</span>
+                      </div>
+                    </div>
+                    <div
+                      class={`as-menu-item ${doubleClickAction === 'source' ? 'active' : ''}`}
+                      onclick={() => {
+                        doubleClickAction = 'source';
+                        try { localStorage.setItem('jetgit_commit_double_click', 'source'); } catch {}
+                        moreOptionsOpen = false;
+                        moreSubmenu = null;
+                      }}
+                      role="menuitemradio"
+                      aria-checked={doubleClickAction === 'source'}
+                      tabindex="0"
+                    >
+                      <div class="as-menu-item-left">
+                        <span class="as-menu-check">
+                          {#if doubleClickAction === 'source'}
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                          {/if}
+                        </span>
+                        <span class="as-menu-label">Open Source</span>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              </div>
+
+              <div class="as-menu-divider"></div>
+
+              <div
+                class="as-menu-item"
+                onmouseenter={() => { moreSubmenu = null; }}
+                onclick={() => openSpeedSearch()}
+                role="menuitem"
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="7" cy="7" r="4.5"/>
+                      <line x1="10.2" y1="10.2" x2="14" y2="14"/>
+                    </svg>
+                  </span>
+                  <span class="as-menu-label">Speed Search</span>
+                </div>
+                <span class="as-menu-shortcut">Ctrl+F</span>
+              </div>
+
+              <div class="as-menu-divider"></div>
+
+              <div
+                class={`as-menu-item ${showToolbar ? 'active' : ''}`}
+                onmouseenter={() => { moreSubmenu = null; }}
+                onclick={() => {
+                  showToolbar = !showToolbar;
+                  try { localStorage.setItem('jetgit_commit_show_toolbar', String(showToolbar)); } catch {}
+                }}
+                role="menuitemcheckbox"
+                aria-checked={showToolbar}
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check">
+                    {#if showToolbar}
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5 8.5 6.5 11.5 12.5 4.5"/></svg>
+                    {/if}
+                  </span>
+                  <span class="as-menu-label">Show Toolbar</span>
+                </div>
+              </div>
+
+              <div
+                class="as-menu-item"
+                onmouseenter={() => { moreSubmenu = null; }}
+                onclick={() => {
+                  moreOptionsOpen = false;
+                  moreSubmenu = null;
+                  vscode.postMessage({ type: 'openLog' });
+                }}
+                role="menuitem"
+                tabindex="0"
+              >
+                <div class="as-menu-item-left">
+                  <span class="as-menu-check"></span>
+                  <span class="as-menu-label">Open Git Log</span>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
       <button
         type="button"
         class="icon-btn"
@@ -752,6 +1102,7 @@
     {/if}
 
     <!-- 3. Toolbar -->
+    {#if showToolbar}
     <div class="commit-toolbar">
       <div class="tool-left">
         <button
@@ -947,13 +1298,52 @@
         </button>
       </div>
     </div>
+    {/if}
+
+    {#if speedSearchOpen}
+      <div class="commit-speed-search-bar">
+        <span class="css-icon">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="7" cy="7" r="4.5"/>
+            <line x1="10.2" y1="10.2" x2="14" y2="14"/>
+          </svg>
+        </span>
+        <input
+          bind:this={speedSearchInputEl}
+          type="text"
+          class="css-input"
+          placeholder="Filter changed files..."
+          bind:value={speedSearchQuery}
+          onkeydown={(e) => {
+            if (e.key === 'Escape') {
+              speedSearchOpen = false;
+              speedSearchQuery = '';
+            }
+          }}
+        />
+        {#if speedSearchQuery}
+          <button
+            type="button"
+            class="css-clear"
+            title="Clear filter"
+            onclick={() => { speedSearchQuery = ''; speedSearchInputEl?.focus(); }}
+          >×</button>
+        {/if}
+        <button
+          type="button"
+          class="css-clear"
+          title="Close (Esc)"
+          onclick={() => { speedSearchOpen = false; speedSearchQuery = ''; }}
+        >Esc</button>
+      </div>
+    {/if}
 
     <!-- 4. Main Body -->
     <div class={`commit-body ${showDiff ? 'with-diff' : ''}`}>
       <div class="commit-left-panel" bind:this={leftPanelEl}>
         <div style={`flex: ${splitRatio}; display: flex; flex-direction: column; min-height: 80px; overflow: hidden;`}>
           <ChangesTree
-            {files}
+            files={displayFiles}
             {skippedFiles}
             {expandSkipped}
             {isLoadingSkipped}

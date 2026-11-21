@@ -14,6 +14,7 @@ const entries = [
   { input: 'webview/merge/main.ts', outfile: 'dist/webview/merge/merge.js' },
   { input: 'webview/conflicts/main.ts', outfile: 'dist/webview/conflicts/conflicts.js' },
   { input: 'webview/push/main.ts', outfile: 'dist/webview/push/push.js' },
+  { input: 'webview/settings/main.ts', outfile: 'dist/webview/settings/settings.js' },
 ];
 
 for (const entry of entries) {

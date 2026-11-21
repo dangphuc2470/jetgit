@@ -18,14 +18,41 @@
 
   let hasVisibleTasks = $derived(tasks.length > 0);
 
-  // Auto-dismiss completed/cancelled tasks if all are idle and not expanded
+  let isHovered = $state(false);
+  let isWindowActive = $state(
+    typeof document !== "undefined" ? !document.hidden && document.hasFocus() : true
+  );
+  let hasFailedTasks = $derived(tasks.some((t) => t.status === "failed"));
+
+  $effect(() => {
+    const syncWindowActive = () => {
+      isWindowActive = !document.hidden && document.hasFocus();
+    };
+    document.addEventListener("visibilitychange", syncWindowActive);
+    window.addEventListener("focus", syncWindowActive);
+    window.addEventListener("blur", syncWindowActive);
+    return () => {
+      document.removeEventListener("visibilitychange", syncWindowActive);
+      window.removeEventListener("focus", syncWindowActive);
+      window.removeEventListener("blur", syncWindowActive);
+    };
+  });
+
+  // Auto-dismiss completed/cancelled tasks only when window is focused, not hovered, and no errors exist
   let autoDismissTimer: any = null;
   $effect(() => {
     if (autoDismissTimer) clearTimeout(autoDismissTimer);
-    if (!isExpanded && runningTasks.length === 0 && tasks.length > 0) {
+    if (
+      !isExpanded &&
+      runningTasks.length === 0 &&
+      tasks.length > 0 &&
+      !hasFailedTasks &&
+      !isHovered &&
+      isWindowActive
+    ) {
       autoDismissTimer = setTimeout(() => {
         onClearFinished();
-      }, 6000);
+      }, 4000);
     }
     return () => {
       if (autoDismissTimer) clearTimeout(autoDismissTimer);
@@ -162,7 +189,13 @@
   {/if}
 
   <!-- Collapsed Bottom Status Strip (Aligned at the end / right side) -->
-  <div class="task-status-bar" role="toolbar" aria-label="Git Status Bar">
+  <div
+    class="task-status-bar"
+    role="toolbar"
+    aria-label="Git Status Bar"
+    onmouseenter={() => (isHovered = true)}
+    onmouseleave={() => (isHovered = false)}
+  >
     <div class="task-status-cluster">
       <button
         type="button"

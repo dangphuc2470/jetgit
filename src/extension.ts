@@ -10,6 +10,7 @@ import { RebasePanel } from './views/rebasePanel';
 import { PushDialogPanel } from './views/pushDialogPanel';
 import { ConflictsDialogPanel } from './views/conflictsDialogPanel';
 import { MergeEditorPanel } from './views/mergeEditorPanel';
+import { SettingsPanel } from './views/settingsPanel';
 import { BranchTreeProvider } from './views/branchTree';
 import { ChangelistTreeProvider } from './views/changelistTree';
 import { BlameDecorationProvider } from './providers/blameDecorations';
@@ -477,6 +478,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeTextEditorSelection(() => {
       graphViewProvider.closeAllMenus();
       commitViewProvider.closeAllMenus();
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('jetgit.openSettings', () => {
+      SettingsPanel.createOrShow(context.extensionUri);
     }),
   );
 

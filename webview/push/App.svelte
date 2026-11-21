@@ -919,8 +919,8 @@
   }
 
   .as-btn-primary {
-    background: var(--vscode-button-background, #3574f0);
-    color: var(--vscode-button-foreground, #ffffff);
+    background: #3574f0;
+    color: #ffffff;
     border: none;
     padding: 6px 18px;
     font-size: 12.5px;

@@ -41,6 +41,11 @@
     width?: number;
     isDragging?: boolean;
     isCollapsed?: boolean;
+    advancedActions?: {
+      fetchBranch?: boolean;
+      fetchBranchShallow?: boolean;
+      trackIntoCurrent?: boolean;
+    };
     onToggleCollapse?: () => void;
   }
 
@@ -52,6 +57,7 @@
     width = 260,
     isDragging = false,
     isCollapsed = $bindable(false),
+    advancedActions = {},
     onToggleCollapse
   }: Props = $props();
 
@@ -97,23 +103,33 @@
   });
 
   // Context menu state
+  interface ContextMenuItem {
+    label: string;
+    shortcut?: string;
+    onClick?: () => void;
+    isDivider?: boolean;
+    disabled?: boolean;
+    children?: ContextMenuItem[];
+  }
+
   let contextMenu = $state<{
     visible: boolean;
     x: number;
     y: number;
-    items: Array<{
-      label: string;
-      shortcut?: string;
-      onClick?: () => void;
-      isDivider?: boolean;
-      disabled?: boolean;
-    }>;
+    items: ContextMenuItem[];
   }>({
     visible: false,
     x: 0,
     y: 0,
     items: []
   });
+
+  let hoveredSubmenu = $state<{
+    index: number;
+    x: number;
+    y: number;
+    items: ContextMenuItem[];
+  } | null>(null);
 
   const currentBranch = $derived(branchData?.currentBranch || (typeof window !== "undefined" ? (window as any).__GIT_CURRENT_BRANCH__ : "") || "");
   const currentRepoKey = $derived(branchData?.repoPath || (typeof window !== "undefined" ? (window as any).__GIT_REPO_PATH__ : "") || "default_repo");
@@ -458,17 +474,118 @@
     const branchInfo = branches.find((b) => b.name === branchName);
     const isRemote = branchInfo ? (!!branchInfo.remote || branchName.startsWith("origin/")) : branchName.startsWith("origin/");
 
-    const items: Array<{
-      label: string;
-      shortcut?: string;
-      onClick?: () => void;
-      isDivider?: boolean;
-      disabled?: boolean;
-    }> = [];
+    const items: ContextMenuItem[] = [];
+    hoveredSubmenu = null;
 
     const closeAndRun = (action: () => void) => {
       contextMenu.visible = false;
+      hoveredSubmenu = null;
       action();
+    };
+
+    const buildRemoteBranchItems = (targetRemoteBranch: string): ContextMenuItem[] => {
+      const rItems: ContextMenuItem[] = [];
+      rItems.push({
+        label: "Checkout",
+        onClick: () => closeAndRun(() => {
+          const slashIdx = targetRemoteBranch.indexOf('/');
+          const defaultName = slashIdx !== -1 ? targetRemoteBranch.slice(slashIdx + 1) : targetRemoteBranch;
+          const localExists = branches.some((b) => !b.remote && b.name === defaultName);
+          if (localExists) {
+            openCheckoutBranchDialog({
+              remoteRef: targetRemoteBranch,
+              defaultName,
+              localBranches: branches.filter((b) => !b.remote).map((b) => b.name)
+            });
+          } else {
+            postMessage("checkout", targetRemoteBranch);
+          }
+        })
+      });
+      if (advancedActions?.fetchBranch) {
+        rItems.push({
+          label: "Fetch Branch",
+          onClick: () => closeAndRun(() => {
+            showToast(`Fetching '${targetRemoteBranch}'...`);
+            postMessage("fetchSingleBranch", { branch: targetRemoteBranch });
+          })
+        });
+      }
+      if (advancedActions?.fetchBranchShallow) {
+        rItems.push({
+          label: "Fetch Branch (--depth=1)",
+          onClick: () => closeAndRun(() => {
+            showToast(`Fetching '${targetRemoteBranch}' (--depth=1)...`);
+            postMessage("fetchSingleBranch", { branch: targetRemoteBranch, depth: 1 });
+          })
+        });
+      }
+      if (advancedActions?.trackIntoCurrent) {
+        const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
+        const isAlreadyTrackingThis = curBranchInfo && curBranchInfo.upstream === targetRemoteBranch;
+        if (currentBranch) {
+          rItems.push({
+            label: `Track into '${currentBranch}'` + (isAlreadyTrackingThis ? " (already tracked)" : ""),
+            disabled: !!isAlreadyTrackingThis,
+            onClick: () => closeAndRun(() => {
+              showToast(`Tracking '${currentBranch}' -> '${targetRemoteBranch}'...`);
+              postMessage("setUpstream", { branch: currentBranch, upstream: targetRemoteBranch });
+            })
+          });
+        }
+      }
+      rItems.push({
+        label: `New Branch from '${targetRemoteBranch}'...`,
+        onClick: () => closeAndRun(() => openCreateBranchDialog(targetRemoteBranch))
+      });
+      rItems.push({
+        label: `Checkout and Rebase onto '${currentBranch || "HEAD"}'`,
+        onClick: () => closeAndRun(() => postMessage("checkoutAndRebase", { branch: targetRemoteBranch, onto: currentBranch }))
+      });
+      rItems.push({ isDivider: true, label: "" });
+      rItems.push({
+        label: `Compare with '${currentBranch || "HEAD"}'`,
+        onClick: () => closeAndRun(() => postMessage("compareBranch", { branch: targetRemoteBranch, withBranch: currentBranch }))
+      });
+      rItems.push({
+        label: "Show Diff with Working Tree",
+        onClick: () => closeAndRun(() => postMessage("showDiff", { branch: targetRemoteBranch }))
+      });
+      rItems.push({ isDivider: true, label: "" });
+      rItems.push({
+        label: `Rebase '${currentBranch || "HEAD"}' onto '${targetRemoteBranch}'`,
+        onClick: () => closeAndRun(() => postMessage("rebase", targetRemoteBranch))
+      });
+      rItems.push({
+        label: `Merge '${targetRemoteBranch}' into '${currentBranch || "HEAD"}'`,
+        onClick: () => closeAndRun(() => postMessage("mergeBranch", targetRemoteBranch))
+      });
+      rItems.push({ isDivider: true, label: "" });
+      rItems.push({
+        label: `New Worktree from '${targetRemoteBranch}'...`,
+        onClick: () => closeAndRun(() => postMessage("newWorktreeFromBranch", { branch: targetRemoteBranch }))
+      });
+      rItems.push({ isDivider: true, label: "" });
+      rItems.push({
+        label: `Pull into '${currentBranch || "HEAD"}' Using Rebase`,
+        onClick: () => closeAndRun(() => {
+          showToast(`Pulling '${targetRemoteBranch}' using rebase...`);
+          postMessage("pullIntoUsingRebase", { branch: targetRemoteBranch });
+        })
+      });
+      rItems.push({
+        label: `Pull into '${currentBranch || "HEAD"}' Using Merge`,
+        onClick: () => closeAndRun(() => {
+          showToast(`Pulling '${targetRemoteBranch}' using merge...`);
+          postMessage("pullIntoUsingMerge", { branch: targetRemoteBranch });
+        })
+      });
+      rItems.push({ isDivider: true, label: "" });
+      rItems.push({
+        label: "Delete",
+        onClick: () => closeAndRun(() => postMessage("deleteBranch", targetRemoteBranch))
+      });
+      return rItems;
     };
 
     if (isCurrent) {
@@ -480,6 +597,10 @@
         label: "Show Diff with Working Tree",
         onClick: () => closeAndRun(() => postMessage("showDiff", { branch: branchName }))
       });
+      items.push({
+        label: `New Worktree from '${branchName}'...`,
+        onClick: () => closeAndRun(() => postMessage("newWorktreeFromBranch", { branch: branchName }))
+      });
       items.push({ isDivider: true, label: "" });
       items.push({
         label: "Update",
@@ -488,7 +609,7 @@
           postMessage("pull", branchName);
         })
       });
-      if (branchInfo?.upstream) {
+      if (branchInfo?.upstream && advancedActions?.fetchBranchShallow) {
         items.push({
           label: `Fetch '${branchInfo.upstream}' (--depth=1)`,
           onClick: () => closeAndRun(() => {
@@ -501,6 +622,12 @@
         label: "Push...",
         onClick: () => closeAndRun(() => postMessage("push", branchName))
       });
+      if (branchInfo?.upstream) {
+        items.push({
+          label: `Tracked Branch '${branchInfo.upstream}'`,
+          children: buildRemoteBranchItems(branchInfo.upstream)
+        });
+      }
       items.push({ isDivider: true, label: "" });
       items.push({
         label: "Rename...",
@@ -508,92 +635,7 @@
         onClick: () => closeAndRun(() => openRenameBranchDialog(branchName))
       });
     } else if (isRemote) {
-      items.push({
-        label: "Checkout",
-        onClick: () => closeAndRun(() => {
-          const slashIdx = branchName.indexOf('/');
-          const defaultName = slashIdx !== -1 ? branchName.slice(slashIdx + 1) : branchName;
-          const localExists = branches.some((b) => !b.remote && b.name === defaultName);
-          if (localExists) {
-            openCheckoutBranchDialog({
-              remoteRef: branchName,
-              defaultName,
-              localBranches: branches.filter((b) => !b.remote).map((b) => b.name)
-            });
-          } else {
-            postMessage("checkout", branchName);
-          }
-        })
-      });
-      items.push({
-        label: "Checkout As...",
-        onClick: () => closeAndRun(() => {
-          const slashIdx = branchName.indexOf('/');
-          const defaultName = slashIdx !== -1 ? branchName.slice(slashIdx + 1) : branchName;
-          openCheckoutBranchDialog({
-            remoteRef: branchName,
-            defaultName,
-            localBranches: branches.filter((b) => !b.remote).map((b) => b.name)
-          });
-        })
-      });
-      items.push({
-        label: "Fetch Branch",
-        onClick: () => closeAndRun(() => {
-          showToast(`Fetching '${branchName}'...`);
-          postMessage("fetchSingleBranch", { branch: branchName });
-        })
-      });
-      items.push({
-        label: "Fetch Branch (--depth=1)",
-        onClick: () => closeAndRun(() => {
-          showToast(`Fetching '${branchName}' (--depth=1)...`);
-          postMessage("fetchSingleBranch", { branch: branchName, depth: 1 });
-        })
-      });
-      const curBranchInfo = currentBranch ? branches.find(b => b.name === currentBranch && !b.remote) : null;
-      const isAlreadyTrackingThis = curBranchInfo && curBranchInfo.upstream === branchName;
-      if (currentBranch) {
-        items.push({
-          label: `Track into '${currentBranch}'` + (isAlreadyTrackingThis ? " (already tracked)" : ""),
-          disabled: !!isAlreadyTrackingThis,
-          onClick: () => closeAndRun(() => {
-            showToast(`Tracking '${currentBranch}' -> '${branchName}'...`);
-            postMessage("setUpstream", { branch: currentBranch, upstream: branchName });
-          })
-        });
-      }
-      items.push({
-        label: `New Branch from '${branchName}'...`,
-        onClick: () => closeAndRun(() => openCreateBranchDialog(branchName))
-      });
-      items.push({
-        label: `Checkout and Rebase onto '${currentBranch || "HEAD"}'`,
-        onClick: () => closeAndRun(() => postMessage("checkoutAndRebase", { branch: branchName, onto: currentBranch }))
-      });
-      items.push({ isDivider: true, label: "" });
-      items.push({
-        label: `Compare with '${currentBranch || "HEAD"}'`,
-        onClick: () => closeAndRun(() => postMessage("compareBranch", { branch: branchName, withBranch: currentBranch }))
-      });
-      items.push({
-        label: "Show Diff with Working Tree",
-        onClick: () => closeAndRun(() => postMessage("showDiff", { branch: branchName }))
-      });
-      items.push({ isDivider: true, label: "" });
-      items.push({
-        label: `Rebase '${currentBranch || "HEAD"}' onto '${branchName}'`,
-        onClick: () => closeAndRun(() => postMessage("rebase", branchName))
-      });
-      items.push({
-        label: `Merge '${branchName}' into '${currentBranch || "HEAD"}'`,
-        onClick: () => closeAndRun(() => postMessage("mergeBranch", branchName))
-      });
-      items.push({ isDivider: true, label: "" });
-      items.push({
-        label: "Delete Remote Branch...",
-        onClick: () => closeAndRun(() => postMessage("deleteBranch", branchName))
-      });
+      items.push(...buildRemoteBranchItems(branchName));
     } else {
       items.push({
         label: "Checkout",
@@ -627,13 +669,18 @@
       });
       items.push({ isDivider: true, label: "" });
       items.push({
+        label: `New Worktree from '${branchName}'...`,
+        onClick: () => closeAndRun(() => postMessage("newWorktreeFromBranch", { branch: branchName }))
+      });
+      items.push({ isDivider: true, label: "" });
+      items.push({
         label: "Update",
         onClick: () => closeAndRun(() => {
           showToast(`Updating '${branchName}'...`);
           postMessage("pull", branchName);
         })
       });
-      if (branchInfo?.upstream) {
+      if (branchInfo?.upstream && advancedActions?.fetchBranchShallow) {
         items.push({
           label: `Fetch '${branchInfo.upstream}' (--depth=1)`,
           onClick: () => closeAndRun(() => {
@@ -645,6 +692,26 @@
       items.push({
         label: "Push...",
         onClick: () => closeAndRun(() => postMessage("push", branchName))
+      });
+      if (branchInfo?.upstream) {
+        items.push({
+          label: `Tracked Branch '${branchInfo.upstream}'`,
+          children: buildRemoteBranchItems(branchInfo.upstream)
+        });
+      }
+      items.push({
+        label: `Pull into '${currentBranch || "HEAD"}' Using Rebase`,
+        onClick: () => closeAndRun(() => {
+          showToast(`Pulling '${branchName}' using rebase...`);
+          postMessage("pullIntoUsingRebase", { branch: branchName });
+        })
+      });
+      items.push({
+        label: `Pull into '${currentBranch || "HEAD"}' Using Merge`,
+        onClick: () => closeAndRun(() => {
+          showToast(`Pulling '${branchName}' using merge...`);
+          postMessage("pullIntoUsingMerge", { branch: branchName });
+        })
       });
       items.push({ isDivider: true, label: "" });
       items.push({
@@ -730,29 +797,51 @@
           postMessage("fetchRemote", { remote: remoteName });
         })
       });
+      if (advancedActions?.fetchBranchShallow) {
+        items.push({
+          label: `Fetch '${remoteName}' (--depth=1)`,
+          onClick: () => closeAndRun(() => {
+            showToast(`Fetching remote '${remoteName}' (--depth=1)...`);
+            postMessage("fetchRemote", { remote: remoteName, depth: 1 });
+          })
+        });
+      }
+    }
+
+    if (advancedActions?.trackIntoCurrent) {
+      const labelText = isRootRemote
+        ? `Track All Local Branches to '${remoteName}'`
+        : `Track '${subNode.fullPath}' for '${folderSubPath}'`;
+
       items.push({
-        label: `Fetch '${remoteName}' (--depth=1)`,
+        label: labelText + (allTracked ? " (already tracked)" : ""),
+        disabled: allTracked,
         onClick: () => closeAndRun(() => {
-          showToast(`Fetching remote '${remoteName}' (--depth=1)...`);
-          postMessage("fetchRemote", { remote: remoteName, depth: 1 });
+          showToast(`Tracking ${isRootRemote ? "all local branches" : `'${folderSubPath}'`} to '${remoteName}'...`);
+          postMessage("trackAllBranchesToRemote", { remote: remoteName, prefix: folderSubPath || undefined });
         })
       });
     }
 
-    const labelText = isRootRemote
-      ? `Track All Local Branches to '${remoteName}'`
-      : `Track '${subNode.fullPath}' for '${folderSubPath}'`;
+    if (isRootRemote) {
+      items.push({ label: "", isDivider: true });
+      items.push({
+        label: "Edit Remote...",
+        onClick: () => closeAndRun(() => {
+          postMessage("editRemote", { remote: remoteName });
+        })
+      });
+      items.push({
+        label: "Remove Remote...",
+        onClick: () => closeAndRun(() => {
+          postMessage("removeRemote", { remote: remoteName });
+        })
+      });
+    }
 
-    items.push({
-      label: labelText + (allTracked ? " (already tracked)" : ""),
-      disabled: allTracked,
-      onClick: () => closeAndRun(() => {
-        showToast(`Tracking ${isRootRemote ? "all local branches" : `'${folderSubPath}'`} to '${remoteName}'...`);
-        postMessage("trackAllBranchesToRemote", { remote: remoteName, prefix: folderSubPath || undefined });
-      })
-    });
-
-    setContextMenu(e.clientX, e.clientY, items);
+    if (items.length > 0) {
+      setContextMenu(e.clientX, e.clientY, items);
+    }
   }
 
   function toggleFolder(fullPath: string, defaultCollapsed: boolean) {
@@ -1212,22 +1301,73 @@
     data-vscode-context={JSON.stringify({ preventDefaultContextMenuItems: true })}
     oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
   >
-    {#each contextMenu.items as it}
+    {#each contextMenu.items as it, idx}
       {#if it.isDivider}
         <div class="bcm-divider"></div>
       {:else}
         <div
           class="bcm-item"
           class:disabled={it.disabled}
+          class:has-submenu={!!it.children?.length}
+          onmouseenter={(e) => {
+            if (it.children && it.children.length > 0) {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              const subW = 280;
+              const subH = Math.min(it.children.length * 26 + 16, window.innerHeight - 16);
+              let sx = rect.right - 2;
+              if (sx + subW > window.innerWidth - 8) {
+                sx = Math.max(8, rect.left - subW + 2);
+              }
+              let sy = rect.top - 6;
+              if (sy + subH > window.innerHeight - 8) {
+                sy = Math.max(8, window.innerHeight - subH - 8);
+              }
+              hoveredSubmenu = { index: idx, x: sx, y: sy, items: it.children };
+            } else {
+              hoveredSubmenu = null;
+            }
+          }}
           onclick={(e) => {
-            if (it.disabled) return;
+            if (it.disabled || it.children?.length) return;
             e.stopPropagation();
             it.onClick?.();
           }}
         >
           <span>{it.label}</span>
-          {#if it.shortcut}
+          {#if it.children?.length}
+            <span class="bcm-shortcut">›</span>
+          {:else if it.shortcut}
             <span class="bcm-shortcut">{it.shortcut}</span>
+          {/if}
+        </div>
+      {/if}
+    {/each}
+  </div>
+{/if}
+
+{#if contextMenu.visible && hoveredSubmenu}
+  <div
+    class="branch-context-menu bcm-submenu"
+    style="left:{hoveredSubmenu.x}px;top:{hoveredSubmenu.y}px;z-index:2010;"
+    data-vscode-context={JSON.stringify({ preventDefaultContextMenuItems: true })}
+    oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+  >
+    {#each hoveredSubmenu.items as sub}
+      {#if sub.isDivider}
+        <div class="bcm-divider"></div>
+      {:else}
+        <div
+          class="bcm-item"
+          class:disabled={sub.disabled}
+          onclick={(e) => {
+            if (sub.disabled) return;
+            e.stopPropagation();
+            sub.onClick?.();
+          }}
+        >
+          <span>{sub.label}</span>
+          {#if sub.shortcut}
+            <span class="bcm-shortcut">{sub.shortcut}</span>
           {/if}
         </div>
       {/if}

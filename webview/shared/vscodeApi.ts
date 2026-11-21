@@ -10,6 +10,7 @@ export function getVsCodeApi(): any {
 }
 
 import type { AnyWebviewToExtensionMessage, AnyExtensionToWebviewMessage } from './protocol';
+import { applyPanelFontSize } from './fontScale';
 
 export function postMessage<M extends { type: string; payload?: any } = AnyWebviewToExtensionMessage>(
   messageOrType: M | string,
@@ -120,6 +121,15 @@ export function onMessage<M = AnyExtensionToWebviewMessage>(handler: (data: M) =
   return () => window.removeEventListener('message', listener);
 }
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', (event: MessageEvent) => {
+    const data = event.data;
+    if (data && data.type === 'settingsUpdate' && typeof data.payload?.fontSize === 'number') {
+      applyPanelFontSize(data.payload.fontSize);
+    }
+  });
+}
+
 function escapePushHtml(str: any): string {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -185,7 +195,7 @@ export function openCreateBranchDialog(startPoint?: string): void {
     </div>
     <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
       <button class="as-dialog-btn" id="as-cb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-      <button class="as-dialog-btn" id="as-cb-create" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+      <button class="as-dialog-btn" id="as-cb-create" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
     </div>
   `;
 
@@ -274,7 +284,7 @@ export function openRenameBranchDialog(oldName: string): void {
     </div>
     <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
       <button class="as-dialog-btn" id="as-rb-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-      <button class="as-dialog-btn" id="as-rb-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Rename</button>
+      <button class="as-dialog-btn" id="as-rb-ok" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Rename</button>
     </div>
   `;
 
@@ -362,7 +372,7 @@ export function openCreateTagDialog(hash?: string): void {
     </div>
     <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
       <button class="as-dialog-btn" id="as-tag-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-      <button class="as-dialog-btn" id="as-tag-ok" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
+      <button class="as-dialog-btn" id="as-tag-ok" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Create</button>
     </div>
   `;
 
@@ -509,7 +519,7 @@ export function openCheckoutBranchDialog(
 
     <div style="padding:10px 20px 14px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));border-bottom-left-radius:8px;border-bottom-right-radius:8px;">
       <button class="as-dialog-btn" id="as-co-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 18px;font-size:12.5px;cursor:pointer;">Cancel</button>
-      <button class="as-dialog-btn" id="as-co-submit" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s ease;">Checkout</button>
+      <button class="as-dialog-btn" id="as-co-submit" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s ease;">Checkout</button>
     </div>
   `;
 
@@ -712,7 +722,7 @@ if (typeof window !== 'undefined') {
       </div>
       <div style="padding:10px 20px 16px 20px;display:flex;align-items:center;justify-content:flex-end;gap:10px;background:var(--vscode-editorWidget-background,var(--vscode-editor-background,#1e1f22));border-top:1px solid var(--vscode-widget-border,var(--vscode-panel-border,#393b40));">
         <button class="as-dialog-btn" id="as-auth-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
-        <button class="as-dialog-btn" id="as-auth-submit" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-radius:4px;padding:6px 22px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+        <button class="as-dialog-btn" id="as-auth-submit" style="background:#3574f0;color:#ffffff;border:none;border-radius:4px;padding:6px 22px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
           <span id="as-auth-spinner" style="display:none;width:12px;height:12px;border:2px solid var(--vscode-button-foreground,#fff);border-top-color:transparent;border-radius:50%;animation:asAuthSpin 0.7s linear infinite;"></span>
           <span id="as-auth-btn-text">Log In</span>
         </button>
@@ -765,7 +775,7 @@ if (typeof window !== 'undefined') {
     btnCancel.onmouseenter = () => { btnCancel.style.background = "var(--vscode-button-secondaryHoverBackground, #35383d)"; };
     btnCancel.onmouseleave = () => { btnCancel.style.background = "var(--vscode-button-secondaryBackground, #2b2d30)"; };
     btnSubmit.onmouseenter = () => { btnSubmit.style.background = "var(--vscode-button-hoverBackground, #4682f7)"; };
-    btnSubmit.onmouseleave = () => { btnSubmit.style.background = "var(--vscode-button-background, #3574f0)"; };
+    btnSubmit.onmouseleave = () => { btnSubmit.style.background = "#3574f0"; };
 
     tabToken.onclick = () => {
       currentAuthMode = "token";
@@ -961,8 +971,8 @@ if (typeof window !== 'undefined') {
         <div style="display:flex;align-items:center;gap:10px;position:relative;">
           <button id="btn-push-cancel" style="background:var(--vscode-button-secondaryBackground,#2b2d30);color:var(--vscode-button-secondaryForeground,#dfe1e5);border:1px solid var(--vscode-widget-border,var(--vscode-input-border,#4e5157));border-radius:4px;padding:6px 16px;font-size:12.5px;cursor:pointer;">Cancel</button>
           <div style="display:inline-flex;border-radius:4px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.3);">
-            <button id="btn-push-submit" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Push</button>
-            <button id="btn-push-menu-trigger" style="background:var(--vscode-button-background,#3574f0);color:var(--vscode-button-foreground,#ffffff);border:none;border-left:1px solid rgba(255,255,255,0.25);padding:6px 8px;font-size:11px;cursor:pointer;" title="Push Options">▼</button>
+            <button id="btn-push-submit" style="background:#3574f0;color:#ffffff;border:none;padding:6px 18px;font-size:12.5px;font-weight:600;cursor:pointer;">Push</button>
+            <button id="btn-push-menu-trigger" style="background:#3574f0;color:#ffffff;border:none;border-left:1px solid rgba(255,255,255,0.25);padding:6px 8px;font-size:11px;cursor:pointer;" title="Push Options">▼</button>
           </div>
           <div id="push-dropdown-menu" style="display:none;position:absolute;bottom:36px;right:0;background:var(--vscode-dropdown-background,var(--vscode-editorWidget-background,#2b2d30));border:1px solid var(--vscode-dropdown-border,var(--vscode-widget-border,#43454a));border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.7);padding:4px 0;z-index:100;min-width:180px;">
             <div id="btn-force-push-opt" style="padding:6px 14px;font-size:12.5px;color:var(--vscode-editor-foreground,#dfe1e5);cursor:pointer;">Force Push (no-verify)...</div>

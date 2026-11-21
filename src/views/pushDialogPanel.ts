@@ -4,6 +4,7 @@ import { GitService } from '../git/gitService';
 import { CommitReviewPanel } from './commitReviewPanel';
 import { getNonce } from '../utils/themeTokens';
 import { PushToExtensionMessage, ExtensionToPushMessage } from '../shared/protocol';
+import { getJetGitSettings } from '../utils/settings';
 
 export class PushDialogPanel {
   public static currentPanel: PushDialogPanel | undefined;
@@ -20,6 +21,15 @@ export class PushDialogPanel {
   ) {
     this.panel = panel;
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    vscode.workspace.onDidChangeConfiguration(
+      e => {
+        if (e.affectsConfiguration('jetgit')) {
+          this.sendSettings();
+        }
+      },
+      null,
+      this.disposables,
+    );
     this.panel.webview.html = this.getHtml();
     this.panel.webview.onDidReceiveMessage(
       msg => this.handleMessage(msg),
@@ -90,9 +100,18 @@ export class PushDialogPanel {
     });
   }
 
+  private sendSettings(): void {
+    const settings = getJetGitSettings();
+    this.panel.webview.postMessage({
+      type: 'settingsUpdate',
+      payload: { fontSize: settings.fontSize.merge },
+    });
+  }
+
   private async handleMessage(msg: any): Promise<void> {
     switch (msg.type) {
       case 'ready': {
+        this.sendSettings();
         this.panel.webview.postMessage({
           type: 'updatePushInfo',
           payload: this.pushInfo,

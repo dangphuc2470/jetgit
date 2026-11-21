@@ -404,8 +404,8 @@
   }
 
   .as-btn-primary {
-    background: var(--vscode-button-background, #3574f0);
-    color: var(--vscode-button-foreground, #ffffff);
+    background: #3574f0;
+    color: #ffffff;
     border: none;
     border-radius: 4px;
     padding: 7px 14px;

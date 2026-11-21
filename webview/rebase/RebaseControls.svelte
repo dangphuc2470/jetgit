@@ -45,13 +45,13 @@
   cursor: not-allowed;
 }
 .primary {
-  background: var(--vscode-button-background, #3574f0);
-  color: var(--vscode-button-foreground, #ffffff);
-  border: 1px solid var(--vscode-button-background, #3574f0);
+  background: #3574f0;
+  color: #ffffff;
+  border: 1px solid #3574f0;
 }
 .primary:hover:not(:disabled) {
-  background: var(--vscode-button-hoverBackground, #3068d9);
-  border-color: var(--vscode-button-hoverBackground, #3068d9);
+  background: #3068d9;
+  border-color: #3068d9;
 }
 .secondary {
   background: var(--vscode-button-secondaryBackground, #2b2d30);

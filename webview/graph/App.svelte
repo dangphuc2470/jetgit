@@ -16,6 +16,7 @@
     openCreateBranchDialog,
     openCheckoutBranchDialog
   } from "$shared/vscodeApi";
+  import { applyPanelFontSize } from "$shared/fontScale";
   import type { ViewOptions } from "./types";
 
   const defaultViewOptions: ViewOptions = {
@@ -110,6 +111,11 @@
   let activeBranch = $state("");
   let noGitData = $state<any>(null);
   let hasInitializedActiveBranch = false;
+  let advancedActions = $state({
+    fetchBranch: false,
+    fetchBranchShallow: false,
+    trackIntoCurrent: false
+  });
 
   let selectedCommit = $derived(commits.find((c) => c.hash === selectedHash) || null);
 
@@ -173,6 +179,13 @@
 
     unsubscribe = onMessage((msg: any) => {
       switch (msg.type) {
+        case "settingsUpdate": {
+          applyPanelFontSize(msg.payload?.fontSize);
+          if (msg.payload?.advancedActions) {
+            advancedActions = msg.payload.advancedActions;
+          }
+          break;
+        }
         case "closeAllMenus": {
           if (Date.now() - ((window as any).__lastGraphMenuOpenedAt || 0) > 200) {
             closeAllFloatingMenus();
@@ -532,6 +545,7 @@
       <BranchSidebar
         {branchData}
         {activeBranch}
+        {advancedActions}
         onSelectActiveBranch={(b) => { activeBranch = b; }}
         {onFilter}
         width={sidebarWidth}

@@ -4,6 +4,7 @@ import { GitService } from '../git/gitService';
 import { MergeEditorPanel } from './mergeEditorPanel';
 import { getNonce } from '../utils/themeTokens';
 import { ConflictsToExtensionMessage, ExtensionToConflictsMessage } from '../shared/protocol';
+import { getJetGitSettings } from '../utils/settings';
 
 export class ConflictsDialogPanel {
   public static currentPanel: ConflictsDialogPanel | undefined;
@@ -24,6 +25,15 @@ export class ConflictsDialogPanel {
       e => {
         if (e.webviewPanel.active) {
           this.refresh();
+        }
+      },
+      null,
+      this.disposables,
+    );
+    vscode.workspace.onDidChangeConfiguration(
+      e => {
+        if (e.affectsConfiguration('jetgit')) {
+          this.sendSettings();
         }
       },
       null,
@@ -104,9 +114,18 @@ export class ConflictsDialogPanel {
     });
   }
 
+  private sendSettings(): void {
+    const settings = getJetGitSettings();
+    this.panel.webview.postMessage({
+      type: 'settingsUpdate',
+      payload: { fontSize: settings.fontSize.merge },
+    });
+  }
+
   private async handleMessage(msg: any): Promise<void> {
     switch (msg.type) {
       case 'ready': {
+        this.sendSettings();
         this.panel.webview.postMessage({
           type: 'updateConflictInfo',
           payload: this.conflictInfo,

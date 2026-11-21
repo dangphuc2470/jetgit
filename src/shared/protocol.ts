@@ -293,7 +293,8 @@ export type GraphToExtensionMessage =
   | { type: 'fetch'; payload?: any }
   | { type: 'cancelTask'; payload: { id: string } }
   | { type: 'dismissTask'; payload: { id: string } }
-  | { type: 'clearFinishedTasks' };
+  | { type: 'clearFinishedTasks' }
+  | { type: 'openSettings' };
 
 
 // ============================================================================

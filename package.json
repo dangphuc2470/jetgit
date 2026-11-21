@@ -2,7 +2,7 @@
   "name": "jetgit",
   "displayName": "JetGit - IntelliJ & JetBrains Style Git Client",
   "description": "JetBrains IntelliJ-style Git integration for VS Code — visual commit graph, colored branch lines, inline blame annotations, interactive rebase, changelists, 3-way merge, and side-by-side diff viewer. Fast, reactive, and powered by Svelte 5.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "dangphuc2470",
   "icon": "icon.png",
   "license": "MIT",
@@ -83,6 +83,13 @@
         {
           "id": "jetgit-commit",
           "title": "Changes",
+          "icon": "resources/commit.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "jetgit-log",
+          "title": "Git Log",
           "icon": "resources/commit.svg"
         }
       ]
@@ -208,7 +215,7 @@
           "name": "Changes"
         }
       ],
-      "panel": [
+      "jetgit-log": [
         {
           "type": "webview",
           "id": "jetgit.logView",

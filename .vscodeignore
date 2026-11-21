@@ -1,4 +1,5 @@
 .vscode/**
+.idea/**
 .git/**
 .gitignore
 src/**
@@ -10,4 +11,5 @@ vite.config.mts
 svelte.config.mjs
 migrate.md
 plan.md
+**/*.map
 *.vsix

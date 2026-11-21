@@ -13,3 +13,5 @@ migrate.md
 plan.md
 **/*.map
 *.vsix
+scripts/**
+resources/screenshots/**

@@ -1138,11 +1138,6 @@
 
   <!-- Diff Viewport Wrapper -->
   <div class="studio-diff-viewport-wrapper">
-    {#if leftRenderLines.length === 0 && rightRenderLines.length === 0}
-      <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--vscode-descriptionForeground, #7f848e); font-size: 13px; z-index: 5; pointer-events: none;">
-        <span>{filePath ? 'No differences or empty file' : 'Loading diff...'}</span>
-      </div>
-    {/if}
     <!-- Left Pane (Base) -->
     <div
       class="editor-pane left-pane"
@@ -1151,17 +1146,23 @@
       onwheel={(e) => onWheelPane(leftPaneEl, "left", e)}
       onpointerdown={() => setScroller("left")}
     >
-      <div class="editor-lines-container">
-        {#each leftRenderLines as line (line.lineNum)}
-          <div class={line.rowClass} data-line={line.lineNum}>
-            <span class="gutter-num">{line.lineNum}</span>
-            <span class="line-content">{@html line.html || "&nbsp;"}</span>
-          </div>
-        {/each}
-        {#each leftInsertions as ins (ins.id)}
-          <div class="diff-insertion-line insertion-add" style={`top: ${ins.topY}px;`}></div>
-        {/each}
-      </div>
+      {#if leftRenderLines.length === 0 && rightRenderLines.length === 0}
+        <div style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--vscode-descriptionForeground, #7f848e); font-size: 13px; pointer-events: none;">
+          <span>{filePath ? 'No differences or empty file' : 'Loading diff...'}</span>
+        </div>
+      {:else}
+        <div class="editor-lines-container">
+          {#each leftRenderLines as line (line.lineNum)}
+            <div class={line.rowClass} data-line={line.lineNum}>
+              <span class="gutter-num">{line.lineNum}</span>
+              <span class="line-content">{@html line.html || "&nbsp;"}</span>
+            </div>
+          {/each}
+          {#each leftInsertions as ins (ins.id)}
+            <div class="diff-insertion-line insertion-add" style={`top: ${ins.topY}px;`}></div>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Middle Gutter (SVG Ribbons & Actions) -->
@@ -1191,23 +1192,29 @@
       onkeydown={onRightKeyDown}
       onpaste={onRightPaste}
     >
-      <div class="editor-lines-container">
-        {#each rightRenderLines as line (line.lineNum)}
-          <div class={`${line.rowClass} in-right`} data-line={line.lineNum}>
-            <span class="gutter-num">{line.lineNum}</span>
-            <span
-              class="line-content"
-              data-line={line.lineNum}
-              oninput={(e) => handleLineInput(e.currentTarget as HTMLElement)}
-            >
-              {@html line.html || "&nbsp;"}
-            </span>
-          </div>
-        {/each}
-        {#each rightInsertions as ins (ins.id)}
-          <div class="diff-insertion-line insertion-del" style={`top: ${ins.topY}px;`}></div>
-        {/each}
-      </div>
+      {#if leftRenderLines.length === 0 && rightRenderLines.length === 0}
+        <div style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--vscode-descriptionForeground, #7f848e); font-size: 13px; pointer-events: none;">
+          <span>{filePath ? 'No differences or empty file' : 'Loading diff...'}</span>
+        </div>
+      {:else}
+        <div class="editor-lines-container">
+          {#each rightRenderLines as line (line.lineNum)}
+            <div class={`${line.rowClass} in-right`} data-line={line.lineNum}>
+              <span class="gutter-num">{line.lineNum}</span>
+              <span
+                class="line-content"
+                data-line={line.lineNum}
+                oninput={(e) => handleLineInput(e.currentTarget as HTMLElement)}
+              >
+                {@html line.html || "&nbsp;"}
+              </span>
+            </div>
+          {/each}
+          {#each rightInsertions as ins (ins.id)}
+            <div class="diff-insertion-line insertion-del" style={`top: ${ins.topY}px;`}></div>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Overview Ruler -->
